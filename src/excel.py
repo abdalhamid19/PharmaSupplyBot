@@ -13,6 +13,8 @@ from .config import ExcelConfig
 
 @dataclass(frozen=True)
 class Item:
+    """One requested product row loaded from the shortage Excel sheet."""
+
     code: str
     name: str
     qty: int
@@ -64,7 +66,10 @@ def _require_columns(dataframe: pd.DataFrame, config: ExcelConfig) -> None:
     for column_name in (config.code_col, config.name_col, config.qty_col):
         if column_name in dataframe.columns:
             continue
-        raise KeyError(f"Missing required column '{column_name}' in Excel. Found: {list(dataframe.columns)}")
+        raise KeyError(
+            f"Missing required column '{column_name}' in Excel. "
+            f"Found: {list(dataframe.columns)}"
+        )
 
 
 def _row_to_item(row: Any, config: ExcelConfig) -> Item | None:

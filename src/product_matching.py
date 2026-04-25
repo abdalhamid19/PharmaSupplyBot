@@ -13,6 +13,8 @@ from .excel import Item
 
 @dataclass(frozen=True)
 class _SearchMatch:
+    """The winning search query, row index, score, and Tawreed payload for a match."""
+
     query: str
     row_index: int
     score: float
@@ -21,6 +23,8 @@ class _SearchMatch:
 
 @dataclass(frozen=True)
 class MatchScoreBreakdown:
+    """Detailed score components used when evaluating one Tawreed candidate."""
+
     sequence_score: float
     overlap_score: float
     numeric_overlap: float
@@ -31,6 +35,8 @@ class MatchScoreBreakdown:
 
 @dataclass(frozen=True)
 class CandidateMatchDiagnostic:
+    """Diagnostic data for one candidate considered during product matching."""
+
     query: str
     row_index: int
     score: float
@@ -44,6 +50,8 @@ class CandidateMatchDiagnostic:
 
 @dataclass(frozen=True)
 class MatchDecision:
+    """Final match decision plus diagnostics for every candidate inspected."""
+
     best_match: _SearchMatch | None
     diagnostics: list[CandidateMatchDiagnostic]
     final_reason: str
@@ -147,11 +155,18 @@ def _acceptance_details(
     normalized_english_name = _normalize_text(_candidate_english_name(candidate))
     best_overlap = _best_candidate_overlap(query, candidate)
     has_numeric_match = _numeric_match_count(normalized_query, normalized_english_name) > 0
-    if matching_config.exact_match_accept and normalized_query and normalized_query == normalized_english_name:
+    if (
+        matching_config.exact_match_accept
+        and normalized_query
+        and normalized_query == normalized_english_name
+    ):
         return True, "exact_normalized_name_match", ""
     if best_overlap >= matching_config.high_overlap_threshold:
         return True, "high_token_overlap", ""
-    if score >= matching_config.medium_score_threshold and best_overlap >= matching_config.medium_overlap_threshold:
+    if (
+        score >= matching_config.medium_score_threshold
+        and best_overlap >= matching_config.medium_overlap_threshold
+    ):
         return True, "strong_score_with_good_overlap", ""
     if (
         score >= matching_config.numeric_score_threshold
@@ -161,7 +176,9 @@ def _acceptance_details(
         return True, "strong_score_with_numeric_match", ""
     rejection_reason = (
         f"Rejected: overlap={best_overlap:.3f}, score={score:.3f}, "
-        f"numeric_match={has_numeric_match}, exact_name={bool(normalized_query and normalized_query == normalized_english_name)}"
+        "numeric_match="
+        f"{has_numeric_match}, exact_name="
+        f"{bool(normalized_query and normalized_query == normalized_english_name)}"
     )
     return False, "", rejection_reason
 
@@ -211,15 +228,26 @@ def explain_best_product_match(
 ) -> MatchDecision:
     """Return the best match plus diagnostics for every candidate considered."""
     active_matching_config = matching_config or _default_matching_config()
-    diagnostics = _build_candidate_diagnostics(item, search_results_by_query, active_matching_config)
+    diagnostics = _build_candidate_diagnostics(
+        item,
+        search_results_by_query,
+        active_matching_config,
+    )
     if not diagnostics:
-        return MatchDecision(best_match=None, diagnostics=[], final_reason="No search candidates were returned.")
+        return MatchDecision(
+            best_match=None,
+            diagnostics=[],
+            final_reason="No search candidates were returned.",
+        )
     best_diagnostic = max(diagnostics, key=lambda diagnostic: diagnostic.sort_key)
     if not best_diagnostic.accepted:
         return MatchDecision(
             best_match=None,
             diagnostics=diagnostics,
-            final_reason=best_diagnostic.rejection_reason or "Best candidate was rejected by acceptance rules.",
+            final_reason=(
+                best_diagnostic.rejection_reason
+                or "Best candidate was rejected by acceptance rules."
+            ),
         )
     return MatchDecision(
         best_match=_SearchMatch(
@@ -302,7 +330,10 @@ def _numeric_tokens(text: str) -> set[str]:
     }
 
 
-def _numeric_overlap_ratio(query_numeric_tokens: set[str], candidate_numeric_tokens: set[str]) -> float:
+def _numeric_overlap_ratio(
+    query_numeric_tokens: set[str],
+    candidate_numeric_tokens: set[str],
+) -> float:
     """Return the fraction of query numeric tokens found in the candidate."""
     return len(query_numeric_tokens & candidate_numeric_tokens) / max(1, len(query_numeric_tokens))
 

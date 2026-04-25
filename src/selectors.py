@@ -34,6 +34,8 @@ WAREHOUSE_DEFAULTS = {
 
 @dataclass(frozen=True)
 class _Sel:
+    """Resolved selectors used by Tawreed Playwright automation flows."""
+
     login_email: str
     login_password: str
     login_submit: str

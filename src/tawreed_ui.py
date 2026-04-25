@@ -21,7 +21,11 @@ def dialog_footer_buttons(dialog, timeout_ms: int):
 
 def bounded_requested_quantity(quantity_input, requested_quantity: int) -> int:
     """Clamp the requested quantity to the allowed quantity range in the dialog."""
-    max_attr = quantity_input.get_attribute("aria-valuemax") or quantity_input.get_attribute("max") or "1"
+    max_attr = (
+        quantity_input.get_attribute("aria-valuemax")
+        or quantity_input.get_attribute("max")
+        or "1"
+    )
     try:
         max_quantity = max(1, int(float(max_attr)))
     except Exception:

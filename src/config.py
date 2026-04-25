@@ -17,6 +17,8 @@ DEFAULT_QUANTITY_COLUMN = "ÙƒÙ…ÙŠØ© Ø§Ù„Ù†Ù‚Øµ"
 
 @dataclass(frozen=True)
 class ExcelConfig:
+    """Excel column names and quantity bounds used to load shortage items."""
+
     code_col: str
     name_col: str
     qty_col: str
@@ -26,12 +28,16 @@ class ExcelConfig:
 
 @dataclass(frozen=True)
 class ProfileConfig:
+    """One pharmacy profile plus its optional pharmacy-switch settings."""
+
     display_name: str
     pharmacy_switch: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class RuntimeConfig:
+    """Browser runtime settings shared across auth and ordering flows."""
+
     headless: bool = True
     slow_mo_ms: int = 0
     timeout_ms: int = 45000
@@ -39,6 +45,8 @@ class RuntimeConfig:
 
 @dataclass(frozen=True)
 class MatchingConfig:
+    """Thresholds that decide whether a Tawreed product match is acceptable."""
+
     exact_match_accept: bool = True
     high_overlap_threshold: float = 0.85
     medium_score_threshold: float = 12.0
@@ -49,6 +57,8 @@ class MatchingConfig:
 
 @dataclass(frozen=True)
 class AppConfig:
+    """Fully parsed application configuration consumed by the bot."""
+
     base_url: str
     excel: ExcelConfig
     profiles: dict[str, ProfileConfig]
@@ -57,7 +67,11 @@ class AppConfig:
     matching: MatchingConfig
     runtime: RuntimeConfig
 
-    def profiles_to_run(self, profile: str | None, all_profiles: bool) -> list[tuple[str, ProfileConfig]]:
+    def profiles_to_run(
+        self,
+        profile: str | None,
+        all_profiles: bool,
+    ) -> list[tuple[str, ProfileConfig]]:
         """Return the configured profiles requested by the CLI arguments."""
         if all_profiles:
             return list(self.profiles.items())
@@ -71,7 +85,10 @@ class AppConfig:
     def _selected_profile(self, profile: str) -> list[tuple[str, ProfileConfig]]:
         """Return one explicitly selected profile or raise a descriptive error."""
         if profile not in self.profiles:
-            raise KeyError(f"Unknown profile '{profile}'. Available: {', '.join(self.profiles.keys())}")
+            available_profiles = ", ".join(self.profiles.keys())
+            raise KeyError(
+                f"Unknown profile '{profile}'. Available: {available_profiles}"
+            )
         return [(profile, self.profiles[profile])]
 
 
@@ -151,7 +168,8 @@ def _load_raw_config(path: Path) -> dict[str, Any]:
     """Read the YAML configuration file from disk."""
     if not path.exists():
         raise FileNotFoundError(
-            f"Config file not found: {path}. Create it by copying config.example.yaml to config.yaml"
+            "Config file not found: "
+            f"{path}. Create it by copying config.example.yaml to config.yaml"
         )
     raw_values = yaml.safe_load(path.read_text(encoding="utf-8"))
     _require(raw_values, "site")

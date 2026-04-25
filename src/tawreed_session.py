@@ -52,12 +52,19 @@ def print_auth_instructions(wait_seconds: int) -> None:
     """Explain the manual login window behavior to the operator."""
     print(
         "Browser opened. Please complete login manually.\n"
-        f"- I will keep the browser open for up to {wait_seconds} seconds waiting for login detection.\n"
+        "- I will keep the browser open for up to "
+        f"{wait_seconds} seconds waiting for login detection.\n"
         "- If the site requires OTP/CAPTCHA, finish it in the browser.\n"
     )
 
 
-def wait_for_login_detection(page: Page, context, wait_seconds: int, logged_in_marker: str, state_path: Path) -> bool:
+def wait_for_login_detection(
+    page: Page,
+    context,
+    wait_seconds: int,
+    logged_in_marker: str,
+    state_path: Path,
+) -> bool:
     """Poll the page until the logged-in marker appears or the timeout is reached."""
     poll_ms = 2000
     save_every_ms = 5000
@@ -174,7 +181,9 @@ def _is_login_form_visible(page: Page, selectors) -> bool:
     """Return whether the login form is still visible on the current page."""
     try:
         login_email_visible = page.locator(selectors.login_email).first.is_visible(timeout=2000)
-        login_password_visible = page.locator(selectors.login_password).first.is_visible(timeout=2000)
+        login_password_visible = page.locator(
+            selectors.login_password
+        ).first.is_visible(timeout=2000)
         if login_email_visible or login_password_visible:
             raise RuntimeError("Still on login page (login inputs visible).")
         return False

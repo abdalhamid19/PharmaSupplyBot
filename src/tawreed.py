@@ -18,7 +18,12 @@ from .product_matching import (
     is_decisive_product_match,
 )
 from .selectors import _selectors
-from .tawreed_artifacts import append_csv_artifact, append_text_artifact, dump_artifacts, write_text_artifact
+from .tawreed_artifacts import (
+    append_csv_artifact,
+    append_text_artifact,
+    dump_artifacts,
+    write_text_artifact,
+)
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_session import (
     attempt_env_login,
@@ -47,11 +52,21 @@ from .tawreed_ui import (
 
 
 class _SkipItem(Exception):
+    """Signal that one item should be skipped without failing the whole order run."""
+
     pass
 
 
 class TawreedBot:
-    def __init__(self, config: AppConfig, profile_key: str, profile: ProfileConfig, state_path: Path):
+    """Coordinate Tawreed authentication, product matching, and order placement."""
+
+    def __init__(
+        self,
+        config: AppConfig,
+        profile_key: str,
+        profile: ProfileConfig,
+        state_path: Path,
+    ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
         self.profile_key = profile_key
@@ -221,8 +236,18 @@ class TawreedBot:
         for query in _search_queries_for_item(item):
             results = self._search_products(page, query)
             search_results_by_query.append((query, results))
-            decision = explain_best_product_match(item, search_results_by_query, self.config.matching)
-            if decision.best_match and is_decisive_product_match(item.name or query, decision.best_match.data):
+            decision = explain_best_product_match(
+                item,
+                search_results_by_query,
+                self.config.matching,
+            )
+            if (
+                decision.best_match
+                and is_decisive_product_match(
+                    item.name or query,
+                    decision.best_match.data,
+                )
+            ):
                 self._write_match_log(item, decision)
                 return decision, query
         active_query = search_results_by_query[-1][0] if search_results_by_query else None
@@ -309,7 +334,10 @@ class TawreedBot:
     def _open_stores_dialog(self, page: Page, row) -> list[dict[str, Any]]:
         """Open the stores dialog for a row and return the API payload behind it."""
         with page.expect_response(
-            lambda resp: "stores/products/product/get" in resp.url and resp.request.method == "POST",
+            lambda resp: (
+                "stores/products/product/get" in resp.url
+                and resp.request.method == "POST"
+            ),
             timeout=self.config.runtime.timeout_ms,
         ) as resp_info:
             stores_button(row).click()
@@ -495,7 +523,11 @@ class TawreedBot:
             lines.extend(self._candidate_log_lines(candidate_index, diagnostic))
         return "\n".join(lines) + "\n"
 
-    def _candidate_log_lines(self, candidate_index: int, diagnostic: CandidateMatchDiagnostic) -> list[str]:
+    def _candidate_log_lines(
+        self,
+        candidate_index: int,
+        diagnostic: CandidateMatchDiagnostic,
+    ) -> list[str]:
         """Build the log lines for one candidate considered during matching."""
         breakdown = diagnostic.breakdown
         candidate_name_en = str(diagnostic.candidate.get("productNameEn") or "")
@@ -537,7 +569,11 @@ class TawreedBot:
                     "item_qty": item.qty,
                     "final_reason": decision.final_reason,
                     "best_match_query": decision.best_match.query if decision.best_match else "",
-                    "best_match_row_index": decision.best_match.row_index if decision.best_match else "",
+                    "best_match_row_index": (
+                        decision.best_match.row_index
+                        if decision.best_match
+                        else ""
+                    ),
                     "best_match_score": decision.best_match.score if decision.best_match else "",
                     "candidate_rank": rank,
                     "query": diagnostic.query,
@@ -564,7 +600,12 @@ class TawreedBot:
     def _safe_item_label(self, item: Item) -> str:
         """Return a filesystem-safe label for item-specific artifacts."""
         item_code = str(item.code or "no_code").strip().replace(" ", "_")
-        return "".join(character for character in item_code if character.isalnum() or character in {"_", "-"}) or "no_code"
+        safe_label = "".join(
+            character
+            for character in item_code
+            if character.isalnum() or character in {"_", "-"}
+        )
+        return safe_label or "no_code"
 
     def _match_log_section_separator(self, item: Item) -> str:
         """Return the section separator used inside the aggregated match log."""
