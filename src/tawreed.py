@@ -11,7 +11,7 @@ from .excel import Item
 from .selectors import _selectors
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_checkout import confirm_order
-from .tawreed_match_logs import write_match_log
+from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_products_flow import add_item_from_products_page
 from .tawreed_session import (
@@ -113,7 +113,7 @@ class TawreedBot:
         """Return the direct Tawreed products page URL for faster order startup."""
         if "#/" in self.config.base_url:
             origin, _ = self.config.base_url.split("#/", 1)
-            return f"{origin}#/catalog/store-products/dv/"
+            return f"{origin}{PRODUCTS_PAGE_ROUTE}"
         return self.config.base_url
 
     def _order_surface_ready(self, page: Page) -> bool:

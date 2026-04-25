@@ -13,6 +13,12 @@ from .product_matching import (
     explain_best_product_match,
     is_decisive_product_match,
 )
+from .tawreed_constants import (
+    PRODUCT_ROWS_SELECTOR,
+    PRODUCT_SEARCH_ENDPOINT,
+    QUANTITY_INPUT_SELECTOR,
+    STORE_DETAILS_ENDPOINT,
+)
 from .tawreed_match_logs import write_match_log
 from .tawreed_strategy import choose_store_index
 from .tawreed_ui import (
@@ -89,7 +95,7 @@ def matched_product_row(bot, page: Page, match: SearchMatch, active_query: str |
 
 def visible_product_rows(page: Page):
     """Return the rendered product rows in the current products table."""
-    return page.locator("tbody.p-datatable-tbody > tr")
+    return page.locator(PRODUCT_ROWS_SELECTOR)
 
 
 def missing_row_message(match: SearchMatch) -> str:
@@ -148,7 +154,7 @@ def click_single_store_cart(row, item: Item, match: SearchMatch, skip_item_excep
 
 def is_product_search_response(response) -> bool:
     """Return whether a network response belongs to the product search endpoint."""
-    return "stores/products/search/similar5" in response.url and response.request.method == "POST"
+    return PRODUCT_SEARCH_ENDPOINT in response.url and response.request.method == "POST"
 
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
@@ -167,14 +173,14 @@ def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
 
 def is_store_details_response(response) -> bool:
     """Return whether a network response belongs to the store-details endpoint."""
-    return "stores/products/product/get" in response.url and response.request.method == "POST"
+    return STORE_DETAILS_ENDPOINT in response.url and response.request.method == "POST"
 
 
 def fill_add_to_cart_dialog(bot, page: Page, requested_qty: int) -> None:
     """Fill the quantity dialog and submit the add-to-cart action."""
     dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
     footer_buttons = dialog_footer_buttons(dialog, bot.config.runtime.timeout_ms)
-    quantity_input = dialog.locator("input[role='spinbutton']").first
+    quantity_input = dialog.locator(QUANTITY_INPUT_SELECTOR).first
     quantity = bounded_requested_quantity(quantity_input, requested_qty)
     fill_quantity_input(quantity_input, quantity)
     footer_buttons.last.click()

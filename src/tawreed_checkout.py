@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from playwright.sync_api import Page
 
+from .tawreed_constants import ENABLED_CHECKOUT_TEXT_SELECTOR, VISIBLE_DIALOG_SELECTOR
 from .tawreed_ui import checkout_confirmation_labels
 
 
@@ -29,7 +30,7 @@ def _checkout_candidates(bot, page: Page):
     """Return checkout buttons that appear to be enabled for submission."""
     configured_buttons = page.locator(bot.selectors.confirm_order_button)
     enabled_buttons = configured_buttons.filter(has_not=page.locator("[disabled]"))
-    enabled_checkout_text = page.locator("button:has-text('Checkout'):not([disabled])")
+    enabled_checkout_text = page.locator(ENABLED_CHECKOUT_TEXT_SELECTOR)
     if enabled_checkout_text.count() > 0:
         return enabled_checkout_text
     return enabled_buttons
@@ -79,7 +80,7 @@ def _wait_for_checkout_dialog(page: Page) -> None:
 
 def _visible_checkout_dialog(page: Page):
     """Return the visible checkout dialog locator."""
-    return page.locator(".p-dialog:visible")
+    return page.locator(VISIBLE_DIALOG_SELECTOR)
 
 
 def _wait_for_checkout_completion(dialog, page: Page) -> None:

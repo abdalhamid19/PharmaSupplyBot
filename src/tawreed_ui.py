@@ -4,17 +4,26 @@ from __future__ import annotations
 
 from playwright.sync_api import Page
 
+from .tawreed_constants import (
+    CART_BUTTON_SELECTOR,
+    CHECKOUT_CONFIRMATION_LABELS,
+    DIALOG_FOOTER_BUTTONS_SELECTOR,
+    STORE_DIALOG_CART_BUTTONS_SELECTOR,
+    STORES_BUTTON_SELECTOR,
+    VISIBLE_DIALOG_SELECTOR,
+)
+
 
 def visible_dialog(page: Page, timeout_ms: int):
     """Return the top-most visible Tawreed dialog."""
-    dialog = page.locator(".p-dialog:visible").last
+    dialog = page.locator(VISIBLE_DIALOG_SELECTOR).last
     dialog.wait_for(timeout=timeout_ms)
     return dialog
 
 
 def dialog_footer_buttons(dialog, timeout_ms: int):
     """Return footer buttons for the currently visible Tawreed dialog."""
-    footer_buttons = dialog.locator(".p-dialog-footer button")
+    footer_buttons = dialog.locator(DIALOG_FOOTER_BUTTONS_SELECTOR)
     footer_buttons.last.wait_for(timeout=timeout_ms)
     return footer_buttons
 
@@ -42,30 +51,19 @@ def fill_quantity_input(quantity_input, quantity: int) -> None:
 
 def stores_button(scope):
     """Return the stores button inside the provided scope."""
-    return scope.locator("button:has(.pi-building)").first
+    return scope.locator(STORES_BUTTON_SELECTOR).first
 
 
 def cart_button(scope):
     """Return the cart button inside the provided scope."""
-    return scope.locator("button:has(.pi-shopping-cart)").first
+    return scope.locator(CART_BUTTON_SELECTOR).first
 
 
 def store_dialog_cart_buttons(dialog):
     """Return all cart buttons rendered inside the stores dialog."""
-    return dialog.locator(".p-dialog-content button:has(.pi-shopping-cart)")
+    return dialog.locator(STORE_DIALOG_CART_BUTTONS_SELECTOR)
 
 
 def checkout_confirmation_labels() -> tuple[str, ...]:
     """Return the button labels accepted as checkout confirmation actions."""
-    return (
-        "Confirm",
-        "confirm",
-        "Ok",
-        "OK",
-        "Continue",
-        "Yes",
-        "Submit",
-        "ØªØ£ÙƒÙŠØ¯",
-        "Ù…ØªØ§Ø¨Ø¹Ø©",
-        "Ù†Ø¹Ù…",
-    )
+    return CHECKOUT_CONFIRMATION_LABELS
