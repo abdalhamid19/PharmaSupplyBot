@@ -52,6 +52,14 @@ warehouse_strategy:
     available_qty: ".available, [data-testid='available']"
     pick_button: "text=اختيار, text=Select"
 
+matching:
+  exact_match_accept: true
+  high_overlap_threshold: 0.85
+  medium_score_threshold: 12.0
+  medium_overlap_threshold: 0.6
+  numeric_score_threshold: 16.0
+  numeric_overlap_threshold: 0.45
+
 runtime:
   headless: true
   slow_mo_ms: 0
