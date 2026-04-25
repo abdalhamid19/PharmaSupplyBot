@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .config import AppConfig
+from .config_models import AppConfig
 
 
 LOGIN_DEFAULTS = {

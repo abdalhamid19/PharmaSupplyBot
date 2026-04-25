@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from .config import ExcelConfig
+from .config_models import ExcelConfig
 
 
 @dataclass(frozen=True)

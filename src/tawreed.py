@@ -6,7 +6,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
-from .config import AppConfig, ProfileConfig
+from .config_models import AppConfig, ProfileConfig
 from .excel import Item
 from .product_matching import (
     CandidateMatchDiagnostic,

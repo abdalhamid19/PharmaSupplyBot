@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any, Iterable
 
-from .config import MatchingConfig
+from .config_models import MatchingConfig
 from .excel import Item
 
 
