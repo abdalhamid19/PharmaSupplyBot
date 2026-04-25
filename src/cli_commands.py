@@ -1,0 +1,74 @@
+"""CLI command runners for Tawreed authentication and ordering workflows."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from .config_models import AppConfig, ProfileConfig
+from .excel import load_items_from_excel
+from .tawreed import TawreedBot
+
+
+def run_auth_command(app_config: AppConfig, args: argparse.Namespace) -> int:
+    """Authenticate and persist session state for the selected profiles."""
+    for profile_key, profile in profiles_to_run(app_config, args):
+        bot = build_bot(app_config, profile_key, profile)
+        bot.auth_interactive(wait_seconds=int(args.wait_seconds))
+    return 0
+
+
+def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
+    """Place orders from Excel for the selected profiles."""
+    items = load_order_items(app_config, args)
+    if not items:
+        print("No items found from Excel (after filtering).")
+        return 0
+    for profile_key, profile in profiles_to_run(app_config, args):
+        require_state_file(profile_key)
+        bot = build_bot(app_config, profile_key, profile)
+        bot.place_order_from_items(items)
+    return 0
+
+
+def profiles_to_run(app_config: AppConfig, args: argparse.Namespace):
+    """Return the profiles selected by the CLI arguments."""
+    return app_config.profiles_to_run(profile=args.profile, all_profiles=args.all_profiles)
+
+
+def load_order_items(app_config: AppConfig, args: argparse.Namespace):
+    """Load the order items requested by the CLI command."""
+    excel_path = Path(args.excel)
+    return load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
+
+
+def build_bot(
+    app_config: AppConfig,
+    profile_key: str,
+    profile: ProfileConfig,
+) -> TawreedBot:
+    """Create a Tawreed bot instance for one profile."""
+    return TawreedBot(
+        config=app_config,
+        profile_key=profile_key,
+        profile=profile,
+        state_path=state_path(profile_key),
+    )
+
+
+def require_state_file(profile_key: str) -> None:
+    """Ensure the profile has a saved Playwright storage state file."""
+    saved_state_path = state_path(profile_key)
+    if saved_state_path.exists():
+        return
+    raise SystemExit(
+        f"Missing saved session state for profile '{profile_key}'. "
+        f"Run: py run.py auth --profile {profile_key}"
+    )
+
+
+def state_path(profile_key: str) -> Path:
+    """Return the storage-state path for one profile."""
+    state_dir = Path("state")
+    state_dir.mkdir(parents=True, exist_ok=True)
+    return state_dir / f"{profile_key}.json"
