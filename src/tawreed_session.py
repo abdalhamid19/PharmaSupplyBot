@@ -8,6 +8,11 @@ from typing import Any
 
 from playwright.sync_api import Page
 
+from .tawreed_auth_waits import (
+    is_logged_in_marker_visible,
+    wait_for_login_detection as poll_for_login_detection,
+)
+
 
 def open_auth_page(playwright, base_url: str, runtime) -> tuple[Any, Any, Page]:
     """Create a visible browser page for one-time manual authentication."""
@@ -66,22 +71,14 @@ def wait_for_login_detection(
     state_path: Path,
 ) -> bool:
     """Poll the page until the logged-in marker appears or the timeout is reached."""
-    poll_ms = 2000
-    save_every_ms = 5000
-    total_waited_ms = 0
-    since_last_save_ms = 0
-    while total_waited_ms < _wait_budget_ms(wait_seconds):
-        if _is_logged_in_marker_visible(page, logged_in_marker, poll_ms):
-            return True
-        total_waited_ms += poll_ms
-        since_last_save_ms += poll_ms
-        since_last_save_ms = _save_state_if_due(
-            context,
-            state_path,
-            since_last_save_ms,
-            save_every_ms,
-        )
-    return False
+    return poll_for_login_detection(
+        page,
+        context,
+        wait_seconds,
+        logged_in_marker,
+        state_path,
+        save_session_state,
+    )
 
 
 def wait_for_network_idle(page: Page) -> None:
@@ -147,34 +144,12 @@ def close_browser(browser) -> None:
 
 def _is_logged_in_marker_visible(page: Page, logged_in_marker: str, timeout_ms: int) -> bool:
     """Return whether the configured logged-in marker appears within the timeout."""
-    try:
-        page.locator(logged_in_marker).first.wait_for(timeout=timeout_ms)
-        return True
-    except Exception:
-        return False
+    return is_logged_in_marker_visible(page, logged_in_marker, timeout_ms)
 
 
 def _has_logged_in_marker(page: Page, logged_in_marker: str, timeout_ms: int) -> bool:
     """Return whether the configured logged-in marker is visible."""
     return _is_logged_in_marker_visible(page, logged_in_marker, timeout_ms)
-
-
-def _wait_budget_ms(wait_seconds: int) -> int:
-    """Return the total wait budget in milliseconds."""
-    return max(1, int(wait_seconds)) * 1000
-
-
-def _save_state_if_due(
-    context,
-    state_path: Path,
-    since_last_save_ms: int,
-    save_every_ms: int,
-) -> int:
-    """Persist intermediate session state when the save interval has elapsed."""
-    if since_last_save_ms < save_every_ms:
-        return since_last_save_ms
-    save_session_state(context, state_path, is_intermediate=True)
-    return 0
 
 
 def _is_login_form_visible(page: Page, selectors) -> bool:
