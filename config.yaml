@@ -1,0 +1,59 @@
+site:
+  base_url: "https://seller.tawreed.io/#/login"
+
+# Excel mapping for your file:
+# Columns found:
+# ["كود","إسم الصنف","كمية النقص", ... "رصيد الوردانى"]
+excel:
+  code_col: "كود"
+  name_col: "إسم الصنف"
+  qty_col: "كمية النقص"
+  # If you want to compute qty differently, keep qty_col and use `min_qty`/`max_qty`.
+  min_qty: 1
+  max_qty: 999999
+
+# One or more pharmacy profiles.
+# Each profile gets its own saved browser session in state/<profile>.json
+profiles:
+  wardany:
+    display_name: "صيدلية الورداني"
+    # If the site has a pharmacy selector after login, set it here (optional).
+    pharmacy_switch:
+      enabled: false
+      pharmacy_name: ""
+
+# UI selectors (update these if the site DOM differs).
+# Strategy: keep selectors flexible and editable without changing code.
+selectors:
+  login:
+    email_input: "input[type='email'], input[name='email']"
+    password_input: "input[type='password'], input[name='password']"
+    submit_button: "button[type='submit']"
+
+  nav:
+    # A selector that indicates the app is logged-in and ready.
+    logged_in_marker: "text=الرئيسية, text=Home, [data-testid='home']"
+
+  order_flow:
+    # Based on current portal sidebar structure:
+    # Purchases -> Purchase Cart (#/purchase/carts/) and Purchase Orders (#/purchase/orders/)
+    go_to_orders: "a[href=\"#/catalog/store-products/dv/\"]"
+    new_order: ""
+    item_search_input: "#tawreedTableGlobalSearch"
+    item_first_result: ""
+    qty_input: ""
+    add_item_button: ""
+    confirm_order_button: ""
+
+warehouse_strategy:
+  # Options: "first_available" | "max_available"
+  mode: "first_available"
+  selectors:
+    warehouse_rows: ".warehouse-row, [data-testid='warehouse-row']"
+    available_qty: ".available, [data-testid='available']"
+    pick_button: "text=اختيار, text=Select"
+
+runtime:
+  headless: false
+  slow_mo_ms: 0
+  timeout_ms: 45000
