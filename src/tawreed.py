@@ -8,10 +8,8 @@ from playwright.sync_api import Page, sync_playwright
 
 from .config_models import AppConfig, ProfileConfig
 from .excel import Item
+from .matching_models import CandidateMatchDiagnostic, MatchDecision, SearchMatch
 from .product_matching import (
-    CandidateMatchDiagnostic,
-    MatchDecision,
-    _SearchMatch,
     _search_queries_for_item,
     explain_best_product_match,
     find_best_product_match,
@@ -255,14 +253,14 @@ class TawreedBot:
         self._write_match_log(item, decision)
         return decision, active_query
 
-    def _require_product_match(self, page: Page, item: Item) -> tuple[_SearchMatch, str | None]:
+    def _require_product_match(self, page: Page, item: Item) -> tuple[SearchMatch, str | None]:
         """Require a valid product match or raise a descriptive runtime error."""
         decision, active_query = self._find_best_product_match(page, item)
         if decision.best_match:
             return decision.best_match, active_query
         raise RuntimeError(f"No matching product found for '{item.name}' (code: {item.code}).")
 
-    def _matched_product_row(self, page: Page, match: _SearchMatch, active_query: str | None):
+    def _matched_product_row(self, page: Page, match: SearchMatch, active_query: str | None):
         """Re-run the winning query and return the visible row that corresponds to the match."""
         if active_query != match.query:
             self._search_products(page, match.query)
@@ -275,7 +273,7 @@ class TawreedBot:
             raise RuntimeError(f"No results found for '{match.query}'.")
         return row
 
-    def _missing_row_message(self, match: _SearchMatch) -> str:
+    def _missing_row_message(self, match: SearchMatch) -> str:
         """Build the error shown when a matched row disappears from the rendered table."""
         return (
             f"Matched row index {match.row_index} is not visible after searching for "
@@ -298,7 +296,7 @@ class TawreedBot:
         page: Page,
         row,
         item: Item,
-        match: _SearchMatch,
+        match: SearchMatch,
     ) -> None:
         """Open the add-to-cart dialog for the selected match and chosen store."""
         if self._match_has_multiple_stores(match):
@@ -306,7 +304,7 @@ class TawreedBot:
             return
         self._click_single_store_cart(row, item, match)
 
-    def _match_has_multiple_stores(self, match: _SearchMatch) -> bool:
+    def _match_has_multiple_stores(self, match: SearchMatch) -> bool:
         """Return whether the matched product requires store selection first."""
         return int(match.data.get("productsCount") or 0) > 0
 

@@ -3,58 +3,18 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import Any, Iterable
 
 from .config_models import MatchingConfig
 from .excel import Item
-
-
-@dataclass(frozen=True)
-class _SearchMatch:
-    """The winning search query, row index, score, and Tawreed payload for a match."""
-
-    query: str
-    row_index: int
-    score: float
-    data: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class MatchScoreBreakdown:
-    """Detailed score components used when evaluating one Tawreed candidate."""
-
-    sequence_score: float
-    overlap_score: float
-    numeric_overlap: float
-    exact_bonus: float
-    availability_bonus: float
-    total_score: float
-
-
-@dataclass(frozen=True)
-class CandidateMatchDiagnostic:
-    """Diagnostic data for one candidate considered during product matching."""
-
-    query: str
-    row_index: int
-    score: float
-    sort_key: tuple[float, int, float, int, int, int]
-    accepted: bool
-    accepted_reason: str
-    rejection_reason: str
-    breakdown: MatchScoreBreakdown
-    candidate: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class MatchDecision:
-    """Final match decision plus diagnostics for every candidate inspected."""
-
-    best_match: _SearchMatch | None
-    diagnostics: list[CandidateMatchDiagnostic]
-    final_reason: str
+from .matching_models import (
+    CandidateMatchDiagnostic,
+    MatchDecision,
+    MatchScoreBreakdown,
+    SearchMatch,
+)
+from .matching_rules import acceptance_details, default_matching_config
 
 
 def _normalize_text(value: str) -> str:
@@ -87,37 +47,9 @@ def _match_score_breakdown(query: str, candidate: dict[str, Any]) -> MatchScoreB
     """Return the detailed score breakdown for one Tawreed search result."""
     candidate_texts = _candidate_texts(candidate)
     if not candidate_texts:
-        return MatchScoreBreakdown(
-            sequence_score=0.0,
-            overlap_score=0.0,
-            numeric_overlap=0.0,
-            exact_bonus=0.0,
-            availability_bonus=-999.0,
-            total_score=-999.0,
-        )
+        return _empty_breakdown()
 
-    query_text = query or ""
-    normalized_query = _normalize_text(query_text)
-    sequence_score = _best_sequence_score(normalized_query, candidate_texts)
-    overlap_score = _best_overlap_score(query_text, candidate_texts)
-    numeric_overlap = _numeric_overlap_score(normalized_query, candidate_texts)
-    exact_bonus = _exact_or_contained_bonus(normalized_query, candidate_texts)
-    availability_bonus = _availability_bonus(candidate)
-    total_score = (
-        (sequence_score * 5.0)
-        + (overlap_score * 8.0)
-        + (numeric_overlap * 6.0)
-        + exact_bonus
-        + availability_bonus
-    )
-    return MatchScoreBreakdown(
-        sequence_score=sequence_score,
-        overlap_score=overlap_score,
-        numeric_overlap=numeric_overlap,
-        exact_bonus=exact_bonus,
-        availability_bonus=availability_bonus,
-        total_score=total_score,
-    )
+    return _scored_breakdown(query, candidate, candidate_texts)
 
 
 def _match_sort_key(
@@ -140,7 +72,12 @@ def _match_sort_key(
 
 def _is_match_acceptable(query: str, candidate: dict[str, Any], score: float) -> bool:
     """Apply acceptance thresholds before a match is allowed to drive ordering."""
-    accepted, _, _ = _acceptance_details(query, candidate, score, _default_matching_config())
+    accepted, _, _ = _acceptance_details(
+        query,
+        candidate,
+        score,
+        default_matching_config(),
+    )
     return accepted
 
 
@@ -151,36 +88,13 @@ def _acceptance_details(
     matching_config: MatchingConfig,
 ) -> tuple[bool, str, str]:
     """Return whether a match is acceptable plus acceptance and rejection reasons."""
-    normalized_query = _normalize_text(query)
-    normalized_english_name = _normalize_text(_candidate_english_name(candidate))
-    best_overlap = _best_candidate_overlap(query, candidate)
-    has_numeric_match = _numeric_match_count(normalized_query, normalized_english_name) > 0
-    if (
-        matching_config.exact_match_accept
-        and normalized_query
-        and normalized_query == normalized_english_name
-    ):
-        return True, "exact_normalized_name_match", ""
-    if best_overlap >= matching_config.high_overlap_threshold:
-        return True, "high_token_overlap", ""
-    if (
-        score >= matching_config.medium_score_threshold
-        and best_overlap >= matching_config.medium_overlap_threshold
-    ):
-        return True, "strong_score_with_good_overlap", ""
-    if (
-        score >= matching_config.numeric_score_threshold
-        and has_numeric_match
-        and best_overlap >= matching_config.numeric_overlap_threshold
-    ):
-        return True, "strong_score_with_numeric_match", ""
-    rejection_reason = (
-        f"Rejected: overlap={best_overlap:.3f}, score={score:.3f}, "
-        "numeric_match="
-        f"{has_numeric_match}, exact_name="
-        f"{bool(normalized_query and normalized_query == normalized_english_name)}"
+    return acceptance_details(
+        query,
+        candidate,
+        score,
+        matching_config,
+        _matching_rule_helpers(),
     )
-    return False, "", rejection_reason
 
 
 def _unique_non_empty(values: list[str]) -> list[str]:
@@ -216,7 +130,7 @@ def find_best_product_match(
     item: Item,
     search_results_by_query: list[tuple[str, list[dict[str, Any]]]],
     matching_config: MatchingConfig | None = None,
-) -> _SearchMatch | None:
+) -> SearchMatch | None:
     """Return the highest-ranked acceptable search result across all generated queries."""
     return explain_best_product_match(item, search_results_by_query, matching_config).best_match
 
@@ -227,38 +141,13 @@ def explain_best_product_match(
     matching_config: MatchingConfig | None = None,
 ) -> MatchDecision:
     """Return the best match plus diagnostics for every candidate considered."""
-    active_matching_config = matching_config or _default_matching_config()
+    active_matching_config = matching_config or default_matching_config()
     diagnostics = _build_candidate_diagnostics(
         item,
         search_results_by_query,
         active_matching_config,
     )
-    if not diagnostics:
-        return MatchDecision(
-            best_match=None,
-            diagnostics=[],
-            final_reason="No search candidates were returned.",
-        )
-    best_diagnostic = max(diagnostics, key=lambda diagnostic: diagnostic.sort_key)
-    if not best_diagnostic.accepted:
-        return MatchDecision(
-            best_match=None,
-            diagnostics=diagnostics,
-            final_reason=(
-                best_diagnostic.rejection_reason
-                or "Best candidate was rejected by acceptance rules."
-            ),
-        )
-    return MatchDecision(
-        best_match=_SearchMatch(
-            query=best_diagnostic.query,
-            row_index=best_diagnostic.row_index,
-            score=best_diagnostic.score,
-            data=best_diagnostic.candidate,
-        ),
-        diagnostics=diagnostics,
-        final_reason=f"Accepted best candidate because {best_diagnostic.accepted_reason}.",
-    )
+    return _decision_from_diagnostics(diagnostics)
 
 
 def is_decisive_product_match(query: str, candidate: dict[str, Any]) -> bool:
@@ -374,28 +263,6 @@ def _best_candidate_overlap(query: str, candidate: dict[str, Any]) -> float:
     )
 
 
-def _best_scored_match(
-    item: Item,
-    search_results_by_query: list[tuple[str, list[dict[str, Any]]]],
-) -> _SearchMatch | None:
-    """Return the highest-ranked scored result across all generated queries."""
-    best_match: _SearchMatch | None = None
-    best_key: tuple[float, int, float, int, int, int] | None = None
-    for query, row_index, result in _iter_results(search_results_by_query):
-        score = _match_score(item.name or query, result)
-        match = _SearchMatch(
-            query=query,
-            row_index=row_index,
-            score=score,
-            data=result,
-        )
-        match_key = _match_sort_key(item.name or query, result, score)
-        if best_match is None or best_key is None or match_key > best_key:
-            best_match = match
-            best_key = match_key
-    return best_match
-
-
 def _build_candidate_diagnostics(
     item: Item,
     search_results_by_query: list[tuple[str, list[dict[str, Any]]]],
@@ -404,34 +271,184 @@ def _build_candidate_diagnostics(
     """Build diagnostics for every search result candidate considered."""
     diagnostics: list[CandidateMatchDiagnostic] = []
     for query, row_index, result in _iter_results(search_results_by_query):
-        score_query = item.name or query
-        breakdown = _match_score_breakdown(score_query, result)
-        accepted, accepted_reason, rejection_reason = _acceptance_details(
-            score_query,
-            result,
-            breakdown.total_score,
-            matching_config,
-        )
         diagnostics.append(
-            CandidateMatchDiagnostic(
-                query=query,
-                row_index=row_index,
-                score=breakdown.total_score,
-                sort_key=_match_sort_key(score_query, result, breakdown.total_score),
-                accepted=accepted,
-                accepted_reason=accepted_reason,
-                rejection_reason=rejection_reason,
-                breakdown=breakdown,
-                candidate=result,
+            _candidate_diagnostic(
+                item.name or query,
+                query,
+                row_index,
+                result,
+                matching_config,
             )
         )
     return diagnostics
 
 
-def _default_matching_config() -> MatchingConfig:
-    """Return the built-in matching thresholds used when no config is supplied."""
-    return MatchingConfig()
+def _empty_breakdown() -> MatchScoreBreakdown:
+    """Return the breakdown used when a candidate has no usable names."""
+    return MatchScoreBreakdown(
+        sequence_score=0.0,
+        overlap_score=0.0,
+        numeric_overlap=0.0,
+        exact_bonus=0.0,
+        availability_bonus=-999.0,
+        total_score=-999.0,
+    )
 
+
+def _scored_breakdown(
+    query: str,
+    candidate: dict[str, Any],
+    candidate_texts: list[str],
+) -> MatchScoreBreakdown:
+    """Return the weighted scoring breakdown for one usable candidate."""
+    score_components = _score_components(query, candidate, candidate_texts)
+    return MatchScoreBreakdown(
+        sequence_score=score_components["sequence_score"],
+        overlap_score=score_components["overlap_score"],
+        numeric_overlap=score_components["numeric_overlap"],
+        exact_bonus=score_components["exact_bonus"],
+        availability_bonus=score_components["availability_bonus"],
+        total_score=_total_score(**score_components),
+    )
+
+
+def _score_components(
+    query: str,
+    candidate: dict[str, Any],
+    candidate_texts: list[str],
+) -> dict[str, float]:
+    """Return the raw score components for one usable candidate."""
+    query_text = query or ""
+    normalized_query = _normalize_text(query_text)
+    return {
+        "sequence_score": _best_sequence_score(normalized_query, candidate_texts),
+        "overlap_score": _best_overlap_score(query_text, candidate_texts),
+        "numeric_overlap": _numeric_overlap_score(normalized_query, candidate_texts),
+        "exact_bonus": _exact_or_contained_bonus(normalized_query, candidate_texts),
+        "availability_bonus": _availability_bonus(candidate),
+    }
+
+
+def _total_score(
+    sequence_score: float,
+    overlap_score: float,
+    numeric_overlap: float,
+    exact_bonus: float,
+    availability_bonus: float,
+) -> float:
+    """Return the weighted final score for one candidate."""
+    return (
+        (sequence_score * 5.0)
+        + (overlap_score * 8.0)
+        + (numeric_overlap * 6.0)
+        + exact_bonus
+        + availability_bonus
+    )
+
+
+def _decision_from_diagnostics(diagnostics: list[CandidateMatchDiagnostic]) -> MatchDecision:
+    """Return the final match decision for an already-scored diagnostic list."""
+    if not diagnostics:
+        return MatchDecision(
+            best_match=None,
+            diagnostics=[],
+            final_reason="No search candidates were returned.",
+        )
+    best_diagnostic = max(diagnostics, key=lambda diagnostic: diagnostic.sort_key)
+    if not best_diagnostic.accepted:
+        return MatchDecision(
+            best_match=None,
+            diagnostics=diagnostics,
+            final_reason=_rejected_decision_reason(best_diagnostic),
+        )
+    return MatchDecision(
+        best_match=_search_match(best_diagnostic),
+        diagnostics=diagnostics,
+        final_reason=_accepted_decision_reason(best_diagnostic),
+    )
+
+
+def _rejected_decision_reason(best_diagnostic: CandidateMatchDiagnostic) -> str:
+    """Return the message used when the best candidate fails acceptance rules."""
+    return (
+        best_diagnostic.rejection_reason
+        or "Best candidate was rejected by acceptance rules."
+    )
+
+
+def _accepted_decision_reason(best_diagnostic: CandidateMatchDiagnostic) -> str:
+    """Return the message used when the best candidate passes acceptance rules."""
+    return f"Accepted best candidate because {best_diagnostic.accepted_reason}."
+
+
+def _search_match(diagnostic: CandidateMatchDiagnostic) -> SearchMatch:
+    """Return the public search-match object for one accepted diagnostic."""
+    return SearchMatch(
+        query=diagnostic.query,
+        row_index=diagnostic.row_index,
+        score=diagnostic.score,
+        data=diagnostic.candidate,
+    )
+
+
+def _candidate_diagnostic(
+    score_query: str,
+    query: str,
+    row_index: int,
+    result: dict[str, Any],
+    matching_config: MatchingConfig,
+) -> CandidateMatchDiagnostic:
+    """Return one diagnostic record for a candidate result row."""
+    breakdown = _match_score_breakdown(score_query, result)
+    acceptance = _diagnostic_acceptance(score_query, result, breakdown, matching_config)
+    return _diagnostic_record(query, row_index, result, score_query, breakdown, acceptance)
+
+
+def _diagnostic_record(
+    query: str,
+    row_index: int,
+    result: dict[str, Any],
+    score_query: str,
+    breakdown: MatchScoreBreakdown,
+    acceptance: tuple[bool, str, str],
+) -> CandidateMatchDiagnostic:
+    """Return the final diagnostic dataclass for one candidate result row."""
+    return CandidateMatchDiagnostic(
+        query=query,
+        row_index=row_index,
+        score=breakdown.total_score,
+        sort_key=_match_sort_key(score_query, result, breakdown.total_score),
+        accepted=acceptance[0],
+        accepted_reason=acceptance[1],
+        rejection_reason=acceptance[2],
+        breakdown=breakdown,
+        candidate=result,
+    )
+
+
+def _diagnostic_acceptance(
+    score_query: str,
+    result: dict[str, Any],
+    breakdown: MatchScoreBreakdown,
+    matching_config: MatchingConfig,
+) -> tuple[bool, str, str]:
+    """Return the acceptance outcome for one candidate diagnostic."""
+    return _acceptance_details(
+        score_query,
+        result,
+        breakdown.total_score,
+        matching_config,
+    )
+
+
+def _matching_rule_helpers() -> tuple:
+    """Return helper callables used by the acceptance-rules module."""
+    return (
+        _normalize_text,
+        _candidate_english_name,
+        _best_candidate_overlap,
+        _numeric_match_count,
+    )
 
 def _iter_results(
     search_results_by_query: list[tuple[str, list[dict[str, Any]]]],
