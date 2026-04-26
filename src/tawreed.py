@@ -45,12 +45,14 @@ class TawreedBot:
         profile_key: str,
         profile: ProfileConfig,
         state_path: Path,
+        debug_browser: bool = False,
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
         self.profile_key = profile_key
         self.profile = profile
         self.state_path = state_path
+        self.debug_browser = debug_browser
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
 
@@ -76,13 +78,23 @@ class TawreedBot:
     def place_order_from_items(self, items: list[Item]) -> None:
         """Place an order by processing each item from the provided list."""
         with sync_playwright() as p:
-            browser, context, page = open_order_page(p, self.config.runtime, self.state_path)
+            browser, context, page = open_order_page(
+                p,
+                self.config.runtime,
+                self.state_path,
+                debug_browser=self.debug_browser,
+            )
             try:
                 self._prepare_order_page(page)
                 self._process_items(page, items)
                 confirm_order(self, page)
-            except Exception:
-                dump_artifacts(page, self.profile_key, label="order_flow_error")
+            except Exception as error:
+                dump_artifacts(
+                    page,
+                    self.profile_key,
+                    label="order_flow_error",
+                    details=_artifact_details("order_flow_error", error),
+                )
                 raise
             finally:
                 close_context(context)
@@ -132,7 +144,18 @@ class TawreedBot:
             print(f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}")
         except Exception as error:
             print(f"[{self.profile_key}] Failed item {item.code} / {item.name}: {error}")
-            dump_artifacts(page, self.profile_key, label=f"item_error_{item.code or 'no_code'}")
+            dump_artifacts(
+                page,
+                self.profile_key,
+                label=f"item_error_{item.code or 'no_code'}",
+                details=_artifact_details(
+                    f"item_error_{item.code or 'no_code'}",
+                    error,
+                    item_code=item.code,
+                    item_name=item.name,
+                    item_qty=item.qty,
+                ),
+            )
 
     def _ensure_logged_in(self, page: Page) -> None:
         """Verify that the saved session is still authenticated before ordering begins."""
@@ -145,11 +168,15 @@ class TawreedBot:
 
     def _add_item(self, page: Page, item: Item) -> None:
         """Add one item using either the products-page flow or the legacy configured flow."""
-        if self.selectors.item_search_input == "#tawreedTableGlobalSearch":
+        if self._is_products_page(page):
             add_item_from_products_page(self, page, item)
             return
 
         self._add_item_with_configured_flow(page, item)
+
+    def _is_products_page(self, page: Page) -> bool:
+        """Return whether the current page is Tawreed's products ordering page."""
+        return PRODUCTS_PAGE_ROUTE in page.url
 
     def _add_item_with_configured_flow(self, page: Page, item: Item) -> None:
         """Execute the selector-driven fallback flow for non-products ordering pages."""
@@ -222,3 +249,11 @@ class TawreedBot:
             page.locator(self.selectors.warehouse_rows).first.wait_for(state="hidden", timeout=1000)
         except Exception:
             pass
+
+
+def _artifact_details(label: str, error: Exception, **extra: object) -> str:
+    """Build plain-text diagnostic details for saved failure artifacts."""
+    lines = [f"label={label}", f"error_type={type(error).__name__}", f"error={error}"]
+    for key, value in extra.items():
+        lines.append(f"{key}={value}")
+    return "\n".join(lines) + "\n"

@@ -8,6 +8,7 @@ from pathlib import Path
 from .config_models import AppConfig, ProfileConfig
 from .excel import load_items_from_excel
 from .tawreed import TawreedBot
+from .tawreed_session import SessionInvalidError, open_reauth_in_browser
 
 
 def run_auth_command(app_config: AppConfig, args: argparse.Namespace) -> int:
@@ -26,8 +27,21 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         return 0
     for profile_key, profile in profiles_to_run(app_config, args):
         require_state_file(profile_key)
-        bot = build_bot(app_config, profile_key, profile)
-        bot.place_order_from_items(items)
+        bot = build_bot(
+            app_config,
+            profile_key,
+            profile,
+            debug_browser=bool(getattr(args, "debug_browser", False)),
+        )
+        try:
+            bot.place_order_from_items(items)
+        except SessionInvalidError as error:
+            print(f"[{profile_key}] {error}")
+            open_reauth_in_browser(app_config.base_url, profile_key)
+            raise SystemExit(
+                f"Session for profile '{profile_key}' is not valid. "
+                f"Run: py run.py auth --profile {profile_key}"
+            ) from error
     return 0
 
 
@@ -46,6 +60,7 @@ def build_bot(
     app_config: AppConfig,
     profile_key: str,
     profile: ProfileConfig,
+    debug_browser: bool = False,
 ) -> TawreedBot:
     """Create a Tawreed bot instance for one profile."""
     return TawreedBot(
@@ -53,6 +68,7 @@ def build_bot(
         profile_key=profile_key,
         profile=profile,
         state_path=state_path(profile_key),
+        debug_browser=debug_browser,
     )
 
 

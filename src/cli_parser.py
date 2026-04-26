@@ -40,6 +40,11 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         default=0,
         help="Limit number of items (0 = no limit)",
     )
+    order_parser.add_argument(
+        "--debug-browser",
+        action="store_true",
+        help="Open a visible browser for this order run",
+    )
 
 
 def _add_common_arguments(argument_parser: argparse.ArgumentParser) -> None:

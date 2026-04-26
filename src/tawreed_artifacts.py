@@ -8,7 +8,7 @@ from pathlib import Path
 from playwright.sync_api import Page
 
 
-def dump_artifacts(page: Page, profile_key: str, label: str) -> None:
+def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") -> None:
     """Persist screenshot, HTML, and URL artifacts for debugging failures."""
     try:
         artifacts_dir = _artifacts_dir(profile_key)
@@ -17,7 +17,7 @@ def dump_artifacts(page: Page, profile_key: str, label: str) -> None:
         text_path = artifacts_dir / f"{label}.txt"
         _write_screenshot_artifact(page, screenshot_path)
         _write_html_artifact(page, html_path)
-        _write_url_artifact(page, text_path)
+        _write_text_artifact(page, text_path, details)
         print(f"[{profile_key}] Saved artifacts to: {artifacts_dir}")
     except Exception:
         pass
@@ -81,9 +81,12 @@ def _write_html_artifact(page: Page, html_path: Path) -> None:
         pass
 
 
-def _write_url_artifact(page: Page, text_path: Path) -> None:
-    """Write the current page URL as a lightweight text artifact."""
+def _write_text_artifact(page: Page, text_path: Path, details: str) -> None:
+    """Write lightweight text diagnostics for the current page state."""
     try:
-        text_path.write_text(f"url={page.url}\n", encoding="utf-8")
+        content = f"url={page.url}\n"
+        if details:
+            content += details
+        text_path.write_text(content, encoding="utf-8")
     except Exception:
         pass

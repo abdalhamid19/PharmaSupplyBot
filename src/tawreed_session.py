@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import webbrowser
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,10 @@ from .tawreed_auth_waits import (
     is_logged_in_marker_visible,
     wait_for_login_detection as poll_for_login_detection,
 )
+
+
+class SessionInvalidError(RuntimeError):
+    """Raised when the saved login session is not valid for order placement."""
 
 
 def open_auth_page(playwright, base_url: str, runtime) -> tuple[Any, Any, Page]:
@@ -27,10 +32,15 @@ def open_auth_page(playwright, base_url: str, runtime) -> tuple[Any, Any, Page]:
     return browser, context, page
 
 
-def open_order_page(playwright, runtime, state_path: Path) -> tuple[Any, Any, Page]:
+def open_order_page(
+    playwright,
+    runtime,
+    state_path: Path,
+    debug_browser: bool = False,
+) -> tuple[Any, Any, Page]:
     """Create an automated browser page using the saved session state."""
     browser = playwright.chromium.launch(
-        headless=runtime.headless,
+        headless=False if debug_browser else runtime.headless,
         slow_mo=runtime.slow_mo_ms,
     )
     context = browser.new_context(storage_state=str(state_path))
@@ -116,14 +126,30 @@ def ensure_logged_in(page: Page, selectors, timeout_ms: int, ready_selector: str
     if _ready_surface_visible(page, ready_selector):
         return
     if _is_login_form_visible(page, selectors):
-        return
+        raise SessionInvalidError(
+            "Saved session is expired or still on the login page."
+        )
     short_timeout_ms = min(timeout_ms, 2000)
     if _has_logged_in_marker(page, selectors.logged_in_marker, short_timeout_ms):
         return
     if _ready_surface_visible(page, ready_selector):
         return
     if _is_login_form_visible(page, selectors):
-        return
+        raise SessionInvalidError(
+            "Saved session is expired or still on the login page."
+        )
+    raise SessionInvalidError(
+        "Saved session did not expose the login page or the expected order surface."
+    )
+
+
+def open_reauth_in_browser(base_url: str, profile_key: str) -> None:
+    """Open the Tawreed login page in a visible system browser for re-authentication."""
+    try:
+        webbrowser.open(base_url)
+        print(f"[{profile_key}] Opened Tawreed login page in a visible browser window.")
+    except Exception:
+        print(f"[{profile_key}] Could not open a visible browser automatically.")
 
 
 def close_context(context) -> None:
@@ -159,11 +185,9 @@ def _is_login_form_visible(page: Page, selectors) -> bool:
         login_password_visible = page.locator(
             selectors.login_password
         ).first.is_visible(timeout=2000)
-        if login_email_visible or login_password_visible:
-            raise RuntimeError("Still on login page (login inputs visible).")
-        return False
+        return bool(login_email_visible or login_password_visible)
     except Exception:
-        return True
+        return False
 
 
 def _ready_surface_visible(page: Page, ready_selector: str) -> bool:

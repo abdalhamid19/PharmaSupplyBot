@@ -43,6 +43,12 @@ py run.py auth --profile wardany
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
+لإظهار المتصفح أثناء تشخيص التنفيذ:
+
+```bash
+py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+```
+
 أو تشغيل كل الصيدليات المعرفة في `config.yaml`:
 
 ```bash
