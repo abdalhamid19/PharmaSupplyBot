@@ -61,15 +61,21 @@ def append_xlsx_artifact(profile_key: str, label: str, rows: list[dict[str, obje
     """Append structured rows to an XLSX artifact for the active profile."""
     if not rows:
         return None
-    artifacts_dir = _artifacts_dir(profile_key)
-    artifact_path = artifacts_dir / f"{label}.xlsx"
-    fieldnames = list(rows[0].keys())
-    workbook, worksheet = _open_or_create_workbook(artifact_path)
-    _ensure_xlsx_header_row(worksheet, fieldnames)
-    for row in rows:
-        worksheet.append([row.get(field_name, "") for field_name in fieldnames])
-    workbook.save(artifact_path)
-    return artifact_path
+    try:
+        artifacts_dir = _artifacts_dir(profile_key)
+        artifact_path = artifacts_dir / f"{label}.xlsx"
+        fieldnames = list(rows[0].keys())
+        workbook, worksheet = _open_or_create_workbook(artifact_path)
+        _ensure_xlsx_header_row(worksheet, fieldnames)
+        for row in rows:
+            worksheet.append([row.get(field_name, "") for field_name in fieldnames])
+        workbook.save(artifact_path)
+        return artifact_path
+    except PermissionError:
+        print(
+            f"[{profile_key}] Could not update {label}.xlsx because it is open in another program."
+        )
+        return None
 
 
 def _artifacts_dir(profile_key: str) -> Path:

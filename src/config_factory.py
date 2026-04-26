@@ -52,6 +52,7 @@ def build_runtime_config(raw_values: dict[str, Any]) -> RuntimeConfig:
         headless=bool(runtime_values.get("headless", True)),
         slow_mo_ms=int(runtime_values.get("slow_mo_ms", 0)),
         timeout_ms=int(runtime_values.get("timeout_ms", 45000)),
+        submit_order=bool(runtime_values.get("submit_order", False)),
     )
 
 

@@ -10,6 +10,12 @@ from .tawreed_ui import checkout_confirmation_labels
 
 def confirm_order(bot, page: Page) -> None:
     """Click enabled checkout buttons and confirm resulting dialogs."""
+    if not bot.config.runtime.submit_order:
+        print(
+            f"[{bot.profile_key}] Order submission skipped. "
+            "Items were prepared for manual human review."
+        )
+        return
     if not bot.selectors.confirm_order_button:
         return
     checkout_buttons = _checkout_candidates(bot, page)

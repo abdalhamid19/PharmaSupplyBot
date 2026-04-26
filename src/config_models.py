@@ -32,6 +32,7 @@ class RuntimeConfig:
     headless: bool = True
     slow_mo_ms: int = 0
     timeout_ms: int = 45000
+    submit_order: bool = False
 
 
 @dataclass(frozen=True)

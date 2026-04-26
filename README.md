@@ -43,6 +43,8 @@ py run.py auth --profile wardany
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
+بشكل افتراضي البوت يضيف الأصناف ويترك اعتماد الطلبية للمراجعة البشرية. لو أردت الإرسال التلقائي لاحقًا غيّر `runtime.submit_order` إلى `true` في `config.yaml`.
+
 لإظهار المتصفح أثناء تشخيص التنفيذ:
 
 ```bash

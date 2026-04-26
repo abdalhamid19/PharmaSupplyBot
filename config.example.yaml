@@ -64,3 +64,4 @@ runtime:
   headless: true
   slow_mo_ms: 0
   timeout_ms: 45000
+  submit_order: false
