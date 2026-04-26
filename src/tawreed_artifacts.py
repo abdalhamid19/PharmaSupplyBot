@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from openpyxl import Workbook, load_workbook
 from playwright.sync_api import Page
 
 
@@ -56,11 +57,42 @@ def append_csv_artifact(profile_key: str, label: str, rows: list[dict[str, objec
     return artifact_path
 
 
+def append_xlsx_artifact(profile_key: str, label: str, rows: list[dict[str, object]]) -> Path | None:
+    """Append structured rows to an XLSX artifact for the active profile."""
+    if not rows:
+        return None
+    artifacts_dir = _artifacts_dir(profile_key)
+    artifact_path = artifacts_dir / f"{label}.xlsx"
+    fieldnames = list(rows[0].keys())
+    workbook, worksheet = _open_or_create_workbook(artifact_path)
+    _ensure_xlsx_header_row(worksheet, fieldnames)
+    for row in rows:
+        worksheet.append([row.get(field_name, "") for field_name in fieldnames])
+    workbook.save(artifact_path)
+    return artifact_path
+
+
 def _artifacts_dir(profile_key: str) -> Path:
     """Return the artifacts directory for the active profile, creating it if needed."""
     artifacts_dir = Path("artifacts") / profile_key
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     return artifacts_dir
+
+
+def _open_or_create_workbook(artifact_path: Path):
+    """Return an existing workbook or a new workbook for the requested artifact path."""
+    if artifact_path.exists():
+        workbook = load_workbook(artifact_path)
+        return workbook, workbook.active
+    workbook = Workbook()
+    return workbook, workbook.active
+
+
+def _ensure_xlsx_header_row(worksheet, fieldnames: list[str]) -> None:
+    """Ensure the worksheet starts with exactly one header row."""
+    if worksheet.max_row == 1 and worksheet.cell(row=1, column=1).value is None:
+        worksheet.delete_rows(1, 1)
+        worksheet.append(fieldnames)
 
 
 def _write_screenshot_artifact(page: Page, screenshot_path: Path) -> None:

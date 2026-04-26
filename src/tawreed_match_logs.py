@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from .excel import Item
 from .matching_models import CandidateMatchDiagnostic, MatchDecision
-from .tawreed_artifacts import append_csv_artifact, append_text_artifact, write_text_artifact
+from .tawreed_artifacts import (
+    append_csv_artifact,
+    append_text_artifact,
+    append_xlsx_artifact,
+    write_text_artifact,
+)
 
 
 def write_match_log(bot, item: Item, decision: MatchDecision) -> None:
@@ -18,6 +23,7 @@ def write_match_log(bot, item: Item, decision: MatchDecision) -> None:
         match_log_section_separator(item) + log_content,
     )
     append_csv_artifact(bot.profile_key, "match_log_all", match_log_csv_rows(item, decision))
+    append_xlsx_artifact(bot.profile_key, "match_summary", match_summary_rows(item, decision))
 
 
 def match_log_content(item: Item, decision: MatchDecision) -> str:
@@ -101,6 +107,18 @@ def match_log_csv_rows(item: Item, decision: MatchDecision) -> list[dict[str, ob
     for rank, diagnostic in enumerate(_sorted_diagnostics(decision), start=1):
         rows.append(_match_log_csv_row(item, decision, diagnostic, rank))
     return rows
+
+
+def match_summary_rows(item: Item, decision: MatchDecision) -> list[dict[str, object]]:
+    """Build one compact row that summarizes whether the item was accepted."""
+    accepted_name = accepted_product_name(decision)
+    return [
+        {
+            "item_name": item.name,
+            "accepted": bool(decision.best_match),
+            "accepted_product_name": accepted_name,
+        }
+    ]
 
 
 def _match_log_csv_row(
@@ -191,6 +209,14 @@ def candidate_name_fields(diagnostic: CandidateMatchDiagnostic) -> dict[str, str
         "product_name_en": str(diagnostic.candidate.get("productNameEn") or ""),
         "product_name_ar": str(diagnostic.candidate.get("productName") or ""),
     }
+
+
+def accepted_product_name(decision: MatchDecision) -> str:
+    """Return the accepted product name when a best match exists."""
+    if not decision.best_match:
+        return ""
+    candidate = decision.best_match.data
+    return str(candidate.get("productNameEn") or candidate.get("productName") or "")
 
 
 def safe_item_label(item: Item) -> str:
