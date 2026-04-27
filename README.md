@@ -96,6 +96,7 @@ http://localhost:8501
 الواجهة توفر:
 - تشغيل `auth` من المتصفح
 - تشغيل `order` على ملف Excel موجود أو مرفوع
+- رفع `state/<profile>.json` من داخل الواجهة عند التشغيل الأونلاين
 - مراجعة `order_result_summary.csv`
 - مراجعة `order_result_summary.xlsx`
 - عرض عدد الثواني لكل صنف في الدفعات الحديثة
@@ -104,6 +105,11 @@ http://localhost:8501
 في تبويب `Results`:
 - يتم عرض `CSV` و`XLSX` في تبويبين منفصلين
 - إذا كان `order_result_summary.xlsx` أقدم من `order_result_summary.csv` ستظهر ملاحظة بذلك داخل الواجهة
+
+عند استخدام النسخة الأونلاين:
+- شغّل `py run.py auth --profile <profile>` محليًا مرة واحدة
+- ثم ارفع ملف `state/<profile>.json` داخل تبويب `Order`
+- إذا لم ترفع الملف، فستستخدم الواجهة أي default state مهيأ على الخادم لنفس الـ profile إذا كان موجودًا
 
 ## سلوك التنفيذ الحالي
 

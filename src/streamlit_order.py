@@ -10,6 +10,11 @@ from .streamlit_order_form import order_form_values
 from .streamlit_process import render_command_result, run_cli_subprocess
 from .streamlit_results import render_fresh_run_analysis
 from .streamlit_shared import csv_row_count, load_new_summary_rows, summary_csv_path
+from .streamlit_state import (
+    ensure_default_state_files,
+    missing_state_profiles,
+    persist_uploaded_states,
+)
 from .streamlit_uploads import resolve_excel_path
 
 
@@ -26,16 +31,19 @@ def render_order_tab(app_config, default_profile: str | None, config_path: Path)
     if excel_path is None:
         st.error("Please choose or upload an Excel file.")
         return
-    run_order_submission(default_profile, config_path, form_values, excel_path)
+    run_order_submission(app_config, default_profile, config_path, form_values, excel_path)
 
 
 def run_order_submission(
+    app_config,
     default_profile: str,
     config_path: Path,
     form_values: dict[str, object],
     excel_path: Path,
 ) -> None:
     """Run one order submission and render its summary output."""
+    if not prepare_order_state_files(app_config, form_values):
+        return
     summary_path = summary_csv_path(default_profile)
     previous_row_count = csv_row_count(summary_path)
     command = order_command(config_path, form_values, excel_path)
@@ -43,6 +51,27 @@ def run_order_submission(
         result = run_cli_subprocess(command)
     render_command_result(result)
     render_fresh_run_analysis(load_new_summary_rows(summary_path, previous_row_count))
+
+
+def prepare_order_state_files(app_config, form_values: dict[str, object]) -> bool:
+    """Persist uploaded state files and ensure every target profile is ready."""
+    persist_uploaded_states(dict(form_values["uploaded_states"]))
+    target_profiles = target_profile_keys(app_config, form_values)
+    ensure_default_state_files(target_profiles)
+    missing_profiles = missing_state_profiles(target_profiles)
+    if not missing_profiles:
+        return True
+    missing_text = ", ".join(f"`{profile_key}`" for profile_key in missing_profiles)
+    st.error(f"Missing session-state JSON for: {missing_text}")
+    st.info("Upload `state/<profile>.json` from a machine where you already ran `py run.py auth`.")
+    return False
+
+
+def target_profile_keys(app_config, form_values: dict[str, object]) -> list[str]:
+    """Return the profiles targeted by one order submission."""
+    if form_values["profile_mode"] == "Single profile":
+        return [str(form_values["profile_key"])]
+    return list(app_config.profiles.keys())
 
 
 def order_command(

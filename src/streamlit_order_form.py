@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from .streamlit_state_uploads import state_upload_fields
 from .streamlit_uploads import available_excel_options
 
 
@@ -19,15 +20,17 @@ def order_form_fields(app_config) -> dict[str, object]:
     """Return the order form field values."""
     input_mode, excel_path_str, upload = excel_source_fields()
     profile_mode, profile_key, limit, debug_browser = profile_run_fields(app_config)
-    return order_values(
-        input_mode,
-        excel_path_str,
-        upload,
-        profile_mode,
-        profile_key,
-        limit,
-        debug_browser,
-    )
+    uploaded_states = state_upload_fields(app_config, profile_mode, profile_key)
+    return {
+        "input_mode": input_mode,
+        "excel_path_str": excel_path_str,
+        "upload": upload,
+        "profile_mode": profile_mode,
+        "profile_key": profile_key,
+        "limit": int(limit),
+        "debug_browser": bool(debug_browser),
+        "uploaded_states": uploaded_states,
+    }
 
 
 def excel_source_fields() -> tuple[str, str, object]:
@@ -62,24 +65,3 @@ def existing_excel_path(input_mode: str, excel_options: list[str]) -> str:
 def uploaded_excel_file(input_mode: str):
     """Return the uploaded Excel file when upload mode is active."""
     return st.file_uploader("Upload Excel", type=["xlsx"]) if input_mode == "Upload file" else None
-
-
-def order_values(
-    input_mode: str,
-    excel_path_str: str,
-    upload,
-    profile_mode: str,
-    profile_key: str,
-    limit: int,
-    debug_browser: bool,
-) -> dict[str, object]:
-    """Return the normalized order form values."""
-    return {
-        "input_mode": input_mode,
-        "excel_path_str": excel_path_str,
-        "upload": upload,
-        "profile_mode": profile_mode,
-        "profile_key": profile_key,
-        "limit": int(limit),
-        "debug_browser": bool(debug_browser),
-    }
