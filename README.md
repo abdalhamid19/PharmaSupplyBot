@@ -1,64 +1,117 @@
 # PharmaSupplyBot
 
-بوت لأتمتة إدخال أصناف من Excel على `seller.tawreed.io` وإنشاء الطلبيات لكل صيدلية بدون تدخل بشري بعد إعداد جلسة تسجيل الدخول مرة واحدة.
+بوت لأتمتة إدخال أصناف من ملف Excel على `seller.tawreed.io` وإنشاء الطلبيات لكل صيدلية بعد حفظ جلسة تسجيل الدخول مرة واحدة.
 
 ## المتطلبات
 
-- Python 3.10+ (عندك 3.13 شغال)
+- Python 3.10 أو أحدث
+- Windows PowerShell
 
 ## التثبيت
 
-```bash
+```powershell
 py -m venv .venv
-.venv\Scripts\activate
+.\.venv\Scripts\Activate.ps1
 py -m pip install -r requirements.txt
 py -m playwright install
 ```
 
 ## الإعداد
 
-1) انسخ ملف الإعدادات:
+انسخ ملف الإعدادات:
 
-```bash
-copy config.example.yaml config.yaml
+```powershell
+Copy-Item config.example.yaml config.yaml
 ```
 
-2) (اختياري) ضع بيانات الدخول في `.env`:
+إذا أردت استخدام البريد وكلمة المرور من البيئة:
 
-```bash
-copy .env.example .env
+```powershell
+Copy-Item .env.example .env
 ```
 
-## تسجيل الدخول (مرة واحدة لكل صيدلية)
+## أوامر الطرفية
 
-يفتح متصفح مرئي لتسجل دخول يدويًا، ثم يحفظ الجلسة في `state/<profile>.json`:
+### 1. تسجيل الدخول وحفظ الجلسة
 
-```bash
+يفتح المتصفح بشكل مرئي، وبعد تسجيل الدخول تُحفظ الجلسة في `state/<profile>.json`:
+
+```powershell
 py run.py auth --profile wardany
 ```
 
-## تشغيل الأتمتة (بدون تدخل بشري)
+يمكن زيادة وقت الانتظار قبل إغلاق نافذة تسجيل الدخول:
 
-```bash
+```powershell
+py run.py auth --profile wardany --wait-seconds 900
+```
+
+### 2. تشغيل الطلب من ملف Excel
+
+```powershell
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
-بشكل افتراضي البوت يضيف الأصناف ويترك اعتماد الطلبية للمراجعة البشرية. لو أردت الإرسال التلقائي لاحقًا غيّر `runtime.submit_order` إلى `true` في `config.yaml`.
+### 3. تشغيل عدد محدود من الأصناف
 
-لإظهار المتصفح أثناء تشخيص التنفيذ:
-
-```bash
-py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+```powershell
+py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
 ```
 
-أو تشغيل كل الصيدليات المعرفة في `config.yaml`:
+### 4. تشغيل كل الصيدليات المعرفة في `config.yaml`
 
-```bash
+```powershell
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
-## ملاحظات مهمة
+### 5. فتح المتصفح أثناء التشغيل للتشخيص
 
-- واجهة الموقع قد تتغير؛ لذلك كل محددات العناصر (selectors) قابلة للتعديل من `config.yaml`.
-- لو الموقع فيه CAPTCHA أو تحقق إضافي، هتحتاج تعمل `auth` يدويًا من وقت لآخر لتجديد الجلسة.
+```powershell
+py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+```
 
+## سلوك التنفيذ الحالي
+
+- افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
+- اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
+  - `runtime.submit_order: true` داخل `config.yaml`
+- إذا كانت الجلسة منتهية أو غير صالحة، سيطلب منك البرنامج إعادة تنفيذ:
+
+```powershell
+py run.py auth --profile wardany
+```
+
+## ملفات مهمة
+
+- `config.yaml`
+  إعدادات التشغيل الفعلية
+- `config.example.yaml`
+  مثال جاهز لهيكل الإعدادات
+- `state/<profile>.json`
+  جلسة Playwright المحفوظة لكل صيدلية
+- `artifacts/<profile>/`
+  صور وHTML وlogs تشخيصية عند الفشل
+- `artifacts/<profile>/match_log_all.txt`
+  سجل نصي لكل مرشحي المطابقة
+- `artifacts/<profile>/match_log_all.csv`
+  سجل CSV لكل مرشحي المطابقة
+
+## فحص الكود محليًا
+
+تشغيل فحص القواعد المحلي:
+
+```powershell
+.\.venv\Scripts\python tools\rule_audit.py
+```
+
+إذا كان كل شيء سليمًا فسيظهر:
+
+```text
+rule_audit_ok
+```
+
+## ملاحظات
+
+- محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
+- المطابقة بين اسم Excel ونتائج Tawreed تعتمد على الاسم فقط، وليس على كود الصنف الداخلي للصيدلية.
+- عند فشل صنف تقنيًا، تُحفظ artifacts داخل `artifacts/<profile>/`.

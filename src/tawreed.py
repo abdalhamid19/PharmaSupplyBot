@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import time
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -12,8 +13,9 @@ from .selectors import _selectors
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
+from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
-from .tawreed_products_flow import add_item_from_products_page
+from .tawreed_products_flow import add_item_from_products_page, close_visible_dialogs
 from .tawreed_session import (
     attempt_env_login,
     close_browser,
@@ -32,6 +34,12 @@ from .tawreed_strategy import max_available_warehouse_row
 
 class _SkipItem(Exception):
     """Signal that one item should be skipped without failing the whole order run."""
+
+    pass
+
+
+class _NoResultsItem(_SkipItem):
+    """Signal that one item had no Tawreed results and should be skipped quickly."""
 
     pass
 
@@ -55,6 +63,10 @@ class TawreedBot:
         self.debug_browser = debug_browser
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
+        self.no_results_exception = _NoResultsItem
+        self.last_match_decision = None
+        self.last_match_elapsed_seconds = 0.0
+        self.last_searched_queries: list[str] = []
 
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""
@@ -138,12 +150,41 @@ class TawreedBot:
 
     def _process_single_item(self, page: Page, item: Item) -> None:
         """Add one item or save artifacts when a technical failure happens."""
+        started_at = time.perf_counter()
+        self.last_match_decision = None
+        self.last_match_elapsed_seconds = 0.0
+        self.last_searched_queries = []
         try:
+            close_visible_dialogs(page)
             self._add_item(page, item)
+            close_visible_dialogs(page)
+            self._record_item_summary(
+                item,
+                status="added-to-cart",
+                reason="Added to cart.",
+                elapsed_seconds=time.perf_counter() - started_at,
+                match_elapsed_seconds=self.last_match_elapsed_seconds,
+            )
         except _SkipItem as error:
-            print(f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}")
+            close_visible_dialogs(page)
+            self._record_item_summary(
+                item,
+                status=self._skip_status(str(error)),
+                reason=str(error),
+                elapsed_seconds=time.perf_counter() - started_at,
+                match_elapsed_seconds=self.last_match_elapsed_seconds,
+            )
+            print(_console_safe(f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}"))
         except Exception as error:
-            print(f"[{self.profile_key}] Failed item {item.code} / {item.name}: {error}")
+            close_visible_dialogs(page)
+            self._record_item_summary(
+                item,
+                status=self._failure_status(str(error)),
+                reason=str(error),
+                elapsed_seconds=time.perf_counter() - started_at,
+                match_elapsed_seconds=self.last_match_elapsed_seconds,
+            )
+            print(_console_safe(f"[{self.profile_key}] Failed item {item.code} / {item.name}: {error}"))
             dump_artifacts(
                 page,
                 self.profile_key,
@@ -250,6 +291,55 @@ class TawreedBot:
         except Exception:
             pass
 
+    def _record_item_summary(
+        self,
+        item: Item,
+        status: str,
+        reason: str,
+        elapsed_seconds: float,
+        match_elapsed_seconds: float,
+    ) -> None:
+        """Append one execution-summary row for the processed item."""
+        matched_product_name, matched_query = self._matched_summary_fields()
+        append_order_result_summary(
+            self.profile_key,
+            item,
+            OrderItemSummary(
+                status=status,
+                reason=reason,
+                matched_product_name=matched_product_name,
+                matched_query=matched_query,
+                searched_queries_count=len(self.last_searched_queries),
+                searched_queries=" | ".join(self.last_searched_queries),
+                elapsed_seconds=elapsed_seconds,
+                match_elapsed_seconds=match_elapsed_seconds,
+            ),
+        )
+
+    def _matched_summary_fields(self) -> tuple[str, str]:
+        """Return matched product summary fields from the last recorded match decision."""
+        decision = self.last_match_decision
+        if not decision or not decision.best_match:
+            return "", ""
+        candidate = decision.best_match.data
+        product_name = str(candidate.get("productNameEn") or candidate.get("productName") or "")
+        return product_name, decision.best_match.query
+
+    def _skip_status(self, reason: str) -> str:
+        """Return the structured summary status for one skipped item."""
+        lowered = reason.lower()
+        if "no matching product found" in lowered:
+            return "no-results"
+        if "unavailable" in lowered or "out of stock" in lowered:
+            return "matched-but-unavailable"
+        return "skipped"
+
+    def _failure_status(self, reason: str) -> str:
+        """Return the structured summary status for one failed item."""
+        if "No matching product found" in reason:
+            return "no-results"
+        return "failed"
+
 
 def _artifact_details(label: str, error: Exception, **extra: object) -> str:
     """Build plain-text diagnostic details for saved failure artifacts."""
@@ -257,3 +347,8 @@ def _artifact_details(label: str, error: Exception, **extra: object) -> str:
     for key, value in extra.items():
         lines.append(f"{key}={value}")
     return "\n".join(lines) + "\n"
+
+
+def _console_safe(text: str) -> str:
+    """Return text that can be printed on cp1252 Windows consoles without crashing."""
+    return text.encode("cp1252", errors="replace").decode("cp1252")

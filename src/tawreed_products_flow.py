@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
+import re
+import time
 from typing import Any
 
 from playwright.sync_api import Page
@@ -14,8 +17,8 @@ from .product_matching import (
     is_decisive_product_match,
 )
 from .tawreed_constants import (
+    DIALOG_MASK_SELECTOR,
     PRODUCT_ROWS_SELECTOR,
-    PRODUCT_SEARCH_ENDPOINT,
     QUANTITY_INPUT_SELECTOR,
     STORE_DETAILS_ENDPOINT,
 )
@@ -24,12 +27,17 @@ from .tawreed_strategy import choose_store_index
 from .tawreed_ui import (
     bounded_requested_quantity,
     cart_button,
+    dialog_close_buttons,
     dialog_footer_buttons,
     fill_quantity_input,
     store_dialog_cart_buttons,
+    store_dialog_rows,
+    visible_dialog_masks,
     stores_button,
     visible_dialog,
 )
+
+MIN_SEARCH_QUERIES_PER_ITEM = 3
 
 
 def add_item_from_products_page(bot, page: Page, item: Item) -> None:
@@ -42,30 +50,35 @@ def add_item_from_products_page(bot, page: Page, item: Item) -> None:
 
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     """Search the products table and return the parsed API results for the query."""
+    close_visible_dialogs(page)
     search = page.locator(bot.selectors.item_search_input).first
     search.click()
     search.fill("")
     search.fill(query)
-    with page.expect_response(
-        is_product_search_response,
-        timeout=bot.config.runtime.timeout_ms,
-    ) as response_info:
-        search.press("Enter")
-    payload = response_info.value.json()
+    with suppress(Exception):
+        page.wait_for_load_state("networkidle", timeout=1000)
+    search.press("Enter")
+    _wait_for_table_overlay_to_clear(page)
     wait_for_product_rows(page)
-    return list(payload.get("data", {}).get("content", []) or [])
+    if _table_has_no_results(page):
+        return []
+    return _dom_search_results(page, query)
 
 
 def find_best_product_match(bot, page: Page, item: Item) -> tuple[MatchDecision, str | None]:
     """Search all candidate queries and return diagnostics plus the active query."""
     search_results_by_query: list[tuple[str, list[dict[str, Any]]]] = []
-    for query in _search_queries_for_item(item):
+    queries = _search_queries_for_item(item)
+    for query_index, query in enumerate(queries):
+        bot.last_searched_queries.append(query)
         results = search_products(bot, page, query)
         search_results_by_query.append((query, results))
         decision = _match_decision(bot, item, search_results_by_query)
-        if _decisive_match(item, query, decision):
+        if _decisive_match(item, query, decision, query_index, len(queries)):
             write_match_log(bot, item, decision)
             return decision, query
+        if _should_stop_after_no_results(queries, query_index, results):
+            break
     active_query = search_results_by_query[-1][0] if search_results_by_query else None
     decision = _match_decision(bot, item, search_results_by_query)
     write_match_log(bot, item, decision)
@@ -74,17 +87,26 @@ def find_best_product_match(bot, page: Page, item: Item) -> tuple[MatchDecision,
 
 def require_product_match(bot, page: Page, item: Item) -> tuple[SearchMatch, str | None]:
     """Require a valid product match or raise a descriptive runtime error."""
+    started_at = time.perf_counter()
     decision, active_query = find_best_product_match(bot, page, item)
+    bot.last_match_elapsed_seconds = time.perf_counter() - started_at
+    bot.last_match_decision = decision
     if decision.best_match:
         return decision.best_match, active_query
-    raise RuntimeError(f"No matching product found for '{item.name}' (code: {item.code}).")
+    raise bot.no_results_exception(
+        f"No matching product found for '{item.name}' (code: {item.code})."
+    )
 
 
 def matched_product_row(bot, page: Page, match: SearchMatch, active_query: str | None):
     """Re-run the winning query and return the visible row that corresponds to the match."""
     if active_query != match.query:
         search_products(bot, page, match.query)
+    _wait_for_table_overlay_to_clear(page)
     rows = visible_product_rows(page)
+    row = _matched_row_by_signature(rows, match)
+    if row is not None:
+        return row
     if rows.count() <= match.row_index:
         raise RuntimeError(missing_row_message(match))
     row = rows.nth(match.row_index)
@@ -108,7 +130,16 @@ def missing_row_message(match: SearchMatch) -> str:
 
 def is_no_results_row(row) -> bool:
     """Return whether the current table row is Tawreed's no-results placeholder."""
-    return "No results found" in row.inner_text()
+    try:
+        text = row.inner_text()
+    except Exception:
+        return False
+    normalized_text = " ".join(str(text).split())
+    return (
+        "No results found" in normalized_text
+        or "لايوجد نتائج" in normalized_text
+        or "لا يوجد نتائج" in normalized_text
+    )
 
 
 def wait_for_product_rows(page: Page) -> None:
@@ -117,10 +148,15 @@ def wait_for_product_rows(page: Page) -> None:
         visible_product_rows(page).first.wait_for(timeout=2000)
     except Exception:
         pass
+    if _table_has_no_results(page):
+        return
 
 
 def open_add_to_cart_for_match(bot, page: Page, row, item: Item, match: SearchMatch) -> None:
     """Open the add-to-cart dialog for the selected match and chosen store."""
+    if _row_cart_button_enabled(row):
+        click_single_store_cart(row, item, match, bot.skip_item_exception)
+        return
     if match_has_multiple_stores(match):
         open_store_cart_dialog(bot, page, row)
         return
@@ -146,29 +182,35 @@ def open_store_cart_dialog(bot, page: Page, row) -> None:
 
 def click_single_store_cart(row, item: Item, match: SearchMatch, skip_item_exception) -> None:
     """Click the direct cart button for matches that do not require a stores dialog."""
+    _wait_for_row_to_settle(row)
     available_quantity = int(match.data.get("availableQuantity") or 0)
     if available_quantity <= 0:
         raise skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
+    if not _row_cart_button_enabled(row):
+        raise skip_item_exception(_disabled_cart_reason(row, item.name))
     cart_button(row).click()
-
-
-def is_product_search_response(response) -> bool:
-    """Return whether a network response belongs to the product search endpoint."""
-    return PRODUCT_SEARCH_ENDPOINT in response.url and response.request.method == "POST"
 
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
     """Open the stores dialog for a row and return the API payload behind it."""
-    with page.expect_response(
+    response_info = page.expect_response(
         lambda response: is_store_details_response(response),
-        timeout=bot.config.runtime.timeout_ms,
-    ) as response_info:
-        stores_button(row).click()
-    payload = response_info.value.json()
-    stores = list(payload.get("data", []) or [])
-    if not stores:
-        raise RuntimeError("Stores dialog opened, but no store rows were returned.")
-    return stores
+        timeout=_search_response_timeout_ms(bot),
+    )
+    stores_button(row).click()
+    dialog_became_visible = _stores_dialog_visible(page, bot)
+    response_value = _response_value(response_info)
+    if response_value is not None:
+        stores = _stores_from_payload(response_value.json())
+        if stores:
+            return stores
+    if dialog_became_visible:
+        return _stores_from_dialog_rows(page, bot)
+    try:
+        close_visible_dialogs(page)
+    except Exception:
+        pass
+    raise RuntimeError("Stores dialog did not produce usable rows or API payload.")
 
 
 def is_store_details_response(response) -> bool:
@@ -187,12 +229,260 @@ def fill_add_to_cart_dialog(bot, page: Page, requested_qty: int) -> None:
     try:
         dialog.wait_for(state="hidden", timeout=1500)
     except Exception:
-        pass
+        close_visible_dialogs(page)
+        _wait_for_dialog_to_clear(page)
 
 
 def warehouse_mode(bot) -> str:
     """Return the configured warehouse-selection mode."""
     return str(bot.config.warehouse_strategy.get("mode", "first_available"))
+
+
+def close_visible_dialogs(page: Page) -> None:
+    """Close any visible dialogs so later items can continue safely."""
+    try:
+        while visible_dialog_masks(page).count() > 0:
+            dialog = visible_dialog(page, 1000)
+            close_buttons = dialog_close_buttons(dialog)
+            if close_buttons.count() > 0:
+                close_buttons.first.click(force=True)
+                dialog.wait_for(state="hidden", timeout=1500)
+                continue
+            try:
+                visible_dialog_masks(page).last.click(force=True)
+                dialog.wait_for(state="hidden", timeout=1500)
+                continue
+            except Exception:
+                pass
+            page.keyboard.press("Escape")
+            dialog.wait_for(state="hidden", timeout=1500)
+    except Exception:
+        pass
+
+
+def _stores_dialog_visible(page: Page, bot) -> bool:
+    """Return whether the stores dialog became visible even without the API response."""
+    try:
+        dialog = visible_dialog(page, 2000)
+        store_dialog_rows(dialog).first.wait_for(timeout=1500)
+        return True
+    except Exception:
+        return False
+
+
+def _stores_from_dialog_rows(page: Page, bot) -> list[dict[str, Any]]:
+    """Return placeholder store rows based on visible dialog cart buttons."""
+    dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
+    cart_buttons = store_dialog_cart_buttons(dialog)
+    if cart_buttons.count() == 0:
+        raise RuntimeError("Stores dialog became visible, but no cart buttons were found.")
+    return [{"availableQuantity": 1} for _ in range(cart_buttons.count())]
+
+
+def _stores_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return normalized stores rows from a store-details payload."""
+    return list(payload.get("data", []) or [])
+
+
+def _response_value(response_info):
+    """Return the resolved Playwright response when available."""
+    if response_info is None:
+        return None
+    try:
+        return response_info.value
+    except Exception:
+        return None
+
+
+def _wait_for_dialog_to_clear(page: Page) -> None:
+    """Wait briefly for remaining visible dialog masks to disappear."""
+    try:
+        page.locator(DIALOG_MASK_SELECTOR).first.wait_for(state="hidden", timeout=1500)
+    except Exception:
+        pass
+
+
+def _search_response_timeout_ms(bot) -> int:
+    """Return the shorter timeout used for search/store response waits."""
+    return min(int(bot.config.runtime.timeout_ms), 1500)
+
+
+def _dom_search_results(page: Page, query: str) -> list[dict[str, Any]]:
+    """Build fallback product candidates from the visible products table rows."""
+    results: list[dict[str, Any]] = []
+    rows = visible_product_rows(page)
+    for row_index in range(rows.count()):
+        row = rows.nth(row_index)
+        if is_no_results_row(row):
+            continue
+        candidate = _dom_candidate_from_row(row, query)
+        if candidate:
+            results.append(candidate)
+    return results
+
+
+def _table_has_no_results(page: Page) -> bool:
+    """Return whether Tawreed's products table currently shows the no-results row."""
+    rows = visible_product_rows(page)
+    if rows.count() != 1:
+        return False
+    try:
+        return is_no_results_row(rows.nth(0))
+    except Exception:
+        return False
+
+
+def _dom_candidate_from_row(row, query: str) -> dict[str, Any] | None:
+    """Return one fallback candidate parsed from a rendered products-table row."""
+    name_lines = _row_name_lines(row)
+    if not name_lines:
+        return None
+    if not _row_is_plausible_for_query(name_lines[0], query):
+        return None
+    supplier_count = _badge_int(row, "button:has(.pi-building) .p-badge")
+    cart_count = _badge_int(row, "button:has(.pi-shopping-cart) .p-badge")
+    return {
+        "productNameEn": _dom_fallback_english_name(query, name_lines[0]),
+        "productName": name_lines[0],
+        "productsCount": supplier_count,
+        "availableQuantity": max(cart_count, supplier_count, 1),
+        "storeProductId": f"dom-row-{_normalized_dom_id(name_lines[0])}",
+    }
+
+
+def _row_name_lines(row) -> list[str]:
+    """Return the visible product-name block lines for one rendered row."""
+    try:
+        name_block = row.locator("td").first.locator("div.flex.flex-column").first.inner_text().strip()
+    except Exception:
+        return []
+    return [line.strip() for line in name_block.splitlines() if line.strip()]
+
+
+def _badge_int(row, selector: str) -> int:
+    """Return an integer badge value from the row or zero when absent."""
+    try:
+        text = row.locator(selector).first.inner_text().strip()
+        return int(float(text))
+    except Exception:
+        return 0
+
+
+def _normalized_dom_id(text: str) -> str:
+    """Return a stable ASCII-ish identifier fragment for one DOM candidate."""
+    return "".join(character if character.isalnum() else "-" for character in text)[:48]
+
+
+def _dom_fallback_english_name(query: str, arabic_name: str) -> str:
+    """Return a query-shaped fallback English name using numeric clues from the Arabic row."""
+    query_tokens = [token for token in re.split(r"\s+", query.strip()) if token]
+    non_numeric_tokens = [token for token in query_tokens if not any(ch.isdigit() for ch in token)]
+    arabic_numeric_tokens = re.findall(r"\d+(?:\.\d+)?", arabic_name)
+    return " ".join(non_numeric_tokens + arabic_numeric_tokens) or query
+
+
+def _row_cart_button_enabled(row) -> bool:
+    """Return whether the row's direct cart button is currently enabled."""
+    try:
+        return cart_button(row).is_enabled()
+    except Exception:
+        return False
+
+
+def _disabled_cart_reason(row, item_name: str) -> str:
+    """Return a more specific skip reason when the cart button is disabled."""
+    visible_message = _row_unavailable_message(row)
+    supplier_count = _badge_int(row, "button:has(.pi-building) .p-badge")
+    cart_count = _badge_int(row, "button:has(.pi-shopping-cart) .p-badge")
+    if visible_message:
+        return f"Matched product is unavailable for '{item_name}': {visible_message}."
+    if supplier_count <= 0 and cart_count <= 0:
+        return f"Matched product has no available suppliers for '{item_name}'."
+    return f"Matched product cart button is disabled for '{item_name}'."
+
+
+def _row_unavailable_message(row) -> str:
+    """Return the row's visible red status message when Tawreed shows one."""
+    try:
+        message = row.locator("div[style*='color: red']").first.inner_text().strip()
+        return message
+    except Exception:
+        return ""
+
+
+def _wait_for_table_overlay_to_clear(page: Page) -> None:
+    """Wait briefly for Tawreed's table loading overlay to disappear after search updates."""
+    try:
+        page.locator(".p-datatable-loading-overlay").first.wait_for(state="hidden", timeout=2000)
+    except Exception:
+        pass
+
+
+def _wait_for_row_to_settle(row) -> None:
+    """Wait briefly for a matched row's cart button to stop changing before click."""
+    try:
+        cart_button(row).wait_for(timeout=1500)
+    except Exception:
+        pass
+
+
+def _matched_row_by_signature(rows, match: SearchMatch):
+    """Return the rendered row that best matches the chosen candidate signature."""
+    target_signature = _candidate_signature(match.data)
+    if not target_signature:
+        return None
+    for row_index in range(rows.count()):
+        row = rows.nth(row_index)
+        if is_no_results_row(row):
+            continue
+        if _row_signature(row) == target_signature:
+            return row
+    return None
+
+
+def _candidate_signature(candidate: dict[str, Any]) -> str:
+    """Return a stable normalized signature for a candidate's visible product text."""
+    product_name = str(candidate.get("productName") or "")
+    return _normalize_signature_text(product_name)
+
+
+def _row_signature(row) -> str:
+    """Return a stable normalized signature for a rendered row."""
+    name_lines = _row_name_lines(row)
+    if not name_lines:
+        return ""
+    return _normalize_signature_text(name_lines[0])
+
+
+def _normalize_signature_text(text: str) -> str:
+    """Return a compact comparable signature for visible row-name text."""
+    return re.sub(r"\s+", " ", str(text or "").strip())
+
+
+def _row_is_plausible_for_query(arabic_name: str, query: str) -> bool:
+    """Return whether a DOM-only Arabic row is numerically plausible for the current query."""
+    query_numbers = re.findall(r"\d+(?:\.\d+)?", query)
+    if not query_numbers:
+        return True
+    row_numbers = re.findall(r"\d+(?:\.\d+)?", arabic_name)
+    if not row_numbers:
+        return False
+    return bool(set(query_numbers) & set(row_numbers))
+
+
+def _should_stop_after_no_results(
+    queries: list[str],
+    query_index: int,
+    results: list[dict[str, Any]],
+) -> bool:
+    """Return whether repeated empty full-name searches should short-circuit later retries."""
+    if results:
+        return False
+    if query_index < min(len(queries), MIN_SEARCH_QUERIES_PER_ITEM) - 1:
+        return False
+    if query_index >= 2:
+        return True
+    return len(queries) <= 1
 
 
 def _match_decision(
@@ -204,9 +494,37 @@ def _match_decision(
     return explain_best_product_match(item, search_results_by_query, bot.config.matching)
 
 
-def _decisive_match(item: Item, query: str, decision: MatchDecision) -> bool:
+def _decisive_match(
+    item: Item,
+    query: str,
+    decision: MatchDecision,
+    query_index: int,
+    total_queries: int,
+) -> bool:
     """Return whether the current best match is decisive enough to stop searching."""
+    if query_index < min(total_queries, MIN_SEARCH_QUERIES_PER_ITEM) - 1:
+        return False
+    if not decision.best_match:
+        return False
+    if is_decisive_product_match(item.name or query, decision.best_match.data):
+        return True
+    best_diagnostic = _best_diagnostic_for_query(decision, query)
+    if best_diagnostic is None or not best_diagnostic.accepted:
+        return False
+    if best_diagnostic.query != query:
+        return False
+    has_numeric_tokens = bool(re.findall(r"\d+(?:\.\d+)?", item.name or query))
     return bool(
-        decision.best_match
-        and is_decisive_product_match(item.name or query, decision.best_match.data)
+        best_diagnostic.accepted_reason == "high_token_overlap"
+        and best_diagnostic.breakdown.overlap_score >= 0.95
+        and best_diagnostic.breakdown.sequence_score >= 0.8
+        and (not has_numeric_tokens or best_diagnostic.breakdown.numeric_overlap >= 1.0)
     )
+
+
+def _best_diagnostic_for_query(decision: MatchDecision, query: str):
+    """Return the highest-ranked diagnostic produced by the active query."""
+    matching = [diagnostic for diagnostic in decision.diagnostics if diagnostic.query == query]
+    if not matching:
+        return None
+    return max(matching, key=lambda diagnostic: diagnostic.sort_key)

@@ -7,7 +7,10 @@ from playwright.sync_api import Page
 from .tawreed_constants import (
     CART_BUTTON_SELECTOR,
     CHECKOUT_CONFIRMATION_LABELS,
+    DIALOG_MASK_SELECTOR,
     DIALOG_FOOTER_BUTTONS_SELECTOR,
+    STORE_DIALOG_CLOSE_BUTTON_SELECTOR,
+    STORE_DIALOG_ROWS_SELECTOR,
     STORE_DIALOG_CART_BUTTONS_SELECTOR,
     STORES_BUTTON_SELECTOR,
     VISIBLE_DIALOG_SELECTOR,
@@ -62,6 +65,21 @@ def cart_button(scope):
 def store_dialog_cart_buttons(dialog):
     """Return all cart buttons rendered inside the stores dialog."""
     return dialog.locator(STORE_DIALOG_CART_BUTTONS_SELECTOR)
+
+
+def dialog_close_buttons(dialog):
+    """Return the close buttons rendered for the current dialog."""
+    return dialog.locator(STORE_DIALOG_CLOSE_BUTTON_SELECTOR)
+
+
+def store_dialog_rows(dialog):
+    """Return the visible data rows inside the stores dialog."""
+    return dialog.locator(STORE_DIALOG_ROWS_SELECTOR)
+
+
+def visible_dialog_masks(page: Page):
+    """Return the visible Tawreed dialog masks."""
+    return page.locator(f"{DIALOG_MASK_SELECTOR}:visible")
 
 
 def checkout_confirmation_labels() -> tuple[str, ...]:

@@ -2,18 +2,35 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .excel import Item
 from .matching_models import CandidateMatchDiagnostic, MatchDecision
 from .tawreed_artifacts import (
     append_csv_artifact,
     append_text_artifact,
-    append_xlsx_artifact,
     write_text_artifact,
 )
 
 
+@dataclass(frozen=True)
+class OrderItemSummary:
+    """One compact execution summary row for an item processed during ordering."""
+
+    status: str
+    reason: str
+    matched_product_name: str = ""
+    matched_query: str = ""
+    searched_queries_count: int = 0
+    searched_queries: str = ""
+    elapsed_seconds: float = 0.0
+    match_elapsed_seconds: float = 0.0
+
+
 def write_match_log(bot, item: Item, decision: MatchDecision) -> None:
     """Write detailed TXT and CSV matching diagnostics for one item."""
+    if not should_write_detailed_match_log(decision):
+        return
     log_content = match_log_content(item, decision)
     log_label = f"match_log_{safe_item_label(item)}"
     write_text_artifact(bot.profile_key, log_label, log_content)
@@ -23,7 +40,46 @@ def write_match_log(bot, item: Item, decision: MatchDecision) -> None:
         match_log_section_separator(item) + log_content,
     )
     append_csv_artifact(bot.profile_key, "match_log_all", match_log_csv_rows(item, decision))
-    append_xlsx_artifact(bot.profile_key, "match_summary", match_summary_rows(item, decision))
+
+
+def should_write_detailed_match_log(decision: MatchDecision) -> bool:
+    """Return whether one decision needs full diagnostic logging for later review."""
+    if not decision.best_match:
+        return True
+    best_diagnostic = _best_match_diagnostic(decision)
+    if best_diagnostic is None:
+        return True
+    if not best_diagnostic.accepted:
+        return True
+    if best_diagnostic.accepted_reason != "high_token_overlap":
+        return True
+    if best_diagnostic.breakdown.overlap_score < 1.0:
+        return True
+    if best_diagnostic.breakdown.numeric_overlap not in (0.0, 1.0):
+        return True
+    return False
+
+
+def append_order_result_summary(
+    profile_key: str,
+    item: Item,
+    summary: OrderItemSummary,
+) -> None:
+    """Append one compact order-result summary row to the CSV artifact."""
+    row = {
+        "item_code": item.code,
+        "item_name": item.name,
+        "item_qty": item.qty,
+        "status": summary.status,
+        "reason": summary.reason,
+        "matched_product_name": summary.matched_product_name,
+        "matched_query": summary.matched_query,
+        "searched_queries_count": summary.searched_queries_count,
+        "searched_queries": summary.searched_queries,
+        "elapsed_seconds": round(summary.elapsed_seconds, 3),
+        "match_elapsed_seconds": round(summary.match_elapsed_seconds, 3),
+    }
+    append_csv_artifact(profile_key, "order_result_summary", [row])
 
 
 def match_log_content(item: Item, decision: MatchDecision) -> str:
@@ -32,6 +88,20 @@ def match_log_content(item: Item, decision: MatchDecision) -> str:
     for candidate_index, diagnostic in enumerate(_sorted_diagnostics(decision), start=1):
         lines.extend(candidate_log_lines(candidate_index, diagnostic))
     return "\n".join(lines) + "\n"
+
+
+def _best_match_diagnostic(decision: MatchDecision) -> CandidateMatchDiagnostic | None:
+    """Return the diagnostic that corresponds to the accepted best match."""
+    best_match = decision.best_match
+    if best_match is None:
+        return None
+    for diagnostic in decision.diagnostics:
+        if diagnostic.query != best_match.query:
+            continue
+        if diagnostic.row_index != best_match.row_index:
+            continue
+        return diagnostic
+    return None
 
 
 def _match_log_header_lines(item: Item, decision: MatchDecision) -> list[str]:

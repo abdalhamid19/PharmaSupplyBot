@@ -114,16 +114,31 @@ def _unique_non_empty(values: list[str]) -> list[str]:
 def _search_queries_for_item(item: Item) -> list[str]:
     """Build ordered search queries from the Excel item name and code."""
     name = str(item.name or "").strip()
+    normalized_name = _normalize_search_query(name)
     tokens = name.split()
+    normalized_tokens = normalized_name.split()
     return _unique_non_empty(
         [
             name,
+            normalized_name,
             " ".join(tokens[:4]),
+            " ".join(normalized_tokens[:4]),
             " ".join(tokens[:3]),
+            " ".join(normalized_tokens[:3]),
             " ".join(tokens[:2]),
+            " ".join(normalized_tokens[:2]),
             tokens[0] if tokens else "",
+            normalized_tokens[0] if normalized_tokens else "",
         ]
     )
+
+
+def _normalize_search_query(value: str) -> str:
+    """Return a search-friendly variant that separates dosage and punctuation tokens."""
+    text = str(value or "").upper()
+    text = re.sub(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)", " ", text)
+    text = re.sub(r"[^A-Z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def find_best_product_match(

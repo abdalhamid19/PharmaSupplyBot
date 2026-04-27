@@ -48,7 +48,11 @@ def append_csv_artifact(profile_key: str, label: str, rows: list[dict[str, objec
     artifacts_dir = _artifacts_dir(profile_key)
     artifact_path = artifacts_dir / f"{label}.csv"
     fieldnames = list(rows[0].keys())
-    should_write_header = not artifact_path.exists()
+    if artifact_path.exists():
+        existing_fieldnames = _csv_header_fieldnames(artifact_path)
+        if existing_fieldnames and existing_fieldnames != fieldnames:
+            _rewrite_csv_artifact_with_fieldnames(artifact_path, fieldnames)
+    should_write_header = not artifact_path.exists() or artifact_path.stat().st_size == 0
     with artifact_path.open("a", encoding="utf-8", newline="") as artifact_file:
         writer = csv.DictWriter(artifact_file, fieldnames=fieldnames)
         if should_write_header:
@@ -92,6 +96,25 @@ def _open_or_create_workbook(artifact_path: Path):
         return workbook, workbook.active
     workbook = Workbook()
     return workbook, workbook.active
+
+
+def _csv_header_fieldnames(artifact_path: Path) -> list[str]:
+    """Return the existing CSV header row fieldnames when the file is present."""
+    with artifact_path.open("r", encoding="utf-8", newline="") as artifact_file:
+        reader = csv.DictReader(artifact_file)
+        return list(reader.fieldnames or [])
+
+
+def _rewrite_csv_artifact_with_fieldnames(artifact_path: Path, fieldnames: list[str]) -> None:
+    """Rewrite an existing CSV artifact so all rows conform to the requested fieldnames."""
+    with artifact_path.open("r", encoding="utf-8", newline="") as artifact_file:
+        reader = csv.DictReader(artifact_file)
+        existing_rows = list(reader)
+    with artifact_path.open("w", encoding="utf-8", newline="") as artifact_file:
+        writer = csv.DictWriter(artifact_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in existing_rows:
+            writer.writerow({field_name: row.get(field_name, "") for field_name in fieldnames})
 
 
 def _ensure_xlsx_header_row(worksheet, fieldnames: list[str]) -> None:

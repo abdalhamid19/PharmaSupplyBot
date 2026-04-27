@@ -8,11 +8,18 @@ PRODUCT_ROWS_SELECTOR = "tbody.p-datatable-tbody > tr"
 PRODUCT_SEARCH_ENDPOINT = "stores/products/search/similar5"
 STORE_DETAILS_ENDPOINT = "stores/products/product/get"
 VISIBLE_DIALOG_SELECTOR = ".p-dialog:visible"
+DIALOG_MASK_SELECTOR = ".p-dialog-mask"
 DIALOG_FOOTER_BUTTONS_SELECTOR = ".p-dialog-footer button"
 QUANTITY_INPUT_SELECTOR = "input[role='spinbutton']"
 STORES_BUTTON_SELECTOR = "button:has(.pi-building)"
 CART_BUTTON_SELECTOR = "button:has(.pi-shopping-cart)"
 STORE_DIALOG_CART_BUTTONS_SELECTOR = ".p-dialog-content button:has(.pi-shopping-cart)"
+STORE_DIALOG_ROWS_SELECTOR = "tbody tr"
+STORE_DIALOG_CLOSE_BUTTON_SELECTOR = (
+    ".p-dialog-header button, "
+    "button[aria-label='Close'], "
+    "button.p-dialog-header-icon"
+)
 ENABLED_CHECKOUT_TEXT_SELECTOR = "button:has-text('Checkout'):not([disabled])"
 CHECKOUT_CONFIRMATION_LABELS = (
     "Confirm",
