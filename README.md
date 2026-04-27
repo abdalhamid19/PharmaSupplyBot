@@ -70,6 +70,24 @@ py run.py order --excel "input/shortage_report_total_20260422.xlsx" --all-profil
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
+### 6. تشغيل واجهة Streamlit
+
+```powershell
+.\.venv\Scripts\python -m streamlit run streamlit_app.py
+```
+
+الواجهة توفر:
+- تشغيل `auth` من المتصفح
+- تشغيل `order` على ملف Excel موجود أو مرفوع
+- مراجعة `order_result_summary.csv`
+- مراجعة `order_result_summary.xlsx`
+- عرض عدد الثواني لكل صنف في الدفعات الحديثة
+- عرض متوسط زمن التنفيذ وأبطأ الأصناف
+
+في تبويب `Results`:
+- يتم عرض `CSV` و`XLSX` في تبويبين منفصلين
+- إذا كان `order_result_summary.xlsx` أقدم من `order_result_summary.csv` ستظهر ملاحظة بذلك داخل الواجهة
+
 ## سلوك التنفيذ الحالي
 
 - افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
@@ -95,6 +113,12 @@ py run.py auth --profile wardany
   سجل نصي لكل مرشحي المطابقة
 - `artifacts/<profile>/match_log_all.csv`
   سجل CSV لكل مرشحي المطابقة
+- `artifacts/<profile>/order_result_summary.csv`
+  الملخص الأساسي لنتائج التشغيل، وهو المصدر الأحدث المعتمد للتحليل
+- `artifacts/<profile>/order_result_summary.xlsx`
+  نسخة Excel من ملخص النتائج إذا كانت موجودة
+- `streamlit_app.py`
+  واجهة Streamlit لتشغيل `auth` و`order` ومراجعة النتائج
 
 ## فحص الكود محليًا
 
