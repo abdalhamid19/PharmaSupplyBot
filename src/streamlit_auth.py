@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import sys
 
 import streamlit as st
 
@@ -15,8 +17,11 @@ def render_auth_tab(app_config, default_profile: str | None, config_path: Path) 
     if not default_profile:
         st.warning("No profiles found in config.")
         return
-    submitted, profile_key, wait_seconds = auth_form_values(app_config)
-    render_local_auth_guidance(profile_key)
+    auth_available = interactive_auth_available()
+    submitted, profile_key, wait_seconds = auth_form_values(app_config, auth_available)
+    render_local_auth_guidance(profile_key, auth_available)
+    if not auth_available:
+        return
     if not submitted:
         return
     with st.spinner("Opening browser for login..."):
@@ -24,18 +29,21 @@ def render_auth_tab(app_config, default_profile: str | None, config_path: Path) 
     render_command_result(result)
 
 
-def auth_form_values(app_config) -> tuple[bool, str, int]:
+def auth_form_values(app_config, auth_available: bool) -> tuple[bool, str, int]:
     """Return the submitted auth form values."""
     with st.form("auth_form"):
         profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
         wait_seconds = st.number_input("Wait seconds", min_value=60, max_value=3600, value=600)
-        submitted = st.form_submit_button("Start Auth Browser")
+        submitted = st.form_submit_button("Start Auth Browser", disabled=not auth_available)
     return bool(submitted), str(profile_key), int(wait_seconds)
 
 
-def render_local_auth_guidance(profile_key: str) -> None:
+def render_local_auth_guidance(profile_key: str, auth_available: bool) -> None:
     """Render the local-auth fallback instructions for one selected profile."""
-    st.info("If the hosted browser flow is unavailable, authenticate once on your local machine.")
+    if auth_available:
+        st.info("If browser auth is unavailable in your environment, authenticate once locally.")
+    else:
+        st.warning("This hosted environment cannot open an interactive Playwright browser.")
     st.code(local_auth_command(profile_key), language="powershell")
     st.caption(f"Then upload `state/{profile_key}.json` in the `Order` tab.")
 
@@ -43,6 +51,15 @@ def render_local_auth_guidance(profile_key: str) -> None:
 def local_auth_command(profile_key: str) -> str:
     """Return the local CLI auth command for one profile."""
     return f"py run.py auth --profile {profile_key}"
+
+
+def interactive_auth_available() -> bool:
+    """Return whether this environment can launch the interactive auth browser."""
+    if os.getenv("PHARMASUPPLYBOT_DISABLE_STREAMLIT_AUTH") == "1":
+        return False
+    if not sys.platform.startswith("linux"):
+        return True
+    return bool(os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY"))
 
 
 def auth_command(profile_key: str, wait_seconds: int, config_path: Path) -> list[str]:

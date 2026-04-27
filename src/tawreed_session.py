@@ -77,6 +77,8 @@ def wait_for_login_detection(
     page: Page,
     context,
     wait_seconds: int,
+    login_email_selector: str,
+    login_password_selector: str,
     logged_in_marker: str,
     state_path: Path,
 ) -> bool:
@@ -85,6 +87,8 @@ def wait_for_login_detection(
         page,
         context,
         wait_seconds,
+        login_email_selector,
+        login_password_selector,
         logged_in_marker,
         state_path,
         save_session_state,

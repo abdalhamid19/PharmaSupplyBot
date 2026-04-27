@@ -78,6 +78,8 @@ class TawreedBot:
                 page,
                 context,
                 wait_seconds,
+                self.selectors.login_email,
+                self.selectors.login_password,
                 self.selectors.logged_in_marker,
                 self.state_path,
             )

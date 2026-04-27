@@ -6,11 +6,17 @@ from pathlib import Path
 
 from playwright.sync_api import Page
 
+from .tawreed_login_detection import (
+    is_logged_in_marker_visible as marker_visible,
+    login_detected,
+)
 
 def wait_for_login_detection(
     page: Page,
     context,
     wait_seconds: int,
+    login_email_selector: str,
+    login_password_selector: str,
     logged_in_marker: str,
     state_path: Path,
     save_session_state,
@@ -18,7 +24,13 @@ def wait_for_login_detection(
     """Poll the page until the logged-in marker appears or the timeout is reached."""
     wait_state = _initial_wait_state(wait_seconds)
     while wait_state["total_waited_ms"] < wait_state["wait_budget_ms"]:
-        if _is_logged_in_marker_visible(page, logged_in_marker, wait_state["poll_ms"]):
+        if login_detected(
+            page,
+            wait_state["poll_ms"],
+            login_email_selector,
+            login_password_selector,
+            logged_in_marker,
+        ):
             return True
         _advance_wait_state(wait_state, context, state_path, save_session_state)
     return False
@@ -56,16 +68,7 @@ def _advance_wait_state(
 
 def is_logged_in_marker_visible(page: Page, logged_in_marker: str, timeout_ms: int) -> bool:
     """Return whether the configured logged-in marker appears within the timeout."""
-    return _is_logged_in_marker_visible(page, logged_in_marker, timeout_ms)
-
-
-def _is_logged_in_marker_visible(page: Page, logged_in_marker: str, timeout_ms: int) -> bool:
-    """Return whether the configured logged-in marker appears within the timeout."""
-    try:
-        page.locator(logged_in_marker).first.wait_for(timeout=timeout_ms)
-        return True
-    except Exception:
-        return False
+    return marker_visible(page, logged_in_marker, timeout_ms)
 
 
 def _wait_budget_ms(wait_seconds: int) -> int:
