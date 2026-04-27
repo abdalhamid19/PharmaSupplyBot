@@ -10,7 +10,7 @@ from .streamlit_auth import render_auth_tab
 from .streamlit_order import render_order_tab
 from .streamlit_overview import render_overview
 from .streamlit_results import render_results_tab
-from .streamlit_shared import APP_TITLE, sidebar_config_path
+from .streamlit_shared import APP_TITLE, FALLBACK_CONFIG_PATH, resolved_streamlit_config_path, sidebar_config_path
 
 
 def main() -> None:
@@ -26,14 +26,28 @@ def main() -> None:
 
 def loaded_app_config():
     """Return the loaded application config and its selected path, or stop on failure."""
-    config_path = sidebar_config_path()
+    selected_config_path = sidebar_config_path()
+    config_path = resolved_streamlit_config_path(selected_config_path)
     try:
         app_config = load_config(config_path)
     except Exception as error:
         st.error(f"Could not load config: {error}")
         st.stop()
     st.sidebar.success(f"Loaded config: `{config_path}`")
+    maybe_warn_fallback_config(selected_config_path, config_path)
     return app_config, config_path
+
+
+def maybe_warn_fallback_config(selected_config_path, loaded_config_path) -> None:
+    """Warn when Streamlit falls back from config.yaml to config.example.yaml."""
+    if selected_config_path == loaded_config_path:
+        return
+    if loaded_config_path != FALLBACK_CONFIG_PATH:
+        return
+    st.warning(
+        "Using `config.example.yaml` because `config.yaml` was not found. "
+        "Provide a real `config.yaml` for production settings."
+    )
 
 
 def first_profile_key(app_config) -> str | None:
@@ -50,7 +64,7 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
     with overview_tab:
         render_overview(app_config)
     with auth_tab:
-        render_auth_tab(app_config, default_profile)
+        render_auth_tab(app_config, default_profile, config_path)
     with order_tab:
         render_order_tab(app_config, default_profile, config_path)
     with results_tab:

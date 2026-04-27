@@ -10,6 +10,7 @@ import streamlit as st
 
 APP_TITLE = "PharmaSupplyBot"
 DEFAULT_CONFIG_PATH = Path("config.yaml")
+FALLBACK_CONFIG_PATH = Path("config.example.yaml")
 INPUT_DIR = Path("input")
 ARTIFACTS_DIR = Path("artifacts")
 RUNNER_PATH = Path("run.py")
@@ -19,6 +20,15 @@ def sidebar_config_path() -> Path:
     """Return the selected YAML config path from the sidebar."""
     config_input = st.sidebar.text_input("Config path", str(DEFAULT_CONFIG_PATH))
     return Path(config_input).expanduser()
+
+
+def resolved_streamlit_config_path(config_path: Path) -> Path:
+    """Return the config path Streamlit should use, including the default example fallback."""
+    if config_path.exists():
+        return config_path
+    if config_path == DEFAULT_CONFIG_PATH and FALLBACK_CONFIG_PATH.exists():
+        return FALLBACK_CONFIG_PATH
+    return config_path
 
 
 def load_csv_rows(path: Path) -> list[dict[str, str]]:

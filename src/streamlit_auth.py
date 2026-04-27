@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
 from .streamlit_process import render_command_result, run_cli_subprocess
-from .streamlit_shared import sidebar_config_path
 
 
-def render_auth_tab(app_config, default_profile: str | None) -> None:
+def render_auth_tab(app_config, default_profile: str | None, config_path: Path) -> None:
     """Render the auth workflow controls."""
     st.subheader("Interactive Login")
     if not default_profile:
@@ -18,7 +19,7 @@ def render_auth_tab(app_config, default_profile: str | None) -> None:
     if not submitted:
         return
     with st.spinner("Opening browser for login..."):
-        result = run_cli_subprocess(auth_command(profile_key, wait_seconds))
+        result = run_cli_subprocess(auth_command(profile_key, wait_seconds, config_path))
     render_command_result(result)
 
 
@@ -31,12 +32,12 @@ def auth_form_values(app_config) -> tuple[bool, str, int]:
     return bool(submitted), str(profile_key), int(wait_seconds)
 
 
-def auth_command(profile_key: str, wait_seconds: int) -> list[str]:
+def auth_command(profile_key: str, wait_seconds: int, config_path: Path) -> list[str]:
     """Return the CLI command arguments for one auth run."""
     return [
         "auth",
         "--config",
-        str(sidebar_config_path()),
+        str(config_path),
         "--profile",
         profile_key,
         "--wait-seconds",
