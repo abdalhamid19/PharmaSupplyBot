@@ -20,6 +20,7 @@ def wait_for_login_detection(
     logged_in_marker: str,
     state_path: Path,
     save_session_state,
+    save_intermediate: bool = True,
 ) -> bool:
     """Poll the page until the logged-in marker appears or the timeout is reached."""
     wait_state = _initial_wait_state(wait_seconds)
@@ -32,7 +33,13 @@ def wait_for_login_detection(
             logged_in_marker,
         ):
             return True
-        _advance_wait_state(wait_state, context, state_path, save_session_state)
+        _advance_wait_state(
+            wait_state,
+            context,
+            state_path,
+            save_session_state,
+            save_intermediate,
+        )
     return False
 
 
@@ -52,6 +59,7 @@ def _advance_wait_state(
     context,
     state_path: Path,
     save_session_state,
+    save_intermediate: bool,
 ) -> None:
     """Advance the polling state and save session state when the interval is due."""
     poll_ms = wait_state["poll_ms"]
@@ -63,6 +71,7 @@ def _advance_wait_state(
         wait_state["since_last_save_ms"],
         wait_state["save_every_ms"],
         save_session_state,
+        save_intermediate,
     )
 
 
@@ -82,8 +91,11 @@ def _save_state_if_due(
     since_last_save_ms: int,
     save_every_ms: int,
     save_session_state,
+    save_intermediate: bool,
 ) -> int:
     """Persist intermediate session state when the save interval has elapsed."""
+    if not save_intermediate:
+        return 0 if since_last_save_ms >= save_every_ms else since_last_save_ms
     if since_last_save_ms < save_every_ms:
         return since_last_save_ms
     save_session_state(context, state_path, is_intermediate=True)

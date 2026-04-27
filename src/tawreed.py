@@ -23,6 +23,7 @@ from .tawreed_session import (
     close_context,
     discard_session_state,
     ensure_logged_in,
+    headless_auth_failure_message,
     open_auth_page,
     open_order_page,
     print_auth_instructions,
@@ -93,7 +94,7 @@ class TawreedBot:
             )
             try:
                 attempt_env_login(page, self.selectors)
-                print_auth_instructions(wait_seconds)
+                print_auth_instructions(wait_seconds, headless=headless)
                 detected = wait_for_login_detection(
                     page,
                     context,
@@ -102,10 +103,13 @@ class TawreedBot:
                     self.selectors.login_password,
                     self.selectors.logged_in_marker,
                     temp_state_path,
+                    save_intermediate=not headless,
                 )
                 wait_for_network_idle(page)
                 print_login_detection_result(detected)
                 save_session_state(context, temp_state_path, is_intermediate=False)
+                if headless and not detected:
+                    raise self._headless_auth_error()
                 validate_saved_session(
                     p,
                     self.config.runtime,
@@ -116,12 +120,23 @@ class TawreedBot:
                 )
                 promote_session_state(temp_state_path, self.state_path)
                 print(f"Saved validated session state: {self.state_path}")
-            except Exception:
+            except Exception as error:
+                if headless:
+                    dump_artifacts(
+                        page,
+                        self.profile_key,
+                        label="headless_auth_error",
+                        details=_artifact_details("headless_auth_error", error),
+                    )
                 discard_session_state(temp_state_path)
                 raise
             finally:
                 close_context(context)
                 close_browser(browser)
+
+    def _headless_auth_error(self) -> Exception:
+        """Return the explicit auth failure used when hosted login never leaves the login page."""
+        return RuntimeError(headless_auth_failure_message())
 
     def place_order_from_items(self, items: list[Item]) -> None:
         """Place an order by processing each item from the provided list."""

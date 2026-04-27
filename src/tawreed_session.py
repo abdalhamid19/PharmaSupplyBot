@@ -62,8 +62,15 @@ def attempt_env_login(page: Page, selectors) -> None:
         pass
 
 
-def print_auth_instructions(wait_seconds: int) -> None:
-    """Explain the manual login window behavior to the operator."""
+def print_auth_instructions(wait_seconds: int, headless: bool = False) -> None:
+    """Explain the authentication behavior to the operator."""
+    if headless:
+        print(
+            "Headless browser opened for credential-based login.\n"
+            f"- I will wait up to {wait_seconds} seconds for Tawreed to authenticate.\n"
+            "- If the site requires CAPTCHA/OTP or extra human verification, this mode will fail.\n"
+        )
+        return
     print(
         "Browser opened. Please complete login manually.\n"
         "- I will keep the browser open for up to "
@@ -80,6 +87,7 @@ def wait_for_login_detection(
     login_password_selector: str,
     logged_in_marker: str,
     state_path: Path,
+    save_intermediate: bool = True,
 ) -> bool:
     """Poll the page until the logged-in marker appears or the timeout is reached."""
     return poll_for_login_detection(
@@ -91,6 +99,7 @@ def wait_for_login_detection(
         logged_in_marker,
         state_path,
         save_session_state,
+        save_intermediate=save_intermediate,
     )
 
 
@@ -115,6 +124,15 @@ def print_login_detection_result(detected: bool) -> None:
     print(
         "Login marker not detected before timeout. Saving session anyway.\n"
         "If it doesn't work later, update selectors.nav.logged_in_marker in config.yaml."
+    )
+
+
+def headless_auth_failure_message() -> str:
+    """Return the user-facing failure message for hosted headless-auth attempts."""
+    return (
+        "Headless auth did not produce a valid Tawreed session. "
+        "The site stayed on the login page or required extra human verification. "
+        "Check credentials, OTP/CAPTCHA requirements, and login selectors."
     )
 
 

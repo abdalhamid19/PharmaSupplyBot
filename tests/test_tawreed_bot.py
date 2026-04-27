@@ -103,6 +103,59 @@ class TawreedBotTests(unittest.TestCase):
             self.assertEqual(state_path.read_text(encoding="utf-8"), "old-state")
             self.assertFalse((Path(temp_dir) / "wardany.tmp.json").exists())
 
+    def test_headless_auth_failure_message_is_used_when_login_is_not_detected(self) -> None:
+        config = AppConfig(
+            base_url="https://seller.tawreed.io/#/login",
+            excel=ExcelConfig(code_col="code", name_col="name", qty_col="qty"),
+            profiles={"wardany": ProfileConfig(display_name="Wardany", pharmacy_switch={})},
+            selectors={
+                "login": {
+                    "email_input": "#email",
+                    "password_input": "#password",
+                    "submit_button": "#submit",
+                },
+                "nav": {"logged_in_marker": "#marker"},
+                "order_flow": {"item_search_input": "#search"},
+            },
+            warehouse_strategy={},
+            matching=MatchingConfig(),
+            runtime=RuntimeConfig(),
+        )
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "wardany.json"
+            bot = TawreedBot(
+                config=config,
+                profile_key="wardany",
+                profile=config.profiles["wardany"],
+                state_path=state_path,
+            )
+
+            class _PlaywrightContext:
+                def __enter__(self):
+                    return object()
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+            fake_context = object()
+            fake_browser = object()
+            fake_page = object()
+
+            with patch("src.tawreed.sync_playwright", return_value=_PlaywrightContext()):
+                with patch("src.tawreed.open_auth_page", return_value=(fake_browser, fake_context, fake_page)):
+                    with patch("src.tawreed.attempt_env_login"):
+                        with patch("src.tawreed.print_auth_instructions"):
+                            with patch("src.tawreed.wait_for_login_detection", return_value=False):
+                                with patch("src.tawreed.wait_for_network_idle"):
+                                    with patch("src.tawreed.print_login_detection_result"):
+                                        with patch("src.tawreed.save_session_state"):
+                                            with patch("src.tawreed.dump_artifacts"):
+                                                with patch("src.tawreed.close_context"):
+                                                    with patch("src.tawreed.close_browser"):
+                                                        with self.assertRaises(RuntimeError) as context:
+                                                            bot.auth_headless(wait_seconds=30)
+            self.assertIn("Headless auth did not produce a valid Tawreed session", str(context.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

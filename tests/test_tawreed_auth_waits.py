@@ -77,6 +77,23 @@ class TawreedAuthWaitsTests(unittest.TestCase):
         )
         self.assertTrue(detected)
 
+    def test_wait_for_login_detection_skips_intermediate_saves_when_disabled(self) -> None:
+        page = _FakePage("https://seller.tawreed.io/#/login", marker_visible=False, login_visible=True)
+        save_calls = []
+        detected = wait_for_login_detection(
+            page,
+            context=object(),
+            wait_seconds=1,
+            login_email_selector="#email",
+            login_password_selector="#password",
+            logged_in_marker="#marker",
+            state_path=Path("state/wardany.json"),
+            save_session_state=lambda *_args, **_kwargs: save_calls.append("saved"),
+            save_intermediate=False,
+        )
+        self.assertFalse(detected)
+        self.assertEqual(save_calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()
