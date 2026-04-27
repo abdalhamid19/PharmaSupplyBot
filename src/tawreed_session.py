@@ -102,6 +102,11 @@ def wait_for_network_idle(page: Page) -> None:
         pass
 
 
+def auth_temp_state_path(state_path: Path) -> Path:
+    """Return the temporary path used while validating a newly captured auth session."""
+    return state_path.with_name(f"{state_path.stem}.tmp{state_path.suffix}")
+
+
 def print_login_detection_result(detected: bool) -> None:
     """Report whether login detection succeeded before the timeout."""
     if detected:
@@ -121,6 +126,38 @@ def save_session_state(context, state_path: Path, is_intermediate: bool) -> None
             print(f"Saved intermediate session state: {state_path}")
     except Exception:
         pass
+
+
+def promote_session_state(temp_state_path: Path, final_state_path: Path) -> None:
+    """Replace the final saved session state with a validated temporary capture."""
+    final_state_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_state_path.replace(final_state_path)
+
+
+def discard_session_state(state_path: Path) -> None:
+    """Delete one temporary or invalid saved session state without surfacing cleanup errors."""
+    try:
+        state_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def validate_saved_session(
+    playwright,
+    runtime,
+    state_path: Path,
+    target_url: str,
+    selectors,
+    ready_selector: str,
+) -> None:
+    """Open a fresh browser context with one saved state and verify it is authenticated."""
+    browser, context, page = open_order_page(playwright, runtime, state_path)
+    try:
+        page.goto(target_url, wait_until="domcontentloaded")
+        ensure_logged_in(page, selectors, runtime.timeout_ms, ready_selector=ready_selector)
+    finally:
+        close_context(context)
+        close_browser(browser)
 
 
 def ensure_logged_in(page: Page, selectors, timeout_ms: int, ready_selector: str = "") -> None:

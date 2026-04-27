@@ -17,15 +17,19 @@ from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_products_flow import add_item_from_products_page, close_visible_dialogs
 from .tawreed_session import (
+    auth_temp_state_path,
     attempt_env_login,
     close_browser,
     close_context,
+    discard_session_state,
     ensure_logged_in,
     open_auth_page,
     open_order_page,
     print_auth_instructions,
     print_login_detection_result,
+    promote_session_state,
     save_session_state,
+    validate_saved_session,
     wait_for_login_detection,
     wait_for_network_idle,
 )
@@ -79,28 +83,45 @@ class TawreedBot:
     def _auth(self, wait_seconds: int, headless: bool) -> None:
         """Authenticate in either interactive or headless mode and save session state."""
         with sync_playwright() as p:
+            temp_state_path = auth_temp_state_path(self.state_path)
+            discard_session_state(temp_state_path)
             browser, context, page = open_auth_page(
                 p,
                 self.config.base_url,
                 self.config.runtime,
                 headless=headless,
             )
-            attempt_env_login(page, self.selectors)
-            print_auth_instructions(wait_seconds)
-            detected = wait_for_login_detection(
-                page,
-                context,
-                wait_seconds,
-                self.selectors.login_email,
-                self.selectors.login_password,
-                self.selectors.logged_in_marker,
-                self.state_path,
-            )
-            wait_for_network_idle(page)
-            print_login_detection_result(detected)
-            save_session_state(context, self.state_path, is_intermediate=False)
-            browser.close()
-            print(f"Saved session state: {self.state_path}")
+            try:
+                attempt_env_login(page, self.selectors)
+                print_auth_instructions(wait_seconds)
+                detected = wait_for_login_detection(
+                    page,
+                    context,
+                    wait_seconds,
+                    self.selectors.login_email,
+                    self.selectors.login_password,
+                    self.selectors.logged_in_marker,
+                    temp_state_path,
+                )
+                wait_for_network_idle(page)
+                print_login_detection_result(detected)
+                save_session_state(context, temp_state_path, is_intermediate=False)
+                validate_saved_session(
+                    p,
+                    self.config.runtime,
+                    temp_state_path,
+                    self._products_page_url(),
+                    self.selectors,
+                    self.selectors.item_search_input,
+                )
+                promote_session_state(temp_state_path, self.state_path)
+                print(f"Saved validated session state: {self.state_path}")
+            except Exception:
+                discard_session_state(temp_state_path)
+                raise
+            finally:
+                close_context(context)
+                close_browser(browser)
 
     def place_order_from_items(self, items: list[Item]) -> None:
         """Place an order by processing each item from the provided list."""

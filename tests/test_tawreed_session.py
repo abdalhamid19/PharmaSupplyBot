@@ -1,7 +1,14 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
-from src.tawreed_session import SessionInvalidError, ensure_logged_in
+from src.tawreed_session import (
+    SessionInvalidError,
+    auth_temp_state_path,
+    ensure_logged_in,
+    promote_session_state,
+)
 
 
 class _FakePage:
@@ -64,6 +71,22 @@ class TawreedSessionTests(unittest.TestCase):
         with self.assertRaises(SessionInvalidError) as context:
             ensure_logged_in(page, self.selectors, timeout_ms=5000, ready_selector="#ready")
         self.assertIn("expected order surface", str(context.exception))
+
+    def test_auth_temp_state_path_uses_tmp_suffix(self) -> None:
+        self.assertEqual(
+            auth_temp_state_path(Path("state/wardany.json")),
+            Path("state/wardany.tmp.json"),
+        )
+
+    def test_promote_session_state_replaces_final_file(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            final_path = Path(temp_dir) / "wardany.json"
+            temp_path = Path(temp_dir) / "wardany.tmp.json"
+            final_path.write_text("old", encoding="utf-8")
+            temp_path.write_text("new", encoding="utf-8")
+            promote_session_state(temp_path, final_path)
+            self.assertEqual(final_path.read_text(encoding="utf-8"), "new")
+            self.assertFalse(temp_path.exists())
 
 
 if __name__ == "__main__":

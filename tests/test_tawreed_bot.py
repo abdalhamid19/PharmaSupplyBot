@@ -1,9 +1,12 @@
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from src.config_models import AppConfig, ExcelConfig, MatchingConfig, ProfileConfig, RuntimeConfig
 from src.tawreed import TawreedBot
+from src.tawreed_session import SessionInvalidError
 
 
 class _FakePage:
@@ -37,6 +40,68 @@ class TawreedBotTests(unittest.TestCase):
             bot._is_products_page(_FakePage("https://seller.tawreed.io/#/catalog/store-products/dv/"))
         )
         self.assertFalse(bot._is_products_page(_FakePage("https://seller.tawreed.io/#/login")))
+
+    def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:
+        config = AppConfig(
+            base_url="https://seller.tawreed.io/#/login",
+            excel=ExcelConfig(code_col="code", name_col="name", qty_col="qty"),
+            profiles={"wardany": ProfileConfig(display_name="Wardany", pharmacy_switch={})},
+            selectors={
+                "login": {
+                    "email_input": "#email",
+                    "password_input": "#password",
+                    "submit_button": "#submit",
+                },
+                "nav": {"logged_in_marker": "#marker"},
+                "order_flow": {"item_search_input": "#search"},
+            },
+            warehouse_strategy={},
+            matching=MatchingConfig(),
+            runtime=RuntimeConfig(),
+        )
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "wardany.json"
+            state_path.write_text("old-state", encoding="utf-8")
+            bot = TawreedBot(
+                config=config,
+                profile_key="wardany",
+                profile=config.profiles["wardany"],
+                state_path=state_path,
+            )
+
+            class _PlaywrightContext:
+                def __enter__(self):
+                    return object()
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+            fake_context = object()
+            fake_browser = object()
+            fake_page = object()
+
+            def fake_save_session_state(_context, path: Path, is_intermediate: bool) -> None:
+                path.write_text("new-state", encoding="utf-8")
+
+            with patch("src.tawreed.sync_playwright", return_value=_PlaywrightContext()):
+                with patch("src.tawreed.open_auth_page", return_value=(fake_browser, fake_context, fake_page)):
+                    with patch("src.tawreed.attempt_env_login"):
+                        with patch("src.tawreed.print_auth_instructions"):
+                            with patch("src.tawreed.wait_for_login_detection", return_value=True):
+                                with patch("src.tawreed.wait_for_network_idle"):
+                                    with patch("src.tawreed.print_login_detection_result"):
+                                        with patch("src.tawreed.save_session_state", side_effect=fake_save_session_state):
+                                            with patch(
+                                                "src.tawreed.validate_saved_session",
+                                                side_effect=SessionInvalidError("invalid"),
+                                            ):
+                                                with patch("src.tawreed.close_context"):
+                                                    with patch("src.tawreed.close_browser"):
+                                                        with self.assertRaises(SessionInvalidError):
+                                                            bot.auth_headless(wait_seconds=30)
+
+            self.assertEqual(state_path.read_text(encoding="utf-8"), "old-state")
+            self.assertFalse((Path(temp_dir) / "wardany.tmp.json").exists())
 
 
 if __name__ == "__main__":
