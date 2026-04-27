@@ -72,6 +72,12 @@ py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wa
 
 ### 6. تشغيل واجهة Streamlit
 
+الرابط الأونلاين:
+
+```text
+https://mahrouspharmacies-pharmasupplybot.streamlit.app/
+```
+
 لتشغيلها محليًا:
 
 ```powershell
