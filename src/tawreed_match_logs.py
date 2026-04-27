@@ -179,18 +179,6 @@ def match_log_csv_rows(item: Item, decision: MatchDecision) -> list[dict[str, ob
     return rows
 
 
-def match_summary_rows(item: Item, decision: MatchDecision) -> list[dict[str, object]]:
-    """Build one compact row that summarizes whether the item was accepted."""
-    accepted_name = accepted_product_name(decision)
-    return [
-        {
-            "item_name": item.name,
-            "accepted": bool(decision.best_match),
-            "accepted_product_name": accepted_name,
-        }
-    ]
-
-
 def _match_log_csv_row(
     item: Item,
     decision: MatchDecision,
