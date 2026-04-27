@@ -72,9 +72,20 @@ py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wa
 
 ### 6. تشغيل واجهة Streamlit
 
+لتشغيلها محليًا:
+
 ```powershell
+.\.venv\Scripts\Activate.ps1
 .\.venv\Scripts\python -m streamlit run streamlit_app.py
 ```
+
+بعد التشغيل افتح المتصفح على:
+
+```text
+http://localhost:8501
+```
+
+إذا كان المنفذ `8501` مستخدمًا بالفعل، سيختار Streamlit منفذًا آخر ويعرضه في الطرفية.
 
 الواجهة توفر:
 - تشغيل `auth` من المتصفح

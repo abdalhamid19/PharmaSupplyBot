@@ -10,7 +10,7 @@ MAX_FILE_LINES = 100
 MAX_FUNCTION_LINES = 20
 MAX_LINE_LENGTH = 100
 ROOT = Path(__file__).resolve().parents[1]
-TARGETS = [ROOT / "run.py", *sorted((ROOT / "src").glob("*.py"))]
+TARGETS = [ROOT / "run.py", ROOT / "streamlit_app.py", *sorted((ROOT / "src").glob("*.py"))]
 EXCEPTED_FILE_LENGTHS = {
     "src\\matching_rules.py",
     "src\\product_matching.py",
