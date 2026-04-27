@@ -15,7 +15,8 @@ def run_auth_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Authenticate and persist session state for the selected profiles."""
     for profile_key, profile in profiles_to_run(app_config, args):
         bot = build_bot(app_config, profile_key, profile)
-        bot.auth_interactive(wait_seconds=int(args.wait_seconds))
+        auth_runner = bot.auth_headless if bool(getattr(args, "headless", False)) else bot.auth_interactive
+        auth_runner(wait_seconds=int(args.wait_seconds))
     return 0
 
 

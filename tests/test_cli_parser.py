@@ -4,6 +4,10 @@ from src.cli_parser import build_parser
 
 
 class CliParserTests(unittest.TestCase):
+    def test_auth_accepts_headless_flag(self) -> None:
+        args = build_parser().parse_args(["auth", "--profile", "wardany", "--headless"])
+        self.assertTrue(args.headless)
+
     def test_order_accepts_debug_browser_flag(self) -> None:
         args = build_parser().parse_args(
             [

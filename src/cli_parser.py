@@ -19,6 +19,11 @@ def _build_auth_parser(subparsers: argparse._SubParsersAction) -> None:
     auth_parser = subparsers.add_parser("auth", help="Manual login once, save session state")
     _add_common_arguments(auth_parser)
     auth_parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run a headless login using TAWREED_EMAIL and TAWREED_PASSWORD",
+    )
+    auth_parser.add_argument(
         "--wait-seconds",
         type=int,
         default=600,

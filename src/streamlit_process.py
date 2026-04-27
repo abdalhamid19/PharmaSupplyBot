@@ -10,21 +10,29 @@ import traceback
 import streamlit as st
 
 from .streamlit_shared import RUNNER_PATH
+from .streamlit_subprocess_env import merged_env
 
 
-def run_cli_subprocess(arguments: list[str]) -> dict[str, object]:
+def run_cli_subprocess(arguments: list[str], env_overrides: dict[str, str] | None = None) -> dict[str, object]:
     """Run the project CLI in a subprocess so Playwright is isolated from Streamlit."""
     command = [sys.executable, str(RUNNER_PATH), *arguments]
     try:
-        completed = _completed_process(command)
+        completed = _completed_process(command, merged_env(env_overrides))
         return _process_result(command, completed.returncode, completed.stdout, completed.stderr)
     except BaseException as error:  # noqa: BLE001
         return _failed_process_result(command, error)
 
 
-def _completed_process(command: list[str]) -> subprocess.CompletedProcess[str]:
+def _completed_process(command: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     """Run one completed subprocess and return the captured result."""
-    return subprocess.run(command, cwd=str(Path.cwd()), text=True, capture_output=True, check=False)
+    return subprocess.run(
+        command,
+        cwd=str(Path.cwd()),
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
 
 
 def _process_result(

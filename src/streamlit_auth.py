@@ -8,6 +8,7 @@ import sys
 
 import streamlit as st
 
+from .streamlit_headless_auth import render_headless_auth
 from .streamlit_process import render_command_result, run_cli_subprocess
 
 
@@ -21,6 +22,7 @@ def render_auth_tab(app_config, default_profile: str | None, config_path: Path) 
     submitted, profile_key, wait_seconds = auth_form_values(app_config, auth_available)
     render_local_auth_guidance(profile_key, auth_available)
     if not auth_available:
+        render_headless_auth(app_config, config_path)
         return
     if not submitted:
         return

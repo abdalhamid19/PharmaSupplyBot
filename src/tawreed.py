@@ -70,8 +70,21 @@ class TawreedBot:
 
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""
+        self._auth(wait_seconds=wait_seconds, headless=False)
+
+    def auth_headless(self, wait_seconds: int = 120) -> None:
+        """Run a headless login attempt and persist session state when credentials succeed."""
+        self._auth(wait_seconds=wait_seconds, headless=True)
+
+    def _auth(self, wait_seconds: int, headless: bool) -> None:
+        """Authenticate in either interactive or headless mode and save session state."""
         with sync_playwright() as p:
-            browser, context, page = open_auth_page(p, self.config.base_url, self.config.runtime)
+            browser, context, page = open_auth_page(
+                p,
+                self.config.base_url,
+                self.config.runtime,
+                headless=headless,
+            )
             attempt_env_login(page, self.selectors)
             print_auth_instructions(wait_seconds)
             detected = wait_for_login_detection(

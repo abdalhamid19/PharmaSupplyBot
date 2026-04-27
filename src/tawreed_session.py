@@ -9,6 +9,7 @@ from typing import Any
 
 from playwright.sync_api import Page
 
+from .playwright_browser import launch_chromium
 from .tawreed_auth_waits import (
     is_logged_in_marker_visible,
     wait_for_login_detection as poll_for_login_detection,
@@ -19,12 +20,9 @@ class SessionInvalidError(RuntimeError):
     """Raised when the saved login session is not valid for order placement."""
 
 
-def open_auth_page(playwright, base_url: str, runtime) -> tuple[Any, Any, Page]:
-    """Create a visible browser page for one-time manual authentication."""
-    browser = playwright.chromium.launch(
-        headless=False,
-        slow_mo=runtime.slow_mo_ms,
-    )
+def open_auth_page(playwright, base_url: str, runtime, headless: bool = False) -> tuple[Any, Any, Page]:
+    """Create a browser page for one-time authentication."""
+    browser = launch_chromium(playwright, headless=headless, slow_mo_ms=runtime.slow_mo_ms)
     context = browser.new_context()
     page = context.new_page()
     page.set_default_timeout(runtime.timeout_ms)
@@ -39,9 +37,10 @@ def open_order_page(
     debug_browser: bool = False,
 ) -> tuple[Any, Any, Page]:
     """Create an automated browser page using the saved session state."""
-    browser = playwright.chromium.launch(
+    browser = launch_chromium(
+        playwright,
         headless=False if debug_browser else runtime.headless,
-        slow_mo=runtime.slow_mo_ms,
+        slow_mo_ms=runtime.slow_mo_ms,
     )
     context = browser.new_context(storage_state=str(state_path))
     page = context.new_page()
