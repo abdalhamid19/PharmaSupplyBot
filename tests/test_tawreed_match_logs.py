@@ -24,6 +24,7 @@ class TawreedMatchLogsTests(unittest.TestCase):
 
         with (
             patch("src.tawreed_match_logs.append_csv_artifact") as append_csv,
+            patch("src.tawreed_match_logs.append_xlsx_artifact") as append_xlsx,
         ):
             append_order_result_summary("wardany", item, summary)
 
@@ -41,6 +42,7 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "match_elapsed_seconds": 0.0,
         }
         append_csv.assert_called_once_with("wardany", "order_result_summary", [expected_row])
+        append_xlsx.assert_called_once_with("wardany", "order_result_summary", [expected_row])
 
     def test_should_write_detailed_match_log_skips_clean_high_overlap_accept(self) -> None:
         candidate = {"productNameEn": "Panadol Extra 24 Tabs", "productName": ""}

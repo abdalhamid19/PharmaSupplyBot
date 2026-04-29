@@ -8,6 +8,7 @@ from .excel import Item
 from .matching_models import CandidateMatchDiagnostic, MatchDecision
 from .tawreed_artifacts import (
     append_csv_artifact,
+    append_xlsx_artifact,
     append_text_artifact,
     write_text_artifact,
 )
@@ -65,7 +66,7 @@ def append_order_result_summary(
     item: Item,
     summary: OrderItemSummary,
 ) -> None:
-    """Append one compact order-result summary row to the CSV artifact."""
+    """Append one compact order-result summary row to the table artifacts."""
     row = {
         "item_code": item.code,
         "item_name": item.name,
@@ -80,6 +81,7 @@ def append_order_result_summary(
         "match_elapsed_seconds": round(summary.match_elapsed_seconds, 3),
     }
     append_csv_artifact(profile_key, "order_result_summary", [row])
+    append_xlsx_artifact(profile_key, "order_result_summary", [row])
 
 
 def match_log_content(item: Item, decision: MatchDecision) -> str:
