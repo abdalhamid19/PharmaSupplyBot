@@ -38,6 +38,36 @@ from .tawreed_ui import (
 )
 
 MIN_SEARCH_QUERIES_PER_ITEM = 3
+STORE_NAME_KEYS = (
+    "storeName",
+    "storeNameAr",
+    "storeNameEn",
+    "supplierName",
+    "supplierNameAr",
+    "supplierNameEn",
+    "warehouseName",
+    "warehouseNameAr",
+    "warehouseNameEn",
+    "pharmacyName",
+    "branchName",
+    "sellerName",
+    "companyName",
+)
+NESTED_STORE_KEYS = ("store", "supplier", "warehouse", "pharmacy", "branch", "seller")
+NESTED_NAME_KEYS = ("name", "nameAr", "nameEn", "arabicName", "englishName", "title")
+DISCOUNT_KEYS = (
+    "discountPercent",
+    "discountPercentage",
+    "discountRate",
+    "discountValue",
+    "discount",
+    "cashDiscount",
+    "companyDiscount",
+    "offerDiscount",
+    "pharmacyDiscount",
+    "percentage",
+    "percent",
+)
 
 
 def add_item_from_products_page(bot, page: Page, item: Item) -> None:
@@ -155,12 +185,12 @@ def wait_for_product_rows(page: Page) -> None:
 def open_add_to_cart_for_match(bot, page: Page, row, item: Item, match: SearchMatch) -> None:
     """Open the add-to-cart dialog for the selected match and chosen store."""
     if _row_cart_button_enabled(row):
-        click_single_store_cart(row, item, match, bot.skip_item_exception)
+        click_single_store_cart(bot, row, item, match)
         return
     if match_has_multiple_stores(match):
         open_store_cart_dialog(bot, page, row)
         return
-    click_single_store_cart(row, item, match, bot.skip_item_exception)
+    click_single_store_cart(bot, row, item, match)
 
 
 def match_has_multiple_stores(match: SearchMatch) -> bool:
@@ -176,19 +206,46 @@ def open_store_cart_dialog(bot, page: Page, row) -> None:
         warehouse_mode(bot),
         bot.skip_item_exception,
     )
+    record_selected_store(bot, store_rows[store_index])
     stores_dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
     store_dialog_cart_buttons(stores_dialog).nth(store_index).click()
 
 
-def click_single_store_cart(row, item: Item, match: SearchMatch, skip_item_exception) -> None:
+def click_single_store_cart(bot, row, item: Item, match: SearchMatch) -> None:
     """Click the direct cart button for matches that do not require a stores dialog."""
     _wait_for_row_to_settle(row)
     available_quantity = int(match.data.get("availableQuantity") or 0)
     if available_quantity <= 0:
-        raise skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
+        raise bot.skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
     if not _row_cart_button_enabled(row):
-        raise skip_item_exception(_disabled_cart_reason(row, item.name))
+        raise bot.skip_item_exception(_disabled_cart_reason(row, item.name))
+    record_selected_store(bot, match.data)
     cart_button(row).click()
+
+
+def record_selected_store(bot, store: dict[str, Any]) -> None:
+    """Remember the selected Tawreed store details for the order summary report."""
+    bot.last_selected_discount_percent = store_discount_percent(store)
+    bot.last_selected_store_name = store_name(store)
+
+
+def store_name(store: dict[str, Any]) -> str:
+    """Return the display name for a Tawreed store/supplier payload."""
+    direct_value = _first_text_field(store, STORE_NAME_KEYS)
+    if direct_value:
+        return direct_value
+    if not _looks_like_product_payload(store):
+        direct_name = _first_text_field(store, NESTED_NAME_KEYS)
+        if direct_name:
+            return direct_name
+    nested_value = _first_nested_text_field(store, NESTED_STORE_KEYS, NESTED_NAME_KEYS)
+    return nested_value
+
+
+def store_discount_percent(store: dict[str, Any]) -> str:
+    """Return the selected store discount as a human-readable percent value."""
+    value = _first_discount_value(store)
+    return _format_discount_percent(value)
 
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
@@ -282,6 +339,89 @@ def _stores_from_dialog_rows(page: Page, bot) -> list[dict[str, Any]]:
 def _stores_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Return normalized stores rows from a store-details payload."""
     return list(payload.get("data", []) or [])
+
+
+def _first_text_field(source: dict[str, Any], keys: tuple[str, ...]) -> str:
+    """Return the first non-empty string-like value for the provided keys."""
+    for key in keys:
+        value = source.get(key)
+        if isinstance(value, (dict, list, tuple)):
+            continue
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _first_nested_text_field(
+    source: dict[str, Any],
+    object_keys: tuple[str, ...],
+    name_keys: tuple[str, ...],
+) -> str:
+    """Return the first non-empty nested store/supplier name value."""
+    for object_key in object_keys:
+        nested = source.get(object_key)
+        if not isinstance(nested, dict):
+            continue
+        text = _first_text_field(nested, name_keys)
+        if text:
+            return text
+    return ""
+
+
+def _looks_like_product_payload(source: dict[str, Any]) -> bool:
+    """Return whether the payload is a product row rather than a store row."""
+    return any(key in source for key in ("productName", "productNameEn", "storeProductId"))
+
+
+def _first_discount_value(source: dict[str, Any]) -> Any:
+    """Return the first discount value found in a Tawreed payload."""
+    for key in DISCOUNT_KEYS:
+        if key not in source:
+            continue
+        value = source.get(key)
+        if isinstance(value, dict):
+            nested_value = _first_discount_value(value)
+            if nested_value not in (None, ""):
+                return nested_value
+            continue
+        if value not in (None, ""):
+            return value
+    for object_key in NESTED_STORE_KEYS:
+        nested = source.get(object_key)
+        if not isinstance(nested, dict):
+            continue
+        nested_value = _first_discount_value(nested)
+        if nested_value not in (None, ""):
+            return nested_value
+    return ""
+
+
+def _format_discount_percent(value: Any) -> str:
+    """Format Tawreed discount values consistently for CSV/XLSX output."""
+    if value in (None, ""):
+        return ""
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return ""
+        number_match = re.search(r"-?\d+(?:[.,]\d+)?", stripped)
+        if not number_match:
+            return stripped
+        number = float(number_match.group(0).replace(",", "."))
+        if "%" in stripped or "٪" in stripped:
+            return f"{number:g}%"
+        return _format_discount_number(number)
+    try:
+        return _format_discount_number(float(value))
+    except Exception:
+        return str(value).strip()
+
+
+def _format_discount_number(value: float) -> str:
+    """Return a percent string, treating fractional values as rates."""
+    percent = value * 100 if 0 < value < 1 else value
+    return f"{percent:g}%"
 
 
 def _response_value(response_info):

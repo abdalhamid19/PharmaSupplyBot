@@ -18,6 +18,8 @@ class TawreedMatchLogsTests(unittest.TestCase):
             reason="Matched product is unavailable.",
             matched_product_name="Panadol Extra 24 Tabs",
             matched_query="Panadol Extra",
+            selected_discount_percent="35%",
+            selected_store_name="Abu Amira",
             searched_queries_count=2,
             searched_queries="Panadol Extra | Panadol",
         )
@@ -36,6 +38,8 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "reason": "Matched product is unavailable.",
             "matched_product_name": "Panadol Extra 24 Tabs",
             "matched_query": "Panadol Extra",
+            "selected_discount_percent": "35%",
+            "selected_store_name": "Abu Amira",
             "searched_queries_count": 2,
             "searched_queries": "Panadol Extra | Panadol",
             "elapsed_seconds": 0.0,

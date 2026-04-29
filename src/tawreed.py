@@ -72,6 +72,8 @@ class TawreedBot:
         self.last_match_decision = None
         self.last_match_elapsed_seconds = 0.0
         self.last_searched_queries: list[str] = []
+        self.last_selected_discount_percent = ""
+        self.last_selected_store_name = ""
 
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""
@@ -205,6 +207,8 @@ class TawreedBot:
         self.last_match_decision = None
         self.last_match_elapsed_seconds = 0.0
         self.last_searched_queries = []
+        self.last_selected_discount_percent = ""
+        self.last_selected_store_name = ""
         try:
             close_visible_dialogs(page)
             self._add_item(page, item)
@@ -360,6 +364,8 @@ class TawreedBot:
                 reason=reason,
                 matched_product_name=matched_product_name,
                 matched_query=matched_query,
+                selected_discount_percent=self.last_selected_discount_percent,
+                selected_store_name=self.last_selected_store_name,
                 searched_queries_count=len(self.last_searched_queries),
                 searched_queries=" | ".join(self.last_searched_queries),
                 elapsed_seconds=elapsed_seconds,

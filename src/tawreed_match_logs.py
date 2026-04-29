@@ -22,6 +22,8 @@ class OrderItemSummary:
     reason: str
     matched_product_name: str = ""
     matched_query: str = ""
+    selected_discount_percent: str = ""
+    selected_store_name: str = ""
     searched_queries_count: int = 0
     searched_queries: str = ""
     elapsed_seconds: float = 0.0
@@ -75,6 +77,8 @@ def append_order_result_summary(
         "reason": summary.reason,
         "matched_product_name": summary.matched_product_name,
         "matched_query": summary.matched_query,
+        "selected_discount_percent": summary.selected_discount_percent,
+        "selected_store_name": summary.selected_store_name,
         "searched_queries_count": summary.searched_queries_count,
         "searched_queries": summary.searched_queries,
         "elapsed_seconds": round(summary.elapsed_seconds, 3),

@@ -122,6 +122,40 @@ def _ensure_xlsx_header_row(worksheet, fieldnames: list[str]) -> None:
     if worksheet.max_row == 1 and worksheet.cell(row=1, column=1).value is None:
         worksheet.delete_rows(1, 1)
         worksheet.append(fieldnames)
+        return
+    existing_fieldnames = _xlsx_header_fieldnames(worksheet)
+    if existing_fieldnames and existing_fieldnames != fieldnames:
+        _rewrite_xlsx_worksheet_with_fieldnames(worksheet, existing_fieldnames, fieldnames)
+
+
+def _xlsx_header_fieldnames(worksheet) -> list[str]:
+    """Return the existing XLSX header fieldnames when a worksheet has a header row."""
+    if worksheet.max_row == 0:
+        return []
+    values = [
+        worksheet.cell(row=1, column=column_index).value
+        for column_index in range(1, worksheet.max_column + 1)
+    ]
+    return [str(value) for value in values if value not in (None, "")]
+
+
+def _rewrite_xlsx_worksheet_with_fieldnames(
+    worksheet,
+    existing_fieldnames: list[str],
+    fieldnames: list[str],
+) -> None:
+    """Rewrite an existing worksheet so rows conform to the requested fieldnames."""
+    existing_rows = []
+    for row_values in worksheet.iter_rows(min_row=2, values_only=True):
+        row = {
+            field_name: row_values[index] if index < len(row_values) else ""
+            for index, field_name in enumerate(existing_fieldnames)
+        }
+        existing_rows.append(row)
+    worksheet.delete_rows(1, worksheet.max_row)
+    worksheet.append(fieldnames)
+    for row in existing_rows:
+        worksheet.append([row.get(field_name, "") for field_name in fieldnames])
 
 
 def _write_screenshot_artifact(page: Page, screenshot_path: Path) -> None:

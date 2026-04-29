@@ -9,8 +9,11 @@ from src.tawreed_products_flow import (
     _should_stop_after_no_results,
     _table_has_no_results,
     fill_add_to_cart_dialog,
+    open_store_cart_dialog,
     open_stores_dialog,
     search_products,
+    store_discount_percent,
+    store_name,
 )
 from src.excel import Item
 from src.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
@@ -97,6 +100,16 @@ class _FakeButton:
 class _FakeFooterButtons:
     def __init__(self):
         self.last = _FakeButton()
+
+
+class _FakeCartButtons:
+    def __init__(self, count):
+        self.count = count
+        self.clicked_index = None
+
+    def nth(self, index):
+        self.clicked_index = index
+        return _FakeButton()
 
 
 class _FakeRows:
@@ -261,6 +274,43 @@ class TawreedProductsFlowTests(unittest.TestCase):
 
         self.assertEqual(stores, [{}, {}])
         dialog_rows.assert_called_once_with(page, bot)
+
+    def test_open_store_cart_dialog_records_selected_store_details(self):
+        store_rows = [
+            {"availableQuantity": 1, "supplierName": "Old Store", "discountPercent": 10},
+            {"availableQuantity": 5, "storeName": "Abu Amira", "discount": 0.35},
+        ]
+        cart_buttons = _FakeCartButtons(count=2)
+        dialog = object()
+        bot = SimpleNamespace(
+            config=SimpleNamespace(
+                runtime=SimpleNamespace(timeout_ms=5000),
+                warehouse_strategy={"mode": "max_available"},
+            ),
+            skip_item_exception=RuntimeError,
+            last_selected_discount_percent="",
+            last_selected_store_name="",
+        )
+
+        with (
+            patch("src.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
+            patch("src.tawreed_products_flow.visible_dialog", return_value=dialog),
+            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+        ):
+            open_store_cart_dialog(bot, object(), object())
+
+        self.assertEqual(bot.last_selected_discount_percent, "35%")
+        self.assertEqual(bot.last_selected_store_name, "Abu Amira")
+        self.assertEqual(cart_buttons.clicked_index, 1)
+
+    def test_store_summary_extracts_nested_payload_fields(self):
+        store = {
+            "supplier": {"name": "Abu Amira"},
+            "discount": {"percentage": "35 %"},
+        }
+
+        self.assertEqual(store_name(store), "Abu Amira")
+        self.assertEqual(store_discount_percent(store), "35%")
 
     def test_fill_add_to_cart_dialog_cleans_up_when_dialog_stays_visible(self):
         quantity_input = _FakeQuantityInput()
