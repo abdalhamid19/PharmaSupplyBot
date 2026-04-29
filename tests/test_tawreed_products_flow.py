@@ -9,6 +9,7 @@ from src.tawreed_products_flow import (
     _should_stop_after_no_results,
     _table_has_no_results,
     fill_add_to_cart_dialog,
+    open_add_to_cart_for_match,
     open_store_cart_dialog,
     open_stores_dialog,
     search_products,
@@ -20,9 +21,10 @@ from src.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchSc
 
 
 class _FakeExpectResponse:
-    def __init__(self, response=None, enter_error=None):
+    def __init__(self, response=None, enter_error=None, exit_error=None):
         self.value = response
         self._enter_error = enter_error
+        self._exit_error = exit_error
 
     def __enter__(self):
         if self._enter_error:
@@ -30,6 +32,8 @@ class _FakeExpectResponse:
         return self
 
     def __exit__(self, exc_type, exc, tb):
+        if self._exit_error:
+            raise self._exit_error
         return False
 
 
@@ -261,7 +265,7 @@ class TawreedProductsFlowTests(unittest.TestCase):
 
     def test_open_stores_dialog_uses_visible_dialog_rows_without_response(self):
         bot = SimpleNamespace(config=SimpleNamespace(runtime=SimpleNamespace(timeout_ms=5000)))
-        page = _FakePage(expect_response=_FakeExpectResponse(enter_error=RuntimeError("timeout")))
+        page = _FakePage(expect_response=_FakeExpectResponse(exit_error=RuntimeError("timeout")))
         row = object()
 
         with (
@@ -302,6 +306,47 @@ class TawreedProductsFlowTests(unittest.TestCase):
         self.assertEqual(bot.last_selected_discount_percent, "35%")
         self.assertEqual(bot.last_selected_store_name, "Abu Amira")
         self.assertEqual(cart_buttons.clicked_index, 1)
+
+    def test_open_add_to_cart_prefers_store_dialog_when_supplier_details_exist(self):
+        bot = SimpleNamespace(skip_item_exception=RuntimeError)
+        match = SearchMatch(
+            query="Panadol",
+            row_index=0,
+            score=10,
+            data={"productsCount": 1, "availableQuantity": 1},
+        )
+
+        with (
+            patch("src.tawreed_products_flow.open_store_cart_dialog") as open_dialog,
+            patch("src.tawreed_products_flow.click_single_store_cart") as click_single,
+        ):
+            open_add_to_cart_for_match(bot, object(), object(), Item("1", "Panadol", 1), match)
+
+        open_dialog.assert_called_once()
+        click_single.assert_not_called()
+
+    def test_open_add_to_cart_falls_back_to_direct_cart_when_store_dialog_fails(self):
+        bot = SimpleNamespace(skip_item_exception=RuntimeError)
+        match = SearchMatch(
+            query="Panadol",
+            row_index=0,
+            score=10,
+            data={"productsCount": 1, "availableQuantity": 1},
+        )
+
+        with (
+            patch(
+                "src.tawreed_products_flow.open_store_cart_dialog",
+                side_effect=ValueError("dialog failed"),
+            ),
+            patch("src.tawreed_products_flow._row_cart_button_enabled", return_value=True),
+            patch("src.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
+            patch("src.tawreed_products_flow.click_single_store_cart") as click_single,
+        ):
+            open_add_to_cart_for_match(bot, object(), object(), Item("1", "Panadol", 1), match)
+
+        close_dialogs.assert_called_once()
+        click_single.assert_called_once()
 
     def test_store_summary_extracts_nested_payload_fields(self):
         store = {

@@ -184,11 +184,18 @@ def wait_for_product_rows(page: Page) -> None:
 
 def open_add_to_cart_for_match(bot, page: Page, row, item: Item, match: SearchMatch) -> None:
     """Open the add-to-cart dialog for the selected match and chosen store."""
+    if match_has_multiple_stores(match):
+        try:
+            open_store_cart_dialog(bot, page, row)
+            return
+        except bot.skip_item_exception:
+            raise
+        except Exception:
+            if not _row_cart_button_enabled(row):
+                raise
+            close_visible_dialogs(page)
     if _row_cart_button_enabled(row):
         click_single_store_cart(bot, row, item, match)
-        return
-    if match_has_multiple_stores(match):
-        open_store_cart_dialog(bot, page, row)
         return
     click_single_store_cart(bot, row, item, match)
 
@@ -250,13 +257,7 @@ def store_discount_percent(store: dict[str, Any]) -> str:
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
     """Open the stores dialog for a row and return the API payload behind it."""
-    response_info = page.expect_response(
-        lambda response: is_store_details_response(response),
-        timeout=_search_response_timeout_ms(bot),
-    )
-    stores_button(row).click()
-    dialog_became_visible = _stores_dialog_visible(page, bot)
-    response_value = _response_value(response_info)
+    response_value, dialog_became_visible = _open_stores_dialog_with_response(bot, page, row)
     if response_value is not None:
         stores = _stores_from_payload(response_value.json())
         if stores:
@@ -268,6 +269,21 @@ def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
     except Exception:
         pass
     raise RuntimeError("Stores dialog did not produce usable rows or API payload.")
+
+
+def _open_stores_dialog_with_response(bot, page: Page, row):
+    """Click the stores button while listening for Tawreed's store-details response."""
+    dialog_became_visible = False
+    try:
+        with page.expect_response(
+            lambda response: is_store_details_response(response),
+            timeout=_search_response_timeout_ms(bot),
+        ) as response_info:
+            stores_button(row).click()
+            dialog_became_visible = _stores_dialog_visible(page, bot)
+        return _response_value(response_info), dialog_became_visible
+    except Exception:
+        return None, dialog_became_visible
 
 
 def is_store_details_response(response) -> bool:
