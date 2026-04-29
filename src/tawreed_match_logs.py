@@ -20,6 +20,7 @@ class OrderItemSummary:
 
     status: str
     reason: str
+    ordered_total_qty: int = 0
     matched_product_name: str = ""
     matched_query: str = ""
     selected_discount_percent: str = ""
@@ -73,6 +74,7 @@ def append_order_result_summary(
         "item_code": item.code,
         "item_name": item.name,
         "item_qty": item.qty,
+        "ordered_total_qty": summary.ordered_total_qty,
         "status": summary.status,
         "reason": summary.reason,
         "matched_product_name": summary.matched_product_name,

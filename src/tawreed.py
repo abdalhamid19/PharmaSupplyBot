@@ -74,6 +74,7 @@ class TawreedBot:
         self.last_searched_queries: list[str] = []
         self.last_selected_discount_percent = ""
         self.last_selected_store_name = ""
+        self.last_ordered_total_qty = 0
 
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""
@@ -209,6 +210,7 @@ class TawreedBot:
         self.last_searched_queries = []
         self.last_selected_discount_percent = ""
         self.last_selected_store_name = ""
+        self.last_ordered_total_qty = 0
         try:
             close_visible_dialogs(page)
             self._add_item(page, item)
@@ -285,6 +287,7 @@ class TawreedBot:
         self._pick_configured_search_result(page, search)
         self._fill_configured_quantity(page, item.qty)
         page.locator(self.selectors.add_item_button).first.click()
+        self.last_ordered_total_qty = int(item.qty)
         self._wait_for_legacy_add_completion(page)
 
     def _pick_configured_search_result(self, page: Page, search) -> None:
@@ -362,6 +365,7 @@ class TawreedBot:
             OrderItemSummary(
                 status=status,
                 reason=reason,
+                ordered_total_qty=self.last_ordered_total_qty,
                 matched_product_name=matched_product_name,
                 matched_query=matched_query,
                 selected_discount_percent=self.last_selected_discount_percent,

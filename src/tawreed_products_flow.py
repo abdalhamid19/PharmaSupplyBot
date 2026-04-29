@@ -75,7 +75,6 @@ def add_item_from_products_page(bot, page: Page, item: Item) -> None:
     match, active_query = require_product_match(bot, page, item)
     row = matched_product_row(bot, page, match, active_query)
     open_add_to_cart_for_match(bot, page, row, item, match)
-    fill_add_to_cart_dialog(bot, page, item.qty)
 
 
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
@@ -186,7 +185,7 @@ def open_add_to_cart_for_match(bot, page: Page, row, item: Item, match: SearchMa
     """Open the add-to-cart dialog for the selected match and chosen store."""
     if match_has_multiple_stores(match):
         try:
-            open_store_cart_dialog(bot, page, row)
+            add_item_from_store_dialogs(bot, page, row, item)
             return
         except bot.skip_item_exception:
             raise
@@ -196,8 +195,10 @@ def open_add_to_cart_for_match(bot, page: Page, row, item: Item, match: SearchMa
             close_visible_dialogs(page)
     if _row_cart_button_enabled(row):
         click_single_store_cart(bot, row, item, match)
+        bot.last_ordered_total_qty = fill_add_to_cart_dialog(bot, page, item.qty)
         return
     click_single_store_cart(bot, row, item, match)
+    bot.last_ordered_total_qty = fill_add_to_cart_dialog(bot, page, item.qty)
 
 
 def match_has_multiple_stores(match: SearchMatch) -> bool:
@@ -218,6 +219,90 @@ def open_store_cart_dialog(bot, page: Page, row) -> None:
     store_dialog_cart_buttons(stores_dialog).nth(store_index).click()
 
 
+def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
+    """Add the requested quantity across stores until fulfilled or supply is exhausted."""
+    remaining_quantity = int(item.qty)
+    used_store_ids: set[str] = set()
+    selections: list[tuple[dict[str, Any], int]] = []
+    while remaining_quantity > 0:
+        store_rows = open_stores_dialog(bot, page, row)
+        try:
+            store_index, store = choose_next_store_for_remaining_quantity(
+                store_rows,
+                used_store_ids,
+                warehouse_mode(bot),
+                bot.skip_item_exception,
+            )
+        except bot.skip_item_exception:
+            close_visible_dialogs(page)
+            if selections:
+                break
+            raise
+        store_quantity = min(remaining_quantity, store_available_quantity(store))
+        if store_quantity <= 0:
+            close_visible_dialogs(page)
+            break
+        stores_dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
+        store_dialog_cart_buttons(stores_dialog).nth(store_index).click()
+        ordered_quantity = fill_add_to_cart_dialog(bot, page, store_quantity)
+        selections.append((store, ordered_quantity))
+        used_store_ids.add(store_identity(store, store_index))
+        remaining_quantity -= ordered_quantity
+    if not selections:
+        raise bot.skip_item_exception("All available stores for this product are out of stock.")
+    bot.last_ordered_total_qty = sum(quantity for _, quantity in selections)
+    record_selected_stores(bot, selections)
+
+
+def choose_next_store_for_remaining_quantity(
+    stores: list[dict[str, Any]],
+    used_store_ids: set[str],
+    mode: str,
+    skip_exception_cls: type[Exception],
+) -> tuple[int, dict[str, Any]]:
+    """Return the next unused store to order from while splitting quantities."""
+    choices = available_store_choices(stores, used_store_ids)
+    if not choices:
+        raise skip_exception_cls("All available stores for this product are out of stock.")
+    if mode == "first_available":
+        return choices[0]
+    if mode == "max_available":
+        return max(choices, key=lambda choice: store_available_quantity(choice[1]))
+    raise ValueError(f"Unknown warehouse strategy mode: {mode}")
+
+
+def available_store_choices(
+    stores: list[dict[str, Any]],
+    used_store_ids: set[str],
+) -> list[tuple[int, dict[str, Any]]]:
+    """Return unused stores that still have available stock."""
+    choices: list[tuple[int, dict[str, Any]]] = []
+    for store_index, store in enumerate(stores):
+        if store_identity(store, store_index) in used_store_ids:
+            continue
+        if store_available_quantity(store) <= 0:
+            continue
+        choices.append((store_index, store))
+    return choices
+
+
+def store_available_quantity(store: dict[str, Any]) -> int:
+    """Return the available stock count for one Tawreed store row."""
+    try:
+        return int(float(store.get("availableQuantity") or 0))
+    except Exception:
+        return 0
+
+
+def store_identity(store: dict[str, Any], fallback_index: int) -> str:
+    """Return a stable identity for one store row while splitting quantities."""
+    for key in ("storeProductId", "storeId", "supplierId", "warehouseId"):
+        value = store.get(key)
+        if value not in (None, ""):
+            return f"{key}:{value}"
+    return f"index:{fallback_index}"
+
+
 def click_single_store_cart(bot, row, item: Item, match: SearchMatch) -> None:
     """Click the direct cart button for matches that do not require a stores dialog."""
     _wait_for_row_to_settle(row)
@@ -234,6 +319,24 @@ def record_selected_store(bot, store: dict[str, Any]) -> None:
     """Remember the selected Tawreed store details for the order summary report."""
     bot.last_selected_discount_percent = store_discount_percent(store)
     bot.last_selected_store_name = store_name(store)
+
+
+def record_selected_stores(bot, selections: list[tuple[dict[str, Any], int]]) -> None:
+    """Remember all selected stores for split-quantity order summary reporting."""
+    bot.last_selected_discount_percent = " | ".join(
+        selection_summary(store_discount_percent(store), quantity)
+        for store, quantity in selections
+    )
+    bot.last_selected_store_name = " | ".join(
+        selection_summary(store_name(store), quantity)
+        for store, quantity in selections
+    )
+
+
+def selection_summary(value: str, quantity: int) -> str:
+    """Return one compact selected-store summary cell value."""
+    label = str(value or "").strip() or "unknown"
+    return f"{label} (qty {quantity})"
 
 
 def store_name(store: dict[str, Any]) -> str:
@@ -291,7 +394,7 @@ def is_store_details_response(response) -> bool:
     return STORE_DETAILS_ENDPOINT in response.url and response.request.method == "POST"
 
 
-def fill_add_to_cart_dialog(bot, page: Page, requested_qty: int) -> None:
+def fill_add_to_cart_dialog(bot, page: Page, requested_qty: int) -> int:
     """Fill the quantity dialog and submit the add-to-cart action."""
     dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
     footer_buttons = dialog_footer_buttons(dialog, bot.config.runtime.timeout_ms)
@@ -304,6 +407,7 @@ def fill_add_to_cart_dialog(bot, page: Page, requested_qty: int) -> None:
     except Exception:
         close_visible_dialogs(page)
         _wait_for_dialog_to_clear(page)
+    return quantity
 
 
 def warehouse_mode(bot) -> str:

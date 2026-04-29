@@ -16,6 +16,7 @@ class TawreedMatchLogsTests(unittest.TestCase):
         summary = OrderItemSummary(
             status="matched-but-unavailable",
             reason="Matched product is unavailable.",
+            ordered_total_qty=2,
             matched_product_name="Panadol Extra 24 Tabs",
             matched_query="Panadol Extra",
             selected_discount_percent="35%",
@@ -34,6 +35,7 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "item_code": "123",
             "item_name": "Panadol Extra",
             "item_qty": 2,
+            "ordered_total_qty": 2,
             "status": "matched-but-unavailable",
             "reason": "Matched product is unavailable.",
             "matched_product_name": "Panadol Extra 24 Tabs",

@@ -5,6 +5,7 @@ from unittest.mock import patch
 from src.tawreed_products_flow import (
     _disabled_cart_reason,
     _decisive_match,
+    add_item_from_store_dialogs,
     is_no_results_row,
     _should_stop_after_no_results,
     _table_has_no_results,
@@ -94,11 +95,14 @@ class _FakeQuantityInput:
 
 
 class _FakeButton:
-    def __init__(self):
+    def __init__(self, on_click=None):
         self.click_count = 0
+        self._on_click = on_click
 
     def click(self):
         self.click_count += 1
+        if self._on_click:
+            self._on_click()
 
 
 class _FakeFooterButtons:
@@ -110,9 +114,11 @@ class _FakeCartButtons:
     def __init__(self, count):
         self.count = count
         self.clicked_index = None
+        self.clicked_indices = []
 
     def nth(self, index):
         self.clicked_index = index
+        self.clicked_indices.append(index)
         return _FakeButton()
 
 
@@ -307,6 +313,55 @@ class TawreedProductsFlowTests(unittest.TestCase):
         self.assertEqual(bot.last_selected_store_name, "Abu Amira")
         self.assertEqual(cart_buttons.clicked_index, 1)
 
+    def test_add_item_from_store_dialogs_splits_quantity_across_stores(self):
+        store_rows = [
+            {
+                "availableQuantity": 2,
+                "storeProductId": "store-1",
+                "storeName": "First Store",
+                "discountPercent": 20,
+            },
+            {
+                "availableQuantity": 5,
+                "storeProductId": "store-2",
+                "storeName": "Second Store",
+                "discountPercent": 30,
+            },
+        ]
+        cart_buttons = _FakeCartButtons(count=2)
+        requested_quantities = []
+        bot = SimpleNamespace(
+            config=SimpleNamespace(
+                runtime=SimpleNamespace(timeout_ms=5000),
+                warehouse_strategy={"mode": "first_available"},
+            ),
+            skip_item_exception=RuntimeError,
+            last_selected_discount_percent="",
+            last_selected_store_name="",
+            last_ordered_total_qty=0,
+        )
+
+        def remember_requested_quantity(_bot, _page, quantity):
+            requested_quantities.append(quantity)
+            return quantity
+
+        with (
+            patch("src.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
+            patch("src.tawreed_products_flow.visible_dialog", return_value=object()),
+            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch(
+                "src.tawreed_products_flow.fill_add_to_cart_dialog",
+                side_effect=remember_requested_quantity,
+            ),
+        ):
+            add_item_from_store_dialogs(bot, object(), object(), Item("1", "DEVAROL", 7))
+
+        self.assertEqual(cart_buttons.clicked_indices, [0, 1])
+        self.assertEqual(requested_quantities, [2, 5])
+        self.assertEqual(bot.last_ordered_total_qty, 7)
+        self.assertEqual(bot.last_selected_discount_percent, "20% (qty 2) | 30% (qty 5)")
+        self.assertEqual(bot.last_selected_store_name, "First Store (qty 2) | Second Store (qty 5)")
+
     def test_open_add_to_cart_prefers_store_dialog_when_supplier_details_exist(self):
         bot = SimpleNamespace(skip_item_exception=RuntimeError)
         match = SearchMatch(
@@ -317,12 +372,12 @@ class TawreedProductsFlowTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_products_flow.open_store_cart_dialog") as open_dialog,
+            patch("src.tawreed_products_flow.add_item_from_store_dialogs") as add_from_stores,
             patch("src.tawreed_products_flow.click_single_store_cart") as click_single,
         ):
             open_add_to_cart_for_match(bot, object(), object(), Item("1", "Panadol", 1), match)
 
-        open_dialog.assert_called_once()
+        add_from_stores.assert_called_once()
         click_single.assert_not_called()
 
     def test_open_add_to_cart_falls_back_to_direct_cart_when_store_dialog_fails(self):
@@ -336,17 +391,19 @@ class TawreedProductsFlowTests(unittest.TestCase):
 
         with (
             patch(
-                "src.tawreed_products_flow.open_store_cart_dialog",
+                "src.tawreed_products_flow.add_item_from_store_dialogs",
                 side_effect=ValueError("dialog failed"),
             ),
             patch("src.tawreed_products_flow._row_cart_button_enabled", return_value=True),
             patch("src.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
             patch("src.tawreed_products_flow.click_single_store_cart") as click_single,
+            patch("src.tawreed_products_flow.fill_add_to_cart_dialog") as fill_quantity,
         ):
             open_add_to_cart_for_match(bot, object(), object(), Item("1", "Panadol", 1), match)
 
         close_dialogs.assert_called_once()
         click_single.assert_called_once()
+        fill_quantity.assert_called_once()
 
     def test_store_summary_extracts_nested_payload_fields(self):
         store = {
@@ -372,9 +429,10 @@ class TawreedProductsFlowTests(unittest.TestCase):
             patch("src.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
             patch("src.tawreed_products_flow._wait_for_dialog_to_clear") as wait_clear,
         ):
-            fill_add_to_cart_dialog(bot, page, 4)
+            ordered_quantity = fill_add_to_cart_dialog(bot, page, 4)
 
         fill_quantity.assert_called_once_with(quantity_input, 2)
+        self.assertEqual(ordered_quantity, 2)
         self.assertEqual(footer_buttons.last.click_count, 1)
         close_dialogs.assert_called_once_with(page)
         wait_clear.assert_called_once_with(page)
