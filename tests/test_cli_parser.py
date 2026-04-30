@@ -22,6 +22,21 @@ class CliParserTests(unittest.TestCase):
         self.assertTrue(args.debug_browser)
         self.assertEqual(args.cmd, "order")
 
+    def test_order_accepts_warehouse_mode_override(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "input/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--warehouse-mode",
+                "max_discount",
+            ]
+        )
+
+        self.assertEqual(args.warehouse_mode, "max_discount")
+
     def test_auth_does_not_expose_debug_browser_flag(self) -> None:
         args = build_parser().parse_args(["auth", "--profile", "wardany"])
         self.assertFalse(hasattr(args, "debug_browser"))

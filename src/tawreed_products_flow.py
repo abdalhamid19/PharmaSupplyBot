@@ -268,6 +268,14 @@ def choose_next_store_for_remaining_quantity(
         return choices[0]
     if mode == "max_available":
         return max(choices, key=lambda choice: store_available_quantity(choice[1]))
+    if mode == "max_discount":
+        return max(
+            choices,
+            key=lambda choice: (
+                store_discount_value(choice[1]),
+                store_available_quantity(choice[1]),
+            ),
+        )
     raise ValueError(f"Unknown warehouse strategy mode: {mode}")
 
 
@@ -356,6 +364,11 @@ def store_discount_percent(store: dict[str, Any]) -> str:
     """Return the selected store discount as a human-readable percent value."""
     value = _first_discount_value(store)
     return _format_discount_percent(value)
+
+
+def store_discount_value(store: dict[str, Any]) -> float:
+    """Return the selected store discount as a comparable percent value."""
+    return _discount_value_as_percent(_first_discount_value(store))
 
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
@@ -536,6 +549,22 @@ def _format_discount_percent(value: Any) -> str:
         return _format_discount_number(float(value))
     except Exception:
         return str(value).strip()
+
+
+def _discount_value_as_percent(value: Any) -> float:
+    """Return a numeric percent value for sorting discounts."""
+    if value in (None, ""):
+        return -1.0
+    if isinstance(value, str):
+        number_match = re.search(r"-?\d+(?:[.,]\d+)?", value.strip())
+        if not number_match:
+            return -1.0
+        value = float(number_match.group(0).replace(",", "."))
+    try:
+        number = float(value)
+    except Exception:
+        return -1.0
+    return number * 100 if 0 < number < 1 else number
 
 
 def _format_discount_number(value: float) -> str:

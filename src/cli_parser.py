@@ -50,6 +50,12 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Open a visible browser for this order run",
     )
+    order_parser.add_argument(
+        "--warehouse-mode",
+        choices=["first_available", "max_available", "max_discount"],
+        default=None,
+        help="Override warehouse selection mode for this order run",
+    )
 
 
 def _add_common_arguments(argument_parser: argparse.ArgumentParser) -> None:

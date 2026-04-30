@@ -22,6 +22,7 @@ def run_auth_command(app_config: AppConfig, args: argparse.Namespace) -> int:
 
 def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Place orders from Excel for the selected profiles."""
+    apply_order_overrides(app_config, args)
     items = load_order_items(app_config, args)
     if not items:
         print("No items found from Excel (after filtering).")
@@ -44,6 +45,13 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
                 f"Run: py run.py auth --profile {profile_key}"
             ) from error
     return 0
+
+
+def apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> None:
+    """Apply optional per-run order settings to the loaded application config."""
+    warehouse_mode = getattr(args, "warehouse_mode", None)
+    if warehouse_mode:
+        app_config.warehouse_strategy["mode"] = str(warehouse_mode)
 
 
 def profiles_to_run(app_config: AppConfig, args: argparse.Namespace):

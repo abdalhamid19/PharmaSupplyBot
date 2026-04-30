@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -17,6 +18,8 @@ def choose_store_index(
         return _first_available_store_index(stores, skip_exception_cls)
     if mode == "max_available":
         return _max_available_store_index(stores, skip_exception_cls)
+    if mode == "max_discount":
+        return _max_discount_store_index(stores, skip_exception_cls)
     raise ValueError(f"Unknown warehouse strategy mode: {mode}")
 
 
@@ -67,3 +70,44 @@ def _max_available_store_index(
     if best_quantity <= 0:
         raise skip_exception_cls("All available stores for this product are out of stock.")
     return best_index
+
+
+def _max_discount_store_index(
+    stores: list[dict[str, Any]],
+    skip_exception_cls: type[Exception],
+) -> int:
+    """Return the available store index with the largest discount percent."""
+    best_index = 0
+    best_sort_key = (-1.0, -1)
+    for store_index, store in enumerate(stores):
+        quantity = int(store.get("availableQuantity") or 0)
+        if quantity <= 0:
+            continue
+        sort_key = (_store_discount_value(store), quantity)
+        if sort_key > best_sort_key:
+            best_sort_key = sort_key
+            best_index = store_index
+    if best_sort_key[1] <= 0:
+        raise skip_exception_cls("All available stores for this product are out of stock.")
+    return best_index
+
+
+def _store_discount_value(store: dict[str, Any]) -> float:
+    """Return a comparable percent discount value from one store payload."""
+    for key in ("discountPercent", "discountPercentage", "discountRate", "discountValue", "discount"):
+        if key not in store:
+            continue
+        value = store.get(key)
+        if value in (None, ""):
+            continue
+        if isinstance(value, str):
+            number_match = re.search(r"-?\d+(?:[.,]\d+)?", value.strip())
+            if not number_match:
+                continue
+            value = float(number_match.group(0).replace(",", "."))
+        try:
+            number = float(value)
+        except Exception:
+            continue
+        return number * 100 if 0 < number < 1 else number
+    return -1.0

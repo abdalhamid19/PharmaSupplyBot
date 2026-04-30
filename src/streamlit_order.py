@@ -88,4 +88,6 @@ def order_command(
         command.append("--all-profiles")
     if form_values["debug_browser"]:
         command.append("--debug-browser")
+    if form_values["highest_discount"]:
+        command.extend(["--warehouse-mode", "max_discount"])
     return command

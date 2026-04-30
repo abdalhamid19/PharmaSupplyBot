@@ -45,7 +45,7 @@ selectors:
     confirm_order_button: "text=تأكيد, text=Confirm"
 
 warehouse_strategy:
-  # Options: "first_available" | "max_available"
+  # Options: "first_available" | "max_available" | "max_discount"
   mode: "first_available"
   selectors:
     warehouse_rows: ".warehouse-row, [data-testid='warehouse-row']"
