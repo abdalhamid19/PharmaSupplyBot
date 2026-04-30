@@ -37,6 +37,21 @@ class CliParserTests(unittest.TestCase):
 
         self.assertEqual(args.warehouse_mode, "max_discount")
 
+    def test_order_accepts_min_discount_override(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "input/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--min-discount-percent",
+                "12",
+            ]
+        )
+
+        self.assertEqual(args.min_discount_percent, 12)
+
     def test_auth_does_not_expose_debug_browser_flag(self) -> None:
         args = build_parser().parse_args(["auth", "--profile", "wardany"])
         self.assertFalse(hasattr(args, "debug_browser"))

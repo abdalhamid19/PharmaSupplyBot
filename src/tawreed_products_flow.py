@@ -23,7 +23,6 @@ from .tawreed_constants import (
     STORE_DETAILS_ENDPOINT,
 )
 from .tawreed_match_logs import write_match_log
-from .tawreed_strategy import choose_store_index
 from .tawreed_ui import (
     bounded_requested_quantity,
     cart_button,
@@ -209,12 +208,14 @@ def match_has_multiple_stores(match: SearchMatch) -> bool:
 def open_store_cart_dialog(bot, page: Page, row) -> None:
     """Open the stores dialog and click the chosen store cart button."""
     store_rows = open_stores_dialog(bot, page, row)
-    store_index = choose_store_index(
+    store_index, store = choose_next_store_for_remaining_quantity(
         store_rows,
+        set(),
         warehouse_mode(bot),
         bot.skip_item_exception,
+        minimum_discount_percent(bot),
     )
-    record_selected_store(bot, store_rows[store_index])
+    record_selected_store(bot, store)
     stores_dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
     store_dialog_cart_buttons(stores_dialog).nth(store_index).click()
 
@@ -232,6 +233,7 @@ def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
                 used_store_ids,
                 warehouse_mode(bot),
                 bot.skip_item_exception,
+                minimum_discount_percent(bot),
             )
         except bot.skip_item_exception:
             close_visible_dialogs(page)
@@ -259,10 +261,15 @@ def choose_next_store_for_remaining_quantity(
     used_store_ids: set[str],
     mode: str,
     skip_exception_cls: type[Exception],
+    min_discount_percent: float = 0.0,
 ) -> tuple[int, dict[str, Any]]:
     """Return the next unused store to order from while splitting quantities."""
-    choices = available_store_choices(stores, used_store_ids)
+    choices = available_store_choices(stores, used_store_ids, min_discount_percent)
     if not choices:
+        if min_discount_percent > 0:
+            raise skip_exception_cls(
+                f"No available stores meet the minimum discount {min_discount_percent:g}%."
+            )
         raise skip_exception_cls("All available stores for this product are out of stock.")
     if mode == "first_available":
         return choices[0]
@@ -282,6 +289,7 @@ def choose_next_store_for_remaining_quantity(
 def available_store_choices(
     stores: list[dict[str, Any]],
     used_store_ids: set[str],
+    min_discount_percent: float = 0.0,
 ) -> list[tuple[int, dict[str, Any]]]:
     """Return unused stores that still have available stock."""
     choices: list[tuple[int, dict[str, Any]]] = []
@@ -289,6 +297,8 @@ def available_store_choices(
         if store_identity(store, store_index) in used_store_ids:
             continue
         if store_available_quantity(store) <= 0:
+            continue
+        if not store_meets_minimum_discount(store, min_discount_percent):
             continue
         choices.append((store_index, store))
     return choices
@@ -317,6 +327,11 @@ def click_single_store_cart(bot, row, item: Item, match: SearchMatch) -> None:
     available_quantity = int(match.data.get("availableQuantity") or 0)
     if available_quantity <= 0:
         raise bot.skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
+    min_discount = minimum_discount_percent(bot)
+    if not store_meets_minimum_discount(match.data, min_discount):
+        raise bot.skip_item_exception(
+            f"Matched product discount is below the minimum discount {min_discount:g}%."
+        )
     if not _row_cart_button_enabled(row):
         raise bot.skip_item_exception(_disabled_cart_reason(row, item.name))
     record_selected_store(bot, match.data)
@@ -369,6 +384,21 @@ def store_discount_percent(store: dict[str, Any]) -> str:
 def store_discount_value(store: dict[str, Any]) -> float:
     """Return the selected store discount as a comparable percent value."""
     return _discount_value_as_percent(_first_discount_value(store))
+
+
+def minimum_discount_percent(bot) -> float:
+    """Return the configured minimum discount percent for store selection."""
+    try:
+        return max(0.0, float(bot.config.warehouse_strategy.get("min_discount_percent") or 0))
+    except Exception:
+        return 0.0
+
+
+def store_meets_minimum_discount(store: dict[str, Any], min_discount_percent: float) -> bool:
+    """Return whether one store is allowed by the configured discount floor."""
+    if min_discount_percent <= 0:
+        return True
+    return store_discount_value(store) >= min_discount_percent
 
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:

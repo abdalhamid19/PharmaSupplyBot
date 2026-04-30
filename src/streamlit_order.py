@@ -90,4 +90,7 @@ def order_command(
         command.append("--debug-browser")
     if form_values["highest_discount"]:
         command.extend(["--warehouse-mode", "max_discount"])
+    min_discount_percent = float(form_values.get("min_discount_percent") or 0)
+    if min_discount_percent > 0:
+        command.extend(["--min-discount-percent", f"{min_discount_percent:g}"])
     return command

@@ -47,6 +47,8 @@ selectors:
 warehouse_strategy:
   # Options: "first_available" | "max_available" | "max_discount"
   mode: "first_available"
+  # Set to 0 to allow any discount, or e.g. 12 to require stores with >= 12% discount.
+  min_discount_percent: 0
   selectors:
     warehouse_rows: ".warehouse-row, [data-testid='warehouse-row']"
     available_qty: ".available, [data-testid='available']"

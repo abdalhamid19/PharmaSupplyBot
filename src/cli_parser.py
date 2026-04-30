@@ -56,6 +56,12 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         default=None,
         help="Override warehouse selection mode for this order run",
     )
+    order_parser.add_argument(
+        "--min-discount-percent",
+        type=float,
+        default=None,
+        help="Only select stores with discount percent greater than or equal to this value",
+    )
 
 
 def _add_common_arguments(argument_parser: argparse.ArgumentParser) -> None:

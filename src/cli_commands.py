@@ -52,6 +52,9 @@ def apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> No
     warehouse_mode = getattr(args, "warehouse_mode", None)
     if warehouse_mode:
         app_config.warehouse_strategy["mode"] = str(warehouse_mode)
+    min_discount_percent = getattr(args, "min_discount_percent", None)
+    if min_discount_percent is not None:
+        app_config.warehouse_strategy["min_discount_percent"] = float(min_discount_percent)
 
 
 def profiles_to_run(app_config: AppConfig, args: argparse.Namespace):

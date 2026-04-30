@@ -20,6 +20,22 @@ class StreamlitOrderTests(unittest.TestCase):
 
         self.assertEqual(command[-2:], ["--warehouse-mode", "max_discount"])
 
+    def test_order_command_adds_min_discount_override(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "highest_discount": False,
+                "min_discount_percent": 12,
+            },
+            Path("input/ddd.xlsx"),
+        )
+
+        self.assertEqual(command[-2:], ["--min-discount-percent", "12"])
+
 
 if __name__ == "__main__":
     unittest.main()

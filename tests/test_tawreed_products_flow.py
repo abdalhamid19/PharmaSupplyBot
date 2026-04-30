@@ -438,6 +438,83 @@ class TawreedProductsFlowTests(unittest.TestCase):
         self.assertEqual(bot.last_selected_discount_percent, "30% (qty 5) | 20% (qty 2)")
         self.assertEqual(bot.last_selected_store_name, "Second Store (qty 5) | First Store (qty 2)")
 
+    def test_add_item_from_store_dialogs_filters_below_minimum_discount(self):
+        store_rows = [
+            {
+                "availableQuantity": 2,
+                "storeProductId": "store-1",
+                "storeName": "Low Store",
+                "discountPercent": 10,
+            },
+            {
+                "availableQuantity": 5,
+                "storeProductId": "store-2",
+                "storeName": "Allowed Store",
+                "discountPercent": 15,
+            },
+        ]
+        cart_buttons = _FakeCartButtons(count=2)
+        requested_quantities = []
+        bot = SimpleNamespace(
+            config=SimpleNamespace(
+                runtime=SimpleNamespace(timeout_ms=5000),
+                warehouse_strategy={"mode": "first_available", "min_discount_percent": 12},
+            ),
+            skip_item_exception=RuntimeError,
+            last_selected_discount_percent="",
+            last_selected_store_name="",
+            last_ordered_total_qty=0,
+        )
+
+        def remember_requested_quantity(_bot, _page, quantity):
+            requested_quantities.append(quantity)
+            return quantity
+
+        with (
+            patch("src.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
+            patch("src.tawreed_products_flow.visible_dialog", return_value=object()),
+            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch(
+                "src.tawreed_products_flow.fill_add_to_cart_dialog",
+                side_effect=remember_requested_quantity,
+            ),
+            patch("src.tawreed_products_flow.close_visible_dialogs"),
+        ):
+            add_item_from_store_dialogs(bot, object(), object(), Item("1", "DEVAROL", 7))
+
+        self.assertEqual(cart_buttons.clicked_indices, [1])
+        self.assertEqual(requested_quantities, [5])
+        self.assertEqual(bot.last_ordered_total_qty, 5)
+        self.assertEqual(bot.last_selected_discount_percent, "15% (qty 5)")
+        self.assertEqual(bot.last_selected_store_name, "Allowed Store (qty 5)")
+
+    def test_add_item_from_store_dialogs_skips_when_no_store_meets_minimum_discount(self):
+        store_rows = [
+            {
+                "availableQuantity": 2,
+                "storeProductId": "store-1",
+                "storeName": "Low Store",
+                "discountPercent": 10,
+            }
+        ]
+        bot = SimpleNamespace(
+            config=SimpleNamespace(
+                runtime=SimpleNamespace(timeout_ms=5000),
+                warehouse_strategy={"mode": "first_available", "min_discount_percent": 12},
+            ),
+            skip_item_exception=RuntimeError,
+            last_selected_discount_percent="",
+            last_selected_store_name="",
+            last_ordered_total_qty=0,
+        )
+
+        with (
+            patch("src.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
+            patch("src.tawreed_products_flow.close_visible_dialogs"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "minimum discount 12%"):
+                add_item_from_store_dialogs(bot, object(), object(), Item("1", "DEVAROL", 2))
+
     def test_open_add_to_cart_prefers_store_dialog_when_supplier_details_exist(self):
         bot = SimpleNamespace(skip_item_exception=RuntimeError)
         match = SearchMatch(
