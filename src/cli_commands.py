@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from pathlib import Path
 
 from .config_models import AppConfig, ProfileConfig
@@ -29,14 +30,19 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         return 0
     for profile_key, profile in profiles_to_run(app_config, args):
         require_state_file(profile_key)
+        profile_items = resumable_order_items(profile_key, items, args)
+        if not profile_items:
+            print(f"[{profile_key}] No remaining items to process.")
+            continue
         bot = build_bot(
             app_config,
             profile_key,
             profile,
             debug_browser=bool(getattr(args, "debug_browser", False)),
+            stop_flag_path=stop_flag_path(args),
         )
         try:
-            bot.place_order_from_items(items)
+            bot.place_order_from_items(profile_items)
         except SessionInvalidError as error:
             print(f"[{profile_key}] {error}")
             open_reauth_in_browser(app_config.base_url, profile_key)
@@ -68,11 +74,48 @@ def load_order_items(app_config: AppConfig, args: argparse.Namespace):
     return load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
 
 
+def resumable_order_items(profile_key: str, items: list, args: argparse.Namespace) -> list:
+    """Return remaining order items when resume mode is enabled."""
+    if not bool(getattr(args, "resume", False)):
+        return items
+    processed_keys = processed_summary_item_keys(profile_key)
+    return [item for item in items if item_key(item.code, item.name) not in processed_keys]
+
+
+def processed_summary_item_keys(profile_key: str) -> set[tuple[str, str]]:
+    """Return item keys already written to the profile order summary."""
+    summary_path = Path("artifacts") / profile_key / "order_result_summary.csv"
+    if not summary_path.exists():
+        return set()
+    with summary_path.open("r", encoding="utf-8", newline="") as summary_file:
+        reader = csv.DictReader(summary_file)
+        return {
+            item_key(row.get("item_code", ""), row.get("item_name", ""))
+            for row in reader
+        }
+
+
+def item_key(code: object, name: object) -> tuple[str, str]:
+    """Return a stable key for matching Excel items to summary rows."""
+    normalized_code = str(code or "").strip().lower()
+    normalized_name = str(name or "").strip().lower()
+    if normalized_code in {"", "nan", "none"}:
+        normalized_code = ""
+    return normalized_code, normalized_name
+
+
+def stop_flag_path(args: argparse.Namespace) -> Path | None:
+    """Return the optional stop-request flag path."""
+    value = getattr(args, "stop_flag", None)
+    return Path(value) if value else None
+
+
 def build_bot(
     app_config: AppConfig,
     profile_key: str,
     profile: ProfileConfig,
     debug_browser: bool = False,
+    stop_flag_path: Path | None = None,
 ) -> TawreedBot:
     """Create a Tawreed bot instance for one profile."""
     return TawreedBot(
@@ -81,6 +124,7 @@ def build_bot(
         profile=profile,
         state_path=state_path(profile_key),
         debug_browser=debug_browser,
+        stop_flag_path=stop_flag_path,
     )
 
 

@@ -23,6 +23,31 @@ def run_cli_subprocess(arguments: list[str], env_overrides: dict[str, str] | Non
         return _failed_process_result(command, error)
 
 
+def start_cli_subprocess(
+    arguments: list[str],
+    output_path: Path,
+    env_overrides: dict[str, str] | None = None,
+) -> dict[str, object]:
+    """Start the project CLI in the background and stream output to a file."""
+    command = [sys.executable, str(RUNNER_PATH), *arguments]
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_file = output_path.open("w", encoding="utf-8", errors="replace")
+    process = subprocess.Popen(
+        command,
+        cwd=str(Path.cwd()),
+        env=merged_env(env_overrides),
+        text=True,
+        stdout=output_file,
+        stderr=subprocess.STDOUT,
+    )
+    return {
+        "process": process,
+        "output_file": output_file,
+        "output_path": output_path,
+        "command": command,
+    }
+
+
 def _completed_process(command: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     """Run one completed subprocess and return the captured result."""
     return subprocess.run(

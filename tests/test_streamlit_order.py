@@ -36,6 +36,23 @@ class StreamlitOrderTests(unittest.TestCase):
 
         self.assertEqual(command[-2:], ["--min-discount-percent", "12"])
 
+    def test_order_command_adds_resume(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "resume": True,
+                "highest_discount": False,
+                "min_discount_percent": 0,
+            },
+            Path("input/ddd.xlsx"),
+        )
+
+        self.assertIn("--resume", command)
+
 
 if __name__ == "__main__":
     unittest.main()

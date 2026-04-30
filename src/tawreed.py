@@ -59,6 +59,7 @@ class TawreedBot:
         profile: ProfileConfig,
         state_path: Path,
         debug_browser: bool = False,
+        stop_flag_path: Path | None = None,
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
@@ -66,6 +67,7 @@ class TawreedBot:
         self.profile = profile
         self.state_path = state_path
         self.debug_browser = debug_browser
+        self.stop_flag_path = stop_flag_path
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
         self.no_results_exception = _NoResultsItem
@@ -152,8 +154,11 @@ class TawreedBot:
             )
             try:
                 self._prepare_order_page(page)
-                self._process_items(page, items)
-                confirm_order(self, page)
+                completed = self._process_items(page, items)
+                if completed and not self._stop_requested():
+                    confirm_order(self, page)
+                else:
+                    print(f"[{self.profile_key}] Stop requested. Order confirmation skipped.")
             except Exception as error:
                 dump_artifacts(
                     page,
@@ -176,10 +181,18 @@ class TawreedBot:
         go_to_orders(page, self.selectors.go_to_orders, self._order_surface_selector())
         start_new_order(page, self.selectors.new_order, self.selectors.item_search_input)
 
-    def _process_items(self, page: Page, items: list[Item]) -> None:
+    def _process_items(self, page: Page, items: list[Item]) -> bool:
         """Process each requested Excel item on the current order page."""
         for item in items:
+            if self._stop_requested():
+                print(f"[{self.profile_key}] Stop requested before item {item.code} / {item.name}.")
+                return False
             self._process_single_item(page, item)
+        return True
+
+    def _stop_requested(self) -> bool:
+        """Return whether an external stop request has been written for this run."""
+        return bool(self.stop_flag_path and self.stop_flag_path.exists())
 
     def _order_surface_selector(self) -> str:
         """Return the selector that best indicates the order surface is ready."""

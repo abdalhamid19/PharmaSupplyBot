@@ -52,6 +52,23 @@ class CliParserTests(unittest.TestCase):
 
         self.assertEqual(args.min_discount_percent, 12)
 
+    def test_order_accepts_resume_and_stop_flag(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "input/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--resume",
+                "--stop-flag",
+                "artifacts/run_control/order_stop.flag",
+            ]
+        )
+
+        self.assertTrue(args.resume)
+        self.assertEqual(args.stop_flag, "artifacts/run_control/order_stop.flag")
+
     def test_auth_does_not_expose_debug_browser_flag(self) -> None:
         args = build_parser().parse_args(["auth", "--profile", "wardany"])
         self.assertFalse(hasattr(args, "debug_browser"))

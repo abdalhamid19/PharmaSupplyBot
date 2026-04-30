@@ -41,6 +41,38 @@ class TawreedBotTests(unittest.TestCase):
         )
         self.assertFalse(bot._is_products_page(_FakePage("https://seller.tawreed.io/#/login")))
 
+    def test_process_items_stops_before_next_item_when_stop_flag_exists(self) -> None:
+        config = AppConfig(
+            base_url="https://seller.tawreed.io/#/login",
+            excel=ExcelConfig(code_col="code", name_col="name", qty_col="qty"),
+            profiles={"wardany": ProfileConfig(display_name="Wardany", pharmacy_switch={})},
+            selectors={"order_flow": {"item_search_input": "#search"}},
+            warehouse_strategy={},
+            matching=MatchingConfig(),
+            runtime=RuntimeConfig(),
+        )
+        with TemporaryDirectory() as temp_dir:
+            stop_flag = Path(temp_dir) / "stop.flag"
+            stop_flag.write_text("stop", encoding="utf-8")
+            bot = TawreedBot(
+                config=config,
+                profile_key="wardany",
+                profile=config.profiles["wardany"],
+                state_path=Path("state/wardany.json"),
+                stop_flag_path=stop_flag,
+            )
+
+            with patch.object(bot, "_process_single_item") as process_item:
+                completed = bot._process_items(object(), [])
+                self.assertTrue(completed)
+                completed = bot._process_items(
+                    object(),
+                    [SimpleNamespace(code="1", name="Panadol")],
+                )
+
+            self.assertFalse(completed)
+            process_item.assert_not_called()
+
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:
         config = AppConfig(
             base_url="https://seller.tawreed.io/#/login",

@@ -51,6 +51,16 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         help="Open a visible browser for this order run",
     )
     order_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip items already present in order_result_summary.csv for the selected profile",
+    )
+    order_parser.add_argument(
+        "--stop-flag",
+        default=None,
+        help="Path to a stop-request flag file checked between items",
+    )
+    order_parser.add_argument(
         "--warehouse-mode",
         choices=["first_available", "max_available", "max_discount"],
         default=None,
