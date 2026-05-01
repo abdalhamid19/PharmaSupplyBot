@@ -117,6 +117,14 @@ def filter_prevented_order_items(
     return allowed_items, skipped_count
 
 
+def is_prevented_items_excel_path(
+    excel_path: Path,
+    prevented_items_path: Path = DEFAULT_PREVENTED_ITEMS_PATH,
+) -> bool:
+    """Return whether the order source path points at the prevented-items list."""
+    return _normalized_path(excel_path) == _normalized_path(prevented_items_path)
+
+
 def normalized_prevented_key(item: PreventedItem) -> tuple[str, str]:
     """Return the comparable identity for one prevented item."""
     return normalized_key(item.code, item.name)
@@ -160,6 +168,11 @@ def display_code_text(value: object) -> str:
     if text.endswith(".0"):
         return text[:-2]
     return text
+
+
+def _normalized_path(path: Path) -> Path:
+    """Return an absolute path for reliable same-file comparisons."""
+    return path.expanduser().resolve(strict=False)
 
 
 def _require_prevented_columns(dataframe: pd.DataFrame) -> None:

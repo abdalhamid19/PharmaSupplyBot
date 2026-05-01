@@ -1,9 +1,11 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.streamlit_order import order_command
+from src import streamlit_order
 from src.streamlit_order_form import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     add_and_save_prevented_item,
@@ -158,6 +160,28 @@ class StreamlitOrderTests(unittest.TestCase):
             [PreventedItem(code="1", name="Panadol"), PreventedItem(code="2", name="Devarol")],
         )
         self.assertEqual(reloaded_items, updated_items)
+
+    def test_render_order_tab_rejects_prevented_file_as_order_excel(self) -> None:
+        form_values = {
+            "excel_path_str": "input/drugprevented.xlsx",
+            "upload": None,
+            "prevented_items_excel": "input/drugprevented.xlsx",
+        }
+        with (
+            patch("src.streamlit_order.render_running_order_controls", return_value=False),
+            patch("src.streamlit_order.order_form_values", return_value=(True, form_values)),
+            patch("src.streamlit_order.st.subheader"),
+            patch("src.streamlit_order.st.error") as error,
+            patch("src.streamlit_order.run_order_submission") as run_submission,
+        ):
+            streamlit_order.render_order_tab(
+                SimpleNamespace(profiles={"wardany": object()}),
+                "wardany",
+                Path("config.yaml"),
+            )
+
+        error.assert_called_once()
+        run_submission.assert_not_called()
 
 
 if __name__ == "__main__":

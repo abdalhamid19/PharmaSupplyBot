@@ -7,6 +7,7 @@ import time
 
 import streamlit as st
 
+from .prevented_items import DEFAULT_PREVENTED_ITEMS_PATH, is_prevented_items_excel_path
 from .streamlit_order_form import order_form_values
 from .streamlit_process import render_command_result, start_cli_subprocess
 from .streamlit_results import render_fresh_run_analysis
@@ -32,6 +33,15 @@ def render_order_tab(app_config, default_profile: str | None, config_path: Path)
     excel_path = resolve_excel_path(form_values["excel_path_str"], form_values["upload"])
     if excel_path is None:
         st.error("Please choose or upload an Excel file.")
+        return
+    prevented_items_path = Path(
+        str(form_values.get("prevented_items_excel") or DEFAULT_PREVENTED_ITEMS_PATH)
+    )
+    if is_prevented_items_excel_path(excel_path, prevented_items_path):
+        st.error(
+            "`drugprevented.xlsx` is the prevented-items list, not an order sheet. "
+            "Please choose the shortage/order Excel file."
+        )
         return
     run_order_submission(app_config, default_profile, config_path, form_values, excel_path)
 

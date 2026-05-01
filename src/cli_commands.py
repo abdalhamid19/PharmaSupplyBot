@@ -11,6 +11,7 @@ from .excel import load_items_from_excel
 from .prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     filter_prevented_order_items,
+    is_prevented_items_excel_path,
     load_prevented_items,
 )
 from .tawreed import TawreedBot
@@ -76,9 +77,14 @@ def profiles_to_run(app_config: AppConfig, args: argparse.Namespace):
 def load_order_items(app_config: AppConfig, args: argparse.Namespace):
     """Load the order items requested by the CLI command."""
     excel_path = Path(args.excel)
-    items = load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
     prevented_path_value = getattr(args, "prevented_items_excel", DEFAULT_PREVENTED_ITEMS_PATH)
     prevented_path = Path(prevented_path_value) if prevented_path_value else None
+    if prevented_path and is_prevented_items_excel_path(excel_path, prevented_path):
+        raise SystemExit(
+            f"Order Excel cannot be the prevented-items file: {excel_path}. "
+            "Choose the shortage/order Excel file instead."
+        )
+    items = load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
     if not prevented_path:
         return items
     if not prevented_path.is_file():

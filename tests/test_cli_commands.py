@@ -73,6 +73,16 @@ class CliCommandsTests(unittest.TestCase):
 
         self.assertEqual(allowed_items, items)
 
+    def test_load_order_items_rejects_prevented_file_as_order_excel(self) -> None:
+        args = SimpleNamespace(
+            excel="input/drugprevented.xlsx",
+            limit=0,
+            prevented_items_excel="input/drugprevented.xlsx",
+        )
+
+        with self.assertRaisesRegex(SystemExit, "Order Excel cannot be"):
+            load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
+
 
 if __name__ == "__main__":
     unittest.main()
