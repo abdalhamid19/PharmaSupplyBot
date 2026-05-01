@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+import shutil
+
 import pandas as pd
 import streamlit as st
 
@@ -29,6 +32,7 @@ def render_results_tab(default_profile: str | None) -> None:
 
 def render_selected_profile_results(profile_key: str) -> None:
     """Render summary and artifacts for one selected profile."""
+    render_clear_profile_results_controls(profile_key)
     summary_rows, summary_xlsx_rows = summary_sources(profile_key)
     if not summary_rows and not summary_xlsx_rows:
         st.info(f"No summary files found for `{profile_key}`.")
@@ -36,6 +40,48 @@ def render_selected_profile_results(profile_key: str) -> None:
         render_profile_summaries(profile_key, summary_rows, summary_xlsx_rows)
         render_timing_metrics(summary_rows or summary_xlsx_rows)
     render_recent_artifact_files(profile_key)
+
+
+def render_clear_profile_results_controls(profile_key: str) -> None:
+    """Render controls that clear old result artifacts for the selected profile."""
+    confirm_clear = st.checkbox(
+        f"Confirm clearing old result data for `{profile_key}`",
+        value=False,
+        key=f"clear_results_confirm_{profile_key}",
+    )
+    if not st.button(
+        "Clear Old Result Data",
+        disabled=not confirm_clear,
+        key=f"clear_results_button_{profile_key}",
+    ):
+        return
+    removed_count = clear_profile_result_data(profile_key)
+    st.success(f"Cleared {removed_count} old result file(s) for `{profile_key}`.")
+    st.rerun()
+
+
+def clear_profile_result_data(profile_key: str) -> int:
+    """Delete files and subdirectories under one profile artifact directory."""
+    artifact_dir = ARTIFACTS_DIR / profile_key
+    if not artifact_dir.exists() or not artifact_dir.is_dir():
+        return 0
+    removed_count = 0
+    for path in safe_profile_artifact_paths(artifact_dir):
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+        removed_count += 1
+    return removed_count
+
+
+def safe_profile_artifact_paths(artifact_dir: Path) -> list[Path]:
+    """Return direct children that are safe to remove from a profile artifact directory."""
+    artifacts_root = ARTIFACTS_DIR.resolve(strict=False)
+    resolved_artifact_dir = artifact_dir.resolve(strict=False)
+    if resolved_artifact_dir.parent != artifacts_root:
+        raise ValueError(f"Refusing to clear non-profile artifact path: {artifact_dir}")
+    return list(artifact_dir.iterdir())
 
 
 def summary_sources(profile_key: str) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
@@ -75,6 +121,9 @@ def render_recent_artifact_files(profile_key: str) -> None:
     """Render the recent artifact files table for one profile."""
     st.subheader("Recent Artifact Files")
     artifact_dir = ARTIFACTS_DIR / profile_key
+    if not artifact_dir.exists():
+        st.info("No artifact files found.")
+        return
     artifact_files = sorted(
         artifact_dir.glob("*"),
         key=lambda path: path.stat().st_mtime,
