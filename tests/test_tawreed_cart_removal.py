@@ -81,6 +81,24 @@ class TawreedCartRemovalTests(unittest.TestCase):
         self.assertEqual(removed_count, 2)
         self.assertEqual([row.deleted for row in rows], [True, True, False])
 
+    def test_remove_matching_cart_rows_counts_row_removed_despite_click_error(self) -> None:
+        rows = [_FakeRow("Supplier A DEVAROL")]
+        page = _FakePage(rows)
+        selectors = CartRemovalSelectors("rows", "delete", "confirm")
+        target = CartRemovalTarget(
+            item=CartRemovalItem(code="47273", name="DEVAROL"),
+            names=["DEVAROL"],
+        )
+
+        def detach_row_after_click_error(delete_button):
+            rows[0].deleted = True
+            raise RuntimeError("element detached")
+
+        with patch("src.tawreed_cart_removal.click_cart_delete_button", side_effect=detach_row_after_click_error):
+            removed_count = remove_matching_cart_rows(page, target, selectors)
+
+        self.assertEqual(removed_count, 1)
+
     def test_remove_items_from_cart_writes_not_found_summary(self) -> None:
         bot = type(
             "Bot",

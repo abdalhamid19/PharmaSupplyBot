@@ -121,10 +121,27 @@ def remove_matching_cart_rows(
             return removed_count
         row = page.locator(selectors.rows).nth(row_index)
         delete_button = row.locator(selectors.delete_button).first
+        remove_one_matching_cart_row(page, target, selectors, delete_button)
+        removed_count += 1
+
+
+def remove_one_matching_cart_row(
+    page: Page,
+    target: CartRemovalTarget,
+    selectors: CartRemovalSelectors,
+    delete_button,
+) -> None:
+    """Remove one matched row and tolerate Tawreed DOM churn after successful clicks."""
+    try:
         click_cart_delete_button(delete_button)
         confirm_delete_if_needed(page, selectors.confirm_delete_button)
         wait_for_cart_after_delete(page, selectors.rows)
-        removed_count += 1
+        return
+    except Exception:
+        wait_for_cart_after_delete(page, selectors.rows)
+        if first_matching_cart_row_index(page, target, selectors.rows) is None:
+            return
+        raise
 
 
 def click_cart_delete_button(delete_button) -> None:
