@@ -10,7 +10,8 @@ import pandas as pd
 
 from .excel import Item
 
-DEFAULT_PREVENTED_ITEMS_PATH = Path("input") / "drugprevented.xlsx"
+PREVENTED_ITEMS_DIR = Path("input") / "prevented_items"
+DEFAULT_PREVENTED_ITEMS_PATH = PREVENTED_ITEMS_DIR / "drugprevented.xlsx"
 PREVENTED_CODE_COLUMN = "كود"
 PREVENTED_NAME_COLUMN = "إسم الصنف"
 

@@ -10,7 +10,13 @@ config.yaml
 artifacts/
 state/
 
-input/
+input/*
+!input/order_items/
+input/order_items/*
+!input/order_items/.gitkeep
+!input/prevented_items/
+input/prevented_items/*
+!input/prevented_items/.gitkeep
 
 .DS_Store
 Thumbs.db

@@ -38,7 +38,11 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         help="Create orders from Excel (no human interaction)",
     )
     _add_common_arguments(order_parser)
-    order_parser.add_argument("--excel", required=True, help="Path to Excel file in input/")
+    order_parser.add_argument(
+        "--excel",
+        required=True,
+        help="Path to order Excel file, usually under input/order_items/",
+    )
     order_parser.add_argument(
         "--limit",
         type=int,
@@ -74,7 +78,7 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
     )
     order_parser.add_argument(
         "--prevented-items-excel",
-        default="input/drugprevented.xlsx",
+        default="input/prevented_items/drugprevented.xlsx",
         help="Path to XLSX file containing items that must not be ordered",
     )
 

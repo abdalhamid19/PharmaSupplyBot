@@ -70,48 +70,48 @@ python3 run.py auth --profile wardany
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany
+py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany
+python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
 ### 3. تشغيل عدد محدود من الأصناف
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
+py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
+python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
 ```
 
 ### 4. تشغيل كل الصيدليات المعرفة في `config.yaml`
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/shortage_report_total_20260422.xlsx" --all-profiles
+py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --all-profiles
+python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
 ### 5. فتح المتصفح أثناء التشغيل للتشخيص
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
 ### 6. تشغيل واجهة Streamlit
@@ -174,6 +174,10 @@ py run.py auth --profile wardany
   مثال جاهز لهيكل الإعدادات
 - `state/<profile>.json`
   جلسة Playwright المحفوظة لكل صيدلية
+- `input/order_items/`
+  ملفات Excel التي تحتوي الأصناف المطلوب رفعها/طلبها على موقع توريد
+- `input/prevented_items/`
+  ملفات Excel الخاصة بالأصناف الممنوعة من الطلب، والافتراضي `drugprevented.xlsx`
 - `artifacts/<profile>/`
   صور وHTML وlogs تشخيصية عند الفشل
 - `artifacts/<profile>/match_log_all.txt`

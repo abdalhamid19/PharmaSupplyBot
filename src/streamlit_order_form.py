@@ -9,6 +9,7 @@ import streamlit as st
 
 from .prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
+    PREVENTED_ITEMS_DIR,
     PREVENTED_CODE_COLUMN,
     PREVENTED_NAME_COLUMN,
     PreventedItem,
@@ -159,7 +160,9 @@ def add_and_save_prevented_item(
 
 def prevented_excel_options(path: Path = DEFAULT_PREVENTED_ITEMS_PATH) -> list[str]:
     """Return available XLSX choices for the prevented-items list."""
-    options = [str(option) for option in available_excel_options()]
+    options = []
+    if PREVENTED_ITEMS_DIR.exists():
+        options = [str(option) for option in sorted(PREVENTED_ITEMS_DIR.glob("*.xlsx"))]
     default_option = str(path)
     if default_option not in options:
         options.insert(0, default_option)

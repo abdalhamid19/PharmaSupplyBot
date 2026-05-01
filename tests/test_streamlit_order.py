@@ -11,6 +11,7 @@ from src.streamlit_order_form import (
     add_and_save_prevented_item,
     order_form_fields,
     order_excel_options,
+    prevented_excel_options,
     persist_existing_prevented_items_file,
     persist_uploaded_prevented_items,
 )
@@ -36,7 +37,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 "debug_browser": False,
                 "highest_discount": True,
             },
-            Path("input/ddd.xlsx"),
+            Path("input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--warehouse-mode", command)
@@ -53,7 +54,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 "highest_discount": False,
                 "min_discount_percent": 12,
             },
-            Path("input/ddd.xlsx"),
+            Path("input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--min-discount-percent", command)
@@ -71,7 +72,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 "highest_discount": False,
                 "min_discount_percent": 0,
             },
-            Path("input/ddd.xlsx"),
+            Path("input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--resume", command)
@@ -87,15 +88,15 @@ class StreamlitOrderTests(unittest.TestCase):
                 "resume": False,
                 "highest_discount": False,
                 "min_discount_percent": 0,
-                "prevented_items_excel": "input/drugprevented.xlsx",
+                "prevented_items_excel": "input/prevented_items/drugprevented.xlsx",
             },
-            Path("input/ddd.xlsx"),
+            Path("input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--prevented-items-excel", command)
         self.assertEqual(
             command[command.index("--prevented-items-excel") + 1],
-            "input/drugprevented.xlsx",
+            "input/prevented_items/drugprevented.xlsx",
         )
 
     def test_persist_uploaded_prevented_items_saves_active_list(self) -> None:
@@ -121,19 +122,30 @@ class StreamlitOrderTests(unittest.TestCase):
         with patch(
             "src.streamlit_order_form.available_excel_options",
             return_value=[
-                "input/drugprevented.xlsx",
-                "input/shortage_report_total_20260426.xlsx",
+                "input/order_items/shortage_report_total_20260426.xlsx",
             ],
         ):
             options = order_excel_options()
 
-        self.assertEqual(options, ["input/shortage_report_total_20260426.xlsx"])
+        self.assertEqual(options, ["input/order_items/shortage_report_total_20260426.xlsx"])
+
+    def test_prevented_excel_options_reads_prevented_items_directory(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            prevented_dir = Path(temp_dir) / "prevented_items"
+            prevented_dir.mkdir()
+            prevented_path = prevented_dir / "drugprevented.xlsx"
+            prevented_path.write_bytes(b"")
+
+            with patch("src.streamlit_order_form.PREVENTED_ITEMS_DIR", prevented_dir):
+                options = prevented_excel_options(prevented_path)
+
+        self.assertEqual(options, [str(prevented_path)])
 
     def test_order_form_fields_uses_default_prevented_items_path(self) -> None:
         with (
             patch(
                 "src.streamlit_order_form.excel_source_fields",
-                return_value=("Existing file", "input/orders.xlsx", None),
+                return_value=("Existing file", "input/order_items/orders.xlsx", None),
             ),
             patch(
                 "src.streamlit_order_form.profile_run_fields",
@@ -163,9 +175,9 @@ class StreamlitOrderTests(unittest.TestCase):
 
     def test_render_order_tab_rejects_prevented_file_as_order_excel(self) -> None:
         form_values = {
-            "excel_path_str": "input/drugprevented.xlsx",
+            "excel_path_str": "input/prevented_items/drugprevented.xlsx",
             "upload": None,
-            "prevented_items_excel": "input/drugprevented.xlsx",
+            "prevented_items_excel": "input/prevented_items/drugprevented.xlsx",
         }
         with (
             patch("src.streamlit_order.render_running_order_controls", return_value=False),

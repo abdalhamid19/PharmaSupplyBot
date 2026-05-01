@@ -12,6 +12,8 @@ APP_TITLE = "PharmaSupplyBot"
 DEFAULT_CONFIG_PATH = Path("config.yaml")
 FALLBACK_CONFIG_PATH = Path("config.example.yaml")
 INPUT_DIR = Path("input")
+ORDER_ITEMS_DIR = INPUT_DIR / "order_items"
+PREVENTED_ITEMS_DIR = INPUT_DIR / "prevented_items"
 ARTIFACTS_DIR = Path("artifacts")
 RUNNER_PATH = Path("run.py")
 

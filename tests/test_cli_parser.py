@@ -13,7 +13,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/ddd.xlsx",
+                "input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--debug-browser",
@@ -27,7 +27,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/ddd.xlsx",
+                "input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--warehouse-mode",
@@ -42,7 +42,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/ddd.xlsx",
+                "input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--min-discount-percent",
@@ -57,7 +57,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/ddd.xlsx",
+                "input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--resume",
@@ -74,15 +74,18 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/ddd.xlsx",
+                "input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--prevented-items-excel",
-                "input/custom_prevented.xlsx",
+                "input/prevented_items/custom_prevented.xlsx",
             ]
         )
 
-        self.assertEqual(args.prevented_items_excel, "input/custom_prevented.xlsx")
+        self.assertEqual(
+            args.prevented_items_excel,
+            "input/prevented_items/custom_prevented.xlsx",
+        )
 
     def test_auth_does_not_expose_debug_browser_flag(self) -> None:
         args = build_parser().parse_args(["auth", "--profile", "wardany"])

@@ -5,14 +5,14 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from .streamlit_shared import INPUT_DIR
+from .streamlit_shared import ORDER_ITEMS_DIR
 
 
 def available_excel_options() -> list[str]:
-    """Return the available existing Excel file choices."""
-    if not INPUT_DIR.exists():
+    """Return the available existing order Excel file choices."""
+    if not ORDER_ITEMS_DIR.exists():
         return []
-    return [str(path) for path in sorted(INPUT_DIR.glob("*.xlsx"))]
+    return [str(path) for path in sorted(ORDER_ITEMS_DIR.glob("*.xlsx"))]
 
 
 def resolve_excel_path(excel_path_str: object, uploaded_file) -> Path | None:
