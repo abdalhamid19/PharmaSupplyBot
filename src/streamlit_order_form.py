@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import streamlit as st
 
-from .streamlit_state_uploads import state_upload_fields
 from .streamlit_uploads import available_excel_options
 
 
@@ -22,7 +21,6 @@ def order_form_fields(app_config) -> dict[str, object]:
     profile_mode, profile_key, limit, debug_browser, resume, highest_discount, min_discount = (
         profile_run_fields(app_config)
     )
-    uploaded_states = state_upload_fields(app_config, profile_mode, profile_key)
     return {
         "input_mode": input_mode,
         "excel_path_str": excel_path_str,
@@ -34,7 +32,6 @@ def order_form_fields(app_config) -> dict[str, object]:
         "resume": bool(resume),
         "highest_discount": bool(highest_discount),
         "min_discount_percent": float(min_discount),
-        "uploaded_states": uploaded_states,
     }
 
 

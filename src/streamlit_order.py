@@ -14,7 +14,6 @@ from .streamlit_shared import ARTIFACTS_DIR, csv_row_count, load_new_summary_row
 from .streamlit_state import (
     ensure_default_state_files,
     missing_state_profiles,
-    persist_uploaded_states,
 )
 from .streamlit_uploads import resolve_excel_path
 
@@ -148,8 +147,7 @@ def close_order_process_output(state: dict[str, object]) -> None:
 
 
 def prepare_order_state_files(app_config, form_values: dict[str, object]) -> bool:
-    """Persist uploaded state files and ensure every target profile is ready."""
-    persist_uploaded_states(dict(form_values["uploaded_states"]))
+    """Ensure every target profile has a ready session-state file."""
     target_profiles = target_profile_keys(app_config, form_values)
     ensure_default_state_files(target_profiles)
     missing_profiles = missing_state_profiles(target_profiles)

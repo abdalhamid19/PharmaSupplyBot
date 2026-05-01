@@ -10,6 +10,8 @@ import streamlit as st
 
 from .streamlit_headless_auth import render_headless_auth
 from .streamlit_process import render_command_result, run_cli_subprocess
+from .streamlit_state import persist_uploaded_states
+from .streamlit_state_uploads import state_upload_fields
 
 
 def render_auth_tab(app_config, default_profile: str | None, config_path: Path) -> None:
@@ -20,6 +22,8 @@ def render_auth_tab(app_config, default_profile: str | None, config_path: Path) 
         return
     auth_available = interactive_auth_available()
     submitted, profile_key, wait_seconds = auth_form_values(app_config, auth_available)
+    uploaded_states = state_upload_fields(app_config, "Single profile", profile_key)
+    persist_uploaded_states(uploaded_states)
     render_local_auth_guidance(profile_key, auth_available)
     if not auth_available:
         render_headless_auth(app_config, config_path)
@@ -47,7 +51,7 @@ def render_local_auth_guidance(profile_key: str, auth_available: bool) -> None:
     else:
         st.warning("This hosted environment cannot open an interactive Playwright browser.")
     st.code(local_auth_command(profile_key), language="powershell")
-    st.caption(f"Then upload `state/{profile_key}.json` in the `Order` tab.")
+    st.caption(f"Then upload `state/{profile_key}.json` in the `Auth` tab.")
 
 
 def local_auth_command(profile_key: str) -> str:
