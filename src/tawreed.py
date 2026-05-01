@@ -13,7 +13,7 @@ from .cart_removal_items import CartRemovalItem
 from .selectors import _selectors
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_checkout import confirm_order
-from .tawreed_cart_removal import remove_items_from_cart
+from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
@@ -183,8 +183,10 @@ class TawreedBot:
                 debug_browser=self.debug_browser,
             )
             try:
+                self._prepare_order_page(page)
+                targets = resolve_cart_removal_targets(self, page, items)
                 self._prepare_cart_page(page)
-                remove_items_from_cart(self, page, items)
+                remove_items_from_cart(self, page, targets)
             except Exception as error:
                 dump_artifacts(
                     page,

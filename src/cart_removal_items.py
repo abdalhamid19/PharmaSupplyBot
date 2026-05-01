@@ -42,9 +42,17 @@ def load_cart_removal_items(path: Path = DEFAULT_REMOVE_ITEMS_PATH) -> list[Cart
 
 def cart_row_matches_item(row_text: str, item: CartRemovalItem) -> bool:
     """Return whether one cart row text appears to belong to the removal item by name."""
+    return cart_row_matches_names(row_text, [item.name])
+
+
+def cart_row_matches_names(row_text: str, names: list[str]) -> bool:
+    """Return whether one cart row text contains any normalized item name."""
     normalized_text = normalize_name(row_text)
-    name = normalize_name(item.name)
-    return bool(name and name in normalized_text)
+    for name in names:
+        normalized_name = normalize_name(name)
+        if normalized_name and normalized_name in normalized_text:
+            return True
+    return False
 
 
 def normalized_key(code: object, name: object) -> tuple[str, str]:

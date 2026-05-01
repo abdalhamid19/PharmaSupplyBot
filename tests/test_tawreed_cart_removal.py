@@ -4,8 +4,10 @@ from unittest.mock import patch
 from src.cart_removal_items import CartRemovalItem
 from src.tawreed_cart_removal import (
     CartRemovalSelectors,
+    CartRemovalTarget,
     remove_items_from_cart,
     remove_matching_cart_rows,
+    resolve_cart_removal_targets,
 )
 
 
@@ -69,7 +71,10 @@ class TawreedCartRemovalTests(unittest.TestCase):
         with patch("src.tawreed_cart_removal.confirm_delete_if_needed"):
             removed_count = remove_matching_cart_rows(
                 page,
-                CartRemovalItem(code="47273", name="DEVAROL"),
+                CartRemovalTarget(
+                    item=CartRemovalItem(code="47273", name="DEVAROL"),
+                    names=["DEVAROL", "ديفارول"],
+                ),
                 selectors,
             )
 
@@ -94,13 +99,37 @@ class TawreedCartRemovalTests(unittest.TestCase):
             },
         )()
         page = _FakePage([_FakeRow("Supplier C PANADOL")])
+        target = CartRemovalTarget(
+            item=CartRemovalItem(code="47273", name="DEVAROL"),
+            names=["DEVAROL", "ديفارول"],
+        )
 
         with patch("src.tawreed_cart_removal.append_cart_removal_summary") as append_summary:
-            remove_items_from_cart(bot, page, [CartRemovalItem(code="47273", name="DEVAROL")])
+            remove_items_from_cart(bot, page, [target])
 
         summary = append_summary.call_args.args[2]
         self.assertEqual(summary.removed_count, 0)
         self.assertEqual(summary.status, "not-found")
+
+    def test_resolve_cart_removal_targets_adds_tawreed_arabic_name(self) -> None:
+        bot = type("Bot", (), {"profile_key": "wardany"})()
+        item = CartRemovalItem(code="47273", name="DEVAROL-S-200.000 I.U 1 AMP")
+        match = type(
+            "Match",
+            (),
+            {
+                "data": {
+                    "productName": "ديفارول اس 200000 وحده 1 امبول",
+                    "productNameEn": "DEVAROL S 200000 IU 1 AMP",
+                }
+            },
+        )()
+
+        with patch("src.tawreed_cart_removal.require_product_match", return_value=(match, "DEVAROL")):
+            targets = resolve_cart_removal_targets(bot, object(), [item])
+
+        self.assertEqual(targets[0].item, item)
+        self.assertIn("ديفارول اس 200000 وحده 1 امبول", targets[0].names)
 
 
 if __name__ == "__main__":
