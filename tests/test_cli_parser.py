@@ -69,6 +69,21 @@ class CliParserTests(unittest.TestCase):
         self.assertTrue(args.resume)
         self.assertEqual(args.stop_flag, "artifacts/run_control/order_stop.flag")
 
+    def test_order_accepts_prevented_items_excel_override(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "input/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--prevented-items-excel",
+                "input/custom_prevented.xlsx",
+            ]
+        )
+
+        self.assertEqual(args.prevented_items_excel, "input/custom_prevented.xlsx")
+
     def test_auth_does_not_expose_debug_browser_flag(self) -> None:
         args = build_parser().parse_args(["auth", "--profile", "wardany"])
         self.assertFalse(hasattr(args, "debug_browser"))

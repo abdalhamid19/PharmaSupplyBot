@@ -187,4 +187,7 @@ def order_command(
     min_discount_percent = float(form_values.get("min_discount_percent") or 0)
     if min_discount_percent > 0:
         command.extend(["--min-discount-percent", f"{min_discount_percent:g}"])
+    prevented_items_excel = str(form_values.get("prevented_items_excel") or "")
+    if prevented_items_excel:
+        command.extend(["--prevented-items-excel", prevented_items_excel])
     return command

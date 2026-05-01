@@ -8,6 +8,11 @@ from pathlib import Path
 
 from .config_models import AppConfig, ProfileConfig
 from .excel import load_items_from_excel
+from .prevented_items import (
+    DEFAULT_PREVENTED_ITEMS_PATH,
+    filter_prevented_order_items,
+    load_prevented_items,
+)
 from .tawreed import TawreedBot
 from .tawreed_session import SessionInvalidError, open_reauth_in_browser
 
@@ -71,7 +76,19 @@ def profiles_to_run(app_config: AppConfig, args: argparse.Namespace):
 def load_order_items(app_config: AppConfig, args: argparse.Namespace):
     """Load the order items requested by the CLI command."""
     excel_path = Path(args.excel)
-    return load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
+    items = load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
+    prevented_path_value = getattr(args, "prevented_items_excel", DEFAULT_PREVENTED_ITEMS_PATH)
+    prevented_path = Path(prevented_path_value) if prevented_path_value else None
+    if not prevented_path:
+        return items
+    if not prevented_path.is_file():
+        print(f"Prevented-items Excel not found: {prevented_path}. Continuing without it.")
+        return items
+    prevented_items = load_prevented_items(prevented_path)
+    allowed_items, skipped_count = filter_prevented_order_items(items, prevented_items)
+    if skipped_count:
+        print(f"Skipped {skipped_count} prevented items from {prevented_path}.")
+    return allowed_items
 
 
 def resumable_order_items(profile_key: str, items: list, args: argparse.Namespace) -> list:

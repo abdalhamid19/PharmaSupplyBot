@@ -72,6 +72,11 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         default=None,
         help="Only select stores with discount percent greater than or equal to this value",
     )
+    order_parser.add_argument(
+        "--prevented-items-excel",
+        default="input/drugprevented.xlsx",
+        help="Path to XLSX file containing items that must not be ordered",
+    )
 
 
 def _add_common_arguments(argument_parser: argparse.ArgumentParser) -> None:
