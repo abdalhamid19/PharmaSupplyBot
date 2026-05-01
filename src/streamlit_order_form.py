@@ -22,9 +22,8 @@ from .streamlit_uploads import available_excel_options
 
 def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
     """Return the submitted order form values."""
-    prevented_items_path = render_prevented_items_manager()
     with st.form("order_form"):
-        values = order_form_fields(app_config, prevented_items_path)
+        values = order_form_fields(app_config, DEFAULT_PREVENTED_ITEMS_PATH)
         submitted = st.form_submit_button("Run Order")
     return bool(submitted), values
 
@@ -109,8 +108,7 @@ def render_prevented_items_editor(
         new_code = st.text_input("Prevented item code", key="prevented_item_code")
         new_name = st.text_input("Prevented item name", key="prevented_item_name")
         if st.button("Add prevented item"):
-            updated_items = add_prevented_item(prevented_items, new_code, new_name)
-            save_prevented_items(updated_items, path)
+            add_and_save_prevented_item(prevented_items, new_code, new_name, path)
             st.rerun()
     with remove_col:
         remove_options = prevented_item_options(prevented_items)
@@ -145,6 +143,18 @@ def render_prevented_items_editor(
 def prevented_item_options(prevented_items: list[PreventedItem]) -> list[str]:
     """Return selectbox options that preserve prevented item identity."""
     return [f"{item.code}\t{item.name}" for item in prevented_items]
+
+
+def add_and_save_prevented_item(
+    prevented_items: list[PreventedItem],
+    code: object,
+    name: object,
+    path: Path = DEFAULT_PREVENTED_ITEMS_PATH,
+) -> list[PreventedItem]:
+    """Add one prevented item and persist the updated list."""
+    updated_items = add_prevented_item(prevented_items, code, name)
+    save_prevented_items(updated_items, path)
+    return updated_items
 
 
 def prevented_excel_options(path: Path = DEFAULT_PREVENTED_ITEMS_PATH) -> list[str]:

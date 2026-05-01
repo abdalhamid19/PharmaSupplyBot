@@ -5,10 +5,14 @@ from unittest.mock import patch
 
 from src.streamlit_order import order_command
 from src.streamlit_order_form import (
+    DEFAULT_PREVENTED_ITEMS_PATH,
+    add_and_save_prevented_item,
+    order_form_fields,
     order_excel_options,
     persist_existing_prevented_items_file,
     persist_uploaded_prevented_items,
 )
+from src.prevented_items import PreventedItem, load_prevented_items
 
 
 class _FakeUpload:
@@ -122,6 +126,38 @@ class StreamlitOrderTests(unittest.TestCase):
             options = order_excel_options()
 
         self.assertEqual(options, ["input/shortage_report_total_20260426.xlsx"])
+
+    def test_order_form_fields_uses_default_prevented_items_path(self) -> None:
+        with (
+            patch(
+                "src.streamlit_order_form.excel_source_fields",
+                return_value=("Existing file", "input/orders.xlsx", None),
+            ),
+            patch(
+                "src.streamlit_order_form.profile_run_fields",
+                return_value=("Single profile", "wardany", 5, False, True, False, 0),
+            ),
+        ):
+            values = order_form_fields(object())
+
+        self.assertEqual(values["prevented_items_excel"], str(DEFAULT_PREVENTED_ITEMS_PATH))
+
+    def test_add_and_save_prevented_item_persists_new_item(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "drugprevented.xlsx"
+            updated_items = add_and_save_prevented_item(
+                [PreventedItem(code="1", name="Panadol")],
+                "2",
+                "Devarol",
+                path,
+            )
+            reloaded_items = load_prevented_items(path)
+
+        self.assertEqual(
+            updated_items,
+            [PreventedItem(code="1", name="Panadol"), PreventedItem(code="2", name="Devarol")],
+        )
+        self.assertEqual(reloaded_items, updated_items)
 
 
 if __name__ == "__main__":
