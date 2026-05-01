@@ -5,10 +5,11 @@
 ## المتطلبات
 
 - Python 3.10 أو أحدث
-- Windows PowerShell
+- Bash (Linux/macOS) أو Windows PowerShell
 
 ## التثبيت
 
+### Windows PowerShell
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -16,91 +17,182 @@ py -m pip install -r requirements.txt
 py -m playwright install
 ```
 
+### Linux / macOS (bash)
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+python3 -m playwright install
+```
+
 ## الإعداد
 
 انسخ ملف الإعدادات:
 
+### Windows PowerShell
 ```powershell
 Copy-Item config.example.yaml config.yaml
 ```
 
+### Linux / macOS (bash)
+```bash
+cp config.example.yaml config.yaml
+```
+
 إذا أردت استخدام البريد وكلمة المرور من البيئة:
 
+### Windows PowerShell
 ```powershell
 Copy-Item .env.example .env
+```
+
+### Linux / macOS (bash)
+```bash
+cp .env.example .env
 ```
 
 ## أوامر الطرفية
 
 ### 1. تسجيل الدخول وحفظ الجلسة
+يفتح المتصفح بشكل مرئي، وبعد تسجيل الدخول تُحفظ الجلسة في `state/<profile>.json`.
 
-يفتح المتصفح بشكل مرئي، وبعد تسجيل الدخول تُحفظ الجلسة في `state/<profile>.json`:
-
+Windows PowerShell:
 ```powershell
 py run.py auth --profile wardany
 ```
 
-يمكن زيادة وقت الانتظار قبل إغلاق نافذة تسجيل الدخول:
-
-```powershell
-py run.py auth --profile wardany --wait-seconds 900
+Linux / macOS (bash):
+```bash
+python3 run.py auth --profile wardany
 ```
 
 ### 2. تشغيل الطلب من ملف Excel
 
+Windows PowerShell:
 ```powershell
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
+Linux / macOS (bash):
+```bash
+python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany
+```
+
 ### 3. تشغيل عدد محدود من الأصناف
 
+Windows PowerShell:
 ```powershell
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
 ```
 
+Linux / macOS (bash):
+```bash
+python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
+```
+
 ### 4. تشغيل كل الصيدليات المعرفة في `config.yaml`
 
+Windows PowerShell:
 ```powershell
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
+Linux / macOS (bash):
+```bash
+python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --all-profiles
+```
+
 ### 5. فتح المتصفح أثناء التشغيل للتشخيص
 
+Windows PowerShell:
 ```powershell
 py run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+```
+
+Linux / macOS (bash):
+```bash
+python3 run.py order --excel "input/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
 ### 6. تشغيل واجهة Streamlit
 
 الرابط الأونلاين:
-
 ```text
 https://mahrouspharmacies-pharmasupplybot.streamlit.app/
 ```
 
 لتشغيلها محليًا:
 
+Windows PowerShell:
 ```powershell
 .\.venv\Scripts\Activate.ps1
 .\.venv\Scripts\python -m streamlit run streamlit_app.py
 ```
 
-بعد التشغيل افتح المتصفح على:
-
-```text
-http://localhost:8501
+Linux / macOS (bash):
+```bash
+source .venv/bin/activate
+python3 -m streamlit run streamlit_app.py
 ```
 
-إذا كان المنفذ `8501` مستخدمًا بالفعل، سيختار Streamlit منفذًا آخر ويعرضه في الطرفية.
+## فحص الكود محليًا
 
-الواجهة توفر:
-- تشغيل `auth` من المتصفح
-- تشغيل `order` على ملف Excel موجود أو مرفوع
-- رفع `state/<profile>.json` من داخل الواجهة عند التشغيل الأونلاين
-- مراجعة `order_result_summary.csv`
-- مراجعة `order_result_summary.xlsx`
-- عرض عدد الثواني لكل صنف في الدفعات الحديثة
-- عرض متوسط زمن التنفيذ وأبطأ الأصناف
+تشغيل فحص القواعد المحلي:
+
+Windows PowerShell:
+```powershell
+.\.venv\Scripts\python tools\rule_audit.py
+```
+
+Linux / macOS (bash):
+```bash
+python3 tools/rule_audit.py
+```
+
+إذا كان كل شيء سليمًا فسيظهر:
+
+```text
+rule_audit_ok
+```
+
+## سلوك التنفيذ الحالي
+
+- افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
+- اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
+  - `runtime.submit_order: true` داخل `config.yaml`
+- إذا كانت الجلسة منتهية أو غير صالحة، سيطلب منك البرنامج إعادة تنفيذ:
+
+```powershell
+py run.py auth --profile wardany
+```
+
+## ملفات مهمة
+
+- `config.yaml`
+  إعدادات التشغيل الفعلية
+- `config.example.yaml`
+  مثال جاهز لهيكل الإعدادات
+- `state/<profile>.json`
+  جلسة Playwright المحفوظة لكل صيدلية
+- `artifacts/<profile>/`
+  صور وHTML وlogs تشخيصية عند الفشل
+- `artifacts/<profile>/match_log_all.txt`
+  سجل نصي لكل مرشحي المطابقة
+- `artifacts/<profile>/match_log_all.csv`
+  سجل CSV لكل مرشحي المطابقة
+- `artifacts/<profile>/order_result_summary.csv`
+  الملخص الأساسي لنتائج التشغيل، وهو المصدر الأحدث المعتمد للتحليل
+- `artifacts/<profile>/order_result_summary.xlsx`
+  نسخة Excel من ملخص النتائج إذا كانت موجودة
+- `streamlit_app.py`
+  واجهة Streamlit لتشغيل `auth` و`order` ومراجعة النتائج
+
+## ملاحظات
+
+- محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
+- المطابقة بين اسم Excel ونتائج Tawreed تعتمد على الاسم فقط، وليس على كود الصنف الداخلي للصيدلية.
+- عند فشل صنف تقنيًا، تُحفظ artifacts داخل `artifacts/<profile>/`.
+
 
 في تبويب `Results`:
 - يتم عرض `CSV` و`XLSX` في تبويبين منفصلين
