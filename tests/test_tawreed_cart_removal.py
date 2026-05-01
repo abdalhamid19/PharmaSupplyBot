@@ -59,8 +59,8 @@ class _FakePage:
 class TawreedCartRemovalTests(unittest.TestCase):
     def test_remove_matching_cart_rows_deletes_all_matching_suppliers(self) -> None:
         rows = [
-            _FakeRow("Supplier A 47273 DEVAROL"),
-            _FakeRow("Supplier B 47273 DEVAROL"),
+            _FakeRow("Supplier A DEVAROL"),
+            _FakeRow("Supplier B DEVAROL"),
             _FakeRow("Supplier C PANADOL"),
         ]
         page = _FakePage(rows)

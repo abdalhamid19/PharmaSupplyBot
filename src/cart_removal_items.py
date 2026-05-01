@@ -41,11 +41,8 @@ def load_cart_removal_items(path: Path = DEFAULT_REMOVE_ITEMS_PATH) -> list[Cart
 
 
 def cart_row_matches_item(row_text: str, item: CartRemovalItem) -> bool:
-    """Return whether one cart row text appears to belong to the removal item."""
+    """Return whether one cart row text appears to belong to the removal item by name."""
     normalized_text = normalize_name(row_text)
-    code = normalize_code(item.code)
-    if code and code in normalize_code(row_text):
-        return True
     name = normalize_name(item.name)
     return bool(name and name in normalized_text)
 
@@ -105,6 +102,6 @@ def _row_to_cart_removal_item(row: Any) -> CartRemovalItem | None:
     """Convert one XLSX row into a cart-removal item."""
     code = display_code_text(row.get(REMOVE_CODE_COLUMN, ""))
     name = normalized_cell_text(row.get(REMOVE_NAME_COLUMN, ""))
-    if not code and not name:
+    if not name:
         return None
     return CartRemovalItem(code=code, name=name)

@@ -21,6 +21,7 @@ class CartRemovalItemsTests(unittest.TestCase):
                 [
                     {REMOVE_CODE_COLUMN: 47273, REMOVE_NAME_COLUMN: "DEVAROL"},
                     {REMOVE_CODE_COLUMN: "", REMOVE_NAME_COLUMN: "MOBIC"},
+                    {REMOVE_CODE_COLUMN: 111, REMOVE_NAME_COLUMN: ""},
                     {REMOVE_CODE_COLUMN: "", REMOVE_NAME_COLUMN: ""},
                 ]
             ).to_excel(path, index=False)
@@ -35,8 +36,8 @@ class CartRemovalItemsTests(unittest.TestCase):
             ],
         )
 
-    def test_cart_row_matches_by_code_or_name(self) -> None:
-        self.assertTrue(
+    def test_cart_row_matches_by_name_only(self) -> None:
+        self.assertFalse(
             cart_row_matches_item(
                 "supplier row 47273 something",
                 CartRemovalItem(code="47273", name="Different"),
@@ -45,7 +46,7 @@ class CartRemovalItemsTests(unittest.TestCase):
         self.assertTrue(
             cart_row_matches_item(
                 "supplier row mobic 15mg 30 tab",
-                CartRemovalItem(code="", name="MOBIC 15MG 30 TAB"),
+                CartRemovalItem(code="73879", name="MOBIC 15MG 30 TAB"),
             )
         )
         self.assertFalse(
