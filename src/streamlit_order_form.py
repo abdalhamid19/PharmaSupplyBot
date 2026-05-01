@@ -55,7 +55,7 @@ def profile_run_fields(app_config) -> tuple[str, str, int, bool, bool, bool, flo
     profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=50)
     resume = st.checkbox("Resume from previous summary", value=True)
-    highest_discount = st.checkbox("Highest discount first", value=False)
+    highest_discount = st.checkbox("Highest discount only", value=False)
     min_discount = st.number_input(
         "Minimum discount percent",
         min_value=0.0,

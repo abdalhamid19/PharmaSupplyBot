@@ -264,7 +264,21 @@ def choose_next_store_for_remaining_quantity(
     min_discount_percent: float = 0.0,
 ) -> tuple[int, dict[str, Any]]:
     """Return the next unused store to order from while splitting quantities."""
-    choices = available_store_choices(stores, used_store_ids, min_discount_percent)
+    all_choices = available_store_choices(stores, set(), min_discount_percent)
+    if mode == "max_discount" and all_choices:
+        highest_discount = max(store_discount_value(store) for _, store in all_choices)
+        choices = [
+            choice
+            for choice in all_choices
+            if store_identity(choice[1], choice[0]) not in used_store_ids
+            and store_discount_value(choice[1]) == highest_discount
+        ]
+    else:
+        choices = [
+            choice
+            for choice in all_choices
+            if store_identity(choice[1], choice[0]) not in used_store_ids
+        ]
     if not choices:
         if min_discount_percent > 0:
             raise skip_exception_cls(
@@ -276,13 +290,7 @@ def choose_next_store_for_remaining_quantity(
     if mode == "max_available":
         return max(choices, key=lambda choice: store_available_quantity(choice[1]))
     if mode == "max_discount":
-        return max(
-            choices,
-            key=lambda choice: (
-                store_discount_value(choice[1]),
-                store_available_quantity(choice[1]),
-            ),
-        )
+        return max(choices, key=lambda choice: store_available_quantity(choice[1]))
     raise ValueError(f"Unknown warehouse strategy mode: {mode}")
 
 
