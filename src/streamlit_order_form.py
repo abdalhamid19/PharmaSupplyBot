@@ -166,8 +166,20 @@ def excel_source_fields() -> tuple[str, str, object]:
         ["Existing file", "Upload file"],
         horizontal=True,
     )
-    excel_path_str = existing_excel_path(input_mode, available_excel_options())
+    excel_path_str = existing_excel_path(input_mode, order_excel_options())
     return input_mode, excel_path_str, uploaded_excel_file(input_mode)
+
+
+def order_excel_options(
+    prevented_items_path: Path = DEFAULT_PREVENTED_ITEMS_PATH,
+) -> list[str]:
+    """Return existing Excel files that can be used as order source sheets."""
+    prevented_path = str(prevented_items_path)
+    return [
+        option
+        for option in available_excel_options()
+        if str(Path(option)) != prevented_path
+    ]
 
 
 def profile_run_fields(app_config) -> tuple[str, str, int, bool, bool, bool, float]:

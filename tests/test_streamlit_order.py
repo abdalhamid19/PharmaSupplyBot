@@ -1,9 +1,11 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from src.streamlit_order import order_command
 from src.streamlit_order_form import (
+    order_excel_options,
     persist_existing_prevented_items_file,
     persist_uploaded_prevented_items,
 )
@@ -108,6 +110,18 @@ class StreamlitOrderTests(unittest.TestCase):
 
             self.assertEqual(saved_path, target_path)
             self.assertEqual(target_path.read_bytes(), b"xlsx-bytes")
+
+    def test_order_excel_options_excludes_default_prevented_items_file(self) -> None:
+        with patch(
+            "src.streamlit_order_form.available_excel_options",
+            return_value=[
+                "input/drugprevented.xlsx",
+                "input/shortage_report_total_20260426.xlsx",
+            ],
+        ):
+            options = order_excel_options()
+
+        self.assertEqual(options, ["input/shortage_report_total_20260426.xlsx"])
 
 
 if __name__ == "__main__":
