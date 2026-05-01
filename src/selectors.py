@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from .config_models import AppConfig
+from .tawreed_constants import (
+    CART_CONFIRM_DELETE_BUTTON_SELECTOR,
+    CART_DELETE_BUTTON_SELECTOR,
+    CARTS_PAGE_ROUTE,
+    PRODUCT_ROWS_SELECTOR,
+)
 
 
 LOGIN_DEFAULTS = {
@@ -23,6 +29,17 @@ ORDER_FLOW_DEFAULTS = {
     "qty_input": ("order_flow", "qty_input", "input[type='number']"),
     "add_item_button": ("order_flow", "add_item_button", "text=Add"),
     "confirm_order_button": ("order_flow", "confirm_order_button", "text=Confirm"),
+}
+
+CART_FLOW_DEFAULTS = {
+    "cart_route": ("cart_flow", "route", CARTS_PAGE_ROUTE),
+    "cart_rows": ("cart_flow", "rows", PRODUCT_ROWS_SELECTOR),
+    "cart_delete_button": ("cart_flow", "delete_button", CART_DELETE_BUTTON_SELECTOR),
+    "cart_confirm_delete_button": (
+        "cart_flow",
+        "confirm_delete_button",
+        CART_CONFIRM_DELETE_BUTTON_SELECTOR,
+    ),
 }
 
 WAREHOUSE_DEFAULTS = {
@@ -47,6 +64,10 @@ class _Sel:
     qty_input: str
     add_item_button: str
     confirm_order_button: str
+    cart_route: str
+    cart_rows: str
+    cart_delete_button: str
+    cart_confirm_delete_button: str
     warehouse_rows: str
     warehouse_available_qty: str
     warehouse_pick_button: str
@@ -69,6 +90,7 @@ def _selectors(config: AppConfig) -> _Sel:
     selector_values = {
         **_mapped_selectors(selectors_config, LOGIN_DEFAULTS),
         **_mapped_selectors(selectors_config, ORDER_FLOW_DEFAULTS),
+        **_mapped_selectors(selectors_config, CART_FLOW_DEFAULTS),
         **_warehouse_selector_values(warehouse_selectors),
     }
     return _Sel(**selector_values)

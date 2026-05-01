@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.cli_commands import load_order_items, resumable_order_items
+from src.cli_commands import load_order_items, resumable_order_items, run_remove_cart_command
 from src.excel import Item
 
 
@@ -82,6 +82,32 @@ class CliCommandsTests(unittest.TestCase):
 
         with self.assertRaisesRegex(SystemExit, "Order Excel cannot be"):
             load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
+
+    def test_run_remove_cart_command_invokes_bot_for_selected_profile(self) -> None:
+        profile = SimpleNamespace()
+        app_config = SimpleNamespace(
+            base_url="https://seller.tawreed.io/#/login",
+            profiles={"wardany": profile},
+            profiles_to_run=lambda profile=None, all_profiles=False: [("wardany", profile)],
+        )
+        args = SimpleNamespace(
+            excel="input/remove_items/remove.xlsx",
+            profile="wardany",
+            all_profiles=False,
+            debug_browser=True,
+        )
+
+        with (
+            patch("src.cli_commands.load_cart_removal_items", return_value=[object()]) as load_items,
+            patch("src.cli_commands.require_state_file"),
+            patch("src.cli_commands.build_bot") as build_bot,
+        ):
+            bot = build_bot.return_value
+            result = run_remove_cart_command(app_config, args)
+
+        self.assertEqual(result, 0)
+        load_items.assert_called_once()
+        bot.remove_cart_items.assert_called_once()
 
 
 if __name__ == "__main__":

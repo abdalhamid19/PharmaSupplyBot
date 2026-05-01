@@ -87,6 +87,34 @@ class CliParserTests(unittest.TestCase):
             "input/prevented_items/custom_prevented.xlsx",
         )
 
+    def test_remove_cart_accepts_excel_and_debug_browser(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "remove-cart",
+                "--excel",
+                "input/remove_items/remove.xlsx",
+                "--profile",
+                "wardany",
+                "--debug-browser",
+            ]
+        )
+
+        self.assertEqual(args.cmd, "remove-cart")
+        self.assertEqual(args.excel, "input/remove_items/remove.xlsx")
+        self.assertTrue(args.debug_browser)
+
+    def test_remove_cart_accepts_all_profiles(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "remove-cart",
+                "--excel",
+                "input/remove_items/remove.xlsx",
+                "--all-profiles",
+            ]
+        )
+
+        self.assertTrue(args.all_profiles)
+
     def test_auth_does_not_expose_debug_browser_flag(self) -> None:
         args = build_parser().parse_args(["auth", "--profile", "wardany"])
         self.assertFalse(hasattr(args, "debug_browser"))

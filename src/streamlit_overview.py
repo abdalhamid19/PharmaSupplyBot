@@ -11,6 +11,7 @@ from .streamlit_shared import (
     ARTIFACTS_DIR,
     ORDER_ITEMS_DIR,
     PREVENTED_ITEMS_DIR,
+    REMOVE_ITEMS_DIR,
     load_csv_rows,
 )
 
@@ -21,11 +22,12 @@ def render_overview(app_config) -> None:
     prevented_files = (
         sorted(PREVENTED_ITEMS_DIR.glob("*.xlsx")) if PREVENTED_ITEMS_DIR.exists() else []
     )
+    remove_files = sorted(REMOVE_ITEMS_DIR.glob("*.xlsx")) if REMOVE_ITEMS_DIR.exists() else []
     summary_path = ARTIFACTS_DIR / "wardany" / "order_result_summary.csv"
     summary_rows = load_csv_rows(summary_path)
     render_overview_metrics(app_config, input_files, prevented_files, summary_rows)
     render_profile_table(app_config.profiles)
-    render_input_files_table(input_files, prevented_files)
+    render_input_files_table(input_files, prevented_files, remove_files)
     render_latest_summary_rows(summary_rows)
 
 
@@ -64,7 +66,11 @@ def _profile_row(profile_key: str, display_name: str, state_path: Path) -> dict[
     }
 
 
-def render_input_files_table(input_files: list[Path], prevented_files: list[Path]) -> None:
+def render_input_files_table(
+    input_files: list[Path],
+    prevented_files: list[Path],
+    remove_files: list[Path],
+) -> None:
     """Render the available Excel files table."""
     st.subheader("Available Order Excel Files")
     rows = file_table_rows(input_files, "order_items")
@@ -76,8 +82,14 @@ def render_input_files_table(input_files: list[Path], prevented_files: list[Path
     prevented_rows = file_table_rows(prevented_files, "prevented_items")
     if not prevented_rows:
         st.info("No prevented-items Excel files found under `input/prevented_items/`.")
+    else:
+        st.dataframe(pd.DataFrame(prevented_rows), use_container_width=True, hide_index=True)
+    st.subheader("Available Remove-Cart Excel Files")
+    remove_rows = file_table_rows(remove_files, "remove_items")
+    if not remove_rows:
+        st.info("No remove-cart Excel files found under `input/remove_items/`.")
         return
-    st.dataframe(pd.DataFrame(prevented_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(remove_rows), use_container_width=True, hide_index=True)
 
 
 def file_table_rows(files: list[Path], category: str) -> list[dict[str, object]]:

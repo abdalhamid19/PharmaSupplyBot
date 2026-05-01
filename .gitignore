@@ -17,6 +17,9 @@ input/order_items/*
 !input/prevented_items/
 input/prevented_items/*
 !input/prevented_items/.gitkeep
+!input/remove_items/
+input/remove_items/*
+!input/remove_items/.gitkeep
 
 .DS_Store
 Thumbs.db

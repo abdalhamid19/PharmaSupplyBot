@@ -6,6 +6,7 @@ import argparse
 import csv
 from pathlib import Path
 
+from .cart_removal_items import load_cart_removal_items
 from .config_models import AppConfig, ProfileConfig
 from .excel import load_items_from_excel
 from .prevented_items import (
@@ -49,6 +50,32 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         )
         try:
             bot.place_order_from_items(profile_items)
+        except SessionInvalidError as error:
+            print(f"[{profile_key}] {error}")
+            open_reauth_in_browser(app_config.base_url, profile_key)
+            raise SystemExit(
+                f"Session for profile '{profile_key}' is not valid. "
+                f"Run: py run.py auth --profile {profile_key}"
+            ) from error
+    return 0
+
+
+def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> int:
+    """Remove requested items from Tawreed carts for the selected profiles."""
+    items = load_cart_removal_items(Path(args.excel))
+    if not items:
+        print("No items found from cart-removal Excel.")
+        return 0
+    for profile_key, profile in profiles_to_run(app_config, args):
+        require_state_file(profile_key)
+        bot = build_bot(
+            app_config,
+            profile_key,
+            profile,
+            debug_browser=bool(getattr(args, "debug_browser", False)),
+        )
+        try:
+            bot.remove_cart_items(items)
         except SessionInvalidError as error:
             print(f"[{profile_key}] {error}")
             open_reauth_in_browser(app_config.base_url, profile_key)

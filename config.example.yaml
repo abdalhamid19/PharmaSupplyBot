@@ -43,6 +43,11 @@ selectors:
     qty_input: "input[type='number']"
     add_item_button: "text=إضافة, text=Add"
     confirm_order_button: "text=تأكيد, text=Confirm"
+  cart_flow:
+    route: "#/purchase/carts/"
+    rows: "tbody.p-datatable-tbody > tr"
+    delete_button: "button:has(.pi-trash), button:has(.pi-times), button:has-text('حذف'), button:has-text('Delete')"
+    confirm_delete_button: "button:has-text('تأكيد'), button:has-text('حذف'), button:has-text('Delete'), button:has-text('Yes'), button:has-text('OK')"
 
 warehouse_strategy:
   # Options: "first_available" | "max_available" | "max_discount"

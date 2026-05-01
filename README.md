@@ -114,7 +114,22 @@ Linux / macOS (bash):
 python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
-### 6. تشغيل واجهة Streamlit
+### 6. حذف أصناف من سلة المشتريات
+
+ضع ملف الحذف داخل `input/remove_items/` ويجب أن يحتوي على الأعمدة:
+`كود` و`إسم الصنف`.
+
+Linux / macOS (bash):
+```bash
+python3 run.py remove-cart --excel "input/remove_items/remove.xlsx" --profile wardany
+```
+
+Windows PowerShell:
+```powershell
+py run.py remove-cart --excel "input/remove_items/remove.xlsx" --profile wardany
+```
+
+### 7. تشغيل واجهة Streamlit
 
 الرابط الأونلاين:
 ```text
@@ -178,6 +193,8 @@ py run.py auth --profile wardany
   ملفات Excel التي تحتوي الأصناف المطلوب رفعها/طلبها على موقع توريد
 - `input/prevented_items/`
   ملفات Excel الخاصة بالأصناف الممنوعة من الطلب، والافتراضي `drugprevented.xlsx`
+- `input/remove_items/`
+  ملفات Excel التي تحتوي الأصناف المطلوب حذفها من سلة مشتريات توريد
 - `artifacts/<profile>/`
   صور وHTML وlogs تشخيصية عند الفشل
 - `artifacts/<profile>/match_log_all.txt`

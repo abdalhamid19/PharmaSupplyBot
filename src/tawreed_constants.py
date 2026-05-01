@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 PRODUCTS_PAGE_ROUTE = "#/catalog/store-products/dv/"
+CARTS_PAGE_ROUTE = "#/purchase/carts/"
 PRODUCT_ROWS_SELECTOR = "tbody.p-datatable-tbody > tr"
 PRODUCT_SEARCH_ENDPOINT = "stores/products/search/similar5"
 STORE_DETAILS_ENDPOINT = "stores/products/product/get"
@@ -32,4 +33,17 @@ CHECKOUT_CONFIRMATION_LABELS = (
     "Ã˜ÂªÃ˜Â£Ã™Æ’Ã™Å Ã˜Â¯",
     "Ã™â€¦Ã˜ÂªÃ˜Â§Ã˜Â¨Ã˜Â¹Ã˜Â©",
     "Ã™â€ Ã˜Â¹Ã™â€¦",
+)
+CART_DELETE_BUTTON_SELECTOR = (
+    "button:has(.pi-trash), "
+    "button:has(.pi-times), "
+    "button:has-text('حذف'), "
+    "button:has-text('Delete')"
+)
+CART_CONFIRM_DELETE_BUTTON_SELECTOR = (
+    "button:has-text('تأكيد'), "
+    "button:has-text('حذف'), "
+    "button:has-text('Delete'), "
+    "button:has-text('Yes'), "
+    "button:has-text('OK')"
 )

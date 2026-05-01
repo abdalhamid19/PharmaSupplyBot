@@ -9,9 +9,11 @@ from playwright.sync_api import Page, sync_playwright
 
 from .config_models import AppConfig, ProfileConfig
 from .excel import Item
+from .cart_removal_items import CartRemovalItem
 from .selectors import _selectors
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_checkout import confirm_order
+from .tawreed_cart_removal import remove_items_from_cart
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
@@ -170,6 +172,53 @@ class TawreedBot:
             finally:
                 close_context(context)
                 close_browser(browser)
+
+    def remove_cart_items(self, items: list[CartRemovalItem]) -> None:
+        """Remove the requested items from Tawreed carts."""
+        with sync_playwright() as p:
+            browser, context, page = open_order_page(
+                p,
+                self.config.runtime,
+                self.state_path,
+                debug_browser=self.debug_browser,
+            )
+            try:
+                self._prepare_cart_page(page)
+                remove_items_from_cart(self, page, items)
+            except Exception as error:
+                dump_artifacts(
+                    page,
+                    self.profile_key,
+                    label="cart_removal_error",
+                    details=_artifact_details("cart_removal_error", error),
+                )
+                raise
+            finally:
+                close_context(context)
+                close_browser(browser)
+
+    def _prepare_cart_page(self, page: Page) -> None:
+        """Open Tawreed's cart page for cart-removal processing."""
+        page.goto(self._cart_page_url(), wait_until="domcontentloaded")
+        ensure_logged_in(
+            page,
+            self.selectors,
+            self.config.runtime.timeout_ms,
+            ready_selector=self.selectors.cart_rows,
+        )
+        maybe_switch_pharmacy(page, self.profile.pharmacy_switch or {})
+        try:
+            page.locator(self.selectors.cart_rows).first.wait_for(timeout=3000)
+        except Exception:
+            pass
+
+    def _cart_page_url(self) -> str:
+        """Return the direct Tawreed cart page URL."""
+        route = self.selectors.cart_route
+        if "#/" in self.config.base_url and route.startswith("#/"):
+            origin, _ = self.config.base_url.split("#/", 1)
+            return f"{origin}{route}"
+        return route or self.config.base_url
 
     def _prepare_order_page(self, page: Page) -> None:
         """Open the site and navigate to the ordering surface for item processing."""

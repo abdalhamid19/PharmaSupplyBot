@@ -11,6 +11,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="cmd", required=True)
     _build_auth_parser(subparsers)
     _build_order_parser(subparsers)
+    _build_remove_cart_parser(subparsers)
     return parser
 
 
@@ -80,6 +81,25 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         "--prevented-items-excel",
         default="input/prevented_items/drugprevented.xlsx",
         help="Path to XLSX file containing items that must not be ordered",
+    )
+
+
+def _build_remove_cart_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Register the remove-cart subcommand."""
+    remove_parser = subparsers.add_parser(
+        "remove-cart",
+        help="Remove matching products from Tawreed carts",
+    )
+    _add_common_arguments(remove_parser)
+    remove_parser.add_argument(
+        "--excel",
+        required=True,
+        help="Path to cart-removal Excel file, usually under input/remove_items/",
+    )
+    remove_parser.add_argument(
+        "--debug-browser",
+        action="store_true",
+        help="Open a visible browser for this cart-removal run",
     )
 
 
