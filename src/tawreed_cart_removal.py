@@ -64,7 +64,7 @@ def remove_items_from_cart(
                 reason=reason,
             ),
         )
-        print(f"[{bot.profile_key}] Cart removal {item.code} / {item.name}: {reason}")
+        print(_console_safe(f"[{bot.profile_key}] Cart removal {item.code} / {item.name}: {reason}"))
 
 
 def resolve_cart_removal_targets(
@@ -80,7 +80,7 @@ def resolve_cart_removal_targets(
             match, _ = require_product_match(bot, page, Item(code=item.code, name=item.name, qty=1))
             names.extend(tawreed_match_names(match.data))
         except Exception as error:
-            print(f"[{bot.profile_key}] Could not resolve Tawreed name for {item.name}: {error}")
+            print(_console_safe(f"[{bot.profile_key}] Could not resolve Tawreed name for {item.name}: {error}"))
         targets.append(CartRemovalTarget(item=item, names=unique_names(names)))
     return targets
 
@@ -162,10 +162,20 @@ def first_matching_cart_row_index(
     """Return the first cart row index matching the removal item."""
     rows = page.locator(rows_selector)
     for row_index in range(rows.count()):
-        row_text = rows.nth(row_index).inner_text(timeout=1500)
+        row_text = cart_row_text(rows, row_index)
+        if not row_text:
+            continue
         if cart_row_matches_names(row_text, target.names):
             return row_index
     return None
+
+
+def cart_row_text(rows, row_index: int) -> str:
+    """Return cart row text, tolerating virtualized or detached rows."""
+    try:
+        return rows.nth(row_index).inner_text(timeout=500)
+    except Exception:
+        return ""
 
 
 def confirm_delete_if_needed(page: Page, confirm_delete_button_selector: str) -> None:
@@ -189,3 +199,8 @@ def wait_for_cart_after_delete(page: Page, rows_selector: str) -> None:
         page.locator(rows_selector).first.wait_for(timeout=1500)
     except Exception:
         pass
+
+
+def _console_safe(text: str) -> str:
+    """Return text that can be printed on cp1252 Windows consoles without crashing."""
+    return text.encode("cp1252", errors="replace").decode("cp1252")

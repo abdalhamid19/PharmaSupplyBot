@@ -24,11 +24,14 @@ class _FakeButton:
 
 
 class _FakeRow:
-    def __init__(self, text):
+    def __init__(self, text, text_error=None):
         self.text = text
+        self.text_error = text_error
         self.deleted = False
 
     def inner_text(self, timeout=None):
+        if self.text_error:
+            raise self.text_error
         return self.text
 
     def locator(self, selector):
@@ -99,6 +102,23 @@ class TawreedCartRemovalTests(unittest.TestCase):
 
         self.assertEqual(removed_count, 1)
 
+    def test_remove_matching_cart_rows_skips_unreadable_virtual_rows(self) -> None:
+        rows = [
+            _FakeRow("virtual row", text_error=TimeoutError("not rendered")),
+            _FakeRow("Supplier A DEVAROL"),
+        ]
+        page = _FakePage(rows)
+        selectors = CartRemovalSelectors("rows", "delete", "confirm")
+        target = CartRemovalTarget(
+            item=CartRemovalItem(code="47273", name="DEVAROL"),
+            names=["DEVAROL"],
+        )
+
+        with patch("src.tawreed_cart_removal.confirm_delete_if_needed"):
+            removed_count = remove_matching_cart_rows(page, target, selectors)
+
+        self.assertEqual(removed_count, 1)
+
     def test_remove_items_from_cart_writes_not_found_summary(self) -> None:
         bot = type(
             "Bot",
@@ -148,6 +168,20 @@ class TawreedCartRemovalTests(unittest.TestCase):
 
         self.assertEqual(targets[0].item, item)
         self.assertIn("ديفارول اس 200000 وحده 1 امبول", targets[0].names)
+
+    def test_resolve_cart_removal_targets_prints_arabic_failures_safely(self) -> None:
+        bot = type("Bot", (), {"profile_key": "wardany"})()
+        item = CartRemovalItem(code="91976", name="عسل حريمي")
+
+        with (
+            patch("src.tawreed_cart_removal.require_product_match", side_effect=RuntimeError("لا يوجد")),
+            patch("builtins.print") as print_call,
+        ):
+            targets = resolve_cart_removal_targets(bot, object(), [item])
+
+        self.assertEqual(targets[0].names, [item.name])
+        printed_text = print_call.call_args.args[0]
+        self.assertIn("??? ?????", printed_text)
 
 
 if __name__ == "__main__":
