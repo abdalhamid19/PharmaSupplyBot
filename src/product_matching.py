@@ -260,7 +260,7 @@ def _availability_bonus(candidate: dict[str, Any]) -> float:
     """Return a small score bonus or penalty based on availability signals."""
     available_quantity = int(candidate.get("availableQuantity") or 0)
     products_count = int(candidate.get("productsCount") or 0)
-    if available_quantity > 0 or products_count > 0 or candidate.get("storeProductId"):
+    if available_quantity > 0 or products_count > 0:
         return 1.0
     return -1.5
 

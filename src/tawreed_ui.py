@@ -9,6 +9,7 @@ from .tawreed_constants import (
     CHECKOUT_CONFIRMATION_LABELS,
     DIALOG_MASK_SELECTOR,
     DIALOG_FOOTER_BUTTONS_SELECTOR,
+    OVERLAY_PANEL_SELECTOR,
     STORE_DIALOG_CLOSE_BUTTON_SELECTOR,
     STORE_DIALOG_ROWS_SELECTOR,
     STORE_DIALOG_CART_BUTTONS_SELECTOR,
@@ -82,6 +83,16 @@ def visible_dialog_masks(page: Page):
     return page.locator(f"{DIALOG_MASK_SELECTOR}:visible")
 
 
+def visible_overlay_panels(page: Page):
+    """Return visible non-dialog overlay panels that can block the products page."""
+    return page.locator(_visible_selector(OVERLAY_PANEL_SELECTOR))
+
+
 def checkout_confirmation_labels() -> tuple[str, ...]:
     """Return the button labels accepted as checkout confirmation actions."""
     return CHECKOUT_CONFIRMATION_LABELS
+
+
+def _visible_selector(selector: str) -> str:
+    """Add :visible to each selector in a comma-separated selector list."""
+    return ", ".join(f"{part.strip()}:visible" for part in selector.split(",") if part.strip())

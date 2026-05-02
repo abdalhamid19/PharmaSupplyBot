@@ -17,7 +17,11 @@ from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_t
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
-from .tawreed_products_flow import add_item_from_products_page, close_visible_dialogs
+from .tawreed_products_flow import (
+    add_item_from_products_page,
+    close_visible_dialogs,
+    visible_overlay_diagnostics,
+)
 from .tawreed_session import (
     auth_temp_state_path,
     attempt_env_login,
@@ -313,6 +317,7 @@ class TawreedBot:
                 details=_artifact_details(
                     f"item_error_{item.code or 'no_code'}",
                     error,
+                    overlay_diagnostics=visible_overlay_diagnostics(page),
                     item_code=item.code,
                     item_name=item.name,
                     item_qty=item.qty,

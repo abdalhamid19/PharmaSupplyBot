@@ -18,6 +18,7 @@ from .product_matching import (
 )
 from .tawreed_constants import (
     DIALOG_MASK_SELECTOR,
+    OVERLAY_PANEL_SELECTOR,
     PRODUCT_ROWS_SELECTOR,
     QUANTITY_INPUT_SELECTOR,
     STORE_DETAILS_ENDPOINT,
@@ -32,11 +33,14 @@ from .tawreed_ui import (
     store_dialog_cart_buttons,
     store_dialog_rows,
     visible_dialog_masks,
+    visible_overlay_panels,
     stores_button,
     visible_dialog,
 )
 
 MIN_SEARCH_QUERIES_PER_ITEM = 3
+MAX_DOM_SEARCH_ROWS = 8
+FAST_OPTIONAL_TEXT_TIMEOUT_MS = 300
 STORE_NAME_KEYS = (
     "storeName",
     "storeNameAr",
@@ -159,7 +163,7 @@ def missing_row_message(match: SearchMatch) -> str:
 def is_no_results_row(row) -> bool:
     """Return whether the current table row is Tawreed's no-results placeholder."""
     try:
-        text = row.inner_text()
+        text = _locator_inner_text(row, timeout_ms=FAST_OPTIONAL_TEXT_TIMEOUT_MS)
     except Exception:
         return False
     normalized_text = " ".join(str(text).split())
@@ -202,7 +206,18 @@ def open_add_to_cart_for_match(bot, page: Page, row, item: Item, match: SearchMa
 
 def match_has_multiple_stores(match: SearchMatch) -> bool:
     """Return whether the matched product requires store selection first."""
+    if _match_has_visible_dom_store(match):
+        return False
     return int(match.data.get("productsCount") or 0) > 0
+
+
+def _match_has_visible_dom_store(match: SearchMatch) -> bool:
+    """Return whether a DOM fallback match already represents a visible store row."""
+    store_product_id = str(match.data.get("storeProductId") or "")
+    return bool(
+        store_product_id.startswith("dom-row-")
+        and match.data.get("discountPercent") not in (None, "")
+    )
 
 
 def open_store_cart_dialog(bot, page: Page, row) -> None:
@@ -411,6 +426,7 @@ def store_meets_minimum_discount(store: dict[str, Any], min_discount_percent: fl
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
     """Open the stores dialog for a row and return the API payload behind it."""
+    close_visible_dialogs(page)
     response_value, dialog_became_visible = _open_stores_dialog_with_response(bot, page, row)
     if response_value is not None:
         stores = _stores_from_payload(response_value.json())
@@ -467,7 +483,7 @@ def warehouse_mode(bot) -> str:
 
 
 def close_visible_dialogs(page: Page) -> None:
-    """Close any visible dialogs so later items can continue safely."""
+    """Close visible dialogs and overlay panels so later items can continue safely."""
     try:
         while visible_dialog_masks(page).count() > 0:
             dialog = visible_dialog(page, 1000)
@@ -486,6 +502,63 @@ def close_visible_dialogs(page: Page) -> None:
             dialog.wait_for(state="hidden", timeout=1500)
     except Exception:
         pass
+    close_visible_overlay_panels(page)
+
+
+def close_visible_overlay_panels(page: Page) -> None:
+    """Dismiss PrimeNG overlay panels that are not represented by dialog masks."""
+    try:
+        for _ in range(3):
+            if visible_overlay_panels(page).count() <= 0:
+                return
+            with suppress(Exception):
+                page.keyboard.press("Escape")
+            _wait_for_overlay_panels_to_clear(page, timeout_ms=500)
+        if visible_overlay_panels(page).count() > 0:
+            _click_safe_page_area(page)
+            _wait_for_overlay_panels_to_clear(page, timeout_ms=700)
+    except Exception:
+        pass
+
+
+def visible_overlay_diagnostics(page: Page) -> str:
+    """Return compact diagnostics for visible dialogs and overlay panels."""
+    lines: list[str] = []
+    _append_visible_count(lines, "dialog_masks", f"{DIALOG_MASK_SELECTOR}:visible", page)
+    _append_visible_count(lines, "overlay_panels", _visible_selector(OVERLAY_PANEL_SELECTOR), page)
+    return "\n".join(lines)
+
+
+def _wait_for_overlay_panels_to_clear(page: Page, timeout_ms: int) -> None:
+    """Wait briefly for non-dialog overlay panels to disappear."""
+    try:
+        page.locator(OVERLAY_PANEL_SELECTOR).first.wait_for(state="hidden", timeout=timeout_ms)
+    except Exception:
+        pass
+
+
+def _click_safe_page_area(page: Page) -> None:
+    """Click outside overlays without depending on page-specific layout."""
+    with suppress(Exception):
+        page.locator("body").click(position={"x": 1, "y": 1}, force=True)
+        return
+    with suppress(Exception):
+        page.mouse.click(1, 1)
+
+
+def _append_visible_count(lines: list[str], label: str, selector: str, page: Page) -> None:
+    """Append one visible-locator count line for failure artifacts."""
+    try:
+        count = page.locator(selector).count()
+    except Exception as error:
+        lines.append(f"{label}=unavailable ({type(error).__name__}: {error})")
+        return
+    lines.append(f"{label}={count}")
+
+
+def _visible_selector(selector: str) -> str:
+    """Add :visible to each selector in a comma-separated selector list."""
+    return ", ".join(f"{part.strip()}:visible" for part in selector.split(",") if part.strip())
 
 
 def _stores_dialog_visible(page: Page, bot) -> bool:
@@ -638,7 +711,7 @@ def _dom_search_results(page: Page, query: str) -> list[dict[str, Any]]:
     """Build fallback product candidates from the visible products table rows."""
     results: list[dict[str, Any]] = []
     rows = visible_product_rows(page)
-    for row_index in range(rows.count()):
+    for row_index in range(min(rows.count(), MAX_DOM_SEARCH_ROWS)):
         row = rows.nth(row_index)
         if is_no_results_row(row):
             continue
@@ -668,11 +741,14 @@ def _dom_candidate_from_row(row, query: str) -> dict[str, Any] | None:
         return None
     supplier_count = _badge_int(row, "button:has(.pi-building) .p-badge")
     cart_count = _badge_int(row, "button:has(.pi-shopping-cart) .p-badge")
+    available_quantity = _dom_available_quantity(row, supplier_count, cart_count)
     return {
         "productNameEn": _dom_fallback_english_name(query, name_lines[0]),
         "productName": name_lines[0],
         "productsCount": supplier_count,
-        "availableQuantity": max(cart_count, supplier_count, 1),
+        "availableQuantity": available_quantity,
+        "discountPercent": _row_discount_percent(row),
+        "supplierName": _row_supplier_name(name_lines),
         "storeProductId": f"dom-row-{_normalized_dom_id(name_lines[0])}",
     }
 
@@ -680,7 +756,10 @@ def _dom_candidate_from_row(row, query: str) -> dict[str, Any] | None:
 def _row_name_lines(row) -> list[str]:
     """Return the visible product-name block lines for one rendered row."""
     try:
-        name_block = row.locator("td").first.locator("div.flex.flex-column").first.inner_text().strip()
+        name_block = _locator_inner_text(
+            row.locator("td").first.locator("div.flex.flex-column").first,
+            timeout_ms=FAST_OPTIONAL_TEXT_TIMEOUT_MS,
+        ).strip()
     except Exception:
         return []
     return [line.strip() for line in name_block.splitlines() if line.strip()]
@@ -689,10 +768,58 @@ def _row_name_lines(row) -> list[str]:
 def _badge_int(row, selector: str) -> int:
     """Return an integer badge value from the row or zero when absent."""
     try:
-        text = row.locator(selector).first.inner_text().strip()
+        text = _locator_inner_text(
+            row.locator(selector).first,
+            timeout_ms=FAST_OPTIONAL_TEXT_TIMEOUT_MS,
+        ).strip()
         return int(float(text))
     except Exception:
         return 0
+
+
+def _dom_available_quantity(row, supplier_count: int, cart_count: int) -> int:
+    """Return visible DOM availability without inventing stock for unavailable rows."""
+    if _row_unavailable_message(row):
+        return 0
+    if supplier_count <= 0 and cart_count <= 0:
+        return 0
+    return max(cart_count, supplier_count)
+
+
+def _row_discount_percent(row) -> str:
+    """Return the visible discount percent from one products-table row."""
+    try:
+        return _locator_inner_text(
+            row.locator("td").nth(1).locator(".text-green-500").first,
+            timeout_ms=FAST_OPTIONAL_TEXT_TIMEOUT_MS,
+        ).strip()
+    except Exception:
+        pass
+    try:
+        return _first_number(
+            _locator_inner_text(
+                row.locator("td").nth(1),
+                timeout_ms=FAST_OPTIONAL_TEXT_TIMEOUT_MS,
+            )
+        )
+    except Exception:
+        return ""
+
+
+def _row_supplier_name(name_lines: list[str]) -> str:
+    """Return the visible supplier/store line from one products-table row."""
+    if len(name_lines) < 2:
+        return ""
+    supplier = name_lines[1].strip()
+    if "غير متوفر" in supplier:
+        return ""
+    return supplier
+
+
+def _first_number(text: str) -> str:
+    """Return the first decimal-like number from visible row text."""
+    number_match = re.search(r"-?\d+(?:[.,]\d+)?", str(text or ""))
+    return number_match.group(0).replace(",", ".") if number_match else ""
 
 
 def _normalized_dom_id(text: str) -> str:
@@ -731,10 +858,21 @@ def _disabled_cart_reason(row, item_name: str) -> str:
 def _row_unavailable_message(row) -> str:
     """Return the row's visible red status message when Tawreed shows one."""
     try:
-        message = row.locator("div[style*='color: red']").first.inner_text().strip()
+        message = _locator_inner_text(
+            row.locator("div[style*='color: red']").first,
+            timeout_ms=FAST_OPTIONAL_TEXT_TIMEOUT_MS,
+        ).strip()
         return message
     except Exception:
         return ""
+
+
+def _locator_inner_text(locator, timeout_ms: int) -> str:
+    """Read locator text with a short timeout, while keeping test fakes simple."""
+    try:
+        return str(locator.inner_text(timeout=timeout_ms))
+    except TypeError:
+        return str(locator.inner_text())
 
 
 def _wait_for_table_overlay_to_clear(page: Page) -> None:
@@ -758,7 +896,7 @@ def _matched_row_by_signature(rows, match: SearchMatch):
     target_signature = _candidate_signature(match.data)
     if not target_signature:
         return None
-    for row_index in range(rows.count()):
+    for row_index in range(min(rows.count(), MAX_DOM_SEARCH_ROWS)):
         row = rows.nth(row_index)
         if is_no_results_row(row):
             continue
@@ -829,8 +967,6 @@ def _decisive_match(
     total_queries: int,
 ) -> bool:
     """Return whether the current best match is decisive enough to stop searching."""
-    if query_index < min(total_queries, MIN_SEARCH_QUERIES_PER_ITEM) - 1:
-        return False
     if not decision.best_match:
         return False
     if is_decisive_product_match(item.name or query, decision.best_match.data):
@@ -839,6 +975,10 @@ def _decisive_match(
     if best_diagnostic is None or not best_diagnostic.accepted:
         return False
     if best_diagnostic.query != query:
+        return False
+    if _early_available_high_confidence_match(item, query, best_diagnostic):
+        return True
+    if query_index < min(total_queries, MIN_SEARCH_QUERIES_PER_ITEM) - 1:
         return False
     has_numeric_tokens = bool(re.findall(r"\d+(?:\.\d+)?", item.name or query))
     return bool(
@@ -855,3 +995,16 @@ def _best_diagnostic_for_query(decision: MatchDecision, query: str):
     if not matching:
         return None
     return max(matching, key=lambda diagnostic: diagnostic.sort_key)
+
+
+def _early_available_high_confidence_match(item: Item, query: str, diagnostic) -> bool:
+    """Return whether the first strong available match is enough to stop retries."""
+    has_numeric_tokens = bool(re.findall(r"\d+(?:\.\d+)?", item.name or query))
+    available_quantity = int(diagnostic.candidate.get("availableQuantity") or 0)
+    products_count = int(diagnostic.candidate.get("productsCount") or 0)
+    return bool(
+        diagnostic.accepted_reason == "high_token_overlap"
+        and diagnostic.breakdown.overlap_score >= 1.0
+        and (not has_numeric_tokens or diagnostic.breakdown.numeric_overlap >= 1.0)
+        and (available_quantity > 0 or products_count > 0)
+    )

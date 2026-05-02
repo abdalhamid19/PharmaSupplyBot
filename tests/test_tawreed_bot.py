@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.config_models import AppConfig, ExcelConfig, MatchingConfig, ProfileConfig, RuntimeConfig
+from src.excel import Item
 from src.tawreed import TawreedBot
 from src.tawreed_session import SessionInvalidError
 
@@ -15,6 +16,23 @@ class _FakePage:
 
 
 class TawreedBotTests(unittest.TestCase):
+    def _bot(self) -> TawreedBot:
+        config = AppConfig(
+            base_url="https://seller.tawreed.io/#/login",
+            excel=ExcelConfig(code_col="code", name_col="name", qty_col="qty"),
+            profiles={"wardany": ProfileConfig(display_name="Wardany", pharmacy_switch={})},
+            selectors={"order_flow": {"item_search_input": "#search"}},
+            warehouse_strategy={},
+            matching=MatchingConfig(),
+            runtime=RuntimeConfig(),
+        )
+        return TawreedBot(
+            config=config,
+            profile_key="wardany",
+            profile=config.profiles["wardany"],
+            state_path=Path("state/wardany.json"),
+        )
+
     def test_products_page_detection_uses_url_not_selector_literal(self) -> None:
         config = AppConfig(
             base_url="https://seller.tawreed.io/#/login",
@@ -72,6 +90,36 @@ class TawreedBotTests(unittest.TestCase):
 
             self.assertFalse(completed)
             process_item.assert_not_called()
+
+    def test_process_single_item_cleans_up_on_success_skip_and_failure(self) -> None:
+        item = Item(code="1", name="Panadol", qty=1)
+        scenarios = (
+            ("success", None, 2),
+            ("skip", self._bot().skip_item_exception("skip item"), 2),
+            ("failure", RuntimeError("technical failure"), 2),
+        )
+
+        for _label, error, expected_cleanup_calls in scenarios:
+            bot = self._bot()
+            with (
+                patch("src.tawreed.close_visible_dialogs") as cleanup,
+                patch.object(bot, "_record_item_summary") as record_summary,
+                patch("src.tawreed.dump_artifacts") as dump_artifacts,
+                patch("src.tawreed.visible_overlay_diagnostics", return_value="overlay_panels=1"),
+            ):
+                if error is None:
+                    with patch.object(bot, "_add_item"):
+                        bot._process_single_item(object(), item)
+                else:
+                    with patch.object(bot, "_add_item", side_effect=error):
+                        bot._process_single_item(object(), item)
+
+            self.assertEqual(cleanup.call_count, expected_cleanup_calls)
+            record_summary.assert_called_once()
+            if isinstance(error, RuntimeError) and not isinstance(error, bot.skip_item_exception):
+                dump_artifacts.assert_called_once()
+                details = dump_artifacts.call_args.kwargs["details"]
+                self.assertIn("overlay_diagnostics=overlay_panels=1", details)
 
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:
         config = AppConfig(

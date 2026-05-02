@@ -3,6 +3,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.tawreed_products_flow import (
+    close_visible_dialogs,
+    close_visible_overlay_panels,
+    _dom_candidate_from_row,
     _disabled_cart_reason,
     _decisive_match,
     add_item_from_store_dialogs,
@@ -10,12 +13,14 @@ from src.tawreed_products_flow import (
     _should_stop_after_no_results,
     _table_has_no_results,
     fill_add_to_cart_dialog,
+    match_has_multiple_stores,
     open_add_to_cart_for_match,
     open_store_cart_dialog,
     open_stores_dialog,
     search_products,
     store_discount_percent,
     store_name,
+    visible_overlay_diagnostics,
 )
 from src.excel import Item
 from src.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
@@ -133,6 +138,68 @@ class _FakeRows:
         return self._rows[index]
 
 
+class _FakeCells:
+    def __init__(self, cells):
+        self._cells = cells
+
+    @property
+    def first(self):
+        return self._cells[0]
+
+    def nth(self, index):
+        return self._cells[index]
+
+
+class _FakeKeyboard:
+    def __init__(self):
+        self.presses = []
+
+    def press(self, key):
+        self.presses.append(key)
+
+
+class _FakeBodyLocator:
+    def __init__(self):
+        self.click_count = 0
+
+    def click(self, **kwargs):
+        self.click_count += 1
+
+
+class _FakeOverlayLocator:
+    def __init__(self, counts):
+        self._counts = list(counts)
+        self.wait_calls = []
+
+    @property
+    def first(self):
+        return self
+
+    def count(self):
+        if not self._counts:
+            return 0
+        if len(self._counts) == 1:
+            return self._counts[0]
+        return self._counts.pop(0)
+
+    def wait_for(self, state=None, timeout=None):
+        self.wait_calls.append((state, timeout))
+
+
+class _FakeOverlayPage:
+    def __init__(self, overlay_counts):
+        self.keyboard = _FakeKeyboard()
+        self.body = _FakeBodyLocator()
+        self.overlay_locator = _FakeOverlayLocator(overlay_counts)
+        self.selectors = []
+
+    def locator(self, selector):
+        self.selectors.append(selector)
+        if selector == "body":
+            return self.body
+        return self.overlay_locator
+
+
 class _FakeTextLocator:
     def __init__(self, text):
         self._text = text
@@ -143,6 +210,9 @@ class _FakeTextLocator:
 
     def inner_text(self):
         return self._text
+
+    def locator(self, selector):
+        return self
 
 
 class _FakeCellLocator:
@@ -158,16 +228,30 @@ class _FakeCellLocator:
 
 
 class _FakeRow:
-    def __init__(self, name_block, suppliers="1", cart="0", row_text="row text", red_message=""):
+    def __init__(
+        self,
+        name_block,
+        suppliers="1",
+        cart="0",
+        row_text="row text",
+        red_message="",
+        discount_text="",
+    ):
         self.name_block = name_block
         self.suppliers = suppliers
         self.cart = cart
         self.row_text = row_text
         self.red_message = red_message
+        self.discount_text = discount_text
 
     def locator(self, selector):
         if selector == "td":
-            return _FakeCellLocator(self)
+            return _FakeCells(
+                [
+                    _FakeCellLocator(self),
+                    _FakeTextLocator(self.discount_text),
+                ]
+            )
         if selector == "button:has(.pi-building) .p-badge":
             return _FakeTextLocator(self.suppliers)
         if selector == "button:has(.pi-shopping-cart) .p-badge":
@@ -268,6 +352,67 @@ class TawreedProductsFlowTests(unittest.TestCase):
             results = search_products(bot, page, "DONEPEZIL")
 
         self.assertEqual(results, [])
+
+    def test_dom_candidate_includes_visible_discount_and_supplier(self):
+        row = _FakeRow(
+            "ايموكس 500 مجم 16 كبسول\nشركه ابو عميره (الجيزه)",
+            suppliers="25",
+            cart="0",
+            discount_text="40.5",
+        )
+
+        candidate = _dom_candidate_from_row(row, "E-MOX 500MG CAP")
+
+        self.assertEqual(candidate["discountPercent"], "40.5")
+        self.assertEqual(candidate["supplierName"], "شركه ابو عميره (الجيزه)")
+        self.assertEqual(candidate["productsCount"], 25)
+        self.assertEqual(candidate["availableQuantity"], 25)
+
+    def test_dom_candidate_does_not_invent_stock_for_unavailable_rows(self):
+        row = _FakeRow(
+            "ايموكس 500 مجم امبول\nالمنتج غير متوفر",
+            suppliers="0",
+            cart="0",
+            discount_text="0",
+            red_message="المنتج غير متوفر",
+        )
+
+        candidate = _dom_candidate_from_row(row, "E-MOX 500MG CAP")
+
+        self.assertEqual(candidate["availableQuantity"], 0)
+
+    def test_close_visible_overlay_panels_presses_escape_for_non_dialog_overlay(self):
+        page = _FakeOverlayPage([1, 0])
+
+        close_visible_overlay_panels(page)
+
+        self.assertEqual(page.keyboard.presses, ["Escape"])
+        self.assertEqual(page.body.click_count, 0)
+
+    def test_close_visible_overlay_panels_clicks_safe_area_when_overlay_remains(self):
+        page = _FakeOverlayPage([1, 1, 1, 1, 1])
+
+        close_visible_overlay_panels(page)
+
+        self.assertEqual(page.keyboard.presses, ["Escape", "Escape", "Escape"])
+        self.assertEqual(page.body.click_count, 1)
+
+    def test_close_visible_dialogs_does_not_raise_when_locators_fail(self):
+        page = _FakePage()
+
+        with (
+            patch("src.tawreed_products_flow.visible_dialog_masks", side_effect=RuntimeError("gone")),
+            patch("src.tawreed_products_flow.visible_overlay_panels", side_effect=RuntimeError("gone")),
+        ):
+            close_visible_dialogs(page)
+
+    def test_visible_overlay_diagnostics_reports_dialog_and_overlay_counts(self):
+        page = _FakeOverlayPage([2])
+
+        diagnostics = visible_overlay_diagnostics(page)
+
+        self.assertIn("dialog_masks=2", diagnostics)
+        self.assertIn("overlay_panels=2", diagnostics)
 
     def test_open_stores_dialog_uses_visible_dialog_rows_without_response(self):
         bot = SimpleNamespace(config=SimpleNamespace(runtime=SimpleNamespace(timeout_ms=5000)))
@@ -594,6 +739,21 @@ class TawreedProductsFlowTests(unittest.TestCase):
 
         add_from_stores.assert_called_once()
         click_single.assert_not_called()
+
+    def test_dom_match_with_visible_discount_uses_direct_cart(self):
+        match = SearchMatch(
+            query="E MOX 500 MG CAP",
+            row_index=0,
+            score=18,
+            data={
+                "productsCount": 25,
+                "availableQuantity": 25,
+                "discountPercent": "40.5",
+                "storeProductId": "dom-row-emox",
+            },
+        )
+
+        self.assertFalse(match_has_multiple_stores(match))
 
     def test_open_add_to_cart_falls_back_to_direct_cart_when_store_dialog_fails(self):
         bot = SimpleNamespace(skip_item_exception=RuntimeError)
