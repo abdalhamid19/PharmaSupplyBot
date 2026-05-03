@@ -8,9 +8,9 @@ from .config_models import ExcelConfig, MatchingConfig, ProfileConfig, RuntimeCo
 
 
 DEFAULT_BASE_URL = "https://seller.tawreed.io/#/login"
-DEFAULT_CODE_COLUMN = "Ã™Æ’Ã™Ë†Ã˜Â¯"
-DEFAULT_NAME_COLUMN = "Ã˜Â¥Ã˜Â³Ã™â€¦ Ã˜Â§Ã™â€žÃ˜ÂµÃ™â€ Ã™Â"
-DEFAULT_QUANTITY_COLUMN = "Ã™Æ’Ã™â€¦Ã™Å Ã˜Â© Ã˜Â§Ã™â€žÃ™â€ Ã™â€šÃ˜Âµ"
+DEFAULT_CODE_COLUMN = "كود"
+DEFAULT_NAME_COLUMN = "إسم الصنف"
+DEFAULT_QUANTITY_COLUMN = "كمية النقص"
 
 
 def build_excel_config(excel_values: dict[str, Any]) -> ExcelConfig:
