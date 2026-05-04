@@ -6,17 +6,17 @@ import argparse
 import csv
 from pathlib import Path
 
-from .cart_removal_items import load_cart_removal_items
-from .config_models import AppConfig, ProfileConfig
-from .excel import load_items_from_excel
-from .prevented_items import (
+from ..cart_removal_items import load_cart_removal_items
+from ..config_models import AppConfig, ProfileConfig
+from ..excel import load_items_from_excel
+from ..prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     filter_prevented_order_items,
     is_prevented_items_excel_path,
     load_prevented_items,
 )
-from .tawreed import TawreedBot
-from .tawreed_session import SessionInvalidError, open_reauth_in_browser
+from ..tawreed import TawreedBot
+from ..tawreed_session import SessionInvalidError, open_reauth_in_browser
 
 
 def run_auth_command(app_config: AppConfig, args: argparse.Namespace) -> int:

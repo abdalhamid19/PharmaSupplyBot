@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.cli_commands import (
+from src.cli.cli_commands import (
     invalid_session_exit,
     load_order_items,
     prepared_order_items,
@@ -52,10 +52,10 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli_commands.load_items_from_excel", return_value=items),
+            patch("src.cli.cli_commands.load_items_from_excel", return_value=items),
             patch("pathlib.Path.is_file", return_value=True),
             patch(
-                "src.cli_commands.load_prevented_items",
+                "src.cli.cli_commands.load_prevented_items",
                 return_value=[SimpleNamespace(code="1", name="Blocked")],
             ),
         ):
@@ -72,7 +72,7 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli_commands.load_items_from_excel", return_value=items),
+            patch("src.cli.cli_commands.load_items_from_excel", return_value=items),
             patch("pathlib.Path.is_file", return_value=False),
         ):
             allowed_items = load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
@@ -94,8 +94,8 @@ class CliCommandsTests(unittest.TestCase):
         args = SimpleNamespace(resume=False)
 
         with (
-            patch("src.cli_commands.require_state_file") as require_state,
-            patch("src.cli_commands.resumable_order_items", return_value=items) as resumable,
+            patch("src.cli.cli_commands.require_state_file") as require_state,
+            patch("src.cli.cli_commands.resumable_order_items", return_value=items) as resumable,
         ):
             prepared = prepared_order_items("wardany", items, args)
 
@@ -106,7 +106,7 @@ class CliCommandsTests(unittest.TestCase):
     def test_invalid_session_exit_opens_reauth_and_returns_standard_message(self) -> None:
         error = RuntimeError("expired")
 
-        with patch("src.cli_commands.open_reauth_in_browser") as reauth:
+        with patch("src.cli.cli_commands.open_reauth_in_browser") as reauth:
             exit_error = invalid_session_exit("https://seller.tawreed.io", "wardany", error)
 
         reauth.assert_called_once_with("https://seller.tawreed.io", "wardany")
@@ -128,9 +128,9 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli_commands.load_cart_removal_items", return_value=[object()]) as load_items,
-            patch("src.cli_commands.require_state_file"),
-            patch("src.cli_commands.build_bot") as build_bot,
+            patch("src.cli.cli_commands.load_cart_removal_items", return_value=[object()]) as load_items,
+            patch("src.cli.cli_commands.require_state_file"),
+            patch("src.cli.cli_commands.build_bot") as build_bot,
         ):
             bot = build_bot.return_value
             result = run_remove_cart_command(app_config, args)

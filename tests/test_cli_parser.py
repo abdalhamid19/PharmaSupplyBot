@@ -1,6 +1,6 @@
 import unittest
 
-from src.cli_parser import build_parser
+from src.cli.cli_parser import build_parser
 
 
 class CliParserTests(unittest.TestCase):
