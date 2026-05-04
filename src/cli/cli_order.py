@@ -29,12 +29,22 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         return 0
 
     profiles = app_config.profiles_to_run(profile=args.profile, all_profiles=args.all_profiles)
-    max_workers = _resolve_max_workers(app_config, args, len(profiles))
+    _execute_profiles(app_config, profiles, items, args)
+    return 0
 
+
+def _execute_profiles(
+    app_config: AppConfig,
+    profiles: list[tuple[str, ProfileConfig]],
+    items: list,
+    args: argparse.Namespace,
+) -> None:
+    """Run the selected profiles either sequentially or in parallel."""
+    max_workers = _resolve_max_workers(app_config, args, len(profiles))
     if max_workers <= 1:
         for profile_key, profile in profiles:
             _run_single_profile(app_config, profile_key, profile, items, args)
-        return 0
+        return
 
     print(f"Running {len(profiles)} profiles in parallel (max_workers={max_workers})...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -43,10 +53,11 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
             for pk, p in profiles
         ]
         concurrent.futures.wait(futures)
-    return 0
 
 
-def _resolve_max_workers(app_config: AppConfig, args: argparse.Namespace, profile_count: int) -> int:
+def _resolve_max_workers(
+    app_config: AppConfig, args: argparse.Namespace, profile_count: int
+) -> int:
     """Return the final concurrency limit for this run."""
     limit = getattr(args, "max_workers", None)
     if limit is None:
