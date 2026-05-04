@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from src.streamlit_uploads import available_excel_options
+from src.ui.streamlit_uploads import available_excel_options
 
 
 class StreamlitUploadsTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class StreamlitUploadsTests(unittest.TestCase):
             (order_dir / "orders.xlsx").write_bytes(b"")
             (prevented_dir / "drugprevented.xlsx").write_bytes(b"")
 
-            with patch("src.streamlit_uploads.ORDER_ITEMS_DIR", order_dir):
+            with patch("src.ui.streamlit_uploads.ORDER_ITEMS_DIR", order_dir):
                 options = available_excel_options()
 
         self.assertEqual(options, [str(order_dir / "orders.xlsx")])

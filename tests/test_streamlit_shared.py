@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.streamlit_shared import DEFAULT_CONFIG_PATH, FALLBACK_CONFIG_PATH, resolved_streamlit_config_path
+from src.ui.streamlit_shared import DEFAULT_CONFIG_PATH, FALLBACK_CONFIG_PATH, resolved_streamlit_config_path
 
 
 class StreamlitSharedTests(unittest.TestCase):

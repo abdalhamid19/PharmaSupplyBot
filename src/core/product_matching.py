@@ -10,8 +10,8 @@ _TOKEN_BOUNDARY_RE = re.compile(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)")
 _NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
 _WHITESPACE_RE = re.compile(r"\s+")
 
-from ..config_models import MatchingConfig
-from ..excel import Item
+from .config.config_models import MatchingConfig
+from .utils.excel import Item
 from .matching_models import (
     CandidateMatchDiagnostic,
     MatchDecision,

@@ -1,6 +1,6 @@
 import unittest
 
-from src.excel import Item
+from src.core.utils.excel import Item
 from src.core.product_matching import _search_queries_for_item
 
 

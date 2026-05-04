@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from src.streamlit_main import render_main_tabs
+from src.ui.streamlit_main import render_main_tabs
 
 
 class _FakeTab:
@@ -17,13 +17,13 @@ class StreamlitMainTests(unittest.TestCase):
         created_tabs = [_FakeTab() for _ in range(6)]
         app_config = object()
         with (
-            patch("src.streamlit_main.st.tabs", return_value=created_tabs) as tabs,
-            patch("src.streamlit_main.render_overview"),
-            patch("src.streamlit_main.render_auth_tab"),
-            patch("src.streamlit_main.render_order_tab"),
-            patch("src.streamlit_main.render_prevented_items_tab") as prevented_tab,
-            patch("src.streamlit_main.render_remove_cart_tab") as remove_cart_tab,
-            patch("src.streamlit_main.render_results_tab"),
+            patch("src.ui.streamlit_main.st.tabs", return_value=created_tabs) as tabs,
+            patch("src.ui.streamlit_main.render_overview"),
+            patch("src.ui.streamlit_main.render_auth_tab"),
+            patch("src.ui.streamlit_main.render_order_tab"),
+            patch("src.ui.streamlit_main.render_prevented_items_tab") as prevented_tab,
+            patch("src.ui.streamlit_main.render_remove_cart_tab") as remove_cart_tab,
+            patch("src.ui.streamlit_main.render_results_tab"),
         ):
             render_main_tabs(app_config, "wardany", "config.yaml")
 

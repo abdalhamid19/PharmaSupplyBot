@@ -4,8 +4,8 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.config_models import AppConfig, ExcelConfig, MatchingConfig, ProfileConfig, RuntimeConfig
-from src.excel import Item
+from src.core.config.config_models import AppConfig, ExcelConfig, MatchingConfig, ProfileConfig, RuntimeConfig
+from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
 from src.tawreed.tawreed_session import SessionInvalidError
 

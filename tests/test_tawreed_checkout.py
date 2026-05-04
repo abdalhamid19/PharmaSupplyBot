@@ -3,7 +3,7 @@ import unittest
 from contextlib import redirect_stdout
 from types import SimpleNamespace
 
-from src.config_factory import build_runtime_config
+from src.core.config.config_factory import build_runtime_config
 from src.tawreed.tawreed_checkout import confirm_order
 
 

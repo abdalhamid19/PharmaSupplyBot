@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from src.playwright_browser import launch_chromium
+from src.core.utils.playwright_browser import launch_chromium
 
 
 class PlaywrightBrowserTests(unittest.TestCase):
@@ -9,7 +9,7 @@ class PlaywrightBrowserTests(unittest.TestCase):
         chromium = Mock()
         chromium.launch.side_effect = [RuntimeError("Executable doesn't exist"), object()]
         playwright = Mock(chromium=chromium)
-        with patch("src.playwright_browser._install_chromium") as install_mock:
+        with patch("src.core.utils.playwright_browser._install_chromium") as install_mock:
             launch_chromium(playwright, headless=True, slow_mo_ms=0)
         install_mock.assert_called_once()
         self.assertEqual(chromium.launch.call_count, 2)

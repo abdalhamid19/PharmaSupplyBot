@@ -4,8 +4,8 @@ import unittest
 
 import pandas as pd
 
-from src.config_models import ExcelConfig
-from src.excel import load_items_from_excel
+from src.core.config.config_models import ExcelConfig
+from src.core.utils.excel import load_items_from_excel
 
 
 class ExcelTests(unittest.TestCase):

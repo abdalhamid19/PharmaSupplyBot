@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from ..excel import Item
+from .utils.excel import Item
 
 PREVENTED_ITEMS_DIR = Path("data/input") / "prevented_items"
 DEFAULT_PREVENTED_ITEMS_PATH = PREVENTED_ITEMS_DIR / "drugprevented.xlsx"

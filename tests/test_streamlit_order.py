@@ -4,9 +4,9 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.streamlit_order import order_command
-from src import streamlit_order
-from src.streamlit_order_form import (
+from src.ui.streamlit_order import order_command
+from src.ui import streamlit_order
+from src.ui.streamlit_order_form import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     add_and_save_prevented_item,
     order_form_fields,
@@ -120,7 +120,7 @@ class StreamlitOrderTests(unittest.TestCase):
 
     def test_order_excel_options_excludes_default_prevented_items_file(self) -> None:
         with patch(
-            "src.streamlit_order_form.available_excel_options",
+            "src.ui.streamlit_order_form.available_excel_options",
             return_value=[
                 "data/input/order_items/shortage_report_total_20260426.xlsx",
             ],
@@ -136,7 +136,7 @@ class StreamlitOrderTests(unittest.TestCase):
             prevented_path = prevented_dir / "drugprevented.xlsx"
             prevented_path.write_bytes(b"")
 
-            with patch("src.streamlit_order_form.PREVENTED_ITEMS_DIR", prevented_dir):
+            with patch("src.ui.streamlit_order_form.PREVENTED_ITEMS_DIR", prevented_dir):
                 options = prevented_excel_options(prevented_path)
 
         self.assertEqual(options, [str(prevented_path)])
@@ -144,11 +144,11 @@ class StreamlitOrderTests(unittest.TestCase):
     def test_order_form_fields_uses_default_prevented_items_path(self) -> None:
         with (
             patch(
-                "src.streamlit_order_form.excel_source_fields",
+                "src.ui.streamlit_order_form.excel_source_fields",
                 return_value=("Existing file", "data/input/order_items/orders.xlsx", None),
             ),
             patch(
-                "src.streamlit_order_form.profile_run_fields",
+                "src.ui.streamlit_order_form.profile_run_fields",
                 return_value=("Single profile", "wardany", 5, False, True, False, 0),
             ),
         ):
@@ -180,11 +180,11 @@ class StreamlitOrderTests(unittest.TestCase):
             "prevented_items_excel": "data/input/prevented_items/drugprevented.xlsx",
         }
         with (
-            patch("src.streamlit_order.render_running_order_controls", return_value=False),
-            patch("src.streamlit_order.order_form_values", return_value=(True, form_values)),
-            patch("src.streamlit_order.st.subheader"),
-            patch("src.streamlit_order.st.error") as error,
-            patch("src.streamlit_order.run_order_submission") as run_submission,
+            patch("src.ui.streamlit_order.render_running_order_controls", return_value=False),
+            patch("src.ui.streamlit_order.order_form_values", return_value=(True, form_values)),
+            patch("src.ui.streamlit_order.st.subheader"),
+            patch("src.ui.streamlit_order.st.error") as error,
+            patch("src.ui.streamlit_order.run_order_submission") as run_submission,
         ):
             streamlit_order.render_order_tab(
                 SimpleNamespace(profiles={"wardany": object()}),

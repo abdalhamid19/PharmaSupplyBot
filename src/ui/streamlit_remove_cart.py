@@ -7,7 +7,7 @@ import time
 
 import streamlit as st
 
-from .core.cart_removal_items import DEFAULT_REMOVE_ITEMS_PATH
+from ..core.cart_removal_items import DEFAULT_REMOVE_ITEMS_PATH
 from .streamlit_process import render_command_result, start_cli_subprocess
 from .streamlit_shared import ARTIFACTS_DIR, REMOVE_ITEMS_DIR, load_csv_rows
 from .streamlit_state import ensure_default_state_files, missing_state_profiles

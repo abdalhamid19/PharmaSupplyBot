@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pandas as pd
 
-from src.excel import Item
+from src.core.utils.excel import Item
 from src.core.prevented_items import (
     PREVENTED_CODE_COLUMN,
     PREVENTED_NAME_COLUMN,

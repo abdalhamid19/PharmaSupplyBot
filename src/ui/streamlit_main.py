@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 from dotenv import load_dotenv
 
-from .config import load_config
+from ..core.config.config import load_config
 from .streamlit_auth import render_auth_tab
 from .streamlit_order import render_order_tab
 from .streamlit_overview import render_overview

@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from .core.prevented_items import (
+from ..core.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     PREVENTED_ITEMS_DIR,
     PREVENTED_CODE_COLUMN,

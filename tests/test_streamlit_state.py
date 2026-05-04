@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src import streamlit_default_state
-from src import streamlit_state
+from src.ui import streamlit_default_state
+from src.ui import streamlit_state
 
 
 class FakeUpload:

@@ -24,7 +24,7 @@ from src.tawreed.tawreed_products_flow import (
     store_name,
     visible_overlay_diagnostics,
 )
-from src.excel import Item
+from src.core.utils.excel import Item
 from src.core.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
 
 

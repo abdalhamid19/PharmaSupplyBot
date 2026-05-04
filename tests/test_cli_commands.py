@@ -12,7 +12,7 @@ from src.cli.cli_commands import (
     resumable_order_items,
     run_remove_cart_command,
 )
-from src.excel import Item
+from src.core.utils.excel import Item
 
 
 class CliCommandsTests(unittest.TestCase):

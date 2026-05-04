@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.streamlit_main import main
+from src.ui.streamlit_main import main
 
 
 if __name__ == "__main__":

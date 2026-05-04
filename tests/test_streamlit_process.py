@@ -4,8 +4,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from src.streamlit_process import cli_command, output_stream
-from src.streamlit_subprocess_env import merged_env
+from src.ui.streamlit_process import cli_command, output_stream
+from src.ui.streamlit_subprocess_env import merged_env
 
 
 class StreamlitProcessTests(unittest.TestCase):

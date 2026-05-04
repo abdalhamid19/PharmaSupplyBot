@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from src.cli.cli_commands import run_auth_command, run_order_command, run_remove_cart_command
 from src.cli.cli_parser import build_parser
-from src.config import load_config
+from src.core.config.config import load_config
 
 
 def main() -> int:
