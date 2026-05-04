@@ -20,28 +20,11 @@ class Item:
     qty: int
 
 
-def _to_int(x: Any) -> int:
-    """Convert a spreadsheet cell to an integer quantity with empty-safe fallbacks."""
-    if x is None:
-        return 0
-    try:
-        if pd.isna(x):
-            return 0
-    except Exception:
-        pass
-    try:
-        return int(round(float(x)))
-    except Exception:
-        s = str(x).strip()
-        if not s:
-            return 0
-        return int(float(s))
-
-
 def load_items_from_excel(path: Path, config: ExcelConfig, limit: int = 0) -> list[Item]:
     """Load order items from an Excel sheet using the configured column mapping."""
+    dataframe = _read_excel_with_headers(path, config)
     items: list[Item] = []
-    for row in _read_item_rows(path, config):
+    for row in dataframe.itertuples(index=False, name=None):
         item = _row_tuple_to_item(row, config)
         if item is None:
             continue
@@ -58,22 +41,20 @@ def _read_excel(path: Path, **read_kwargs: Any) -> pd.DataFrame:
     return pd.read_excel(path, **read_kwargs)
 
 
-def _read_item_rows(path: Path, config: ExcelConfig):
-    """Yield only the configured Excel item columns as row tuples."""
-    dataframe = _read_excel_with_headers(path, config)
-    for row in dataframe.itertuples(index=False, name=None):
-        yield row
-
-
 def _read_excel_with_headers(path: Path, config: ExcelConfig) -> pd.DataFrame:
     """Read one Excel file while avoiding a full-sheet fallback on title-row exports."""
     header_row_index = _detect_header_row(path, config)
-    if header_row_index is not None:
-        try:
-            return _read_excel(path, usecols=_required_columns(config), header=header_row_index)
-        except ValueError as error:
-            raise KeyError(_missing_columns_message(config, error)) from error
-    return _read_required_columns(path, config)
+    usecols = [config.code_col, config.name_col, config.qty_col]
+    try:
+        return _read_excel(
+            path,
+            usecols=usecols,
+            header=header_row_index if header_row_index is not None else 0,
+        )
+    except ValueError as error:
+        raise KeyError(
+            f"Missing one or more required Excel columns {usecols}. Original error: {error}"
+        ) from error
 
 
 def _detect_header_row(path: Path, config: ExcelConfig) -> int | None:
@@ -93,39 +74,6 @@ def _detect_header_row(path: Path, config: ExcelConfig) -> int | None:
     return best_partial_match
 
 
-def _read_required_columns(path: Path, config: ExcelConfig) -> pd.DataFrame:
-    """Read the configured columns directly from a standard header-row sheet."""
-    try:
-        return _read_excel(path, usecols=_required_columns(config))
-    except ValueError as error:
-        raise KeyError(_missing_columns_message(config, error)) from error
-
-
-def _required_columns(config: ExcelConfig) -> list[str]:
-    """Return the configured columns needed to build order items."""
-    return [config.code_col, config.name_col, config.qty_col]
-
-
-def _missing_columns_message(config: ExcelConfig, error: ValueError) -> str:
-    """Return a readable missing-column error from one pandas read failure."""
-    return (
-        "Missing one or more required Excel columns "
-        f"{_required_columns(config)}. Original error: {error}"
-    )
-
-
-def _row_to_item(row: Any, config: ExcelConfig) -> Item | None:
-    """Convert one spreadsheet row to an order item when it passes filters."""
-    code = str(row.get(config.code_col, "")).strip()
-    name = str(row.get(config.name_col, "")).strip()
-    quantity = _bounded_quantity(row.get(config.qty_col), config)
-    if not code and not name:
-        return None
-    if quantity < config.min_qty:
-        return None
-    return Item(code=code, name=name, qty=quantity)
-
-
 def _row_tuple_to_item(row: tuple, config: ExcelConfig) -> Item | None:
     """Convert one Excel row tuple to an order item when it passes filters."""
     code = str(row[0] or "").strip()
@@ -142,3 +90,21 @@ def _bounded_quantity(value: Any, config: ExcelConfig) -> int:
     """Clamp the requested quantity to the configured Excel limits."""
     quantity = _to_int(value)
     return min(quantity, config.max_qty)
+
+
+def _to_int(x: Any) -> int:
+    """Convert a spreadsheet cell to an integer quantity with empty-safe fallbacks."""
+    if x is None:
+        return 0
+    try:
+        if pd.isna(x):
+            return 0
+    except Exception:
+        pass
+    try:
+        return int(round(float(x)))
+    except Exception:
+        s = str(x).strip()
+        if not s:
+            return 0
+        return int(float(s))
