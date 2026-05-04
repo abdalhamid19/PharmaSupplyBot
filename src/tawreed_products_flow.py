@@ -7,6 +7,10 @@ import re
 import time
 from typing import Any
 
+_WHITESPACE_RE = re.compile(r"\s+")
+_NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+_NUMERIC_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?")
+
 from playwright.sync_api import Page
 
 from .excel import Item
@@ -166,7 +170,7 @@ def is_no_results_row(row) -> bool:
         text = _locator_inner_text(row, timeout_ms=FAST_OPTIONAL_TEXT_TIMEOUT_MS)
     except Exception:
         return False
-    normalized_text = " ".join(str(text).split())
+    normalized_text = _WHITESPACE_RE.sub(" ", str(text or "").strip())
     return (
         "No results found" in normalized_text
         or "لايوجد نتائج" in normalized_text
@@ -649,7 +653,7 @@ def _format_discount_percent(value: Any) -> str:
         stripped = value.strip()
         if not stripped:
             return ""
-        number_match = re.search(r"-?\d+(?:[.,]\d+)?", stripped)
+        number_match = _NUMBER_RE.search(stripped)
         if not number_match:
             return stripped
         number = float(number_match.group(0).replace(",", "."))
@@ -667,7 +671,7 @@ def _discount_value_as_percent(value: Any) -> float:
     if value in (None, ""):
         return -1.0
     if isinstance(value, str):
-        number_match = re.search(r"-?\d+(?:[.,]\d+)?", value.strip())
+        number_match = _NUMBER_RE.search(value.strip())
         if not number_match:
             return -1.0
         value = float(number_match.group(0).replace(",", "."))
@@ -818,7 +822,7 @@ def _row_supplier_name(name_lines: list[str]) -> str:
 
 def _first_number(text: str) -> str:
     """Return the first decimal-like number from visible row text."""
-    number_match = re.search(r"-?\d+(?:[.,]\d+)?", str(text or ""))
+    number_match = _NUMBER_RE.search(str(text or ""))
     return number_match.group(0).replace(",", ".") if number_match else ""
 
 
@@ -829,9 +833,9 @@ def _normalized_dom_id(text: str) -> str:
 
 def _dom_fallback_english_name(query: str, arabic_name: str) -> str:
     """Return a query-shaped fallback English name using numeric clues from the Arabic row."""
-    query_tokens = [token for token in re.split(r"\s+", query.strip()) if token]
+    query_tokens = [token for token in _WHITESPACE_RE.split(query.strip()) if token]
     non_numeric_tokens = [token for token in query_tokens if not any(ch.isdigit() for ch in token)]
-    arabic_numeric_tokens = re.findall(r"\d+(?:\.\d+)?", arabic_name)
+    arabic_numeric_tokens = _NUMERIC_TOKEN_RE.findall(arabic_name)
     return " ".join(non_numeric_tokens + arabic_numeric_tokens) or query
 
 
@@ -921,15 +925,15 @@ def _row_signature(row) -> str:
 
 def _normalize_signature_text(text: str) -> str:
     """Return a compact comparable signature for visible row-name text."""
-    return re.sub(r"\s+", " ", str(text or "").strip())
+    return _WHITESPACE_RE.sub(" ", str(text or "").strip())
 
 
 def _row_is_plausible_for_query(arabic_name: str, query: str) -> bool:
     """Return whether a DOM-only Arabic row is numerically plausible for the current query."""
-    query_numbers = re.findall(r"\d+(?:\.\d+)?", query)
+    query_numbers = _NUMERIC_TOKEN_RE.findall(query)
     if not query_numbers:
         return True
-    row_numbers = re.findall(r"\d+(?:\.\d+)?", arabic_name)
+    row_numbers = _NUMERIC_TOKEN_RE.findall(arabic_name)
     if not row_numbers:
         return False
     return bool(set(query_numbers) & set(row_numbers))
@@ -980,7 +984,7 @@ def _decisive_match(
         return True
     if query_index < min(total_queries, MIN_SEARCH_QUERIES_PER_ITEM) - 1:
         return False
-    has_numeric_tokens = bool(re.findall(r"\d+(?:\.\d+)?", item.name or query))
+    has_numeric_tokens = bool(_NUMERIC_TOKEN_RE.findall(item.name or query))
     return bool(
         best_diagnostic.accepted_reason == "high_token_overlap"
         and best_diagnostic.breakdown.overlap_score >= 0.95
@@ -999,7 +1003,7 @@ def _best_diagnostic_for_query(decision: MatchDecision, query: str):
 
 def _early_available_high_confidence_match(item: Item, query: str, diagnostic) -> bool:
     """Return whether the first strong available match is enough to stop retries."""
-    has_numeric_tokens = bool(re.findall(r"\d+(?:\.\d+)?", item.name or query))
+    has_numeric_tokens = bool(_NUMERIC_TOKEN_RE.findall(item.name or query))
     available_quantity = int(diagnostic.candidate.get("availableQuantity") or 0)
     products_count = int(diagnostic.candidate.get("productsCount") or 0)
     return bool(
