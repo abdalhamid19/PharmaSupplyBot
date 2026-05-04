@@ -38,19 +38,27 @@ def require_product_match(bot, page: Page, item: Item) -> tuple[SearchMatch, str
             return decision.best_match, query
 
     # If no match found after all queries
+    return _handle_no_match(bot, item, searched_queries, search_results_by_query)
+
+
+def _handle_no_match(bot, item: Item, queries: list[str], results: list[tuple[str, list]]):
+    """Record and raise a descriptive error when all search attempts fail."""
     decision = is_decisive_product_match(
-        searched_queries[-1], search_results_by_query[-1][1], 
-        item.name, item.code, query_index=len(searched_queries)-1
+        queries[-1], results[-1][1], item.name, item.code, query_index=len(queries)-1
     )
     write_match_log(bot, item, decision)
     raise bot.no_results_exception(
-        f"No decisive match found for '{item.name}' after {len(searched_queries)} queries."
+        f"No decisive match found for '{item.name}' after {len(queries)} queries."
     )
+
 
 
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     """Search the products table and return the parsed API results for the query."""
-    from .tawreed_products_flow import close_visible_dialogs, _wait_for_table_overlay_to_clear, wait_for_product_rows, _table_has_no_results, _dom_search_results
+    from .tawreed_products_flow import (
+        close_visible_dialogs, _wait_for_table_overlay_to_clear,
+        wait_for_product_rows, _table_has_no_results, _dom_search_results
+    )
     
     close_visible_dialogs(page)
     search = page.locator(bot.selectors.item_search_input).first
@@ -66,29 +74,19 @@ def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
 
 
 def _decisive_match(
-    bot,
-    item: Item,
-    decision: MatchDecision,
-    started_at: float,
-    searched_queries: list[str],
+    bot, item: Item, decision: MatchDecision, started_at: float, queries: list[str]
 ) -> bool:
     """Return whether the current decision is final and record the outcome."""
     bot.last_match_decision = decision
-    bot.last_searched_queries = searched_queries
-    
+    bot.last_searched_queries = queries
     if not decision.best_match:
-        if len(searched_queries) < MIN_SEARCH_QUERIES_PER_ITEM:
-            return False
-        write_match_log(bot, item, decision)
-        # We don't raise here if we have more queries to try in require_product_match loop
+        if len(queries) >= MIN_SEARCH_QUERIES_PER_ITEM:
+            write_match_log(bot, item, decision)
         return False
 
     bot.last_match_elapsed_seconds = time.perf_counter() - started_at
     write_match_log(bot, item, decision)
-    
-    # Check availability
-    available = decision.best_match.data.get("availableQuantity", 0)
-    if available <= 0:
+    if decision.best_match.data.get("availableQuantity", 0) <= 0:
         raise bot.skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
-        
     return True
+

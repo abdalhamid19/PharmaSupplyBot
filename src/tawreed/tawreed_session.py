@@ -204,10 +204,70 @@ def ensure_logged_in(page: Page, selectors, timeout_ms: int, ready_selector: str
 def open_reauth_in_browser(base_url: str, profile_key: str) -> None:
     """Open the Tawreed login page in a visible system browser for re-authentication."""
     try:
+        import webbrowser
         webbrowser.open(base_url)
         print(f"[{profile_key}] Opened Tawreed login page in a visible browser window.")
     except Exception:
         print(f"[{profile_key}] Could not open a visible browser automatically.")
+
+
+def perform_tawreed_auth(bot, wait_seconds: int, headless: bool) -> None:
+    """Authenticate in either interactive or headless mode and save session state."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        temp_state_path = auth_temp_state_path(bot.state_path)
+        discard_session_state(temp_state_path)
+        browser, context, page = open_auth_page(
+            p, bot.config.base_url, bot.config.runtime, headless=headless
+        )
+        try:
+            attempt_env_login(page, bot.selectors)
+            print_auth_instructions(wait_seconds, headless=headless)
+            _poll_and_save_auth(bot, page, context, wait_seconds, temp_state_path, headless)
+            _finalize_tawreed_auth(bot, p, temp_state_path)
+        except Exception as error:
+            _handle_auth_failure(bot, page, error, temp_state_path, headless)
+            raise
+        finally:
+            close_context(context)
+            close_browser(browser)
+
+
+def _poll_and_save_auth(bot, page, context, wait_seconds, temp_state_path, headless):
+    """Wait for login markers and persist the captured session state."""
+    detected = wait_for_login_detection(
+        page, context, wait_seconds,
+        bot.selectors.login_email, bot.selectors.login_password,
+        bot.selectors.logged_in_marker, temp_state_path,
+        save_intermediate=not headless,
+    )
+    wait_for_network_idle(page)
+    print_login_detection_result(detected)
+    save_session_state(context, temp_state_path, is_intermediate=False)
+    if headless and not detected:
+        raise bot._headless_auth_error()
+
+
+def _finalize_tawreed_auth(bot, p, temp_state_path):
+    """Validate the newly captured session and promote it to the final state path."""
+    validate_saved_session(
+        p, bot.config.runtime, temp_state_path,
+        bot._products_page_url(), bot.selectors, bot.selectors.item_search_input
+    )
+    promote_session_state(temp_state_path, bot.state_path)
+    print(f"Saved validated session state: {bot.state_path}")
+
+
+def _handle_auth_failure(bot, page, error, temp_state_path, headless):
+    """Clean up and record diagnostics after a failed authentication attempt."""
+    from .tawreed_artifacts import dump_artifacts
+    if headless:
+        dump_artifacts(
+            page, bot.profile_key, label="headless_auth_error",
+            details=f"headless_auth_error: {error}",
+        )
+    discard_session_state(temp_state_path)
+
 
 
 def close_context(context) -> None:

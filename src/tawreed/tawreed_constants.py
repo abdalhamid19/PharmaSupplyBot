@@ -57,3 +57,17 @@ CART_CONFIRM_DELETE_BUTTON_SELECTOR = (
     "button:has-text('Yes'), "
     "button:has-text('OK')"
 )
+
+STORE_NAME_KEYS = (
+    "storeName", "storeNameAr", "storeNameEn", "supplierName", "supplierNameAr",
+    "supplierNameEn", "warehouseName", "warehouseNameAr", "warehouseNameEn",
+    "pharmacyName", "branchName", "sellerName", "companyName",
+)
+NESTED_STORE_KEYS = ("store", "supplier", "warehouse", "pharmacy", "branch", "seller")
+NESTED_NAME_KEYS = ("name", "nameAr", "nameEn", "arabicName", "englishName", "title")
+DISCOUNT_KEYS = (
+    "discountPercent", "discountPercentage", "discountRate", "discountValue",
+    "discount", "cashDiscount", "companyDiscount", "offerDiscount",
+    "pharmacyDiscount", "percentage", "percent",
+)
+
