@@ -1,7 +1,10 @@
 import os
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from src.streamlit_process import cli_command, output_stream
 from src.streamlit_subprocess_env import merged_env
 
 
@@ -16,6 +19,23 @@ class StreamlitProcessTests(unittest.TestCase):
         original = os.environ.get("PATH", "")
         env = merged_env(None)
         self.assertEqual(env.get("PATH", ""), original)
+
+    def test_cli_command_uses_project_runner(self) -> None:
+        command = cli_command(["order", "--profile", "wardany"])
+
+        self.assertEqual(command[2:], ["order", "--profile", "wardany"])
+        self.assertTrue(command[1].endswith("run.py"))
+
+    def test_output_stream_creates_parent_directory(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "nested" / "command.log"
+
+            output_file = output_stream(output_path)
+            output_file.write("ok")
+            output_file.close()
+
+            self.assertTrue(output_path.exists())
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "ok")
 
 
 if __name__ == "__main__":

@@ -36,27 +36,12 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         print("No items found from Excel (after filtering).")
         return 0
     for profile_key, profile in profiles_to_run(app_config, args):
-        require_state_file(profile_key)
-        profile_items = resumable_order_items(profile_key, items, args)
+        profile_items = prepared_order_items(profile_key, items, args)
         if not profile_items:
             print(f"[{profile_key}] No remaining items to process.")
             continue
-        bot = build_bot(
-            app_config,
-            profile_key,
-            profile,
-            debug_browser=bool(getattr(args, "debug_browser", False)),
-            stop_flag_path=stop_flag_path(args),
-        )
-        try:
-            bot.place_order_from_items(profile_items)
-        except SessionInvalidError as error:
-            print(f"[{profile_key}] {error}")
-            open_reauth_in_browser(app_config.base_url, profile_key)
-            raise SystemExit(
-                f"Session for profile '{profile_key}' is not valid. "
-                f"Run: py run.py auth --profile {profile_key}"
-            ) from error
+        bot = order_bot(app_config, profile_key, profile, args)
+        run_profile_order(app_config.base_url, profile_key, bot, profile_items)
     return 0
 
 
@@ -68,21 +53,8 @@ def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> 
         return 0
     for profile_key, profile in profiles_to_run(app_config, args):
         require_state_file(profile_key)
-        bot = build_bot(
-            app_config,
-            profile_key,
-            profile,
-            debug_browser=bool(getattr(args, "debug_browser", False)),
-        )
-        try:
-            bot.remove_cart_items(items)
-        except SessionInvalidError as error:
-            print(f"[{profile_key}] {error}")
-            open_reauth_in_browser(app_config.base_url, profile_key)
-            raise SystemExit(
-                f"Session for profile '{profile_key}' is not valid. "
-                f"Run: py run.py auth --profile {profile_key}"
-            ) from error
+        bot = remove_cart_bot(app_config, profile_key, profile, args)
+        run_profile_cart_removal(app_config.base_url, profile_key, bot, items)
     return 0
 
 
@@ -104,8 +76,7 @@ def profiles_to_run(app_config: AppConfig, args: argparse.Namespace):
 def load_order_items(app_config: AppConfig, args: argparse.Namespace):
     """Load the order items requested by the CLI command."""
     excel_path = Path(args.excel)
-    prevented_path_value = getattr(args, "prevented_items_excel", DEFAULT_PREVENTED_ITEMS_PATH)
-    prevented_path = Path(prevented_path_value) if prevented_path_value else None
+    prevented_path = prevented_items_path(args)
     if prevented_path and is_prevented_items_excel_path(excel_path, prevented_path):
         raise SystemExit(
             f"Order Excel cannot be the prevented-items file: {excel_path}. "
@@ -122,6 +93,18 @@ def load_order_items(app_config: AppConfig, args: argparse.Namespace):
     if skipped_count:
         print(f"Skipped {skipped_count} prevented items from {prevented_path}.")
     return allowed_items
+
+
+def prevented_items_path(args: argparse.Namespace) -> Path | None:
+    """Return the configured prevented-items Excel path when one is enabled."""
+    value = getattr(args, "prevented_items_excel", DEFAULT_PREVENTED_ITEMS_PATH)
+    return Path(value) if value else None
+
+
+def prepared_order_items(profile_key: str, items: list, args: argparse.Namespace) -> list:
+    """Return one profile's remaining order items after session and resume checks."""
+    require_state_file(profile_key)
+    return resumable_order_items(profile_key, items, args)
 
 
 def resumable_order_items(profile_key: str, items: list, args: argparse.Namespace) -> list:
@@ -158,6 +141,68 @@ def stop_flag_path(args: argparse.Namespace) -> Path | None:
     """Return the optional stop-request flag path."""
     value = getattr(args, "stop_flag", None)
     return Path(value) if value else None
+
+
+def order_bot(
+    app_config: AppConfig,
+    profile_key: str,
+    profile: ProfileConfig,
+    args: argparse.Namespace,
+) -> TawreedBot:
+    """Build the bot used for one profile order run."""
+    return build_bot(
+        app_config,
+        profile_key,
+        profile,
+        debug_browser=bool(getattr(args, "debug_browser", False)),
+        stop_flag_path=stop_flag_path(args),
+    )
+
+
+def remove_cart_bot(
+    app_config: AppConfig,
+    profile_key: str,
+    profile: ProfileConfig,
+    args: argparse.Namespace,
+) -> TawreedBot:
+    """Build the bot used for one profile cart-removal run."""
+    return build_bot(
+        app_config,
+        profile_key,
+        profile,
+        debug_browser=bool(getattr(args, "debug_browser", False)),
+    )
+
+
+def run_profile_order(base_url: str, profile_key: str, bot: TawreedBot, items: list) -> None:
+    """Run one profile order flow and handle session-expiry failures uniformly."""
+    try:
+        bot.place_order_from_items(items)
+    except SessionInvalidError as error:
+        raise invalid_session_exit(base_url, profile_key, error) from error
+
+
+def run_profile_cart_removal(
+    base_url: str,
+    profile_key: str,
+    bot: TawreedBot,
+    items: list,
+) -> None:
+    """Run one profile cart-removal flow and handle session-expiry failures uniformly."""
+    try:
+        bot.remove_cart_items(items)
+    except SessionInvalidError as error:
+        raise invalid_session_exit(base_url, profile_key, error) from error
+
+
+def invalid_session_exit(base_url: str, profile_key: str, error: SessionInvalidError) -> SystemExit:
+    """Return the standard session-expired CLI exit after opening browser reauth."""
+    print(f"[{profile_key}] {error}")
+    open_reauth_in_browser(base_url, profile_key)
+    return SystemExit(
+        f"Session for profile '{profile_key}' is not valid. "
+        f"Run: py run.py auth --profile {profile_key}"
+    )
 
 
 def build_bot(

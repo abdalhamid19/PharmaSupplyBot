@@ -15,7 +15,7 @@ from .streamlit_subprocess_env import merged_env
 
 def run_cli_subprocess(arguments: list[str], env_overrides: dict[str, str] | None = None) -> dict[str, object]:
     """Run the project CLI in a subprocess so Playwright is isolated from Streamlit."""
-    command = [sys.executable, str(RUNNER_PATH), *arguments]
+    command = cli_command(arguments)
     try:
         completed = _completed_process(command, merged_env(env_overrides))
         return _process_result(command, completed.returncode, completed.stdout, completed.stderr)
@@ -29,12 +29,11 @@ def start_cli_subprocess(
     env_overrides: dict[str, str] | None = None,
 ) -> dict[str, object]:
     """Start the project CLI in the background and stream output to a file."""
-    command = [sys.executable, str(RUNNER_PATH), *arguments]
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_file = output_path.open("w", encoding="utf-8", errors="replace")
+    command = cli_command(arguments)
+    output_file = output_stream(output_path)
     process = subprocess.Popen(
         command,
-        cwd=str(Path.cwd()),
+        cwd=working_directory(),
         env=merged_env(env_overrides),
         text=True,
         stdout=output_file,
@@ -48,11 +47,27 @@ def start_cli_subprocess(
     }
 
 
+def cli_command(arguments: list[str]) -> list[str]:
+    """Return the Python command used to invoke the project CLI."""
+    return [sys.executable, str(RUNNER_PATH), *arguments]
+
+
+def output_stream(output_path: Path):
+    """Return the writable output file used for a background CLI run."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    return output_path.open("w", encoding="utf-8", errors="replace")
+
+
+def working_directory() -> str:
+    """Return the current working directory for spawned subprocesses."""
+    return str(Path.cwd())
+
+
 def _completed_process(command: list[str], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     """Run one completed subprocess and return the captured result."""
     return subprocess.run(
         command,
-        cwd=str(Path.cwd()),
+        cwd=working_directory(),
         env=env,
         text=True,
         capture_output=True,

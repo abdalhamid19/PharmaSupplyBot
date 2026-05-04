@@ -5,7 +5,13 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.cli_commands import load_order_items, resumable_order_items, run_remove_cart_command
+from src.cli_commands import (
+    invalid_session_exit,
+    load_order_items,
+    prepared_order_items,
+    resumable_order_items,
+    run_remove_cart_command,
+)
 from src.excel import Item
 
 
@@ -82,6 +88,30 @@ class CliCommandsTests(unittest.TestCase):
 
         with self.assertRaisesRegex(SystemExit, "Order Excel cannot be"):
             load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
+
+    def test_prepared_order_items_requires_state_then_applies_resume(self) -> None:
+        items = [Item(code="1", name="Panadol", qty=1)]
+        args = SimpleNamespace(resume=False)
+
+        with (
+            patch("src.cli_commands.require_state_file") as require_state,
+            patch("src.cli_commands.resumable_order_items", return_value=items) as resumable,
+        ):
+            prepared = prepared_order_items("wardany", items, args)
+
+        self.assertEqual(prepared, items)
+        require_state.assert_called_once_with("wardany")
+        resumable.assert_called_once_with("wardany", items, args)
+
+    def test_invalid_session_exit_opens_reauth_and_returns_standard_message(self) -> None:
+        error = RuntimeError("expired")
+
+        with patch("src.cli_commands.open_reauth_in_browser") as reauth:
+            exit_error = invalid_session_exit("https://seller.tawreed.io", "wardany", error)
+
+        reauth.assert_called_once_with("https://seller.tawreed.io", "wardany")
+        self.assertIsInstance(exit_error, SystemExit)
+        self.assertIn("py run.py auth --profile wardany", str(exit_error))
 
     def test_run_remove_cart_command_invokes_bot_for_selected_profile(self) -> None:
         profile = SimpleNamespace()
