@@ -1,209 +1,185 @@
 # PharmaSupplyBot Project Guidelines
 
-This document consolidates the project rules into a single file and aligns them
-with the current structure of `PharmaSupplyBot`.
+This document defines the project rules for `PharmaSupplyBot` and keeps them
+aligned with the current repository structure, runtime model, and local audit
+tooling.
 
 ## Purpose
 
-- Guide code development so it remains clear, maintainable, and suitable for
-  automating `seller.tawreed.io` orders.
-- Support the current project structure in `src/`, the Streamlit interface, and
-  the `config.yaml` configuration files.
-- Establish fixed rules for local code checks using `tools/rule_audit.py`.
+- Keep the codebase maintainable while automating `seller.tawreed.io` flows.
+- Improve execution speed, memory efficiency, and safe scalability.
+- Keep the rules compatible with the current `src/`, Streamlit, and CLI layout.
+- Distinguish between hard audit constraints and architectural guidance.
 
 ## Project Scope
 
-- `run.py`: The main command-line interface for auth, ordering, and cart removal.
-- `streamlit_app.py`: The local Streamlit entrypoint.
-- `src/`: Source code for configuration, matching, Tawreed automation, and UI logic.
-- `input/`: Input Excel files, including `order_items/`, `prevented_items/`, and
-  `remove_items/`.
-- `state/`: Stored Playwright sessions for each profile.
-- `artifacts/`: Diagnostic output and logs for failures.
+- `run.py`: CLI entrypoint for auth, ordering, and cart removal.
+- `streamlit_app.py`: local Streamlit entrypoint.
+- `src/`: configuration, Excel loading, matching, Tawreed automation, and UI
+  helpers.
+- `input/`: source Excel files for orders, prevented items, and cart removal.
+- `state/`: persisted Playwright session-state JSON files.
+- `artifacts/`: run outputs, summaries, timing data, and diagnostic logs.
 
-## Core Code Rules
+## Hard Constraints
 
-### Python Formatting
+These rules are enforced today by `python3 tools/rule_audit.py`.
 
-- Use Python 3.10 or newer.
-- Use 4 spaces for indentation.
+- Target Python version: 3.10 or newer.
 - Maximum line length: 100 characters.
-- Do not use tabs.
-- Use comments to explain why, not what.
+- Public modules must have a module docstring.
+- Public functions and classes must have docstrings.
+- The audit currently flags files longer than 100 lines and functions longer
+  than 20 lines, with a small exception list.
 
-### Code Length Rules
+These file and function size thresholds are code-health guardrails, not
+performance rules. Do not split logic into artificial fragments just to satisfy
+a number if that would hurt clarity, cohesion, or runtime behavior.
 
-- Maximum file length: 100 lines.
-- Maximum function length: 20 lines.
-- If a file or function exceeds the limit, split the code into a separate module
-  or helper function.
+## Style and API Rules
 
-### Naming and Style
+- Use `snake_case` for functions and variables, `PascalCase` for classes, and
+  `UPPER_SNAKE_CASE` for constants.
+- Prefer descriptive names over short abstractions such as `util`, `handler`,
+  `data`, or `temp`.
+- Use type hints on public APIs and shared domain models.
+- Prefer precise types over `Any` where practical.
+- Keep public interfaces small and stable.
+- Avoid global mutable state; inject dependencies and pass explicit inputs.
+- Write comments to explain intent, invariants, or tradeoffs, not obvious code.
 
-- Variables and functions: `snake_case`.
-- Classes: `PascalCase`.
-- Constants: `UPPER_SNAKE_CASE`.
-- Use fully descriptive names; do not abbreviate domain concepts.
-- Avoid generic names like `data`, `temp`, `util`, or `handler` without clear
-  context.
+## Architecture Rules
 
-### Type Safety and Explicit APIs
+- Separate business logic from Playwright, CLI, and Streamlit integration code.
+- Keep configuration loading separate from configuration consumption.
+- Keep matching and warehouse-selection logic separate from browser actions.
+- Prefer pure functions for parsing, matching, scoring, and validation.
+- Reserve side effects for integration layers such as `tawreed*.py`,
+  `streamlit_*.py`, and CLI command wiring.
+- Add new behavior as explicit services, commands, or strategies instead of
+  growing monolithic control flows.
+- Avoid import cycles and keep dependencies moving inward toward reusable logic.
 
-- Use type hints for public functions and data structures.
-- Prefer explicit return types over `Any` or implicit `None`.
-- Keep public APIs small and stable to enable safe extensions.
-- Avoid global mutable state; pass dependencies explicitly.
+## Import Rules
 
-### Documentation
+- Inside `src/`, prefer package-relative imports such as `from .excel import Item`
+  because that matches the current codebase.
+- In top-level entrypoints and tests, import through `src...` when needed.
+- Avoid cross-module imports that pull UI code into domain or runtime modules.
 
-- Every public source file must have a module docstring.
-- Every public function or class must have a clear docstring.
-- Private helper functions should be prefixed with `_` and may include a short
-  comment when needed.
+## Performance Rules
 
-### Performance and Memory Usage
+### General
 
-- Minimize loading Excel files or page data into memory all at once.
-- Use streaming or batch processing for large item lists.
-- Avoid unnecessary data copies during processing; pass by reference when safe.
-- Prefer operations on series or iterators over copying full DataFrames if using
-  `pandas` or equivalent.
-- Prefer generators for one-pass processing and avoid building large intermediate
-  collections.
-- Use temporary caches only for reusable outputs between requests, and avoid
-  holding long-lived state.
-- Keep temporary state localized to a single function or module to prevent
-  memory leaks across broader scopes.
-- Use indexing and smart lookup strategies instead of repeated scans over lists.
-- Reduce repeated network or browser calls by reusing stored sessions and valid
-  state when possible.
-- Use explicit timeouts and failure handling for browser and network operations.
-- Keep browser automation and session state separate from business logic.
-- Measure and profile slow paths before optimizing; prefer clarity over early
-  micro-optimization.
-- Evaluate execution time and complexity when adding new features; make heavy
-  features configurable.
+- Measure before optimizing; use timing data or lightweight profiling on slow
+  paths before making structural changes.
+- Optimize repeated work first: redundant Excel reads, repeated DOM scans,
+  duplicate parsing, unnecessary retries, and repeated browser/session setup.
+- Prefer algorithmic improvements over micro-optimizations.
+- Treat every new loop over items, rows, or products as a potential hot path.
 
-## Scalability and Extensibility
+### Memory
 
-- Design functions to be reusable across different execution flows, separate
-  from UI details.
-- Add new logic in separate modules instead of modifying large existing files.
-- Use simple design patterns such as `Factory` or `Strategy` when adding new
-  behavior without changing existing code.
-- Keep clear extension points in the code so new flows can be added for
-  `order`, `remove-cart`, `auth`, and similar commands without excessive
-  coupling.
-- Prefer small public interfaces and keep implementation details private.
-- Make configurable behavior driven by `config.yaml` rather than hardcoded
-  constants inside functions.
-- Consider a single extensibility layer (`extension` or `plugin`) for adding new
-  input formats or authentication methods.
-- Avoid deep call stacks and multi-layer state propagation when adding new
-  features.
-- Keep domain logic pure and side-effect-free when possible, reserving side
-  effects for the integration layer.
-- Structure new functionality as explicit commands or services rather than
-  branching large monolithic flows.
+- Do not keep large intermediate collections unless later steps reuse them.
+- Prefer iterators, generators, and incremental writes for one-pass workflows.
+- Avoid copying lists, dicts, or DataFrames unless isolation is required.
+- Keep caches bounded by size or lifetime; unbounded caches are forbidden.
+- Keep temporary state local to one run instead of storing long-lived mutable
+  process state.
 
-## Project Organization and Layering
+### Excel and Data Loading
 
-- Keep `src/` code focused on well-defined responsibilities.
-- `config.py`, `config_factory.py`, and `config_models.py` handle configuration
-  loading and representation.
-- `excel.py` and `selectors.py` handle input data and page element access.
-- `product_matching.py`, `matching_models.py`, and `matching_rules.py` handle only
-  item matching.
-- `tawreed*.py` handle interaction with the Tawreed site and browser navigation.
-- `streamlit_*.py` handle UI and presentation, clearly separated from runtime
+- Read only the columns needed for the current operation.
+- For large spreadsheets, prefer chunked or streaming approaches when library
+  support is practical.
+- If `pandas` remains in use, avoid loading full sheets twice when one preview
+  pass and one targeted read are sufficient.
+- Prefer row iteration APIs that avoid Series allocation per row when converting
+  Excel rows into domain objects.
+- Normalize and validate rows as they are read instead of building multiple
+  transformed copies of the same dataset.
+
+### Playwright and Network Use
+
+- Reuse one browser/context/page sequence for a single run whenever possible.
+- Reuse validated session-state files to avoid unnecessary reauthentication.
+- Prefer waiting on precise UI signals over broad sleeps or repeated polling.
+- Avoid repeated DOM queries for the same stable element inside tight loops.
+- Bound retries and timeouts explicitly; no unbounded waiting loops.
+- Close dialogs, pages, contexts, and files deterministically.
+
+### Concurrency and Throughput
+
+- Parallelism must be bounded. Do not run unlimited profiles, browsers, or file
+  loads at once.
+- If multi-profile execution is added or expanded, control concurrency with a
+  fixed worker limit or semaphore.
+- Shared output files must be append-safe or partitioned per run/profile.
+- Any cache or session reuse must be safe across concurrent runs.
+
+## Scalability Rules
+
+- Make expensive behavior configurable through `config.yaml` or typed config
+  models, not hardcoded constants.
+- Define explicit extension points for auth flows, warehouse strategies, and
+  input-source handling.
+- Prefer structured result objects over ad hoc dictionaries when values cross
+  multiple layers.
+- Keep per-profile execution isolated so failures in one profile do not corrupt
+  another.
+- Persist artifacts incrementally instead of holding full run history in memory.
+- Prefer append-only logs and summaries for long runs.
+
+## Project Organization
+
+- Keep `src/` modules focused on one clear responsibility each.
+- `config.py`, `config_factory.py`, and `config_models.py` own configuration.
+- `excel.py`, `prevented_items.py`, and related helpers own input processing.
+- `matching_*.py`, `product_matching.py`, and `tawreed_strategy.py` own match
+  and selection logic.
+- `tawreed*.py` own browser automation, session validation, and order/cart flow.
+- `streamlit_*.py` own presentation and subprocess orchestration only.
+- Keep `input/`, `state/`, and `artifacts/` outside source logic concerns.
+
+## Refactoring Rules
+
+- Do not change business behavior during refactoring unless the task explicitly
+  includes a behavior change.
+- Extract helpers or modules when they improve cohesion, testability, or
+  performance visibility.
+- Do not split a function only to satisfy a size target if the result increases
+  call indirection without improving readability.
+- If a file exceeds audit thresholds, reduce it deliberately around logical
+  seams rather than by mechanical slicing.
+- Preserve existing public interfaces unless the migration is planned and tested.
+
+## Testing and Validation
+
+- Run `python3 tools/rule_audit.py` after structural changes.
+- Add or update tests when changing matching, parsing, session, or orchestration
   logic.
+- Prefer focused unit tests for scoring, parsing, and selection logic.
+- For performance-sensitive code, add regression-friendly checks when practical,
+  such as row-count, timeout, or bounded-work assertions.
 
-### Imports
+## Project-Specific Guidance
 
-- Use absolute imports within `src/` whenever possible.
-- Keep `from src...` imports in Streamlit modules to avoid dynamic loading issues.
-- Avoid heavy relative path dependencies between large `src/` modules.
+- Keep `order_items`, `prevented_items`, and `remove_items` flows explicit and
+  separate.
+- Do not duplicate product-matching rules inside browser-flow modules when the
+  logic can live in shared matching modules.
+- Store persistent auth state only in `state/`; `artifacts/` must remain
+  disposable run output.
+- When adding warehouse-selection behavior, prefer extending
+  `tawreed_strategy.py` or related matching logic instead of branching in UI or
+  CLI layers.
+- If configuration models grow, prefer typed fields and smaller nested models
+  over broad `dict[str, Any]` surfaces.
 
-### File and Folder Organization
+## Source of Truth
 
-- Use separate folders for each layer or responsibility in `src/`, such as
-  `src/tawreed/`, `src/config/`, and `src/streamlit/` when appropriate.
-- Place core business modules in one folder, configuration modules in another,
-  and UI modules in a third.
-- Ensure filenames reflect precise responsibility: `config_factory.py` for
-  configuration loading, `product_matching.py` for matching, and
-  `tawreed_checkout.py` for checkout flow.
-- Combine files with shared responsibility only after confirming the merge does
-  not exceed length limits or blur architectural layers.
-- Keep `input/`, `state/`, and `artifacts/` separate from source code; use them as
-  data and state directories only.
-- If a file contains more than one responsibility, split it into a new subfolder
-  rather than enlarging a single file.
-
-## Review and Refactoring Rules
-
-### General Rules
-
-- Do not change program behavior during refactoring.
-- Do not change business logic or algorithms unless explicitly requested.
-- Do not delete working code; if a section is unused, document it in the review
-  first.
-- Give every new module exactly one clear responsibility.
-
-### Module and Helper Extraction
-
-- Extract a new module only when:
-  - the file exceeds 100 lines, or
-  - the file contains a distinct separate responsibility.
-- Extract a helper function only if it improves readability or enables reuse.
-- Keep private helper functions prefixed with `_` and place them after public
-  functions in the file.
-
-### Dependencies
-
-- Keep dependencies pointing downward; higher-level modules should not depend on
-  lower-level modules.
-- Avoid import cycles.
-- Prefer dependency injection over importing whole modules for general behavior.
-
-### Separation of Concerns
-
-- Separate UI logic from runtime and Tawreed automation logic.
-- Separate configuration loading from configuration usage.
-- Separate input validation from execution logic.
-
-## Streamlit and Playwright Rules
-
-- Keep UI logic inside `streamlit_*.py` and expose simple interfaces for business
-  functions.
-- Keep auth and stored session state separate in `streamlit_auth.py` and
-  `streamlit_state.py`.
-- Store Playwright sessions in `state/<profile>.json` and protect them from
-  accidental overwrites.
-- Use absolute imports like `from src...` when a Streamlit page needs to import
-  a module.
-
-## Local Validation
-
-- Use `python3 tools/rule_audit.py` to verify length and documentation rules.
-- Even if values appear in `EXCEPTED_FILE_LENGTHS`, reduce file sizes gradually
-  during refactoring.
-- Record audit results in the output and ensure there are no
-  `rule_audit_violations` before merging.
-
-## Project-Specific Notes
-
-- Keep handling of `order_items`, `prevented_items`, and `remove_items` clear and
-  separated.
-- `artifacts/` should contain only run results and failure logs, not persistent
-  runtime state.
-- Avoid duplicating product matching logic inside `tawreed_*`; if logic can be
-  shared, place it in `product_matching.py` or `matching_rules.py`.
-- Keep tunable settings in `config.yaml` instead of hardcoding them in code.
-
-## Desired Final Structure
-
-- One consolidated rule file: `docs/project_guidelines.md`
-- No nested separate rule files under `.agent/rules/refactoring/`.
-- Content should focus on the current project and comply with the constraints
-  defined in `tools/rule_audit.py`.
+- `docs/project_guidelines.md` is the main project rule document.
+- `tools/rule_audit.py` is the source of truth for currently enforced local
+  audit checks.
+- When these two disagree, either update the document or update the audit so
+  both describe the same expectation.

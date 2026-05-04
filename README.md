@@ -170,6 +170,17 @@ python3 tools/rule_audit.py
 rule_audit_ok
 ```
 
+قبل كل `push` نفّذ:
+
+```bash
+.venv/bin/python -m unittest discover -s tests -q
+.venv/bin/python tools/rule_audit.py
+```
+
+ملاحظة:
+- `rule_audit.py` يمنع المخالفات الجديدة، ويسمح بخفض المخالفات القديمة تدريجيًا أثناء refactor.
+- GitHub Actions يشغل نفس الفحوصات تلقائيًا بعد كل `push` و`pull request`.
+
 ## سلوك التنفيذ الحالي
 
 - افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
