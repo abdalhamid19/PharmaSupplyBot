@@ -23,9 +23,9 @@ class StreamlitRemoveCartTests(unittest.TestCase):
             [
                 "remove-cart",
                 "--config",
-                "config.yaml",
+                str(Path("config.yaml")),
                 "--excel",
-                "data/input/remove_items/remove.xlsx",
+                str(Path("data/input/remove_items/remove.xlsx")),
                 "--profile",
                 "wardany",
                 "--debug-browser",

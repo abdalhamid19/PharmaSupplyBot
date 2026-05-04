@@ -9,7 +9,7 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-from .playwright_browser import launch_chromium
+from ..playwright_browser import launch_chromium
 from .tawreed_auth_waits import (
     is_logged_in_marker_visible,
     wait_for_login_detection as poll_for_login_detection,

@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 from src.config_models import AppConfig, ExcelConfig, MatchingConfig, ProfileConfig, RuntimeConfig
 from src.excel import Item
-from src.tawreed import TawreedBot
-from src.tawreed_session import SessionInvalidError
+from src.tawreed.tawreed import TawreedBot
+from src.tawreed.tawreed_session import SessionInvalidError
 
 
 class _FakePage:
@@ -102,10 +102,10 @@ class TawreedBotTests(unittest.TestCase):
         for _label, error, expected_cleanup_calls in scenarios:
             bot = self._bot()
             with (
-                patch("src.tawreed.close_visible_dialogs") as cleanup,
+                patch("src.tawreed.tawreed.close_visible_dialogs") as cleanup,
                 patch.object(bot, "_record_item_summary") as record_summary,
-                patch("src.tawreed.dump_artifacts") as dump_artifacts,
-                patch("src.tawreed.visible_overlay_diagnostics", return_value="overlay_panels=1"),
+                patch("src.tawreed.tawreed.dump_artifacts") as dump_artifacts,
+                patch("src.tawreed.tawreed.visible_overlay_diagnostics", return_value="overlay_panels=1"),
             ):
                 if error is None:
                     with patch.object(bot, "_add_item"):
@@ -163,20 +163,17 @@ class TawreedBotTests(unittest.TestCase):
             def fake_save_session_state(_context, path: Path, is_intermediate: bool) -> None:
                 path.write_text("new-state", encoding="utf-8")
 
-            with patch("src.tawreed.sync_playwright", return_value=_PlaywrightContext()):
-                with patch("src.tawreed.open_auth_page", return_value=(fake_browser, fake_context, fake_page)):
-                    with patch("src.tawreed.attempt_env_login"):
-                        with patch("src.tawreed.print_auth_instructions"):
-                            with patch("src.tawreed.wait_for_login_detection", return_value=True):
-                                with patch("src.tawreed.wait_for_network_idle"):
-                                    with patch("src.tawreed.print_login_detection_result"):
-                                        with patch("src.tawreed.save_session_state", side_effect=fake_save_session_state):
-                                            with patch(
-                                                "src.tawreed.validate_saved_session",
-                                                side_effect=SessionInvalidError("invalid"),
-                                            ):
-                                                with patch("src.tawreed.close_context"):
-                                                    with patch("src.tawreed.close_browser"):
+            with patch("src.tawreed.tawreed.sync_playwright", return_value=_PlaywrightContext()):
+                with patch("src.tawreed.tawreed.open_auth_page", return_value=(fake_browser, fake_context, fake_page)):
+                    with patch("src.tawreed.tawreed.attempt_env_login"):
+                        with patch("src.tawreed.tawreed.print_auth_instructions"):
+                            with patch("src.tawreed.tawreed.wait_for_login_detection", return_value=True):
+                                with patch("src.tawreed.tawreed.wait_for_network_idle"):
+                                    with patch("src.tawreed.tawreed.print_login_detection_result"):
+                                        with patch("src.tawreed.tawreed.save_session_state", side_effect=fake_save_session_state):
+                                            with patch("src.tawreed.tawreed.validate_saved_session", side_effect=SessionInvalidError("invalid")):
+                                                with patch("src.tawreed.tawreed.close_context"):
+                                                    with patch("src.tawreed.tawreed.close_browser"):
                                                         with self.assertRaises(SessionInvalidError):
                                                             bot.auth_headless(wait_seconds=30)
 
@@ -221,17 +218,17 @@ class TawreedBotTests(unittest.TestCase):
             fake_browser = object()
             fake_page = object()
 
-            with patch("src.tawreed.sync_playwright", return_value=_PlaywrightContext()):
-                with patch("src.tawreed.open_auth_page", return_value=(fake_browser, fake_context, fake_page)):
-                    with patch("src.tawreed.attempt_env_login"):
-                        with patch("src.tawreed.print_auth_instructions"):
-                            with patch("src.tawreed.wait_for_login_detection", return_value=False):
-                                with patch("src.tawreed.wait_for_network_idle"):
-                                    with patch("src.tawreed.print_login_detection_result"):
-                                        with patch("src.tawreed.save_session_state"):
-                                            with patch("src.tawreed.dump_artifacts"):
-                                                with patch("src.tawreed.close_context"):
-                                                    with patch("src.tawreed.close_browser"):
+            with patch("src.tawreed.tawreed.sync_playwright", return_value=_PlaywrightContext()):
+                with patch("src.tawreed.tawreed.open_auth_page", return_value=(fake_browser, fake_context, fake_page)):
+                    with patch("src.tawreed.tawreed.attempt_env_login"):
+                        with patch("src.tawreed.tawreed.print_auth_instructions"):
+                            with patch("src.tawreed.tawreed.wait_for_login_detection", return_value=False):
+                                with patch("src.tawreed.tawreed.wait_for_network_idle"):
+                                    with patch("src.tawreed.tawreed.print_login_detection_result"):
+                                        with patch("src.tawreed.tawreed.save_session_state"):
+                                            with patch("src.tawreed.tawreed.dump_artifacts"):
+                                                with patch("src.tawreed.tawreed.close_context"):
+                                                    with patch("src.tawreed.tawreed.close_browser"):
                                                         with self.assertRaises(RuntimeError) as context:
                                                             bot.auth_headless(wait_seconds=30)
             self.assertIn("Headless auth did not produce a valid Tawreed session", str(context.exception))

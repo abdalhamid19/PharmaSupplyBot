@@ -15,8 +15,8 @@ from ..core.prevented_items import (
     is_prevented_items_excel_path,
     load_prevented_items,
 )
-from ..tawreed import TawreedBot
-from ..tawreed_session import SessionInvalidError, open_reauth_in_browser
+from ..tawreed.tawreed import TawreedBot
+from ..tawreed.tawreed_session import SessionInvalidError, open_reauth_in_browser
 
 
 def run_auth_command(app_config: AppConfig, args: argparse.Namespace) -> int:

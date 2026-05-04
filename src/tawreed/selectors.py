@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .config_models import AppConfig
+from ..config_models import AppConfig
 from .tawreed_constants import (
     CART_CONFIRM_DELETE_BUTTON_SELECTOR,
     CART_DELETE_BUTTON_SELECTOR,

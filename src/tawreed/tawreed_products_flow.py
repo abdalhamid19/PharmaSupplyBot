@@ -14,9 +14,9 @@ _NUMERIC_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?")
 
 from playwright.sync_api import Page
 
-from .excel import Item
-from .core.matching_models import MatchDecision, SearchMatch
-from .core.product_matching import (
+from ..excel import Item
+from ..core.matching_models import MatchDecision, SearchMatch
+from ..core.product_matching import (
     _search_queries_for_item,
     explain_best_product_match,
     is_decisive_product_match,

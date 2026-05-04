@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
-from src.tawreed_session import (
+from src.tawreed.tawreed_session import (
     SessionInvalidError,
     auth_temp_state_path,
     ensure_logged_in,

@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.tawreed_products_flow import (
+from src.tawreed.tawreed_products_flow import (
     available_store_choices,
     choose_next_store_for_remaining_quantity,
     close_visible_dialogs,
@@ -324,9 +324,9 @@ class TawreedProductsFlowTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
-            patch("src.tawreed_products_flow.wait_for_product_rows") as wait_rows,
-            patch("src.tawreed_products_flow.visible_product_rows", return_value=rows),
+            patch("src.tawreed.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
+            patch("src.tawreed.tawreed_products_flow.wait_for_product_rows") as wait_rows,
+            patch("src.tawreed.tawreed_products_flow.visible_product_rows", return_value=rows),
         ):
             results = search_products(bot, page, "DONEPEZIL")
 
@@ -344,10 +344,10 @@ class TawreedProductsFlowTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_products_flow.close_visible_dialogs"),
-            patch("src.tawreed_products_flow.wait_for_product_rows"),
+            patch("src.tawreed.tawreed_products_flow.close_visible_dialogs"),
+            patch("src.tawreed.tawreed_products_flow.wait_for_product_rows"),
             patch(
-                "src.tawreed_products_flow.visible_product_rows",
+                "src.tawreed.tawreed_products_flow.visible_product_rows",
                 return_value=_FakeRows([_FakeRow("ignored", row_text="No results found")]),
             ),
         ):
@@ -403,8 +403,8 @@ class TawreedProductsFlowTests(unittest.TestCase):
         page = _FakePage()
 
         with (
-            patch("src.tawreed_products_flow.visible_dialog_masks", side_effect=RuntimeError("gone")),
-            patch("src.tawreed_products_flow.visible_overlay_panels", side_effect=RuntimeError("gone")),
+            patch("src.tawreed.tawreed_products_flow.visible_dialog_masks", side_effect=RuntimeError("gone")),
+            patch("src.tawreed.tawreed_products_flow.visible_overlay_panels", side_effect=RuntimeError("gone")),
         ):
             close_visible_dialogs(page)
 
@@ -422,9 +422,9 @@ class TawreedProductsFlowTests(unittest.TestCase):
         row = object()
 
         with (
-            patch("src.tawreed_products_flow.stores_button") as stores_button,
-            patch("src.tawreed_products_flow._stores_dialog_visible", return_value=True),
-            patch("src.tawreed_products_flow._stores_from_dialog_rows", return_value=[{}, {}]) as dialog_rows,
+            patch("src.tawreed.tawreed_products_flow.stores_button") as stores_button,
+            patch("src.tawreed.tawreed_products_flow._stores_dialog_visible", return_value=True),
+            patch("src.tawreed.tawreed_products_flow._stores_from_dialog_rows", return_value=[{}, {}]) as dialog_rows,
         ):
             stores_button.return_value.click.return_value = None
             stores = open_stores_dialog(bot, page, row)
@@ -450,9 +450,9 @@ class TawreedProductsFlowTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
-            patch("src.tawreed_products_flow.visible_dialog", return_value=dialog),
-            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch("src.tawreed.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
+            patch("src.tawreed.tawreed_products_flow.visible_dialog", return_value=dialog),
+            patch("src.tawreed.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
         ):
             open_store_cart_dialog(bot, object(), object())
 
@@ -477,9 +477,9 @@ class TawreedProductsFlowTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
-            patch("src.tawreed_products_flow.visible_dialog", return_value=object()),
-            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch("src.tawreed.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
+            patch("src.tawreed.tawreed_products_flow.visible_dialog", return_value=object()),
+            patch("src.tawreed.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
         ):
             open_store_cart_dialog(bot, object(), object())
 
@@ -520,11 +520,11 @@ class TawreedProductsFlowTests(unittest.TestCase):
             return quantity
 
         with (
-            patch("src.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
-            patch("src.tawreed_products_flow.visible_dialog", return_value=object()),
-            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch("src.tawreed.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
+            patch("src.tawreed.tawreed_products_flow.visible_dialog", return_value=object()),
+            patch("src.tawreed.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
             patch(
-                "src.tawreed_products_flow.fill_add_to_cart_dialog",
+                "src.tawreed.tawreed_products_flow.fill_add_to_cart_dialog",
                 side_effect=remember_requested_quantity,
             ),
         ):
@@ -569,11 +569,11 @@ class TawreedProductsFlowTests(unittest.TestCase):
             return quantity
 
         with (
-            patch("src.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
-            patch("src.tawreed_products_flow.visible_dialog", return_value=object()),
-            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch("src.tawreed.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
+            patch("src.tawreed.tawreed_products_flow.visible_dialog", return_value=object()),
+            patch("src.tawreed.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
             patch(
-                "src.tawreed_products_flow.fill_add_to_cart_dialog",
+                "src.tawreed.tawreed_products_flow.fill_add_to_cart_dialog",
                 side_effect=remember_requested_quantity,
             ),
         ):
@@ -625,16 +625,16 @@ class TawreedProductsFlowTests(unittest.TestCase):
 
         with (
             patch(
-                "src.tawreed_products_flow.open_stores_dialog",
+                "src.tawreed.tawreed_products_flow.open_stores_dialog",
                 side_effect=[store_rows, store_rows, store_rows],
             ),
-            patch("src.tawreed_products_flow.visible_dialog", return_value=object()),
-            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch("src.tawreed.tawreed_products_flow.visible_dialog", return_value=object()),
+            patch("src.tawreed.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
             patch(
-                "src.tawreed_products_flow.fill_add_to_cart_dialog",
+                "src.tawreed.tawreed_products_flow.fill_add_to_cart_dialog",
                 side_effect=remember_requested_quantity,
             ),
-            patch("src.tawreed_products_flow.close_visible_dialogs"),
+            patch("src.tawreed.tawreed_products_flow.close_visible_dialogs"),
         ):
             add_item_from_store_dialogs(bot, object(), object(), Item("1", "DEVAROL", 9))
 
@@ -680,14 +680,14 @@ class TawreedProductsFlowTests(unittest.TestCase):
             return quantity
 
         with (
-            patch("src.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
-            patch("src.tawreed_products_flow.visible_dialog", return_value=object()),
-            patch("src.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
+            patch("src.tawreed.tawreed_products_flow.open_stores_dialog", side_effect=[store_rows, store_rows]),
+            patch("src.tawreed.tawreed_products_flow.visible_dialog", return_value=object()),
+            patch("src.tawreed.tawreed_products_flow.store_dialog_cart_buttons", return_value=cart_buttons),
             patch(
-                "src.tawreed_products_flow.fill_add_to_cart_dialog",
+                "src.tawreed.tawreed_products_flow.fill_add_to_cart_dialog",
                 side_effect=remember_requested_quantity,
             ),
-            patch("src.tawreed_products_flow.close_visible_dialogs"),
+            patch("src.tawreed.tawreed_products_flow.close_visible_dialogs"),
         ):
             add_item_from_store_dialogs(bot, object(), object(), Item("1", "DEVAROL", 7))
 
@@ -749,8 +749,8 @@ class TawreedProductsFlowTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
-            patch("src.tawreed_products_flow.close_visible_dialogs"),
+            patch("src.tawreed.tawreed_products_flow.open_stores_dialog", return_value=store_rows),
+            patch("src.tawreed.tawreed_products_flow.close_visible_dialogs"),
         ):
             with self.assertRaisesRegex(RuntimeError, "minimum discount 12%"):
                 add_item_from_store_dialogs(bot, object(), object(), Item("1", "DEVAROL", 2))
@@ -765,8 +765,8 @@ class TawreedProductsFlowTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_products_flow.add_item_from_store_dialogs") as add_from_stores,
-            patch("src.tawreed_products_flow.click_single_store_cart") as click_single,
+            patch("src.tawreed.tawreed_products_flow.add_item_from_store_dialogs") as add_from_stores,
+            patch("src.tawreed.tawreed_products_flow.click_single_store_cart") as click_single,
         ):
             open_add_to_cart_for_match(bot, object(), object(), Item("1", "Panadol", 1), match)
 
@@ -799,13 +799,13 @@ class TawreedProductsFlowTests(unittest.TestCase):
 
         with (
             patch(
-                "src.tawreed_products_flow.add_item_from_store_dialogs",
+                "src.tawreed.tawreed_products_flow.add_item_from_store_dialogs",
                 side_effect=ValueError("dialog failed"),
             ),
-            patch("src.tawreed_products_flow._row_cart_button_enabled", return_value=True),
-            patch("src.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
-            patch("src.tawreed_products_flow.click_single_store_cart") as click_single,
-            patch("src.tawreed_products_flow.fill_add_to_cart_dialog") as fill_quantity,
+            patch("src.tawreed.tawreed_products_flow._row_cart_button_enabled", return_value=True),
+            patch("src.tawreed.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
+            patch("src.tawreed.tawreed_products_flow.click_single_store_cart") as click_single,
+            patch("src.tawreed.tawreed_products_flow.fill_add_to_cart_dialog") as fill_quantity,
         ):
             open_add_to_cart_for_match(bot, object(), object(), Item("1", "Panadol", 1), match)
 
@@ -830,12 +830,12 @@ class TawreedProductsFlowTests(unittest.TestCase):
         page = _FakePage()
 
         with (
-            patch("src.tawreed_products_flow.visible_dialog", return_value=dialog),
-            patch("src.tawreed_products_flow.dialog_footer_buttons", return_value=footer_buttons),
-            patch("src.tawreed_products_flow.bounded_requested_quantity", return_value=2),
-            patch("src.tawreed_products_flow.fill_quantity_input") as fill_quantity,
-            patch("src.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
-            patch("src.tawreed_products_flow._wait_for_dialog_to_clear") as wait_clear,
+            patch("src.tawreed.tawreed_products_flow.visible_dialog", return_value=dialog),
+            patch("src.tawreed.tawreed_products_flow.dialog_footer_buttons", return_value=footer_buttons),
+            patch("src.tawreed.tawreed_products_flow.bounded_requested_quantity", return_value=2),
+            patch("src.tawreed.tawreed_products_flow.fill_quantity_input") as fill_quantity,
+            patch("src.tawreed.tawreed_products_flow.close_visible_dialogs") as close_dialogs,
+            patch("src.tawreed.tawreed_products_flow._wait_for_dialog_to_clear") as wait_clear,
         ):
             ordered_quantity = fill_add_to_cart_dialog(bot, page, 4)
 
@@ -873,7 +873,7 @@ class TawreedProductsFlowTests(unittest.TestCase):
         page = _FakePage()
         rows = _FakeRows([_FakeRow("ignored", row_text="No results found")])
 
-        with patch("src.tawreed_products_flow.visible_product_rows", return_value=rows):
+        with patch("src.tawreed.tawreed_products_flow.visible_product_rows", return_value=rows):
             self.assertTrue(_table_has_no_results(page))
 
     def test_is_no_results_row_accepts_arabic_text(self):

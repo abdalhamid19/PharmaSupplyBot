@@ -1,4 +1,4 @@
-from src.tawreed_strategy import choose_store_index
+from src.tawreed.tawreed_strategy import choose_store_index
 
 
 def test_choose_store_index_max_discount_prefers_highest_discount():

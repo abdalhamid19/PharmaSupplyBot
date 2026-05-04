@@ -4,7 +4,7 @@ from contextlib import redirect_stdout
 from types import SimpleNamespace
 
 from src.config_factory import build_runtime_config
-from src.tawreed_checkout import confirm_order
+from src.tawreed.tawreed_checkout import confirm_order
 
 
 class TawreedCheckoutTests(unittest.TestCase):

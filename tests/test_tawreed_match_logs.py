@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from src.excel import Item
 from src.core.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
-from src.tawreed_match_logs import (
+from src.tawreed.tawreed_match_logs import (
     OrderItemSummary,
     append_order_result_summary,
     should_write_detailed_match_log,
@@ -26,8 +26,8 @@ class TawreedMatchLogsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed_match_logs.append_csv_artifact") as append_csv,
-            patch("src.tawreed_match_logs.append_xlsx_artifact") as append_xlsx,
+            patch("src.tawreed.tawreed_match_logs.append_csv_artifact") as append_csv,
+            patch("src.tawreed.tawreed_match_logs.append_xlsx_artifact") as append_xlsx,
         ):
             append_order_result_summary("wardany", item, summary)
 

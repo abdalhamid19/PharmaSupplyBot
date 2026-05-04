@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 from playwright.sync_api import Page
 
-from .core.cart_removal_items import CartRemovalItem, cart_row_matches_names
-from .core.cart_removal_summary import CartRemovalSummary, append_cart_removal_summary
-from .excel import Item
+from ..core.cart_removal_items import CartRemovalItem, cart_row_matches_names
+from ..core.cart_removal_summary import CartRemovalSummary, append_cart_removal_summary
+from ..excel import Item
 from .tawreed_constants import VISIBLE_DIALOG_SELECTOR
 from .tawreed_products_flow import require_product_match
 

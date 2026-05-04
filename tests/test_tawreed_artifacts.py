@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 from openpyxl import Workbook, load_workbook
 
-from src.tawreed_artifacts import append_xlsx_artifact
+from src.tawreed.tawreed_artifacts import append_xlsx_artifact
 
 
 class TawreedArtifactsTests(unittest.TestCase):

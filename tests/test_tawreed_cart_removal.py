@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from src.core.cart_removal_items import CartRemovalItem
-from src.tawreed_cart_removal import (
+from src.tawreed.tawreed_cart_removal import (
     CartRemovalSelectors,
     CartRemovalTarget,
     remove_items_from_cart,
@@ -71,7 +71,7 @@ class TawreedCartRemovalTests(unittest.TestCase):
         page = _FakePage(rows)
         selectors = CartRemovalSelectors("rows", "delete", "confirm")
 
-        with patch("src.tawreed_cart_removal.confirm_delete_if_needed"):
+        with patch("src.tawreed.tawreed_cart_removal.confirm_delete_if_needed"):
             removed_count = remove_matching_cart_rows(
                 page,
                 CartRemovalTarget(
@@ -97,7 +97,7 @@ class TawreedCartRemovalTests(unittest.TestCase):
             rows[0].deleted = True
             raise RuntimeError("element detached")
 
-        with patch("src.tawreed_cart_removal.click_cart_delete_button", side_effect=detach_row_after_click_error):
+        with patch("src.tawreed.tawreed_cart_removal.click_cart_delete_button", side_effect=detach_row_after_click_error):
             removed_count = remove_matching_cart_rows(page, target, selectors)
 
         self.assertEqual(removed_count, 1)
@@ -114,7 +114,7 @@ class TawreedCartRemovalTests(unittest.TestCase):
             names=["DEVAROL"],
         )
 
-        with patch("src.tawreed_cart_removal.confirm_delete_if_needed"):
+        with patch("src.tawreed.tawreed_cart_removal.confirm_delete_if_needed"):
             removed_count = remove_matching_cart_rows(page, target, selectors)
 
         self.assertEqual(removed_count, 1)
@@ -142,7 +142,7 @@ class TawreedCartRemovalTests(unittest.TestCase):
             names=["DEVAROL", "ديفارول"],
         )
 
-        with patch("src.tawreed_cart_removal.append_cart_removal_summary") as append_summary:
+        with patch("src.tawreed.tawreed_cart_removal.append_cart_removal_summary") as append_summary:
             remove_items_from_cart(bot, page, [target])
 
         summary = append_summary.call_args.args[2]
@@ -163,7 +163,7 @@ class TawreedCartRemovalTests(unittest.TestCase):
             },
         )()
 
-        with patch("src.tawreed_cart_removal.require_product_match", return_value=(match, "DEVAROL")):
+        with patch("src.tawreed.tawreed_cart_removal.require_product_match", return_value=(match, "DEVAROL")):
             targets = resolve_cart_removal_targets(bot, object(), [item])
 
         self.assertEqual(targets[0].item, item)
@@ -174,7 +174,7 @@ class TawreedCartRemovalTests(unittest.TestCase):
         item = CartRemovalItem(code="91976", name="عسل حريمي")
 
         with (
-            patch("src.tawreed_cart_removal.require_product_match", side_effect=RuntimeError("لا يوجد")),
+            patch("src.tawreed.tawreed_cart_removal.require_product_match", side_effect=RuntimeError("لا يوجد")),
             patch("builtins.print") as print_call,
         ):
             targets = resolve_cart_removal_targets(bot, object(), [item])
