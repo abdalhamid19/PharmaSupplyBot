@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+_NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+
 
 def choose_store_index(
     stores: list[dict[str, Any]],
@@ -101,7 +103,7 @@ def _store_discount_value(store: dict[str, Any]) -> float:
         if value in (None, ""):
             continue
         if isinstance(value, str):
-            number_match = re.search(r"-?\d+(?:[.,]\d+)?", value.strip())
+            number_match = _NUMBER_RE.search(value.strip())
             if not number_match:
                 continue
             value = float(number_match.group(0).replace(",", "."))
