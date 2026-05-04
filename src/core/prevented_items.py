@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-import pandas as pd
+import openpyxl
 
 from .utils.excel import Item
 
@@ -25,23 +25,37 @@ class PreventedItem:
 
 
 def load_prevented_items(path: Path = DEFAULT_PREVENTED_ITEMS_PATH) -> list[PreventedItem]:
-    """Load prevented items from an XLSX file."""
-    if not path.exists():
-        return []
-    dataframe = pd.read_excel(path)
-    _require_prevented_columns(dataframe)
-    prevented_items: list[PreventedItem] = []
+    """Load prevented items from an XLSX file using openpyxl."""
+    if not path.exists(): return []
+    with open(path, "rb") as f:
+        workbook = openpyxl.load_workbook(f, read_only=True, data_only=True)
+        try:
+            sheet = workbook.active
+            rows = sheet.iter_rows(min_row=1, values_only=True)
+            return _parse_prevented_rows(rows, path)
+        finally: workbook.close()
+
+
+def _parse_prevented_rows(rows, path) -> list[PreventedItem]:
+    """Extract and validate prevented items from Excel rows."""
+    header = [str(cell).strip() if cell else "" for cell in next(rows)]
+    try:
+        code_idx = header.index(PREVENTED_CODE_COLUMN)
+        name_idx = header.index(PREVENTED_NAME_COLUMN)
+    except ValueError:
+        raise KeyError(f"Missing columns in {path}. Found: {header}")
+    items: list[PreventedItem] = []
     seen_keys: set[tuple[str, str]] = set()
-    for row in dataframe.to_dict(orient="records"):
-        item = _row_to_prevented_item(row)
-        if item is None:
-            continue
+    for row in rows:
+        code, name = display_code_text(row[code_idx]), normalized_cell_text(row[name_idx])
+        if not code and not name: continue
+        item = PreventedItem(code=code, name=name)
         key = normalized_prevented_key(item)
-        if key in seen_keys:
-            continue
-        seen_keys.add(key)
-        prevented_items.append(item)
-    return prevented_items
+        if key not in seen_keys:
+            seen_keys.add(key)
+            items.append(item)
+    return items
+
 
 
 def save_prevented_items(
@@ -50,17 +64,12 @@ def save_prevented_items(
 ) -> Path:
     """Save the prevented list to disk as an XLSX file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    dataframe = pd.DataFrame(
-        [
-            {
-                PREVENTED_CODE_COLUMN: item.code,
-                PREVENTED_NAME_COLUMN: item.name,
-            }
-            for item in prevented_items
-        ],
-        columns=[PREVENTED_CODE_COLUMN, PREVENTED_NAME_COLUMN],
-    )
-    dataframe.to_excel(path, index=False)
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append([PREVENTED_CODE_COLUMN, PREVENTED_NAME_COLUMN])
+    for item in prevented_items:
+        sheet.append([item.code, item.name])
+    workbook.save(str(path))
     return path
 
 
@@ -94,33 +103,22 @@ def remove_prevented_item(
 def filter_prevented_order_items(
     items: Iterable[Item],
     prevented_items: list[PreventedItem],
-) -> tuple[Iterable[Item], int]:
-    """Return an iterable of order items excluding any products in the prevented list."""
+) -> Iterable[Item]:
+    """Yield order items excluding any products in the prevented list."""
     blocked_codes = {
-        normalize_code(item.code) for item in prevented_items if normalize_code(item.code)
+        normalize_code(i.code) for i in prevented_items if normalize_code(i.code)
     }
     blocked_names = {
-        normalize_name(item.name) for item in prevented_items if normalize_name(item.name)
+        normalize_name(i.name) for i in prevented_items if normalize_name(i.name)
     }
 
-    # Since we need to return the skipped_count, we must consume the generator or wrap it.
-    # To maintain true RAM efficiency, we should ideally NOT return skipped_count immediately.
-    # But for now, we'll build a list to avoid breaking the CLI summary.
-    allowed_items: list[Item] = []
-    skipped_count = 0
     for item in items:
         item_code = normalize_code(item.code)
         item_name = normalize_name(item.name)
-        if item_code:
-            is_prevented = item_code in blocked_codes
-        else:
-            is_prevented = item_name in blocked_names
+        is_prevented = (item_code in blocked_codes) if item_code else (item_name in blocked_names)
 
-        if is_prevented:
-            skipped_count += 1
-            continue
-        allowed_items.append(item)
-    return allowed_items, skipped_count
+        if not is_prevented:
+            yield item
 
 
 def is_prevented_items_excel_path(
@@ -157,15 +155,11 @@ def normalize_name(value: object) -> str:
 
 
 def normalized_cell_text(value: object) -> str:
-    """Return spreadsheet cell text without pandas empty-value artifacts."""
-    if value is None:
+    """Return spreadsheet cell text safely without pandas artifacts."""
+    if value is None or (isinstance(value, float) and value != value):
         return ""
-    try:
-        if pd.isna(value):
-            return ""
-    except Exception:
-        pass
     return str(value).strip()
+
 
 
 def display_code_text(value: object) -> str:

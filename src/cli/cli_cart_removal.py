@@ -14,14 +14,10 @@ from .cli_shared import build_bot, invalid_session_exit, require_state_file
 
 def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Remove requested items from Tawreed carts for the selected profiles."""
-    items = load_cart_removal_items(Path(args.excel))
-    if not items:
-        print("No items found from cart-removal Excel.")
-        return 0
-
     profiles = app_config.profiles_to_run(profile=args.profile, all_profiles=args.all_profiles)
     for profile_key, profile in profiles:
         require_state_file(profile_key)
+        items = load_cart_removal_items(Path(args.excel))
         bot = _remove_cart_bot(app_config, profile_key, profile, args)
         _run_profile_cart_removal(app_config.base_url, profile_key, bot, items)
     return 0
@@ -46,7 +42,7 @@ def _run_profile_cart_removal(
     base_url: str,
     profile_key: str,
     bot: TawreedBot,
-    items: list,
+    items: Iterable[CartRemovalItem],
 ) -> None:
     """Run one profile cart-removal flow and handle session-expiry failures uniformly."""
     try:

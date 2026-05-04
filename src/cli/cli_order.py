@@ -23,33 +23,27 @@ from .cli_shared import build_bot, invalid_session_exit, require_state_file
 def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Place orders from Excel for the selected profiles."""
     _apply_order_overrides(app_config, args)
-    items = _load_order_items(app_config, args)
-    if not items:
-        print("No items found from Excel (after filtering).")
-        return 0
-
     profiles = app_config.profiles_to_run(profile=args.profile, all_profiles=args.all_profiles)
-    _execute_profiles(app_config, profiles, items, args)
+    _execute_profiles(app_config, profiles, args)
     return 0
 
 
 def _execute_profiles(
     app_config: AppConfig,
     profiles: list[tuple[str, ProfileConfig]],
-    items: list,
     args: argparse.Namespace,
 ) -> None:
     """Run the selected profiles either sequentially or in parallel."""
     max_workers = _resolve_max_workers(app_config, args, len(profiles))
     if max_workers <= 1:
         for profile_key, profile in profiles:
-            _run_single_profile(app_config, profile_key, profile, items, args)
+            _run_single_profile(app_config, profile_key, profile, args)
         return
 
     print(f"Running {len(profiles)} profiles in parallel (max_workers={max_workers})...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
-            executor.submit(_run_single_profile, app_config, pk, p, items, args)
+            executor.submit(_run_single_profile, app_config, pk, p, args)
             for pk, p in profiles
         ]
         concurrent.futures.wait(futures)
@@ -71,10 +65,10 @@ def _run_single_profile(
     app_config: AppConfig,
     profile_key: str,
     profile: ProfileConfig,
-    items: list,
     args: argparse.Namespace,
 ) -> None:
     """Prepare and run a single profile order flow."""
+    items = _load_order_items(app_config, args)
     profile_items = _prepared_order_items(profile_key, items, args)
     if not profile_items:
         print(f"[{profile_key}] No remaining items to process.")
@@ -93,26 +87,15 @@ def _apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> N
         app_config.warehouse_strategy["min_discount_percent"] = float(min_discount_percent)
 
 
-def _load_order_items(app_config: AppConfig, args: argparse.Namespace):
-    """Load the order items requested by the CLI command."""
+def _load_order_items(app_config: AppConfig, args: argparse.Namespace) -> Iterable[Item]:
+    """Load and filter order items iteratively."""
     excel_path = Path(args.excel)
-    prevented_path = _prevented_items_path(args)
-    if prevented_path and is_prevented_items_excel_path(excel_path, prevented_path):
-        raise SystemExit(
-            f"Order Excel cannot be the prevented-items file: {excel_path}. "
-            "Choose the shortage/order Excel file instead."
-        )
     items = load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
-    if not prevented_path:
-        return items
-    if not prevented_path.is_file():
-        print(f"Prevented-items Excel not found: {prevented_path}. Continuing without it.")
-        return items
-    prevented_items = load_prevented_items(prevented_path)
-    allowed_items, skipped_count = filter_prevented_order_items(items, prevented_items)
-    if skipped_count:
-        print(f"Skipped {skipped_count} prevented items from {prevented_path}.")
-    return allowed_items
+    prevented_path = _prevented_items_path(args)
+    if prevented_path and prevented_path.is_file():
+        prevented_items = load_prevented_items(prevented_path)
+        items = filter_prevented_order_items(items, prevented_items)
+    return items
 
 
 def _prevented_items_path(args: argparse.Namespace) -> Path | None:
@@ -121,13 +104,18 @@ def _prevented_items_path(args: argparse.Namespace) -> Path | None:
     return Path(value) if value else None
 
 
-def _prepared_order_items(profile_key: str, items: list, args: argparse.Namespace) -> list:
-    """Return one profile's remaining order items after session and resume checks."""
+def _prepared_order_items(
+    profile_key: str, items: Iterable[Item], args: argparse.Namespace
+) -> Iterable[Item]:
+    """Yield one profile's remaining order items after session and resume checks."""
     require_state_file(profile_key)
     if not bool(getattr(args, "resume", False)):
-        return items
+        yield from items
+        return
     processed_keys = _processed_summary_item_keys(profile_key)
-    return [item for item in items if _item_key(item.code, item.name) not in processed_keys]
+    for item in items:
+        if _item_key(item.code, item.name) not in processed_keys:
+            yield item
 
 
 def _processed_summary_item_keys(profile_key: str) -> set[tuple[str, str]]:
@@ -169,7 +157,9 @@ def _order_bot(
     )
 
 
-def _run_profile_order(base_url: str, profile_key: str, bot: TawreedBot, items: list) -> None:
+def _run_profile_order(
+    base_url: str, profile_key: str, bot: TawreedBot, items: Iterable[Item]
+) -> None:
     """Run one profile order flow and handle session-expiry failures uniformly."""
     try:
         bot.place_order_from_items(items)

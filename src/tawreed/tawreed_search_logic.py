@@ -76,22 +76,18 @@ def _decisive_match(
     bot, item: Item, decision: MatchDecision, started_at: float, queries: list[str]
 ) -> bool:
     """Return whether the current decision is final and record the outcome."""
-    bot.last_match_decision = decision
-    bot.last_searched_queries = queries
+    bot.last_match_decision, bot.last_searched_queries = decision, queries
     if not decision.best_match:
-        if len(queries) >= MIN_SEARCH_QUERIES_PER_ITEM:
-            write_match_log(bot, item, decision)
+        if len(queries) >= MIN_SEARCH_QUERIES_PER_ITEM: write_match_log(bot, item, decision)
         return False
-
-    # Check if this match is strong enough to stop searching early
+    # Early stop check
     is_decisive = is_decisive_product_match(queries[-1], decision.best_match.data)
-    if not is_decisive and len(queries) < MIN_SEARCH_QUERIES_PER_ITEM:
-        return False
-
+    if not is_decisive and len(queries) < MIN_SEARCH_QUERIES_PER_ITEM: return False
     bot.last_match_elapsed_seconds = time.perf_counter() - started_at
     write_match_log(bot, item, decision)
     if decision.best_match.data.get("availableQuantity", 0) <= 0:
         raise bot.skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
     return True
+
 
 

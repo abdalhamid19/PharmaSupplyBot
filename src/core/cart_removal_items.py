@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
-import pandas as pd
+import openpyxl
 
 REMOVE_ITEMS_DIR = Path("data/input") / "remove_items"
 DEFAULT_REMOVE_ITEMS_PATH = REMOVE_ITEMS_DIR / "remove.xlsx"
@@ -22,22 +22,36 @@ class CartRemovalItem:
     name: str
 
 
-def load_cart_removal_items(path: Path = DEFAULT_REMOVE_ITEMS_PATH) -> list[CartRemovalItem]:
-    """Load cart-removal items from an XLSX file."""
-    dataframe = pd.read_excel(path)
-    _require_remove_columns(dataframe)
-    items: list[CartRemovalItem] = []
+def load_cart_removal_items(
+    path: Path = DEFAULT_REMOVE_ITEMS_PATH,
+) -> Iterable[CartRemovalItem]:
+    """Yield cart-removal items from an XLSX file using openpyxl."""
+    if not path.exists(): return
+    with open(path, "rb") as f:
+        workbook = openpyxl.load_workbook(f, read_only=True, data_only=True)
+        try:
+            sheet = workbook.active
+            rows = sheet.iter_rows(min_row=1, values_only=True)
+            yield from _parse_cart_removal_rows(rows, path)
+        finally: workbook.close()
+
+
+def _parse_cart_removal_rows(rows, path) -> Iterable[CartRemovalItem]:
+    """Parse Excel rows into CartRemovalItem objects."""
+    header = [str(cell).strip() if cell else "" for cell in next(rows)]
+    try:
+        code_idx, name_idx = header.index(REMOVE_CODE_COLUMN), header.index(REMOVE_NAME_COLUMN)
+    except ValueError:
+        raise KeyError(f"Missing columns in {path}. Found: {header}")
     seen_keys: set[tuple[str, str]] = set()
-    for _, row in dataframe.iterrows():
-        item = _row_to_cart_removal_item(row)
-        if item is None:
-            continue
-        key = normalized_key(item.code, item.name)
-        if key in seen_keys:
-            continue
-        seen_keys.add(key)
-        items.append(item)
-    return items
+    for row in rows:
+        code, name = display_code_text(row[code_idx]), normalized_cell_text(row[name_idx])
+        if not name: continue
+        key = normalized_key(code, name)
+        if key not in seen_keys:
+            seen_keys.add(key)
+            yield CartRemovalItem(code=code, name=name)
+
 
 
 def cart_row_matches_item(row_text: str, item: CartRemovalItem) -> bool:
@@ -76,15 +90,11 @@ def normalize_name(value: object) -> str:
 
 
 def normalized_cell_text(value: object) -> str:
-    """Return spreadsheet cell text without pandas empty-value artifacts."""
-    if value is None:
+    """Return spreadsheet cell text safely without pandas artifacts."""
+    if value is None or (isinstance(value, float) and value != value):
         return ""
-    try:
-        if pd.isna(value):
-            return ""
-    except Exception:
-        pass
     return str(value).strip()
+
 
 
 def display_code_text(value: object) -> str:
