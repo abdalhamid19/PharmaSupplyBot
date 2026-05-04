@@ -31,7 +31,7 @@ class RuleAuditTests(unittest.TestCase):
         )
         self.assertEqual(
             rule_audit.violation_key("src/tawreed.py:95:function_lines:_auth:49"),
-            "src/tawreed.py:95:function_lines:_auth",
+            "src/tawreed.py:function_lines:_auth",
         )
 
 

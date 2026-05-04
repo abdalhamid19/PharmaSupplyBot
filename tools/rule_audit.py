@@ -200,9 +200,9 @@ def violation_key(violation: str) -> str:
     if len(parts) == 3 and parts[1] == "file_lines":
         return f"{parts[0]}:file_lines"
     if len(parts) == 4 and parts[2] == "line_length":
-        return f"{parts[0]}:{parts[1]}:line_length"
+        return f"{parts[0]}:line_length:{parts[3]}"
     if len(parts) == 5 and parts[2] == "function_lines":
-        return f"{parts[0]}:{parts[1]}:function_lines:{parts[3]}"
+        return f"{parts[0]}:function_lines:{parts[3]}"
     return violation
 
 

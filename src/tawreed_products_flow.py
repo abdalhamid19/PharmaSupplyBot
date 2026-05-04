@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import suppress
+from dataclasses import dataclass
 import re
 import time
 from typing import Any
@@ -75,6 +76,17 @@ DISCOUNT_KEYS = (
     "percentage",
     "percent",
 )
+
+
+@dataclass(frozen=True)
+class StoreChoice:
+    """One precomputed store candidate for split-quantity selection."""
+
+    index: int
+    store: dict[str, Any]
+    identity: str
+    available_quantity: int
+    discount_percent: float
 
 
 def add_item_from_products_page(bot, page: Page, item: Item) -> None:
@@ -227,16 +239,16 @@ def _match_has_visible_dom_store(match: SearchMatch) -> bool:
 def open_store_cart_dialog(bot, page: Page, row) -> None:
     """Open the stores dialog and click the chosen store cart button."""
     store_rows = open_stores_dialog(bot, page, row)
-    store_index, store = choose_next_store_for_remaining_quantity(
+    choice = choose_next_store_for_remaining_quantity(
         store_rows,
         set(),
         warehouse_mode(bot),
         bot.skip_item_exception,
         minimum_discount_percent(bot),
     )
-    record_selected_store(bot, store)
+    record_selected_store(bot, choice.store)
     stores_dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
-    store_dialog_cart_buttons(stores_dialog).nth(store_index).click()
+    store_dialog_cart_buttons(stores_dialog).nth(choice.index).click()
 
 
 def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
@@ -247,7 +259,7 @@ def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
     while remaining_quantity > 0:
         store_rows = open_stores_dialog(bot, page, row)
         try:
-            store_index, store = choose_next_store_for_remaining_quantity(
+            choice = choose_next_store_for_remaining_quantity(
                 store_rows,
                 used_store_ids,
                 warehouse_mode(bot),
@@ -259,15 +271,15 @@ def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
             if selections:
                 break
             raise
-        store_quantity = min(remaining_quantity, store_available_quantity(store))
+        store_quantity = min(remaining_quantity, choice.available_quantity)
         if store_quantity <= 0:
             close_visible_dialogs(page)
             break
         stores_dialog = visible_dialog(page, bot.config.runtime.timeout_ms)
-        store_dialog_cart_buttons(stores_dialog).nth(store_index).click()
+        store_dialog_cart_buttons(stores_dialog).nth(choice.index).click()
         ordered_quantity = fill_add_to_cart_dialog(bot, page, store_quantity)
-        selections.append((store, ordered_quantity))
-        used_store_ids.add(store_identity(store, store_index))
+        selections.append((choice.store, ordered_quantity))
+        used_store_ids.add(choice.identity)
         remaining_quantity -= ordered_quantity
     if not selections:
         raise bot.skip_item_exception("All available stores for this product are out of stock.")
@@ -281,23 +293,19 @@ def choose_next_store_for_remaining_quantity(
     mode: str,
     skip_exception_cls: type[Exception],
     min_discount_percent: float = 0.0,
-) -> tuple[int, dict[str, Any]]:
+) -> StoreChoice:
     """Return the next unused store to order from while splitting quantities."""
-    all_choices = available_store_choices(stores, set(), min_discount_percent)
+    all_choices = available_store_choices(stores, min_discount_percent)
     if mode == "max_discount" and all_choices:
-        highest_discount = max(store_discount_value(store) for _, store in all_choices)
+        highest_discount = max(choice.discount_percent for choice in all_choices)
         choices = [
             choice
             for choice in all_choices
-            if store_identity(choice[1], choice[0]) not in used_store_ids
-            and store_discount_value(choice[1]) == highest_discount
+            if choice.identity not in used_store_ids
+            if choice.discount_percent == highest_discount
         ]
     else:
-        choices = [
-            choice
-            for choice in all_choices
-            if store_identity(choice[1], choice[0]) not in used_store_ids
-        ]
+        choices = [choice for choice in all_choices if choice.identity not in used_store_ids]
     if not choices:
         if min_discount_percent > 0:
             raise skip_exception_cls(
@@ -307,28 +315,44 @@ def choose_next_store_for_remaining_quantity(
     if mode == "first_available":
         return choices[0]
     if mode == "max_available":
-        return max(choices, key=lambda choice: store_available_quantity(choice[1]))
+        return max(choices, key=lambda choice: choice.available_quantity)
     if mode == "max_discount":
-        return max(choices, key=lambda choice: store_available_quantity(choice[1]))
+        return max(choices, key=lambda choice: choice.available_quantity)
     raise ValueError(f"Unknown warehouse strategy mode: {mode}")
 
 
 def available_store_choices(
     stores: list[dict[str, Any]],
-    used_store_ids: set[str],
     min_discount_percent: float = 0.0,
-) -> list[tuple[int, dict[str, Any]]]:
-    """Return unused stores that still have available stock."""
-    choices: list[tuple[int, dict[str, Any]]] = []
+) -> list[StoreChoice]:
+    """Return available stores with precomputed values for repeated selection work."""
+    choices: list[StoreChoice] = []
     for store_index, store in enumerate(stores):
-        if store_identity(store, store_index) in used_store_ids:
-            continue
-        if store_available_quantity(store) <= 0:
-            continue
-        if not store_meets_minimum_discount(store, min_discount_percent):
-            continue
-        choices.append((store_index, store))
+        choice = _store_choice_or_none(store, store_index, min_discount_percent)
+        if choice is not None:
+            choices.append(choice)
     return choices
+
+
+def _store_choice_or_none(
+    store: dict[str, Any],
+    store_index: int,
+    min_discount_percent: float,
+) -> StoreChoice | None:
+    """Return one store choice when stock and discount filters both pass."""
+    available_quantity = store_available_quantity(store)
+    if available_quantity <= 0:
+        return None
+    discount_percent = store_discount_value(store)
+    if not store_meets_minimum_discount_value(discount_percent, min_discount_percent):
+        return None
+    return StoreChoice(
+        index=store_index,
+        store=store,
+        identity=store_identity(store, store_index),
+        available_quantity=available_quantity,
+        discount_percent=discount_percent,
+    )
 
 
 def store_available_quantity(store: dict[str, Any]) -> int:
@@ -423,9 +447,20 @@ def minimum_discount_percent(bot) -> float:
 
 def store_meets_minimum_discount(store: dict[str, Any], min_discount_percent: float) -> bool:
     """Return whether one store is allowed by the configured discount floor."""
+    return store_meets_minimum_discount_value(
+        store_discount_value(store),
+        min_discount_percent,
+    )
+
+
+def store_meets_minimum_discount_value(
+    discount_percent: float,
+    min_discount_percent: float,
+) -> bool:
+    """Return whether one parsed discount value is allowed by the configured floor."""
     if min_discount_percent <= 0:
         return True
-    return store_discount_value(store) >= min_discount_percent
+    return discount_percent >= min_discount_percent
 
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:

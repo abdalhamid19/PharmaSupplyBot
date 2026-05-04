@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.tawreed_products_flow import (
+    available_store_choices,
+    choose_next_store_for_remaining_quantity,
     close_visible_dialogs,
     close_visible_overlay_panels,
     _dom_candidate_from_row,
@@ -694,6 +696,37 @@ class TawreedProductsFlowTests(unittest.TestCase):
         self.assertEqual(bot.last_ordered_total_qty, 5)
         self.assertEqual(bot.last_selected_discount_percent, "15% (qty 5)")
         self.assertEqual(bot.last_selected_store_name, "Allowed Store (qty 5)")
+
+    def test_available_store_choices_precomputes_filtered_store_metadata(self):
+        choices = available_store_choices(
+            [
+                {"availableQuantity": 0, "storeProductId": "skip-stock", "discountPercent": 20},
+                {"availableQuantity": 3, "storeProductId": "keep", "discountPercent": "0.15"},
+                {"availableQuantity": 2, "storeProductId": "skip-discount", "discountPercent": 10},
+            ],
+            min_discount_percent=12,
+        )
+
+        self.assertEqual(len(choices), 1)
+        self.assertEqual(choices[0].identity, "storeProductId:keep")
+        self.assertEqual(choices[0].available_quantity, 3)
+        self.assertEqual(choices[0].discount_percent, 15.0)
+
+    def test_choose_next_store_prefers_highest_discount_then_quantity(self):
+        choice = choose_next_store_for_remaining_quantity(
+            [
+                {"availableQuantity": 2, "storeProductId": "a", "discountPercent": "15%"},
+                {"availableQuantity": 5, "storeProductId": "b", "discountPercent": "0.15"},
+                {"availableQuantity": 6, "storeProductId": "c", "discountPercent": "10%"},
+            ],
+            used_store_ids=set(),
+            mode="max_discount",
+            skip_exception_cls=RuntimeError,
+        )
+
+        self.assertEqual(choice.index, 1)
+        self.assertEqual(choice.identity, "storeProductId:b")
+        self.assertEqual(choice.available_quantity, 5)
 
     def test_add_item_from_store_dialogs_skips_when_no_store_meets_minimum_discount(self):
         store_rows = [
