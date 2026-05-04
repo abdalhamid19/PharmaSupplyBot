@@ -32,7 +32,7 @@ def load_prevented_items(path: Path = DEFAULT_PREVENTED_ITEMS_PATH) -> list[Prev
     _require_prevented_columns(dataframe)
     prevented_items: list[PreventedItem] = []
     seen_keys: set[tuple[str, str]] = set()
-    for _, row in dataframe.iterrows():
+    for row in dataframe.to_dict(orient="records"):
         item = _row_to_prevented_item(row)
         if item is None:
             continue
