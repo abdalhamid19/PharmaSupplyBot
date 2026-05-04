@@ -1,0 +1,117 @@
+/* Modern Premium Design System for PharmaSupplyBot */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --primary-color: #4A90E2;
+    --accent-color: #6C5CE7;
+    --bg-gradient: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+}
+
+/* Global Styles */
+.main {
+    background: var(--bg-gradient);
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+}
+
+h1, h2, h3 {
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.02em;
+}
+
+/* Sidebar Styling */
+section[data-testid="stSidebar"] {
+    background-color: rgba(15, 23, 42, 0.8) !important;
+    backdrop-filter: blur(10px);
+    border-right: 1px solid var(--glass-border);
+}
+
+/* Card/Container Glassmorphism */
+div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column"] {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column"]:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Buttons */
+.stButton > button {
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color)) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 10px 24px !important;
+    font-weight: 600 !important;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    width: 100%;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+}
+
+/* Inputs */
+.stTextInput > div > div > input, .stSelectbox > div > div > div {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+}
+
+/* Tabs */
+div[data-testid="stTabBar"] {
+    background-color: transparent !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+}
+
+button[data-baseweb="tab"] {
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: var(--primary-color) !important;
+    border-bottom: 2px solid var(--primary-color) !important;
+}
+
+/* Success/Error Messages */
+.stAlert {
+    background-color: rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 12px !important;
+}
+
+/* Custom Header Area */
+.premium-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 20px 0;
+}
+
+.premium-logo {
+    font-size: 2.5rem;
+}
+
+.premium-title {
+    font-size: 2rem;
+    font-weight: 700;
+    background: linear-gradient(to right, #fff, #94A3B8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}

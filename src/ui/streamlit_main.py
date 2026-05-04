@@ -12,18 +12,33 @@ from .streamlit_overview import render_overview
 from .streamlit_prevented_items import render_prevented_items_tab
 from .streamlit_remove_cart import render_remove_cart_tab
 from .streamlit_results import render_results_tab
-from .streamlit_shared import APP_TITLE, FALLBACK_CONFIG_PATH, resolved_streamlit_config_path, sidebar_config_path
+from .streamlit_shared import APP_TITLE, FALLBACK_CONFIG_PATH, inject_custom_css, resolved_streamlit_config_path, sidebar_config_path
 
 
 def main() -> None:
     """Render the Streamlit application."""
     load_dotenv()
+    inject_custom_css()
     st.set_page_config(page_title=APP_TITLE, layout="wide")
-    st.title(APP_TITLE)
+    render_premium_header()
     st.caption("Tawreed authentication, order execution, and result review from one UI.")
     app_config, config_path = loaded_app_config()
     default_profile = first_profile_key(app_config)
     render_main_tabs(app_config, default_profile, config_path)
+
+
+
+def render_premium_header() -> None:
+    """Render a modern premium header for the application."""
+    st.markdown(
+        f"""
+        <div class="premium-header">
+            <span class="premium-logo">💊</span>
+            <span class="premium-title">{APP_TITLE}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def loaded_app_config():

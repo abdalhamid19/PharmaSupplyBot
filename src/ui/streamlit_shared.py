@@ -8,6 +8,15 @@ import pandas as pd
 import streamlit as st
 
 
+
+def inject_custom_css() -> None:
+    """Inject custom CSS into the Streamlit app for a premium look."""
+    css_path = Path(__file__).parent / "index.css"
+    if css_path.exists():
+        with css_path.open("r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+
 APP_TITLE = "PharmaSupplyBot"
 DEFAULT_CONFIG_PATH = Path("config.yaml")
 FALLBACK_CONFIG_PATH = Path("config.example.yaml")
