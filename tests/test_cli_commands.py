@@ -46,9 +46,9 @@ class CliCommandsTests(unittest.TestCase):
             Item(code="2", name="Allowed", qty=1),
         ]
         args = SimpleNamespace(
-            excel="input/order_items/orders.xlsx",
+            excel="data/input/order_items/orders.xlsx",
             limit=0,
-            prevented_items_excel="input/prevented_items/drugprevented.xlsx",
+            prevented_items_excel="data/input/prevented_items/drugprevented.xlsx",
         )
 
         with (
@@ -66,9 +66,9 @@ class CliCommandsTests(unittest.TestCase):
     def test_load_order_items_ignores_missing_prevented_items_file(self) -> None:
         items = [Item(code="1", name="Allowed", qty=1)]
         args = SimpleNamespace(
-            excel="input/order_items/orders.xlsx",
+            excel="data/input/order_items/orders.xlsx",
             limit=0,
-            prevented_items_excel="input/prevented_items/missing.xlsx",
+            prevented_items_excel="data/input/prevented_items/missing.xlsx",
         )
 
         with (
@@ -81,9 +81,9 @@ class CliCommandsTests(unittest.TestCase):
 
     def test_load_order_items_rejects_prevented_file_as_order_excel(self) -> None:
         args = SimpleNamespace(
-            excel="input/prevented_items/drugprevented.xlsx",
+            excel="data/input/prevented_items/drugprevented.xlsx",
             limit=0,
-            prevented_items_excel="input/prevented_items/drugprevented.xlsx",
+            prevented_items_excel="data/input/prevented_items/drugprevented.xlsx",
         )
 
         with self.assertRaisesRegex(SystemExit, "Order Excel cannot be"):
@@ -121,7 +121,7 @@ class CliCommandsTests(unittest.TestCase):
             profiles_to_run=lambda profile=None, all_profiles=False: [("wardany", profile)],
         )
         args = SimpleNamespace(
-            excel="input/remove_items/remove.xlsx",
+            excel="data/input/remove_items/remove.xlsx",
             profile="wardany",
             all_profiles=False,
             debug_browser=True,

@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-REMOVE_ITEMS_DIR = Path("input") / "remove_items"
+REMOVE_ITEMS_DIR = Path("data/input") / "remove_items"
 DEFAULT_REMOVE_ITEMS_PATH = REMOVE_ITEMS_DIR / "remove.xlsx"
 REMOVE_CODE_COLUMN = "كود"
 REMOVE_NAME_COLUMN = "إسم الصنف"

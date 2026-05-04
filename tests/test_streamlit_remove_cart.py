@@ -15,7 +15,7 @@ class StreamlitRemoveCartTests(unittest.TestCase):
                 "profile_key": "wardany",
                 "debug_browser": True,
             },
-            Path("input/remove_items/remove.xlsx"),
+            Path("data/input/remove_items/remove.xlsx"),
         )
 
         self.assertEqual(
@@ -25,7 +25,7 @@ class StreamlitRemoveCartTests(unittest.TestCase):
                 "--config",
                 "config.yaml",
                 "--excel",
-                "input/remove_items/remove.xlsx",
+                "data/input/remove_items/remove.xlsx",
                 "--profile",
                 "wardany",
                 "--debug-browser",

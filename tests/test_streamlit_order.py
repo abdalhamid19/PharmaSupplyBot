@@ -37,7 +37,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 "debug_browser": False,
                 "highest_discount": True,
             },
-            Path("input/order_items/ddd.xlsx"),
+            Path("data/input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--warehouse-mode", command)
@@ -54,7 +54,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 "highest_discount": False,
                 "min_discount_percent": 12,
             },
-            Path("input/order_items/ddd.xlsx"),
+            Path("data/input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--min-discount-percent", command)
@@ -72,7 +72,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 "highest_discount": False,
                 "min_discount_percent": 0,
             },
-            Path("input/order_items/ddd.xlsx"),
+            Path("data/input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--resume", command)
@@ -88,15 +88,15 @@ class StreamlitOrderTests(unittest.TestCase):
                 "resume": False,
                 "highest_discount": False,
                 "min_discount_percent": 0,
-                "prevented_items_excel": "input/prevented_items/drugprevented.xlsx",
+                "prevented_items_excel": "data/input/prevented_items/drugprevented.xlsx",
             },
-            Path("input/order_items/ddd.xlsx"),
+            Path("data/input/order_items/ddd.xlsx"),
         )
 
         self.assertIn("--prevented-items-excel", command)
         self.assertEqual(
             command[command.index("--prevented-items-excel") + 1],
-            "input/prevented_items/drugprevented.xlsx",
+            "data/input/prevented_items/drugprevented.xlsx",
         )
 
     def test_persist_uploaded_prevented_items_saves_active_list(self) -> None:
@@ -122,12 +122,12 @@ class StreamlitOrderTests(unittest.TestCase):
         with patch(
             "src.streamlit_order_form.available_excel_options",
             return_value=[
-                "input/order_items/shortage_report_total_20260426.xlsx",
+                "data/input/order_items/shortage_report_total_20260426.xlsx",
             ],
         ):
             options = order_excel_options()
 
-        self.assertEqual(options, ["input/order_items/shortage_report_total_20260426.xlsx"])
+        self.assertEqual(options, ["data/input/order_items/shortage_report_total_20260426.xlsx"])
 
     def test_prevented_excel_options_reads_prevented_items_directory(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -145,7 +145,7 @@ class StreamlitOrderTests(unittest.TestCase):
         with (
             patch(
                 "src.streamlit_order_form.excel_source_fields",
-                return_value=("Existing file", "input/order_items/orders.xlsx", None),
+                return_value=("Existing file", "data/input/order_items/orders.xlsx", None),
             ),
             patch(
                 "src.streamlit_order_form.profile_run_fields",
@@ -175,9 +175,9 @@ class StreamlitOrderTests(unittest.TestCase):
 
     def test_render_order_tab_rejects_prevented_file_as_order_excel(self) -> None:
         form_values = {
-            "excel_path_str": "input/prevented_items/drugprevented.xlsx",
+            "excel_path_str": "data/input/prevented_items/drugprevented.xlsx",
             "upload": None,
-            "prevented_items_excel": "input/prevented_items/drugprevented.xlsx",
+            "prevented_items_excel": "data/input/prevented_items/drugprevented.xlsx",
         }
         with (
             patch("src.streamlit_order.render_running_order_controls", return_value=False),

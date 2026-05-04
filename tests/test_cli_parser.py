@@ -13,7 +13,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/order_items/ddd.xlsx",
+                "data/input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--debug-browser",
@@ -27,7 +27,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/order_items/ddd.xlsx",
+                "data/input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--warehouse-mode",
@@ -42,7 +42,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/order_items/ddd.xlsx",
+                "data/input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--min-discount-percent",
@@ -57,7 +57,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/order_items/ddd.xlsx",
+                "data/input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--resume",
@@ -74,17 +74,17 @@ class CliParserTests(unittest.TestCase):
             [
                 "order",
                 "--excel",
-                "input/order_items/ddd.xlsx",
+                "data/input/order_items/ddd.xlsx",
                 "--profile",
                 "wardany",
                 "--prevented-items-excel",
-                "input/prevented_items/custom_prevented.xlsx",
+                "data/input/prevented_items/custom_prevented.xlsx",
             ]
         )
 
         self.assertEqual(
             args.prevented_items_excel,
-            "input/prevented_items/custom_prevented.xlsx",
+            "data/input/prevented_items/custom_prevented.xlsx",
         )
 
     def test_remove_cart_accepts_excel_and_debug_browser(self) -> None:
@@ -92,7 +92,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "remove-cart",
                 "--excel",
-                "input/remove_items/remove.xlsx",
+                "data/input/remove_items/remove.xlsx",
                 "--profile",
                 "wardany",
                 "--debug-browser",
@@ -100,7 +100,7 @@ class CliParserTests(unittest.TestCase):
         )
 
         self.assertEqual(args.cmd, "remove-cart")
-        self.assertEqual(args.excel, "input/remove_items/remove.xlsx")
+        self.assertEqual(args.excel, "data/input/remove_items/remove.xlsx")
         self.assertTrue(args.debug_browser)
 
     def test_remove_cart_accepts_all_profiles(self) -> None:
@@ -108,7 +108,7 @@ class CliParserTests(unittest.TestCase):
             [
                 "remove-cart",
                 "--excel",
-                "input/remove_items/remove.xlsx",
+                "data/input/remove_items/remove.xlsx",
                 "--all-profiles",
             ]
         )
