@@ -39,7 +39,7 @@ def _build_order_parser(subparsers: argparse._SubParsersAction) -> None:
         help="Create orders from Excel (no human interaction)",
     )
     _add_common_arguments(order_parser)
-    _add_excel_argument(order_parser, "order", "input/order_items/")
+    _add_excel_argument(order_parser, "order", "data/input/order_items/")
     _add_order_runtime_arguments(order_parser)
     _add_order_filter_arguments(order_parser)
 
@@ -51,7 +51,7 @@ def _build_remove_cart_parser(subparsers: argparse._SubParsersAction) -> None:
         help="Remove matching products from Tawreed carts",
     )
     _add_common_arguments(remove_parser)
-    _add_excel_argument(remove_parser, "cart-removal", "input/remove_items/")
+    _add_excel_argument(remove_parser, "cart-removal", "data/input/remove_items/")
     remove_parser.add_argument(
         "--debug-browser",
         action="store_true",
@@ -138,6 +138,6 @@ def _add_order_filter_arguments(argument_parser: argparse.ArgumentParser) -> Non
     )
     argument_parser.add_argument(
         "--prevented-items-excel",
-        default="input/prevented_items/drugprevented.xlsx",
+        default="data/input/prevented_items/drugprevented.xlsx",
         help="Path to XLSX file containing items that must not be ordered",
     )
