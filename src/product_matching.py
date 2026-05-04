@@ -6,6 +6,10 @@ import re
 from difflib import SequenceMatcher
 from typing import Any, Iterable
 
+_TOKEN_BOUNDARY_RE = re.compile(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)")
+_NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
+_WHITESPACE_RE = re.compile(r"\s+")
+
 from .config_models import MatchingConfig
 from .excel import Item
 from .matching_models import (
@@ -18,17 +22,22 @@ from .matching_rules import acceptance_details, default_matching_config
 
 
 def _normalize_text(value: str) -> str:
-    """Normalize product text so Arabic and English matching stay numerically stable."""
+    """Normalize product text so Arabic and English matching stay stable."""
     text = str(value or "").upper()
-    text = re.sub(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)", " ", text)
-    text = re.sub(r"[^A-Z0-9]+", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    text = _TOKEN_BOUNDARY_RE.sub(" ", text)
+    text = _NON_ALNUM_RE.sub(" ", text)
+    return _WHITESPACE_RE.sub(" ", text).strip()
+
+
+def _normalized_tokens(value: str) -> list[str]:
+    """Return normalized tokens for a search term or candidate name."""
+    return _normalize_text(value).split()
 
 
 def _token_overlap_score(query: str, candidate: str) -> float:
     """Measure how much the candidate tokens overlap the query tokens."""
-    query_tokens = _normalize_text(query).split()
-    candidate_tokens = _normalize_text(candidate).split()
+    query_tokens = _normalized_tokens(query)
+    candidate_tokens = _normalized_tokens(candidate)
     if not query_tokens or not candidate_tokens:
         return 0.0
 
@@ -135,10 +144,7 @@ def _search_queries_for_item(item: Item) -> list[str]:
 
 def _normalize_search_query(value: str) -> str:
     """Return a search-friendly variant that separates dosage and punctuation tokens."""
-    text = str(value or "").upper()
-    text = re.sub(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)", " ", text)
-    text = re.sub(r"[^A-Z0-9]+", " ", text)
-    return re.sub(r"\s+", " ", text).strip()
+    return _normalize_text(value)
 
 
 def find_best_product_match(
@@ -204,10 +210,12 @@ def _best_sequence_score(normalized_query: str, candidate_texts: Iterable[str]) 
     )
 
 
-def _best_overlap_score(query: str, candidate_texts: Iterable[str]) -> float:
+def _best_overlap_score(normalized_query: str, candidate_texts: Iterable[str]) -> float:
     """Return the best token overlap score against all candidate names."""
+    if not normalized_query:
+        return 0.0
     return max(
-        _token_overlap_score(query, candidate_text)
+        _token_overlap_score(normalized_query, candidate_text)
         for candidate_text in candidate_texts
     )
 
@@ -333,11 +341,10 @@ def _score_components(
     candidate_texts: list[str],
 ) -> dict[str, float]:
     """Return the raw score components for one usable candidate."""
-    query_text = query or ""
-    normalized_query = _normalize_text(query_text)
+    normalized_query = _normalize_text(query or "")
     return {
         "sequence_score": _best_sequence_score(normalized_query, candidate_texts),
-        "overlap_score": _best_overlap_score(query_text, candidate_texts),
+        "overlap_score": _best_overlap_score(normalized_query, candidate_texts),
         "numeric_overlap": _numeric_overlap_score(normalized_query, candidate_texts),
         "exact_bonus": _exact_or_contained_bonus(normalized_query, candidate_texts),
         "availability_bonus": _availability_bonus(candidate),
