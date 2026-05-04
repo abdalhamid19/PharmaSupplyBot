@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
+import openpyxl
 import pandas as pd
 
 from ..config.config_models import ExcelConfig
@@ -20,41 +21,61 @@ class Item:
     qty: int
 
 
-def load_items_from_excel(path: Path, config: ExcelConfig, limit: int = 0) -> list[Item]:
-    """Load order items from an Excel sheet using the configured column mapping."""
-    dataframe = _read_excel_with_headers(path, config)
-    items: list[Item] = []
-    for row in dataframe.itertuples(index=False, name=None):
+def load_items_from_excel(
+    path: Path, config: ExcelConfig, limit: int = 0
+) -> Iterable[Item]:
+    """Yield order items from an Excel sheet using the configured column mapping."""
+    count = 0
+    for row in _read_item_rows(path, config):
         item = _row_tuple_to_item(row, config)
         if item is None:
             continue
-        items.append(item)
-        if limit and len(items) >= limit:
+        yield item
+        count += 1
+        if limit and count >= limit:
             break
-    return items
+
+
+def _read_item_rows(path: Path, config: ExcelConfig) -> Iterable[tuple]:
+    """Yield only the configured Excel item columns as row tuples using openpyxl."""
+    header_row_index = _detect_header_row(path, config)
+    if header_row_index is None:
+        header_row_index = 0
+
+    with openpyxl.load_workbook(str(path), read_only=True, data_only=True) as workbook:
+        sheet = workbook.active
+
+        # Map column names to indices
+        col_map = {}
+        header_row = list(
+            sheet.iter_rows(
+                min_row=header_row_index + 1, max_row=header_row_index + 1, values_only=True
+            )
+        )[0]
+        for idx, cell in enumerate(header_row):
+            if cell:
+                col_map[str(cell).strip()] = idx
+
+        required_cols = [config.code_col, config.name_col, config.qty_col]
+        indices = [col_map.get(col) for col in required_cols]
+
+        if any(idx is None for idx in indices):
+            missing = [col for col, idx in zip(required_cols, indices) if idx is None]
+            raise KeyError(
+                f"Missing one or more required Excel columns {required_cols}. Original error: columns not found {missing}"
+            )
+
+        # Iterate rows starting after header
+        for row in sheet.iter_rows(min_row=header_row_index + 2, values_only=True):
+            yield tuple(row[idx] for idx in indices)
 
 
 def _read_excel(path: Path, **read_kwargs: Any) -> pd.DataFrame:
-    """Read the Excel file from disk."""
+    """Read the Excel file from disk using pandas (fallback/previews only)."""
     if not path.exists():
         raise FileNotFoundError(f"Excel not found: {path}")
     return pd.read_excel(path, **read_kwargs)
 
-
-def _read_excel_with_headers(path: Path, config: ExcelConfig) -> pd.DataFrame:
-    """Read one Excel file while avoiding a full-sheet fallback on title-row exports."""
-    header_row_index = _detect_header_row(path, config)
-    usecols = [config.code_col, config.name_col, config.qty_col]
-    try:
-        return _read_excel(
-            path,
-            usecols=usecols,
-            header=header_row_index if header_row_index is not None else 0,
-        )
-    except ValueError as error:
-        raise KeyError(
-            f"Missing one or more required Excel columns {usecols}. Original error: {error}"
-        ) from error
 
 
 def _detect_header_row(path: Path, config: ExcelConfig) -> int | None:

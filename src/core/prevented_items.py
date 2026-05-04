@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import pandas as pd
 
@@ -92,16 +92,20 @@ def remove_prevented_item(
 
 
 def filter_prevented_order_items(
-    items: list[Item],
+    items: Iterable[Item],
     prevented_items: list[PreventedItem],
-) -> tuple[list[Item], int]:
-    """Return order items excluding any products in the prevented list."""
+) -> tuple[Iterable[Item], int]:
+    """Return an iterable of order items excluding any products in the prevented list."""
     blocked_codes = {
         normalize_code(item.code) for item in prevented_items if normalize_code(item.code)
     }
     blocked_names = {
         normalize_name(item.name) for item in prevented_items if normalize_name(item.name)
     }
+
+    # Since we need to return the skipped_count, we must consume the generator or wrap it.
+    # To maintain true RAM efficiency, we should ideally NOT return skipped_count immediately.
+    # But for now, we'll build a list to avoid breaking the CLI summary.
     allowed_items: list[Item] = []
     skipped_count = 0
     for item in items:
@@ -111,6 +115,7 @@ def filter_prevented_order_items(
             is_prevented = item_code in blocked_codes
         else:
             is_prevented = item_name in blocked_names
+
         if is_prevented:
             skipped_count += 1
             continue
