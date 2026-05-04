@@ -49,10 +49,11 @@ class ExcelTests(unittest.TestCase):
             path = Path(temp_dir) / "orders.xlsx"
             pd.DataFrame([{"code": 123, "name": "ASPIRIN"}]).to_excel(path, index=False)
 
-            with self.assertRaises(KeyError) as context:
+            with self.assertRaises(ValueError) as context:
                 list(load_items_from_excel(path, config))
 
-        self.assertIn("Missing one or more required Excel columns", str(context.exception))
+        self.assertIn("Missing required Excel columns", str(context.exception))
+
         self.assertIn("qty", str(context.exception))
 
     def test_load_items_coerces_and_limits_quantities_in_single_pass(self) -> None:
