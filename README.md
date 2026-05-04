@@ -70,63 +70,63 @@ python3 run.py auth --profile wardany
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
+py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
+python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
 ```
 
 ### 3. تشغيل عدد محدود من الأصناف
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
+py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
+python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
 ```
 
 ### 4. تشغيل كل الصيدليات المعرفة في `config.yaml`
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
+py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
+python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
 ### 5. فتح المتصفح أثناء التشغيل للتشخيص
 
 Windows PowerShell:
 ```powershell
-py run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
 Linux / macOS (bash):
 ```bash
-python3 run.py order --excel "input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
+python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
 ### 6. حذف أصناف من سلة المشتريات
 
-ضع ملف الحذف داخل `input/remove_items/` ويجب أن يحتوي على الأعمدة:
+ضع ملف الحذف داخل `data/input/remove_items/` ويجب أن يحتوي على الأعمدة:
 `كود` و`إسم الصنف`.
 
 Linux / macOS (bash):
 ```bash
-python3 run.py remove-cart --excel "input/remove_items/remove.xlsx" --profile wardany
+python3 run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
 ```
 
 Windows PowerShell:
 ```powershell
-py run.py remove-cart --excel "input/remove_items/remove.xlsx" --profile wardany
+py run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
 ```
 
 ### 7. تشغيل واجهة Streamlit
@@ -200,11 +200,11 @@ py run.py auth --profile wardany
   مثال جاهز لهيكل الإعدادات
 - `state/<profile>.json`
   جلسة Playwright المحفوظة لكل صيدلية
-- `input/order_items/`
+- `data/input/order_items/`
   ملفات Excel التي تحتوي الأصناف المطلوب رفعها/طلبها على موقع توريد
-- `input/prevented_items/`
+- `data/input/prevented_items/`
   ملفات Excel الخاصة بالأصناف الممنوعة من الطلب، والافتراضي `drugprevented.xlsx`
-- `input/remove_items/`
+- `data/input/remove_items/`
   ملفات Excel التي تحتوي الأصناف المطلوب حذفها من سلة مشتريات توريد
 - `artifacts/<profile>/`
   صور وHTML وlogs تشخيصية عند الفشل
@@ -235,54 +235,29 @@ py run.py auth --profile wardany
 - ثم ارفع ملف `state/<profile>.json` داخل تبويب `Order`
 - إذا لم ترفع الملف، فستستخدم الواجهة أي default state مهيأ على الخادم لنفس الـ profile إذا كان موجودًا
 
-## سلوك التنفيذ الحالي
+## هيكل المشروع (للتحسين والصيانة)
 
-- افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
-- اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
-  - `runtime.submit_order: true` داخل `config.yaml`
-- إذا كانت الجلسة منتهية أو غير صالحة، سيطلب منك البرنامج إعادة تنفيذ:
-
-```powershell
-py run.py auth --profile wardany
-```
+تم تنظيم الكود البرمجي في حزم منفصلة لزيادة الوضوح:
+- `src/tawreed/`: منطق العمل الخاص بموقع توريد (تسجيل الدخول، الطلب، الحذف).
+- `src/ui/`: منطق واجهة Streamlit.
+- `src/cli/`: منطق أوامر الطرفية (CLI).
+- `src/core/`: النماذج (Models) والأدوات الأساسية المشتركة.
+  - `src/core/config/`: معالجة ملفات الإعدادات.
+  - `src/core/utils/`: أدوات معالجة Excel والمتصفح.
 
 ## ملفات مهمة
 
-- `config.yaml`
-  إعدادات التشغيل الفعلية
-- `config.example.yaml`
-  مثال جاهز لهيكل الإعدادات
-- `state/<profile>.json`
-  جلسة Playwright المحفوظة لكل صيدلية
-- `artifacts/<profile>/`
-  صور وHTML وlogs تشخيصية عند الفشل
-- `artifacts/<profile>/match_log_all.txt`
-  سجل نصي لكل مرشحي المطابقة
-- `artifacts/<profile>/match_log_all.csv`
-  سجل CSV لكل مرشحي المطابقة
-- `artifacts/<profile>/order_result_summary.csv`
-  الملخص الأساسي لنتائج التشغيل، وهو المصدر الأحدث المعتمد للتحليل
-- `artifacts/<profile>/order_result_summary.xlsx`
-  نسخة Excel من ملخص النتائج إذا كانت موجودة
-- `streamlit_app.py`
-  واجهة Streamlit لتشغيل `auth` و`order` ومراجعة النتائج
+- `config.yaml`: إعدادات التشغيل الفعلية (معدلات المطابقة، الروابط، الحسابات).
+- `config.example.yaml`: مثال مرجعي للإعدادات.
+- `streamlit_app.py`: نقطة انطلاق واجهة الويب.
+- `run.py`: نقطة انطلاق أوامر الطرفية.
+- `data/input/`: المجلد الرئيسي لملفات Excel المدخلة.
+- `state/<profile>.json`: ملفات حفظ الجلسة.
+- `artifacts/<profile>/`: نتائج التشغيل (Summaries, Screenshots, Logs).
 
-## فحص الكود محليًا
-
-تشغيل فحص القواعد المحلي:
-
-```powershell
-.\.venv\Scripts\python tools\rule_audit.py
-```
-
-إذا كان كل شيء سليمًا فسيظهر:
-
-```text
-rule_audit_ok
-```
-
-## ملاحظات
+## ملاحظات إضافية
 
 - محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
-- المطابقة بين اسم Excel ونتائج Tawreed تعتمد على الاسم فقط، وليس على كود الصنف الداخلي للصيدلية.
-- عند فشل صنف تقنيًا، تُحفظ artifacts داخل `artifacts/<profile>/`.
+- المطابقة تعتمد على خوارزميات نصية مرنة (Fuzzy matching) يمكن ضبط معاملاتها من الإعدادات.
+- البرنامج يدعم الاستكمال (Resume) حيث يتخطى الأصناف التي تم طلبها بنجاح في نفس اليوم.
+
