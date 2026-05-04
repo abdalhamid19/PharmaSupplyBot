@@ -61,8 +61,11 @@ def append_csv_artifact(profile_key: str, label: str, rows: list[dict[str, objec
     return artifact_path
 
 
-def append_xlsx_artifact(profile_key: str, label: str, rows: list[dict[str, object]]) -> Path | None:
+def append_xlsx_artifact(
+    profile_key: str, label: str, rows: list[dict[str, object]]
+) -> Path | None:
     """Append structured rows to an XLSX artifact for the active profile."""
+
     if not rows:
         return None
     try:
@@ -132,30 +135,25 @@ def _xlsx_header_fieldnames(worksheet) -> list[str]:
     """Return the existing XLSX header fieldnames when a worksheet has a header row."""
     if worksheet.max_row == 0:
         return []
-    values = [
-        worksheet.cell(row=1, column=column_index).value
-        for column_index in range(1, worksheet.max_column + 1)
-    ]
-    return [str(value) for value in values if value not in (None, "")]
+    values = [worksheet.cell(row=1, column=i).value for i in range(1, worksheet.max_column + 1)]
+    return [str(v) for v in values if v not in (None, "")]
 
 
 def _rewrite_xlsx_worksheet_with_fieldnames(
-    worksheet,
-    existing_fieldnames: list[str],
-    fieldnames: list[str],
+    worksheet, existing_fieldnames: list[str], fieldnames: list[str]
 ) -> None:
     """Rewrite an existing worksheet so rows conform to the requested fieldnames."""
     existing_rows = []
     for row_values in worksheet.iter_rows(min_row=2, values_only=True):
         row = {
-            field_name: row_values[index] if index < len(row_values) else ""
-            for index, field_name in enumerate(existing_fieldnames)
+            f: row_values[i] if i < len(row_values) else ""
+            for i, f in enumerate(existing_fieldnames)
         }
         existing_rows.append(row)
     worksheet.delete_rows(1, worksheet.max_row)
     worksheet.append(fieldnames)
     for row in existing_rows:
-        worksheet.append([row.get(field_name, "") for field_name in fieldnames])
+        worksheet.append([row.get(f, "") for f in fieldnames])
 
 
 def _write_screenshot_artifact(page: Page, screenshot_path: Path) -> None:

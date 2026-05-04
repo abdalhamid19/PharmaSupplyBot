@@ -12,35 +12,17 @@ from .tawreed_login_detection import (
 )
 
 def wait_for_login_detection(
-    page: Page,
-    context,
-    wait_seconds: int,
-    login_email_selector: str,
-    login_password_selector: str,
-    logged_in_marker: str,
-    state_path: Path,
-    save_session_state,
-    save_intermediate: bool = True,
+    page: Page, context, wait_seconds: int, email_sel: str, pwd_sel: str,
+    marker: str, state_path: Path, save_session_state, save_inter: bool = True,
 ) -> bool:
-    """Poll the page until the logged-in marker appears or the timeout is reached."""
-    wait_state = _initial_wait_state(wait_seconds)
-    while wait_state["total_waited_ms"] < wait_state["wait_budget_ms"]:
-        if login_detected(
-            page,
-            wait_state["poll_ms"],
-            login_email_selector,
-            login_password_selector,
-            logged_in_marker,
-        ):
+    """Poll the page until the logged-in marker appears or timeout is reached."""
+    ws = _initial_wait_state(wait_seconds)
+    while ws["total_waited_ms"] < ws["wait_budget_ms"]:
+        if login_detected(page, ws["poll_ms"], email_sel, pwd_sel, marker):
             return True
-        _advance_wait_state(
-            wait_state,
-            context,
-            state_path,
-            save_session_state,
-            save_intermediate,
-        )
+        _advance_wait_state(ws, context, state_path, save_session_state, save_inter)
     return False
+
 
 
 def _initial_wait_state(wait_seconds: int) -> dict[str, int]:

@@ -20,9 +20,9 @@ class SessionInvalidError(RuntimeError):
     """Raised when the saved login session is not valid for order placement."""
 
 
-def open_auth_page(playwright, base_url: str, runtime, headless: bool = False) -> tuple[Any, Any, Page]:
+def open_auth_page(pw, base_url: str, runtime, headless: bool = False) -> tuple[Any, Any, Page]:
     """Create a browser page for one-time authentication."""
-    browser = launch_chromium(playwright, headless=headless, slow_mo_ms=runtime.slow_mo_ms)
+    browser = launch_chromium(pw, headless=headless, slow_mo_ms=runtime.slow_mo_ms)
     context = browser.new_context()
     page = context.new_page()
     page.set_default_timeout(runtime.timeout_ms)
@@ -179,26 +179,18 @@ def validate_saved_session(
 
 
 def ensure_logged_in(page: Page, selectors, timeout_ms: int, ready_selector: str = "") -> None:
-    """Verify that the saved session is still authenticated before ordering begins."""
+    """Verify that the saved session is still authenticated."""
     page.wait_for_load_state("domcontentloaded")
-    if _ready_surface_visible(page, ready_selector):
-        return
+    if _ready_surface_visible(page, ready_selector): return
     if _is_login_form_visible(page, selectors):
-        raise SessionInvalidError(
-            "Saved session is expired or still on the login page."
-        )
-    short_timeout_ms = min(timeout_ms, 2000)
-    if _has_logged_in_marker(page, selectors.logged_in_marker, short_timeout_ms):
+        raise SessionInvalidError("Saved session is expired or on login page.")
+    if _has_logged_in_marker(page, selectors.logged_in_marker, min(timeout_ms, 2000)):
         return
-    if _ready_surface_visible(page, ready_selector):
-        return
+    if _ready_surface_visible(page, ready_selector): return
     if _is_login_form_visible(page, selectors):
-        raise SessionInvalidError(
-            "Saved session is expired or still on the login page."
-        )
-    raise SessionInvalidError(
-        "Saved session did not expose the login page or the expected order surface."
-    )
+        raise SessionInvalidError("Saved session is expired or on login page.")
+    raise SessionInvalidError("Saved session did not expose order surface.")
+
 
 
 def open_reauth_in_browser(base_url: str, profile_key: str) -> None:

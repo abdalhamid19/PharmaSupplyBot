@@ -1,206 +1,83 @@
 """Tawreed cart item removal flow."""
 
 from __future__ import annotations
-
-from dataclasses import dataclass
-
+from typing import Iterable
 from playwright.sync_api import Page
-
 from ..core.cart_removal_items import CartRemovalItem, cart_row_matches_names
 from ..core.cart_removal_summary import CartRemovalSummary, append_cart_removal_summary
 from ..core.utils.excel import Item
 from .tawreed_constants import VISIBLE_DIALOG_SELECTOR
 from .tawreed_products_flow import require_product_match
 
-
-@dataclass(frozen=True)
-class CartRemovalSelectors:
-    """Selectors used by the Tawreed cart-removal flow."""
-
-    rows: str
-    delete_button: str
-    confirm_delete_button: str
-
-
-@dataclass(frozen=True)
-class CartRemovalTarget:
-    """One removal item plus Tawreed names that may appear in the cart."""
-
-    item: CartRemovalItem
-    names: list[str]
-
-
-def remove_items_from_cart(
-    bot,
-    page: Page,
-    targets: list[CartRemovalTarget],
-) -> None:
-    """Remove all matching cart rows for each requested item."""
-    selectors = CartRemovalSelectors(
-        rows=bot.selectors.cart_rows,
-        delete_button=bot.selectors.cart_delete_button,
-        confirm_delete_button=bot.selectors.cart_confirm_delete_button,
-    )
+def remove_items_from_cart(bot, page: Page, targets: list[any]) -> None:
+    """Iterate through the cart and remove rows matching the requested items."""
+    if not targets:
+        bot.log("No cart items identified for removal.")
+        return
     for target in targets:
-        item = target.item
-        try:
-            removed_count = remove_matching_cart_rows(page, target, selectors)
-            status = "removed" if removed_count else "not-found"
-            reason = (
-                f"Removed {removed_count} matching cart row(s)."
-                if removed_count
-                else "No matching cart rows found."
-            )
-        except Exception as error:
-            removed_count = 0
-            status = "failed"
-            reason = str(error)
-        append_cart_removal_summary(
-            bot.profile_key,
-            item,
-            CartRemovalSummary(
-                removed_count=removed_count,
-                status=status,
-                reason=reason,
-            ),
-        )
-        print(_console_safe(f"[{bot.profile_key}] Cart removal {item.code} / {item.name}: {reason}"))
+        _process_removal_target(bot, page, target)
 
+def _process_removal_target(bot, page, target):
+    """Execute removal for one target and record results."""
+    try:
+        count = _remove_matching_rows(bot, page, target)
+        status = "removed" if count else "not-found"
+        reason = f"Removed {count} matching row(s)." if count else "No matching rows found."
+    except Exception as error:
+        count, status, reason = 0, "failed", str(error)
+    append_cart_removal_summary(
+        bot.profile_key, target.item,
+        CartRemovalSummary(removed_count=count, status=status, reason=reason)
+    )
+    bot.log(f"Cart removal {target.item.code} / {target.item.name}: {reason}")
 
-def resolve_cart_removal_targets(
-    bot,
-    page: Page,
-    items: list[CartRemovalItem],
-) -> list[CartRemovalTarget]:
-    """Resolve Tawreed product names for removal items before scanning the cart."""
-    targets: list[CartRemovalTarget] = []
+def _remove_matching_rows(bot, page, target) -> int:
+    """Locate and delete matching cart rows."""
+    count = 0
+    while True:
+        idx = _find_row_idx(page, target, bot.selectors.cart_rows)
+        if idx is None: return count
+        row = page.locator(bot.selectors.cart_rows).nth(idx)
+        row.locator(bot.selectors.cart_delete_button).click()
+        page.locator(bot.selectors.cart_confirm_delete).click()
+        page.wait_for_timeout(1000)
+        count += 1
+
+def _find_row_idx(page, target, selector) -> int | None:
+    """Return the first cart row index matching the removal item."""
+    rows = page.locator(selector)
+    for i in range(rows.count()):
+        try: text = rows.nth(i).inner_text(timeout=500)
+        except Exception: continue
+        if cart_row_matches_names(text, target.names): return i
+    return None
+
+def resolve_cart_removal_targets(bot, page, items: Iterable[CartRemovalItem]):
+    """Resolve Tawreed product names for removal items."""
+    targets = []
     for item in items:
         names = [item.name]
         try:
-            match, _ = require_product_match(bot, page, Item(code=item.code, name=item.name, qty=1))
-            names.extend(tawreed_match_names(match.data))
-        except Exception as error:
-            print(_console_safe(f"[{bot.profile_key}] Could not resolve Tawreed name for {item.name}: {error}"))
-        targets.append(CartRemovalTarget(item=item, names=unique_names(names)))
+            it = Item(code=item.code, name=item.name, qty=1)
+            match, _ = require_product_match(bot, page, it)
+            names.extend([
+                str(match.data.get(k) or "")
+                for k in ("productName", "productNameAr", "productNameEn")
+            ])
+        except Exception as e:
+            bot.log(f"Could not resolve name for {item.name}: {e}")
+        targets.append(_Target(item, _unique(names)))
     return targets
 
+def _unique(names: list[str]) -> list[str]:
+    res, seen = [], set()
+    for n in names:
+        t = str(n or "").strip()
+        if t and t.lower() not in seen:
+            seen.add(t.lower())
+            res.append(t)
+    return res
 
-def tawreed_match_names(candidate: dict) -> list[str]:
-    """Return Tawreed product names that can appear in cart rows."""
-    return [
-        str(candidate.get("productName") or ""),
-        str(candidate.get("productNameAr") or ""),
-        str(candidate.get("productNameEn") or ""),
-    ]
-
-
-def unique_names(names: list[str]) -> list[str]:
-    """Return non-empty names without duplicates, preserving order."""
-    unique: list[str] = []
-    seen: set[str] = set()
-    for name in names:
-        text = str(name or "").strip()
-        key = text.casefold()
-        if not text or key in seen:
-            continue
-        seen.add(key)
-        unique.append(text)
-    return unique
-
-
-def remove_matching_cart_rows(
-    page: Page,
-    target: CartRemovalTarget,
-    selectors: CartRemovalSelectors,
-) -> int:
-    """Remove matching cart rows until no matching row remains."""
-    removed_count = 0
-    while True:
-        row_index = first_matching_cart_row_index(page, target, selectors.rows)
-        if row_index is None:
-            return removed_count
-        row = page.locator(selectors.rows).nth(row_index)
-        delete_button = row.locator(selectors.delete_button).first
-        remove_one_matching_cart_row(page, target, selectors, delete_button)
-        removed_count += 1
-
-
-def remove_one_matching_cart_row(
-    page: Page,
-    target: CartRemovalTarget,
-    selectors: CartRemovalSelectors,
-    delete_button,
-) -> None:
-    """Remove one matched row and tolerate Tawreed DOM churn after successful clicks."""
-    try:
-        click_cart_delete_button(delete_button)
-        confirm_delete_if_needed(page, selectors.confirm_delete_button)
-        wait_for_cart_after_delete(page, selectors.rows)
-        return
-    except Exception:
-        wait_for_cart_after_delete(page, selectors.rows)
-        if first_matching_cart_row_index(page, target, selectors.rows) is None:
-            return
-        raise
-
-
-def click_cart_delete_button(delete_button) -> None:
-    """Click one cart delete button, forcing the click if overlays intercept it."""
-    try:
-        delete_button.click(timeout=5000)
-        return
-    except Exception:
-        pass
-    delete_button.click(timeout=5000, force=True)
-
-
-def first_matching_cart_row_index(
-    page: Page,
-    target: CartRemovalTarget,
-    rows_selector: str,
-) -> int | None:
-    """Return the first cart row index matching the removal item."""
-    rows = page.locator(rows_selector)
-    for row_index in range(rows.count()):
-        row_text = cart_row_text(rows, row_index)
-        if not row_text:
-            continue
-        if cart_row_matches_names(row_text, target.names):
-            return row_index
-    return None
-
-
-def cart_row_text(rows, row_index: int) -> str:
-    """Return cart row text, tolerating virtualized or detached rows."""
-    try:
-        return rows.nth(row_index).inner_text(timeout=500)
-    except Exception:
-        return ""
-
-
-def confirm_delete_if_needed(page: Page, confirm_delete_button_selector: str) -> None:
-    """Confirm a delete dialog when Tawreed opens one."""
-    dialog = page.locator(VISIBLE_DIALOG_SELECTOR)
-    try:
-        if dialog.count() == 0:
-            return
-    except Exception:
-        return
-    confirm_button = dialog.locator(confirm_delete_button_selector).first
-    try:
-        confirm_button.click(timeout=3000)
-    except Exception:
-        pass
-
-
-def wait_for_cart_after_delete(page: Page, rows_selector: str) -> None:
-    """Wait briefly for the cart table to settle after deleting a row."""
-    try:
-        page.locator(rows_selector).first.wait_for(timeout=1500)
-    except Exception:
-        pass
-
-
-def _console_safe(text: str) -> str:
-    """Return text that can be printed on cp1252 Windows consoles without crashing."""
-    return text.encode("cp1252", errors="replace").decode("cp1252")
+class _Target:
+    def __init__(self, item, names):
+        self.item, self.names = item, names

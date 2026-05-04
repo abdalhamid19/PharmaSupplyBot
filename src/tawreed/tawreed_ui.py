@@ -10,6 +10,8 @@ from .tawreed_constants import (
     DIALOG_MASK_SELECTOR,
     DIALOG_FOOTER_BUTTONS_SELECTOR,
     OVERLAY_PANEL_SELECTOR,
+    PRODUCT_ROWS_SELECTOR,
+    QUANTITY_INPUT_SELECTOR,
     STORE_DIALOG_CLOSE_BUTTON_SELECTOR,
     STORE_DIALOG_ROWS_SELECTOR,
     STORE_DIALOG_CART_BUTTONS_SELECTOR,
@@ -46,11 +48,15 @@ def bounded_requested_quantity(quantity_input, requested_quantity: int) -> int:
     return max(1, min(int(requested_quantity), max_quantity))
 
 
-def fill_quantity_input(quantity_input, quantity: int) -> None:
-    """Fill the quantity input with the validated quantity value."""
-    quantity_input.click()
-    quantity_input.fill("")
-    quantity_input.type(str(quantity), delay=10)
+def fill_quantity_input(dialog, quantity: int) -> int:
+    """Fill the quantity input in a dialog and return the clamped amount."""
+    q_input = dialog.locator(QUANTITY_INPUT_SELECTOR).first
+    q_input.wait_for(timeout=2000)
+    qty = bounded_requested_quantity(q_input, quantity)
+    q_input.click()
+    q_input.fill("")
+    q_input.type(str(qty), delay=10)
+    return qty
 
 
 def stores_button(scope):
@@ -76,6 +82,19 @@ def dialog_close_buttons(dialog):
 def store_dialog_rows(dialog):
     """Return the visible data rows inside the stores dialog."""
     return dialog.locator(STORE_DIALOG_ROWS_SELECTOR)
+
+
+def visible_product_rows(page: Page):
+    """Return the rendered product rows in the current products table."""
+    return page.locator(PRODUCT_ROWS_SELECTOR)
+
+
+def is_no_results_row(row) -> bool:
+    """Return whether the current table row is Tawreed's no-results placeholder."""
+    try: text = str(row.inner_text(timeout=300))
+    except Exception: return False
+    norm = " ".join(text.split()).lower()
+    return any(k in norm for k in ("no results found", "لايوجد نتائج", "لا يوجد نتائج"))
 
 
 def visible_dialog_masks(page: Page):

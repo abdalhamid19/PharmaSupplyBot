@@ -29,7 +29,9 @@ ORDER_FLOW_DEFAULTS = {
     "qty_input": ("order_flow", "qty_input", "input[type='number']"),
     "add_item_button": ("order_flow", "add_item_button", "text=Add"),
     "confirm_order_button": ("order_flow", "confirm_order_button", "text=Confirm"),
+    "checkout_button": ("order_flow", "checkout_button", "button:has-text('Checkout')"),
 }
+
 
 CART_FLOW_DEFAULTS = {
     "cart_route": ("cart_flow", "route", CARTS_PAGE_ROUTE),
@@ -64,7 +66,9 @@ class _Sel:
     qty_input: str
     add_item_button: str
     confirm_order_button: str
+    checkout_button: str
     cart_route: str
+
     cart_rows: str
     cart_delete_button: str
     cart_confirm_delete_button: str
