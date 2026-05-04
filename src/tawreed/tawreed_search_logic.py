@@ -24,15 +24,15 @@ def require_product_match(bot, page: Page, item: Item) -> tuple[SearchMatch, str
     searched_queries: list[str] = []
     search_results_by_query: list[tuple[str, list[dict[str, Any]]]] = []
     started_at = time.perf_counter()
-    queries = _search_queries_for_item(item.name, item.code)
+    queries = _search_queries_for_item(item)
 
     for query_index, query in enumerate(queries):
         searched_queries.append(query)
         candidates = search_products(bot, page, query)
         search_results_by_query.append((query, candidates))
         
-        decision = is_decisive_product_match(
-            query, candidates, item.name, item.code, query_index=query_index
+        decision = explain_best_product_match(
+            item, search_results_by_query, bot.config.matching
         )
         if _decisive_match(bot, item, decision, started_at, searched_queries):
             return decision.best_match, query
@@ -43,10 +43,9 @@ def require_product_match(bot, page: Page, item: Item) -> tuple[SearchMatch, str
 
 def _handle_no_match(bot, item: Item, queries: list[str], results: list[tuple[str, list]]):
     """Record and raise a descriptive error when all search attempts fail."""
-    decision = is_decisive_product_match(
-        queries[-1], results[-1][1], item.name, item.code, query_index=len(queries)-1
-    )
+    decision = explain_best_product_match(item, results, bot.config.matching)
     write_match_log(bot, item, decision)
+
     raise bot.no_results_exception(
         f"No decisive match found for '{item.name}' after {len(queries)} queries."
     )
@@ -84,9 +83,15 @@ def _decisive_match(
             write_match_log(bot, item, decision)
         return False
 
+    # Check if this match is strong enough to stop searching early
+    is_decisive = is_decisive_product_match(queries[-1], decision.best_match.data)
+    if not is_decisive and len(queries) < MIN_SEARCH_QUERIES_PER_ITEM:
+        return False
+
     bot.last_match_elapsed_seconds = time.perf_counter() - started_at
     write_match_log(bot, item, decision)
     if decision.best_match.data.get("availableQuantity", 0) <= 0:
         raise bot.skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
     return True
+
 

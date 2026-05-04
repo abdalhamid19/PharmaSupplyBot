@@ -65,6 +65,7 @@ STORE_NAME_KEYS = (
 )
 NESTED_STORE_KEYS = ("store", "supplier", "warehouse", "pharmacy", "branch", "seller")
 NESTED_NAME_KEYS = ("name", "nameAr", "nameEn", "arabicName", "englishName", "title")
+MAX_DOM_SEARCH_ROWS = 50
 DISCOUNT_KEYS = (
     "discountPercent", "discountPercentage", "discountRate", "discountValue",
     "discount", "cashDiscount", "companyDiscount", "offerDiscount",

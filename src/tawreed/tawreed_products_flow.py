@@ -26,6 +26,7 @@ from .tawreed_constants import (
     OVERLAY_PANEL_SELECTOR,
     PRODUCT_ROWS_SELECTOR,
     QUANTITY_INPUT_SELECTOR,
+    MAX_DOM_SEARCH_ROWS,
     STORE_DETAILS_ENDPOINT,
 )
 from .tawreed_match_logs import write_match_log
