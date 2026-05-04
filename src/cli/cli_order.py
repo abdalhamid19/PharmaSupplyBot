@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import csv
 from pathlib import Path
 
@@ -28,14 +29,47 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         return 0
 
     profiles = app_config.profiles_to_run(profile=args.profile, all_profiles=args.all_profiles)
-    for profile_key, profile in profiles:
-        profile_items = _prepared_order_items(profile_key, items, args)
-        if not profile_items:
-            print(f"[{profile_key}] No remaining items to process.")
-            continue
-        bot = _order_bot(app_config, profile_key, profile, args)
-        _run_profile_order(app_config.base_url, profile_key, bot, profile_items)
+    max_workers = _resolve_max_workers(app_config, args, len(profiles))
+
+    if max_workers <= 1:
+        for profile_key, profile in profiles:
+            _run_single_profile(app_config, profile_key, profile, items, args)
+        return 0
+
+    print(f"Running {len(profiles)} profiles in parallel (max_workers={max_workers})...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(_run_single_profile, app_config, pk, p, items, args)
+            for pk, p in profiles
+        ]
+        concurrent.futures.wait(futures)
     return 0
+
+
+def _resolve_max_workers(app_config: AppConfig, args: argparse.Namespace, profile_count: int) -> int:
+    """Return the final concurrency limit for this run."""
+    limit = getattr(args, "max_workers", None)
+    if limit is None:
+        limit = app_config.runtime.max_workers
+    if limit <= 0:
+        return profile_count
+    return min(limit, profile_count)
+
+
+def _run_single_profile(
+    app_config: AppConfig,
+    profile_key: str,
+    profile: ProfileConfig,
+    items: list,
+    args: argparse.Namespace,
+) -> None:
+    """Prepare and run a single profile order flow."""
+    profile_items = _prepared_order_items(profile_key, items, args)
+    if not profile_items:
+        print(f"[{profile_key}] No remaining items to process.")
+        return
+    bot = _order_bot(app_config, profile_key, profile, args)
+    _run_profile_order(app_config.base_url, profile_key, bot, profile_items)
 
 
 def _apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> None:

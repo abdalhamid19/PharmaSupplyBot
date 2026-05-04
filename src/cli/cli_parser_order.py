@@ -33,6 +33,12 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
         help="Open a visible browser for this order run",
     )
     argument_parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=None,
+        help="Maximum number of parallel profiles (0 = unlimited)",
+    )
+    argument_parser.add_argument(
         "--resume",
         action="store_true",
         help="Skip items already present in order_result_summary.csv",

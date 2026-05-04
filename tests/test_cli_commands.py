@@ -5,13 +5,12 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.cli.cli_commands import (
-    invalid_session_exit,
-    load_order_items,
-    prepared_order_items,
-    resumable_order_items,
-    run_remove_cart_command,
+from src.cli.cli_cart_removal import run_remove_cart_command
+from src.cli.cli_order import (
+    _load_order_items as load_order_items,
+    _prepared_order_items as prepared_order_items,
 )
+from src.cli.cli_shared import invalid_session_exit
 from src.core.utils.excel import Item
 
 
@@ -34,7 +33,9 @@ class CliCommandsTests(unittest.TestCase):
                     encoding="utf-8",
                 )
 
-                remaining = resumable_order_items("wardany", items, args)
+                with patch("src.cli.cli_order.require_state_file"):
+                    from src.cli.cli_order import _prepared_order_items
+                    remaining = _prepared_order_items("wardany", items, args)
             finally:
                 os.chdir(original_cwd)
 
@@ -52,10 +53,10 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli.cli_commands.load_items_from_excel", return_value=items),
+            patch("src.cli.cli_order.load_items_from_excel", return_value=items),
             patch("pathlib.Path.is_file", return_value=True),
             patch(
-                "src.cli.cli_commands.load_prevented_items",
+                "src.cli.cli_order.load_prevented_items",
                 return_value=[SimpleNamespace(code="1", name="Blocked")],
             ),
         ):
@@ -72,7 +73,7 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli.cli_commands.load_items_from_excel", return_value=items),
+            patch("src.cli.cli_order.load_items_from_excel", return_value=items),
             patch("pathlib.Path.is_file", return_value=False),
         ):
             allowed_items = load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
@@ -94,19 +95,17 @@ class CliCommandsTests(unittest.TestCase):
         args = SimpleNamespace(resume=False)
 
         with (
-            patch("src.cli.cli_commands.require_state_file") as require_state,
-            patch("src.cli.cli_commands.resumable_order_items", return_value=items) as resumable,
+            patch("src.cli.cli_order.require_state_file") as require_state,
         ):
             prepared = prepared_order_items("wardany", items, args)
 
         self.assertEqual(prepared, items)
         require_state.assert_called_once_with("wardany")
-        resumable.assert_called_once_with("wardany", items, args)
 
     def test_invalid_session_exit_opens_reauth_and_returns_standard_message(self) -> None:
-        error = RuntimeError("expired")
+        error = SimpleNamespace()
 
-        with patch("src.cli.cli_commands.open_reauth_in_browser") as reauth:
+        with patch("src.cli.cli_shared.open_reauth_in_browser") as reauth:
             exit_error = invalid_session_exit("https://seller.tawreed.io", "wardany", error)
 
         reauth.assert_called_once_with("https://seller.tawreed.io", "wardany")
@@ -128,9 +127,9 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli.cli_commands.load_cart_removal_items", return_value=[object()]) as load_items,
-            patch("src.cli.cli_commands.require_state_file"),
-            patch("src.cli.cli_commands.build_bot") as build_bot,
+            patch("src.cli.cli_cart_removal.load_cart_removal_items", return_value=[object()]) as load_items,
+            patch("src.cli.cli_cart_removal.require_state_file"),
+            patch("src.cli.cli_cart_removal.build_bot") as build_bot,
         ):
             bot = build_bot.return_value
             result = run_remove_cart_command(app_config, args)
