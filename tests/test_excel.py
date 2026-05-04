@@ -43,6 +43,34 @@ class ExcelTests(unittest.TestCase):
         self.assertEqual(items[0].name, "ASPIRIN")
         self.assertEqual(items[0].qty, 3)
 
+    def test_load_items_raises_clear_error_for_missing_columns(self) -> None:
+        config = ExcelConfig(code_col="code", name_col="name", qty_col="qty")
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "orders.xlsx"
+            pd.DataFrame([{"code": 123, "name": "ASPIRIN"}]).to_excel(path, index=False)
+
+            with self.assertRaises(KeyError) as context:
+                load_items_from_excel(path, config)
+
+        self.assertIn("Missing one or more required Excel columns", str(context.exception))
+        self.assertIn("qty", str(context.exception))
+
+    def test_load_items_coerces_and_limits_quantities_in_single_pass(self) -> None:
+        config = ExcelConfig(code_col="code", name_col="name", qty_col="qty", min_qty=1, max_qty=4)
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "orders.xlsx"
+            pd.DataFrame(
+                [
+                    {"code": 123, "name": "ASPIRIN", "qty": "2.6"},
+                    {"code": 124, "name": "VITAMIN C", "qty": "10"},
+                    {"code": 125, "name": "IGNORE", "qty": ""},
+                ]
+            ).to_excel(path, index=False)
+
+            items = load_items_from_excel(path, config)
+
+        self.assertEqual([(item.code, item.qty) for item in items], [("123", 3), ("124", 4)])
+
 
 if __name__ == "__main__":
     unittest.main()

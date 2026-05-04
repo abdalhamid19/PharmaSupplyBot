@@ -40,56 +40,45 @@ def _to_int(x: Any) -> int:
 
 def load_items_from_excel(path: Path, config: ExcelConfig, limit: int = 0) -> list[Item]:
     """Load order items from an Excel sheet using the configured column mapping."""
-    dataframe = _read_excel_with_headers(path, config)
-    _require_columns(dataframe, config)
-    dataframe = dataframe.loc[:, [config.code_col, config.name_col, config.qty_col]]
-
     items: list[Item] = []
-    for row in dataframe.itertuples(index=False, name=None):
+    for row in _read_item_rows(path, config):
         item = _row_tuple_to_item(row, config)
         if item is None:
             continue
         items.append(item)
         if limit and len(items) >= limit:
             break
-
     return items
 
 
-def _read_excel(path: Path, usecols: list[str] | None = None) -> pd.DataFrame:
+def _read_excel(path: Path, **read_kwargs: Any) -> pd.DataFrame:
     """Read the Excel file from disk."""
     if not path.exists():
         raise FileNotFoundError(f"Excel not found: {path}")
-    return pd.read_excel(path, usecols=usecols)
+    return pd.read_excel(path, **read_kwargs)
+
+
+def _read_item_rows(path: Path, config: ExcelConfig):
+    """Yield only the configured Excel item columns as row tuples."""
+    dataframe = _read_excel_with_headers(path, config)
+    for row in dataframe.itertuples(index=False, name=None):
+        yield row
 
 
 def _read_excel_with_headers(path: Path, config: ExcelConfig) -> pd.DataFrame:
-    """Read an Excel file whose header may be below an exported title row."""
-    dataframe = _read_excel(path)
-    if _has_any_required_column(dataframe, config):
-        return dataframe
-
+    """Read one Excel file while avoiding a full-sheet fallback on title-row exports."""
     header_row_index = _detect_header_row(path, config)
-    if header_row_index is None:
-        return dataframe
-    return pd.read_excel(
-        path,
-        header=header_row_index,
-        usecols=[config.code_col, config.name_col, config.qty_col],
-    )
-
-
-def _has_any_required_column(dataframe: pd.DataFrame, config: ExcelConfig) -> bool:
-    """Return whether the loaded sheet already exposes configured columns."""
-    return any(
-        column_name in dataframe.columns
-        for column_name in (config.code_col, config.name_col, config.qty_col)
-    )
+    if header_row_index is not None:
+        try:
+            return _read_excel(path, usecols=_required_columns(config), header=header_row_index)
+        except ValueError as error:
+            raise KeyError(_missing_columns_message(config, error)) from error
+    return _read_required_columns(path, config)
 
 
 def _detect_header_row(path: Path, config: ExcelConfig) -> int | None:
     """Find the likely header row in report-style exports."""
-    preview = pd.read_excel(path, header=None, nrows=20)
+    preview = _read_excel(path, header=None, nrows=20)
     required_columns = {config.code_col, config.name_col, config.qty_col}
     identity_columns = {config.code_col, config.name_col}
     best_partial_match: int | None = None
@@ -104,15 +93,25 @@ def _detect_header_row(path: Path, config: ExcelConfig) -> int | None:
     return best_partial_match
 
 
-def _require_columns(dataframe: pd.DataFrame, config: ExcelConfig) -> None:
-    """Ensure the configured Excel columns exist in the sheet."""
-    for column_name in (config.code_col, config.name_col, config.qty_col):
-        if column_name in dataframe.columns:
-            continue
-        raise KeyError(
-            f"Missing required column '{column_name}' in Excel. "
-            f"Found: {list(dataframe.columns)}"
-        )
+def _read_required_columns(path: Path, config: ExcelConfig) -> pd.DataFrame:
+    """Read the configured columns directly from a standard header-row sheet."""
+    try:
+        return _read_excel(path, usecols=_required_columns(config))
+    except ValueError as error:
+        raise KeyError(_missing_columns_message(config, error)) from error
+
+
+def _required_columns(config: ExcelConfig) -> list[str]:
+    """Return the configured columns needed to build order items."""
+    return [config.code_col, config.name_col, config.qty_col]
+
+
+def _missing_columns_message(config: ExcelConfig, error: ValueError) -> str:
+    """Return a readable missing-column error from one pandas read failure."""
+    return (
+        "Missing one or more required Excel columns "
+        f"{_required_columns(config)}. Original error: {error}"
+    )
 
 
 def _row_to_item(row: Any, config: ExcelConfig) -> Item | None:
@@ -143,4 +142,3 @@ def _bounded_quantity(value: Any, config: ExcelConfig) -> int:
     """Clamp the requested quantity to the configured Excel limits."""
     quantity = _to_int(value)
     return min(quantity, config.max_qty)
-
