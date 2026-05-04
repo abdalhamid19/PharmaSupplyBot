@@ -1,5 +1,6 @@
 **Rule Audit**
-The repository now passes the active local checks for:
+This repository is audited against the current local rule set in `docs/project_guidelines.md`.
+The active checks include:
 - line length `<= 100`
 - function length `<= 20`
 - module and public API docstrings
@@ -16,7 +17,7 @@ Current status:
 - Tawreed ordering was split into `src/tawreed.py`, `src/tawreed_products_flow.py`, `src/tawreed_checkout.py`, `src/tawreed_match_logs.py`, `src/tawreed_session.py`, `src/tawreed_auth_waits.py`, and `src/tawreed_constants.py`.
 
 **Documented Exceptions**
-The strict `100`-line file rule from `.agent/rules/project_specific.md` is still exceeded by some focused modules:
+The strict `100`-line file rule from `docs/project_guidelines.md` is still exceeded by some focused modules:
 - `src/product_matching.py`
 - `src/matching_rules.py`
 - `src/tawreed.py`
