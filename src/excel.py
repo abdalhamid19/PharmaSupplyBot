@@ -42,9 +42,11 @@ def load_items_from_excel(path: Path, config: ExcelConfig, limit: int = 0) -> li
     """Load order items from an Excel sheet using the configured column mapping."""
     dataframe = _read_excel_with_headers(path, config)
     _require_columns(dataframe, config)
+    dataframe = dataframe.loc[:, [config.code_col, config.name_col, config.qty_col]]
+
     items: list[Item] = []
-    for _, row in dataframe.iterrows():
-        item = _row_to_item(row, config)
+    for row in dataframe.itertuples(index=False, name=None):
+        item = _row_tuple_to_item(row, config)
         if item is None:
             continue
         items.append(item)
@@ -54,11 +56,11 @@ def load_items_from_excel(path: Path, config: ExcelConfig, limit: int = 0) -> li
     return items
 
 
-def _read_excel(path: Path) -> pd.DataFrame:
+def _read_excel(path: Path, usecols: list[str] | None = None) -> pd.DataFrame:
     """Read the Excel file from disk."""
     if not path.exists():
         raise FileNotFoundError(f"Excel not found: {path}")
-    return pd.read_excel(path)
+    return pd.read_excel(path, usecols=usecols)
 
 
 def _read_excel_with_headers(path: Path, config: ExcelConfig) -> pd.DataFrame:
@@ -70,7 +72,11 @@ def _read_excel_with_headers(path: Path, config: ExcelConfig) -> pd.DataFrame:
     header_row_index = _detect_header_row(path, config)
     if header_row_index is None:
         return dataframe
-    return pd.read_excel(path, header=header_row_index)
+    return pd.read_excel(
+        path,
+        header=header_row_index,
+        usecols=[config.code_col, config.name_col, config.qty_col],
+    )
 
 
 def _has_any_required_column(dataframe: pd.DataFrame, config: ExcelConfig) -> bool:
@@ -114,6 +120,18 @@ def _row_to_item(row: Any, config: ExcelConfig) -> Item | None:
     code = str(row.get(config.code_col, "")).strip()
     name = str(row.get(config.name_col, "")).strip()
     quantity = _bounded_quantity(row.get(config.qty_col), config)
+    if not code and not name:
+        return None
+    if quantity < config.min_qty:
+        return None
+    return Item(code=code, name=name, qty=quantity)
+
+
+def _row_tuple_to_item(row: tuple, config: ExcelConfig) -> Item | None:
+    """Convert one Excel row tuple to an order item when it passes filters."""
+    code = str(row[0] or "").strip()
+    name = str(row[1] or "").strip()
+    quantity = _bounded_quantity(row[2], config)
     if not code and not name:
         return None
     if quantity < config.min_qty:

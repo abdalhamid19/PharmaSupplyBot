@@ -47,6 +47,13 @@ with the current structure of `PharmaSupplyBot`.
 - Avoid generic names like `data`, `temp`, `util`, or `handler` without clear
   context.
 
+### Type Safety and Explicit APIs
+
+- Use type hints for public functions and data structures.
+- Prefer explicit return types over `Any` or implicit `None`.
+- Keep public APIs small and stable to enable safe extensions.
+- Avoid global mutable state; pass dependencies explicitly.
+
 ### Documentation
 
 - Every public source file must have a module docstring.
@@ -61,6 +68,8 @@ with the current structure of `PharmaSupplyBot`.
 - Avoid unnecessary data copies during processing; pass by reference when safe.
 - Prefer operations on series or iterators over copying full DataFrames if using
   `pandas` or equivalent.
+- Prefer generators for one-pass processing and avoid building large intermediate
+  collections.
 - Use temporary caches only for reusable outputs between requests, and avoid
   holding long-lived state.
 - Keep temporary state localized to a single function or module to prevent
@@ -68,6 +77,10 @@ with the current structure of `PharmaSupplyBot`.
 - Use indexing and smart lookup strategies instead of repeated scans over lists.
 - Reduce repeated network or browser calls by reusing stored sessions and valid
   state when possible.
+- Use explicit timeouts and failure handling for browser and network operations.
+- Keep browser automation and session state separate from business logic.
+- Measure and profile slow paths before optimizing; prefer clarity over early
+  micro-optimization.
 - Evaluate execution time and complexity when adding new features; make heavy
   features configurable.
 
@@ -81,10 +94,17 @@ with the current structure of `PharmaSupplyBot`.
 - Keep clear extension points in the code so new flows can be added for
   `order`, `remove-cart`, `auth`, and similar commands without excessive
   coupling.
+- Prefer small public interfaces and keep implementation details private.
 - Make configurable behavior driven by `config.yaml` rather than hardcoded
   constants inside functions.
 - Consider a single extensibility layer (`extension` or `plugin`) for adding new
   input formats or authentication methods.
+- Avoid deep call stacks and multi-layer state propagation when adding new
+  features.
+- Keep domain logic pure and side-effect-free when possible, reserving side
+  effects for the integration layer.
+- Structure new functionality as explicit commands or services rather than
+  branching large monolithic flows.
 
 ## Project Organization and Layering
 
