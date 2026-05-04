@@ -25,7 +25,7 @@ from src.tawreed_products_flow import (
     visible_overlay_diagnostics,
 )
 from src.excel import Item
-from src.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
+from src.core.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
 
 
 class _FakeExpectResponse:

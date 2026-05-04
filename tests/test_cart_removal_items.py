@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 
 import pandas as pd
 
-from src.cart_removal_items import (
+from src.core.cart_removal_items import (
     REMOVE_CODE_COLUMN,
     REMOVE_NAME_COLUMN,
     CartRemovalItem,

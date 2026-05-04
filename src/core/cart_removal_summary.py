@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cart_removal_items import CartRemovalItem
-from .tawreed_artifacts import append_csv_artifact
+from ..tawreed_artifacts import append_csv_artifact
 
 
 @dataclass(frozen=True)

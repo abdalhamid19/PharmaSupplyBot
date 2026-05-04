@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .config_models import MatchingConfig
+from ..config_models import MatchingConfig
 
 
 def default_matching_config() -> MatchingConfig:

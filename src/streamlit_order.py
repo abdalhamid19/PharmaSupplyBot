@@ -7,7 +7,7 @@ import time
 
 import streamlit as st
 
-from .prevented_items import DEFAULT_PREVENTED_ITEMS_PATH, is_prevented_items_excel_path
+from .core.prevented_items import DEFAULT_PREVENTED_ITEMS_PATH, is_prevented_items_excel_path
 from .streamlit_order_form import order_form_values
 from .streamlit_process import render_command_result, start_cli_subprocess
 from .streamlit_results import render_fresh_run_analysis

@@ -1,7 +1,7 @@
 import unittest
 
 from src.excel import Item
-from src.product_matching import _search_queries_for_item
+from src.core.product_matching import _search_queries_for_item
 
 
 class ProductMatchingQueryTests(unittest.TestCase):

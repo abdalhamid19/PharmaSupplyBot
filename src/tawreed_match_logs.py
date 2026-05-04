@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .excel import Item
-from .matching_models import CandidateMatchDiagnostic, MatchDecision
+from .core.matching_models import CandidateMatchDiagnostic, MatchDecision
 from .tawreed_artifacts import (
     append_csv_artifact,
     append_xlsx_artifact,

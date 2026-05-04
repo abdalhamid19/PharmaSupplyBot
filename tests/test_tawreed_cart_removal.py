@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from src.cart_removal_items import CartRemovalItem
+from src.core.cart_removal_items import CartRemovalItem
 from src.tawreed_cart_removal import (
     CartRemovalSelectors,
     CartRemovalTarget,

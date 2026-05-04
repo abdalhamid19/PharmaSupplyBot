@@ -15,7 +15,7 @@ from src.streamlit_order_form import (
     persist_existing_prevented_items_file,
     persist_uploaded_prevented_items,
 )
-from src.prevented_items import PreventedItem, load_prevented_items
+from src.core.prevented_items import PreventedItem, load_prevented_items
 
 
 class _FakeUpload:

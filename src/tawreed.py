@@ -9,7 +9,7 @@ from playwright.sync_api import Page, sync_playwright
 
 from .config_models import AppConfig, ProfileConfig
 from .excel import Item
-from .cart_removal_items import CartRemovalItem
+from .core.cart_removal_items import CartRemovalItem
 from .selectors import _selectors
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_checkout import confirm_order

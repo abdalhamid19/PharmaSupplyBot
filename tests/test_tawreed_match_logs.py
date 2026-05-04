@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from src.excel import Item
-from src.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
+from src.core.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
 from src.tawreed_match_logs import (
     OrderItemSummary,
     append_order_result_summary,
