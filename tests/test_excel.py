@@ -21,7 +21,7 @@ class ExcelTests(unittest.TestCase):
                 ]
             ).to_excel(path, index=False, header=False)
 
-            items = load_items_from_excel(path, config)
+            items = list(load_items_from_excel(path, config))
 
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].code, "73368")
@@ -36,7 +36,7 @@ class ExcelTests(unittest.TestCase):
                 [{"code": 123, "name": "ASPIRIN", "qty": 3}]
             ).to_excel(path, index=False)
 
-            items = load_items_from_excel(path, config)
+            items = list(load_items_from_excel(path, config))
 
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].code, "123")
@@ -50,7 +50,7 @@ class ExcelTests(unittest.TestCase):
             pd.DataFrame([{"code": 123, "name": "ASPIRIN"}]).to_excel(path, index=False)
 
             with self.assertRaises(KeyError) as context:
-                load_items_from_excel(path, config)
+                list(load_items_from_excel(path, config))
 
         self.assertIn("Missing one or more required Excel columns", str(context.exception))
         self.assertIn("qty", str(context.exception))
@@ -67,7 +67,7 @@ class ExcelTests(unittest.TestCase):
                 ]
             ).to_excel(path, index=False)
 
-            items = load_items_from_excel(path, config)
+            items = list(load_items_from_excel(path, config))
 
         self.assertEqual([(item.code, item.qty) for item in items], [("123", 3), ("124", 4)])
 

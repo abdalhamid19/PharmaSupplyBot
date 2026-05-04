@@ -43,50 +43,8 @@ from .tawreed_ui import (
     visible_dialog,
 )
 
-MIN_SEARCH_QUERIES_PER_ITEM = 3
-MAX_DOM_SEARCH_ROWS = 8
-FAST_OPTIONAL_TEXT_TIMEOUT_MS = 300
-STORE_NAME_KEYS = (
-    "storeName",
-    "storeNameAr",
-    "storeNameEn",
-    "supplierName",
-    "supplierNameAr",
-    "supplierNameEn",
-    "warehouseName",
-    "warehouseNameAr",
-    "warehouseNameEn",
-    "pharmacyName",
-    "branchName",
-    "sellerName",
-    "companyName",
-)
-NESTED_STORE_KEYS = ("store", "supplier", "warehouse", "pharmacy", "branch", "seller")
-NESTED_NAME_KEYS = ("name", "nameAr", "nameEn", "arabicName", "englishName", "title")
-DISCOUNT_KEYS = (
-    "discountPercent",
-    "discountPercentage",
-    "discountRate",
-    "discountValue",
-    "discount",
-    "cashDiscount",
-    "companyDiscount",
-    "offerDiscount",
-    "pharmacyDiscount",
-    "percentage",
-    "percent",
-)
-
-
-@dataclass(frozen=True)
-class StoreChoice:
-    """One precomputed store candidate for split-quantity selection."""
-
-    index: int
-    store: dict[str, Any]
-    identity: str
-    available_quantity: int
-    discount_percent: float
+from .tawreed_search_logic import require_product_match
+from .tawreed_store_selection import StoreChoice, choose_next_store_for_remaining_quantity
 
 
 def add_item_from_products_page(bot, page: Page, item: Item) -> None:
@@ -94,56 +52,6 @@ def add_item_from_products_page(bot, page: Page, item: Item) -> None:
     match, active_query = require_product_match(bot, page, item)
     row = matched_product_row(bot, page, match, active_query)
     open_add_to_cart_for_match(bot, page, row, item, match)
-
-
-def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
-    """Search the products table and return the parsed API results for the query."""
-    close_visible_dialogs(page)
-    search = page.locator(bot.selectors.item_search_input).first
-    search.click()
-    search.fill("")
-    search.fill(query)
-    with suppress(Exception):
-        page.wait_for_load_state("networkidle", timeout=1000)
-    search.press("Enter")
-    _wait_for_table_overlay_to_clear(page)
-    wait_for_product_rows(page)
-    if _table_has_no_results(page):
-        return []
-    return _dom_search_results(page, query)
-
-
-def find_best_product_match(bot, page: Page, item: Item) -> tuple[MatchDecision, str | None]:
-    """Search all candidate queries and return diagnostics plus the active query."""
-    search_results_by_query: list[tuple[str, list[dict[str, Any]]]] = []
-    queries = _search_queries_for_item(item)
-    for query_index, query in enumerate(queries):
-        bot.last_searched_queries.append(query)
-        results = search_products(bot, page, query)
-        search_results_by_query.append((query, results))
-        decision = _match_decision(bot, item, search_results_by_query)
-        if _decisive_match(item, query, decision, query_index, len(queries)):
-            write_match_log(bot, item, decision)
-            return decision, query
-        if _should_stop_after_no_results(queries, query_index, results):
-            break
-    active_query = search_results_by_query[-1][0] if search_results_by_query else None
-    decision = _match_decision(bot, item, search_results_by_query)
-    write_match_log(bot, item, decision)
-    return decision, active_query
-
-
-def require_product_match(bot, page: Page, item: Item) -> tuple[SearchMatch, str | None]:
-    """Require a valid product match or raise a descriptive runtime error."""
-    started_at = time.perf_counter()
-    decision, active_query = find_best_product_match(bot, page, item)
-    bot.last_match_elapsed_seconds = time.perf_counter() - started_at
-    bot.last_match_decision = decision
-    if decision.best_match:
-        return decision.best_match, active_query
-    raise bot.no_results_exception(
-        f"No matching product found for '{item.name}' (code: {item.code})."
-    )
 
 
 def matched_product_row(bot, page: Page, match: SearchMatch, active_query: str | None):
@@ -287,38 +195,7 @@ def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
     record_selected_stores(bot, selections)
 
 
-def choose_next_store_for_remaining_quantity(
-    stores: list[dict[str, Any]],
-    used_store_ids: set[str],
-    mode: str,
-    skip_exception_cls: type[Exception],
-    min_discount_percent: float = 0.0,
-) -> StoreChoice:
-    """Return the next unused store to order from while splitting quantities."""
-    all_choices = available_store_choices(stores, min_discount_percent)
-    if mode == "max_discount" and all_choices:
-        highest_discount = max(choice.discount_percent for choice in all_choices)
-        choices = [
-            choice
-            for choice in all_choices
-            if choice.identity not in used_store_ids
-            if choice.discount_percent == highest_discount
-        ]
-    else:
-        choices = [choice for choice in all_choices if choice.identity not in used_store_ids]
-    if not choices:
-        if min_discount_percent > 0:
-            raise skip_exception_cls(
-                f"No available stores meet the minimum discount {min_discount_percent:g}%."
-            )
-        raise skip_exception_cls("All available stores for this product are out of stock.")
-    if mode == "first_available":
-        return choices[0]
-    if mode == "max_available":
-        return max(choices, key=lambda choice: choice.available_quantity)
-    if mode == "max_discount":
-        return max(choices, key=lambda choice: choice.available_quantity)
-    raise ValueError(f"Unknown warehouse strategy mode: {mode}")
+
 
 
 def available_store_choices(
@@ -998,34 +875,7 @@ def _match_decision(
     return explain_best_product_match(item, search_results_by_query, bot.config.matching)
 
 
-def _decisive_match(
-    item: Item,
-    query: str,
-    decision: MatchDecision,
-    query_index: int,
-    total_queries: int,
-) -> bool:
-    """Return whether the current best match is decisive enough to stop searching."""
-    if not decision.best_match:
-        return False
-    if is_decisive_product_match(item.name or query, decision.best_match.data):
-        return True
-    best_diagnostic = _best_diagnostic_for_query(decision, query)
-    if best_diagnostic is None or not best_diagnostic.accepted:
-        return False
-    if best_diagnostic.query != query:
-        return False
-    if _early_available_high_confidence_match(item, query, best_diagnostic):
-        return True
-    if query_index < min(total_queries, MIN_SEARCH_QUERIES_PER_ITEM) - 1:
-        return False
-    has_numeric_tokens = bool(_NUMERIC_TOKEN_RE.findall(item.name or query))
-    return bool(
-        best_diagnostic.accepted_reason == "high_token_overlap"
-        and best_diagnostic.breakdown.overlap_score >= 0.95
-        and best_diagnostic.breakdown.sequence_score >= 0.8
-        and (not has_numeric_tokens or best_diagnostic.breakdown.numeric_overlap >= 1.0)
-    )
+
 
 
 def _best_diagnostic_for_query(decision: MatchDecision, query: str):
