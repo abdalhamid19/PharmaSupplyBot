@@ -20,3 +20,9 @@ def build_remove_cart_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Open a visible browser for this cart-removal run",
     )
+    remove_parser.add_argument(
+        "--item-workers",
+        type=int,
+        default=None,
+        help="Parallel worker processes for items within one profile (overrides config)",
+    )

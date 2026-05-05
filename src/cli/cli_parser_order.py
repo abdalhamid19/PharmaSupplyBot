@@ -53,6 +53,12 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
         action="store_true",
         help="Stop after the first acceptable product match instead of probing extra query variants",
     )
+    argument_parser.add_argument(
+        "--item-workers",
+        type=int,
+        default=None,
+        help="Parallel worker processes for items within one profile (overrides config)",
+    )
 
 
 def _add_order_filter_arguments(argument_parser: argparse.ArgumentParser) -> None:

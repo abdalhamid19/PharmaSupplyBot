@@ -133,6 +133,46 @@ class CliParserTests(unittest.TestCase):
         args = build_parser().parse_args(["auth", "--profile", "wardany"])
         self.assertFalse(hasattr(args, "debug_browser"))
 
+    def test_order_accepts_item_workers_flag(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--item-workers",
+                "3",
+            ]
+        )
+        self.assertEqual(args.item_workers, 3)
+
+    def test_order_item_workers_defaults_to_none(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--profile",
+                "wardany",
+            ]
+        )
+        self.assertIsNone(args.item_workers)
+
+    def test_remove_cart_accepts_item_workers_flag(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "remove-cart",
+                "--excel",
+                "data/input/remove_items/remove.xlsx",
+                "--profile",
+                "wardany",
+                "--item-workers",
+                "2",
+            ]
+        )
+        self.assertEqual(args.item_workers, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
