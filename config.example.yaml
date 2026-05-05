@@ -72,3 +72,7 @@ runtime:
   slow_mo_ms: 0
   timeout_ms: 45000
   submit_order: false
+  # Item-level parallel workers per profile. 1 = sequential (default).
+  # Each extra worker spawns its own Chromium process (~150MB RAM each).
+  # Keep at or below 4 to avoid triggering Tawreed concurrent-session limits.
+  item_workers: 1

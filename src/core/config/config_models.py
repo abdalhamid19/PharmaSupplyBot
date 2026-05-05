@@ -34,6 +34,7 @@ class RuntimeConfig:
     timeout_ms: int = 45000
     submit_order: bool = False
     max_workers: int = 1
+    item_workers: int = 1
 
 
 @dataclass(frozen=True)
