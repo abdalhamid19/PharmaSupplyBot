@@ -48,6 +48,11 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
         default=None,
         help="Path to a stop-request flag file checked between items",
     )
+    argument_parser.add_argument(
+        "--fast-search",
+        action="store_true",
+        help="Stop after the first acceptable product match instead of probing extra query variants",
+    )
 
 
 def _add_order_filter_arguments(argument_parser: argparse.ArgumentParser) -> None:

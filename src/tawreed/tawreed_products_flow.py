@@ -1,6 +1,7 @@
 """Products-page search and add-to-cart flow for Tawreed ordering."""
 
 from __future__ import annotations
+import re
 import time
 from typing import Any
 from playwright.sync_api import Page
@@ -19,6 +20,7 @@ from .tawreed_dom_parsing import dom_search_results
 from .tawreed_waits import wait_for_table_overlay_to_clear, wait_for_row_to_settle
 from .tawreed_selections import stores_from_payload
 from .tawreed_constants import MAX_DOM_SEARCH_ROWS, STORE_DETAILS_ENDPOINT
+from .tawreed_search_logic import PRODUCT_SEARCH_INPUT_SELECTOR
 
 def add_item_from_products_page(bot, page: Page, item: Item) -> None:
     """Add one item using the Tawreed products page search-and-store selection flow."""
@@ -87,7 +89,7 @@ def _next_store_choice(bot, page, store_rows, used_ids, sels):
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     """Execute a product search and return candidates from API or DOM."""
     bot.log(f"Searching for '{query}'...")
-    search_input = page.locator("input[placeholder*='البحث']").first
+    search_input = page.locator(PRODUCT_SEARCH_INPUT_SELECTOR).first
     search_input.fill(query)
     with page.expect_response(re.compile(r".*/products/search.*"), timeout=2000) as resp:
         search_input.press("Enter")

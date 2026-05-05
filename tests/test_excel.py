@@ -43,6 +43,27 @@ class ExcelTests(unittest.TestCase):
         self.assertEqual(items[0].name, "ASPIRIN")
         self.assertEqual(items[0].qty, 3)
 
+    def test_load_items_accepts_common_arabic_header_variants(self) -> None:
+        config = ExcelConfig(code_col="كود", name_col="إسم الصنف", qty_col="كمية النقص")
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "orders.xlsx"
+            pd.DataFrame(
+                [
+                    {
+                        "الكود": 47273,
+                        "إسم الصنف": "DEVAROL-S-200.000 I.U 1 AMP",
+                        "الكمية المطلوبة": 106,
+                    },
+                ]
+            ).to_excel(path, index=False)
+
+            items = list(load_items_from_excel(path, config))
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].code, "47273")
+        self.assertEqual(items[0].name, "DEVAROL-S-200.000 I.U 1 AMP")
+        self.assertEqual(items[0].qty, 106)
+
     def test_load_items_raises_clear_error_for_missing_columns(self) -> None:
         config = ExcelConfig(code_col="code", name_col="name", qty_col="qty")
         with TemporaryDirectory() as temp_dir:

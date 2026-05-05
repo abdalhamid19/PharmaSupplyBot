@@ -15,6 +15,7 @@ def build_bot(
     profile: ProfileConfig,
     debug_browser: bool = False,
     stop_flag_path: Path | None = None,
+    fast_search: bool = False,
 ) -> TawreedBot:
     """Create a Tawreed bot instance for one profile."""
     return TawreedBot(
@@ -24,6 +25,7 @@ def build_bot(
         state_path=state_path(profile_key),
         debug_browser=debug_browser,
         stop_flag_path=stop_flag_path,
+        fast_search=fast_search,
     )
 
 

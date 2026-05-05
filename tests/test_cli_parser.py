@@ -69,6 +69,20 @@ class CliParserTests(unittest.TestCase):
         self.assertTrue(args.resume)
         self.assertEqual(args.stop_flag, "artifacts/run_control/order_stop.flag")
 
+    def test_order_accepts_fast_search_flag(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--fast-search",
+            ]
+        )
+
+        self.assertTrue(args.fast_search)
+
     def test_order_accepts_prevented_items_excel_override(self) -> None:
         args = build_parser().parse_args(
             [

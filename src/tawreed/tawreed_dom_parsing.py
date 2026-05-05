@@ -75,7 +75,7 @@ def _row_supplier_name(lines: list[str]) -> str:
 def _inner_text(locator, timeout_ms: int) -> str:
     """Read locator text with a short timeout."""
     try: return str(locator.inner_text(timeout=timeout_ms))
-    except Exception: return str(locator.inner_text())
+    except Exception: return ""
 
 def _first_number(text: str) -> str:
     """Return the first decimal-like number from visible row text."""

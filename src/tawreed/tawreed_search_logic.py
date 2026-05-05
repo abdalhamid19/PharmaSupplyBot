@@ -17,6 +17,13 @@ from .tawreed_constants import PRODUCT_ROWS_SELECTOR
 from .tawreed_match_logs import write_match_log
 
 MIN_SEARCH_QUERIES_PER_ITEM = 3
+PRODUCT_SEARCH_INPUT_SELECTOR = (
+    "#tawreedTableGlobalSearch, "
+    "input[name='tawreedTableGlobalSearch'], "
+    "input[type='search'], "
+    "input[placeholder*='بحث'], "
+    "input[placeholder*='Search']"
+)
 
 
 def require_product_match(bot, page: Page, item: Item) -> tuple[SearchMatch, str]:
@@ -54,22 +61,26 @@ def _handle_no_match(bot, item: Item, queries: list[str], results: list[tuple[st
 
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     """Search the products table and return the parsed API results for the query."""
-    from .tawreed_products_flow import (
-        close_visible_dialogs, _wait_for_table_overlay_to_clear,
-        wait_for_product_rows, _table_has_no_results, _dom_search_results
-    )
+    from .tawreed_dialogs import close_visible_dialogs
+    from .tawreed_dom_parsing import dom_search_results
+    from .tawreed_ui import is_no_results_row, visible_product_rows
+    from .tawreed_waits import wait_for_table_overlay_to_clear
     
     close_visible_dialogs(page)
-    search = page.locator(bot.selectors.item_search_input).first
+    search = page.locator(PRODUCT_SEARCH_INPUT_SELECTOR).first
     search.click()
     search.fill("")
     search.fill(query)
     search.press("Enter")
-    _wait_for_table_overlay_to_clear(page)
-    wait_for_product_rows(page)
-    if _table_has_no_results(page):
+    wait_for_table_overlay_to_clear(page)
+    rows = visible_product_rows(page)
+    try:
+        rows.first.wait_for(timeout=3000)
+    except Exception:
         return []
-    return _dom_search_results(page, query)
+    if rows.count() > 0 and is_no_results_row(rows.first):
+        return []
+    return dom_search_results(page, query)
 
 
 def _decisive_match(
@@ -81,6 +92,12 @@ def _decisive_match(
         if len(queries) >= MIN_SEARCH_QUERIES_PER_ITEM: write_match_log(bot, item, decision)
         return False
     # Early stop check
+    if getattr(bot, "fast_search", False):
+        bot.last_match_elapsed_seconds = time.perf_counter() - started_at
+        write_match_log(bot, item, decision)
+        if decision.best_match.data.get("availableQuantity", 0) <= 0:
+            raise bot.skip_item_exception(f"Matched product is out of stock for '{item.name}'.")
+        return True
     is_decisive = is_decisive_product_match(queries[-1], decision.best_match.data)
     if not is_decisive and len(queries) < MIN_SEARCH_QUERIES_PER_ITEM: return False
     bot.last_match_elapsed_seconds = time.perf_counter() - started_at

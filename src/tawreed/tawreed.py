@@ -64,6 +64,7 @@ class TawreedBot:
         state_path: Path,
         debug_browser: bool = False,
         stop_flag_path: Path | None = None,
+        fast_search: bool = False,
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
@@ -72,10 +73,15 @@ class TawreedBot:
         self.state_path = state_path
         self.debug_browser = debug_browser
         self.stop_flag_path = stop_flag_path
+        self.fast_search = fast_search
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
         self.no_results_exception = _NoResultsItem
         self._reset_last_item_state()
+
+    def log(self, message: str) -> None:
+        """Print a profile-scoped diagnostic message."""
+        print(_console_safe(f"[{self.profile_key}] {message}"))
 
     def _reset_last_item_state(self) -> None:
         """Reset internal state tracking for the next item to be processed."""
@@ -128,6 +134,12 @@ class TawreedBot:
         self._prepare_order_page(page)
         completed = self._process_items(page, items)
         if completed and not self._stop_requested():
+            if not self.config.runtime.submit_order:
+                print(
+                    f"[{self.profile_key}] Items added to cart. "
+                    "Final order submission is disabled for manual human review."
+                )
+                return
             confirm_order(page, self.selectors, self.config.runtime.timeout_ms)
         else:
             print(f"[{self.profile_key}] Stop requested or incomplete. Order confirmation skipped.")
@@ -195,12 +207,13 @@ class TawreedBot:
 
     def _process_items(self, page: Page, items: Iterable[Item]) -> bool:
         """Process each requested Excel item on the current order page."""
+        added_any = False
         for item in items:
             if self._stop_requested():
                 print(f"[{self.profile_key}] Stop requested before item {item.code} / {item.name}.")
                 return False
-            self._process_single_item(page, item)
-        return True
+            added_any = self._process_single_item(page, item) or added_any
+        return added_any
 
 
     def _stop_requested(self) -> bool:
@@ -228,7 +241,7 @@ class TawreedBot:
         except Exception:
             return False
 
-    def _process_single_item(self, page: Page, item: Item) -> None:
+    def _process_single_item(self, page: Page, item: Item) -> bool:
         """Add one item or save artifacts when a technical failure happens."""
         started_at = time.perf_counter()
         self._reset_last_item_state()
@@ -237,10 +250,14 @@ class TawreedBot:
             self._add_item(page, item)
             close_visible_dialogs(page)
             self._record_success(item, started_at)
+            return True
         except _SkipItem as error:
+            close_visible_dialogs(page)
             self._record_skip(item, error, started_at)
+            return False
         except Exception as error:
             self._record_failure(page, item, error, started_at)
+            return False
 
     def _record_success(self, item: Item, started_at: float) -> None:
         """Record a successful add-to-cart summary."""
