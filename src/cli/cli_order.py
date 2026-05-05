@@ -6,9 +6,12 @@ import argparse
 import concurrent.futures
 import csv
 import itertools
+import multiprocessing
 from pathlib import Path
+from typing import Any
 
 from ..core.config.config_models import AppConfig, ProfileConfig
+from ..core.utils.chunking import split_into_chunks
 from ..core.utils.excel import load_items_from_excel
 from ..core.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
@@ -16,6 +19,7 @@ from ..core.prevented_items import (
     is_prevented_items_excel_path,
     load_prevented_items,
 )
+from ..tawreed.order_result_merger import merge_worker_summaries
 from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import build_bot, invalid_session_exit, require_state_file
@@ -73,6 +77,10 @@ def _run_single_profile(
     profile_items = _prepared_order_items(profile_key, items, args)
     profile_items = _ensure_non_empty_items(profile_key, profile_items)
     if profile_items is None:
+        return
+    item_workers = _resolve_item_workers(app_config, args)
+    if item_workers > 1:
+        _run_parallel_order(app_config, profile_key, profile_items, args, item_workers)
         return
     bot = _order_bot(app_config, profile_key, profile, args)
     _run_profile_order(app_config.base_url, profile_key, bot, profile_items)
@@ -181,3 +189,71 @@ def _run_profile_order(
         bot.place_order_from_items(items)
     except SessionInvalidError as error:
         raise invalid_session_exit(base_url, profile_key, error) from error
+
+
+def _resolve_item_workers(app_config: AppConfig, args: argparse.Namespace) -> int:
+    """Return the effective item-level worker count for this run."""
+    cli_value = getattr(args, "item_workers", None)
+    return cli_value if cli_value is not None else app_config.runtime.item_workers
+
+
+def _run_parallel_order(
+    app_config: AppConfig,
+    profile_key: str,
+    items,
+    args: argparse.Namespace,
+    item_workers: int,
+) -> None:
+    """Split items across multiprocessing workers and merge results."""
+    from .item_worker_runner import run_order_chunk
+
+    materialized = list(items)
+    chunks = split_into_chunks(materialized, item_workers)
+    payloads = _build_order_payloads(profile_key, chunks, args)
+    print(f"[{profile_key}] Launching {len(chunks)} parallel item workers...")
+    ctx = multiprocessing.get_context("spawn")
+    with ctx.Pool(processes=len(chunks)) as pool:
+        results = pool.map(run_order_chunk, payloads)
+    merge_worker_summaries(profile_key, "order_result_summary")
+    _report_worker_results(app_config.base_url, profile_key, results)
+
+
+def _build_order_payloads(
+    profile_key: str,
+    chunks: list[list[Any]],
+    args: argparse.Namespace,
+) -> list[dict[str, Any]]:
+    """Build serializable payloads for each order worker."""
+    config_path = str(Path(getattr(args, "config", "config.yaml")))
+    options = _worker_options(args)
+    return [
+        {
+            "config_path": config_path,
+            "profile_key": profile_key,
+            "items": [(it.code, it.name, it.qty) for it in chunk],
+            "worker_id": idx,
+            "options": options,
+        }
+        for idx, chunk in enumerate(chunks)
+    ]
+
+
+def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
+    """Extract serializable worker options from the CLI namespace."""
+    return {
+        "debug_browser": bool(getattr(args, "debug_browser", False)),
+        "fast_search": bool(getattr(args, "fast_search", False)),
+        "stop_flag": getattr(args, "stop_flag", None),
+        "warehouse_mode": getattr(args, "warehouse_mode", None),
+        "min_discount_percent": getattr(args, "min_discount_percent", None),
+    }
+
+
+def _report_worker_results(base_url: str, profile_key: str, results: list[dict]) -> None:
+    """Log worker outcomes and raise on session-invalid failures."""
+    for result in results:
+        if result.get("status") == "session_invalid":
+            error = SessionInvalidError(result.get("error", ""))
+            raise invalid_session_exit(base_url, profile_key, error) from None
+        if result.get("status") == "error":
+            print(f"[{profile_key}] Worker error: {result.get('error', '')}")
