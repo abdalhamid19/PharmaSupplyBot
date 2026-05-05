@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import csv
+import itertools
 from pathlib import Path
 
 from ..core.config.config_models import AppConfig, ProfileConfig
@@ -70,11 +71,25 @@ def _run_single_profile(
     """Prepare and run a single profile order flow."""
     items = _load_order_items(app_config, args)
     profile_items = _prepared_order_items(profile_key, items, args)
-    if not profile_items:
-        print(f"[{profile_key}] No remaining items to process.")
+    profile_items = _ensure_non_empty_items(profile_key, profile_items)
+    if profile_items is None:
         return
     bot = _order_bot(app_config, profile_key, profile, args)
     _run_profile_order(app_config.base_url, profile_key, bot, profile_items)
+
+
+def _ensure_non_empty_items(
+    profile_key: str,
+    items: Iterable[Item],
+) -> Iterable[Item] | None:
+    """Return an iterable that is guaranteed to yield at least one item, else None."""
+    _, probe_iter = itertools.tee(items)
+    try:
+        first_item = next(probe_iter)
+    except StopIteration:
+        print(f"[{profile_key}] No remaining items to process.")
+        return None
+    return itertools.chain([first_item], probe_iter)
 
 
 def _apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> None:

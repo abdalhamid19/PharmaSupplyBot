@@ -99,7 +99,7 @@ def wait_for_login_detection(
         logged_in_marker,
         state_path,
         save_session_state,
-        save_intermediate=save_intermediate,
+        save_inter=save_intermediate,
     )
 
 
