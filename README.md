@@ -90,7 +90,21 @@ Linux / macOS (bash):
 python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
 ```
 
-### 4. تشغيل كل الصيدليات المعرفة في `config.yaml`
+### 4. تشغيل البحث السريع
+
+يستخدم `--fast-search` أول مطابقة مقبولة بدل تجربة صيغ بحث إضافية، وهذا يقلل زمن إضافة الصنف عندما تكون نتائج Tawreed واضحة.
+
+Windows PowerShell:
+```powershell
+py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --fast-search
+```
+
+Linux / macOS (bash):
+```bash
+python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --fast-search
+```
+
+### 5. تشغيل كل الصيدليات المعرفة في `config.yaml`
 
 Windows PowerShell:
 ```powershell
@@ -102,7 +116,7 @@ Linux / macOS (bash):
 python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
-### 5. فتح المتصفح أثناء التشغيل للتشخيص
+### 6. فتح المتصفح أثناء التشغيل للتشخيص
 
 Windows PowerShell:
 ```powershell
@@ -184,6 +198,7 @@ rule_audit_ok
 ## سلوك التنفيذ الحالي
 
 - افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
+- استخدم `--fast-search` لتقليل زمن البحث عن الصنف؛ يتوقف عند أول نتيجة مطابقة مقبولة بدل تجربة صيغ إضافية.
 - اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
   - `runtime.submit_order: true` داخل `config.yaml`
 - إذا كانت الجلسة منتهية أو غير صالحة، سيطلب منك البرنامج إعادة تنفيذ:
