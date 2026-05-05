@@ -27,7 +27,8 @@ def _process_removal_target(bot, page, target):
         count, status, reason = 0, "failed", str(error)
     append_cart_removal_summary(
         bot.profile_key, target.item,
-        CartRemovalSummary(removed_count=count, status=status, reason=reason)
+        CartRemovalSummary(removed_count=count, status=status, reason=reason),
+        label_suffix=bot.summary_label_suffix,
     )
     bot.log(f"Cart removal {target.item.code} / {target.item.name}: {reason}")
 

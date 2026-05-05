@@ -41,12 +41,18 @@ def append_text_artifact(profile_key: str, label: str, content: str) -> Path:
     return artifact_path
 
 
-def append_csv_artifact(profile_key: str, label: str, rows: list[dict[str, object]]) -> Path | None:
+def append_csv_artifact(
+    profile_key: str,
+    label: str,
+    rows: list[dict[str, object]],
+    label_suffix: str | None = None,
+) -> Path | None:
     """Append structured diagnostic rows to a CSV artifact for the active profile."""
     if not rows:
         return None
     artifacts_dir = _artifacts_dir(profile_key)
-    artifact_path = artifacts_dir / f"{label}.csv"
+    effective_label = f"{label}.{label_suffix}" if label_suffix else label
+    artifact_path = artifacts_dir / f"{effective_label}.csv"
     fieldnames = list(rows[0].keys())
     if artifact_path.exists():
         existing_fieldnames = _csv_header_fieldnames(artifact_path)
@@ -62,7 +68,10 @@ def append_csv_artifact(profile_key: str, label: str, rows: list[dict[str, objec
 
 
 def append_xlsx_artifact(
-    profile_key: str, label: str, rows: list[dict[str, object]]
+    profile_key: str,
+    label: str,
+    rows: list[dict[str, object]],
+    label_suffix: str | None = None,
 ) -> Path | None:
     """Append structured rows to an XLSX artifact for the active profile."""
 
@@ -70,7 +79,8 @@ def append_xlsx_artifact(
         return None
     try:
         artifacts_dir = _artifacts_dir(profile_key)
-        artifact_path = artifacts_dir / f"{label}.xlsx"
+        effective_label = f"{label}.{label_suffix}" if label_suffix else label
+        artifact_path = artifacts_dir / f"{effective_label}.xlsx"
         fieldnames = list(rows[0].keys())
         workbook, worksheet = _open_or_create_workbook(artifact_path)
         _ensure_xlsx_header_row(worksheet, fieldnames)

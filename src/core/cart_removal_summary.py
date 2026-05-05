@@ -21,6 +21,7 @@ def append_cart_removal_summary(
     profile_key: str,
     item: CartRemovalItem,
     summary: CartRemovalSummary,
+    label_suffix: str | None = None,
 ) -> None:
     """Append one cart-removal summary row."""
     append_csv_artifact(
@@ -35,4 +36,5 @@ def append_cart_removal_summary(
                 "reason": summary.reason,
             }
         ],
+        label_suffix=label_suffix,
     )

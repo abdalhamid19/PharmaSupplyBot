@@ -65,6 +65,7 @@ class TawreedBot:
         debug_browser: bool = False,
         stop_flag_path: Path | None = None,
         fast_search: bool = False,
+        summary_label_suffix: str | None = None,
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
@@ -74,6 +75,7 @@ class TawreedBot:
         self.debug_browser = debug_browser
         self.stop_flag_path = stop_flag_path
         self.fast_search = fast_search
+        self.summary_label_suffix = summary_label_suffix
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
         self.no_results_exception = _NoResultsItem
@@ -407,7 +409,9 @@ class TawreedBot:
         summary = self._build_item_summary(
             status, reason, elapsed_seconds, match_elapsed_seconds
         )
-        append_order_result_summary(self.profile_key, item, summary)
+        append_order_result_summary(
+            self.profile_key, item, summary, label_suffix=self.summary_label_suffix
+        )
 
     def _build_item_summary(
         self, status: str, reason: str, elapsed: float, match_elapsed: float
