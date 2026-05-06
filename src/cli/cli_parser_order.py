@@ -41,7 +41,7 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
     argument_parser.add_argument(
         "--resume",
         action="store_true",
-        help="Skip items already present in order_result_summary.csv",
+        help="Skip items already present in the active summary CSV",
     )
     argument_parser.add_argument(
         "--stop-flag",
