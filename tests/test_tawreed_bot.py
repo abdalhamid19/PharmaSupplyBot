@@ -1,7 +1,6 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -12,6 +11,7 @@ from src.core.config.config_models import (
     ProfileConfig,
     RuntimeConfig,
 )
+from src.core.matching_models import MatchDecision, SearchMatch
 from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
 from src.tawreed.tawreed_session import SessionInvalidError
@@ -102,7 +102,7 @@ class TawreedBotTests(unittest.TestCase):
                 self.assertFalse(completed)
                 completed = bot._process_items(
                     page,
-                    [SimpleNamespace(code="1", name="Panadol")],
+                    [Item(code="1", name="Panadol", qty=1)],
                 )
 
             self.assertFalse(completed)
@@ -144,6 +144,34 @@ class TawreedBotTests(unittest.TestCase):
                 dump_artifacts.assert_called_once()
                 details = dump_artifacts.call_args.kwargs["details"]
                 self.assertIn("overlay_diagnostics=overlay_panels=1", details)
+
+    def test_build_item_summary_populates_matched_names_by_language(self) -> None:
+        bot = self._bot()
+        bot.last_match_decision = MatchDecision(
+            best_match=SearchMatch(
+                query="Panadol Extra",
+                row_index=0,
+                score=22.5,
+                data={
+                    "productNameEn": "Panadol Extra 24 Tabs",
+                    "productName": "بنادول اكسترا 24 قرص",
+                },
+            ),
+            diagnostics=[],
+            final_reason="Accepted",
+        )
+
+        summary = bot._build_item_summary(
+            status="added-to-cart",
+            reason="Added to cart.",
+            elapsed=1.0,
+            match_elapsed=0.5,
+        )
+
+        self.assertEqual(summary.matched_product_name, "Panadol Extra 24 Tabs")
+        self.assertEqual(summary.matched_product_english_name, "Panadol Extra 24 Tabs")
+        self.assertEqual(summary.matched_product_arabic_name, "بنادول اكسترا 24 قرص")
+        self.assertEqual(summary.matched_query, "Panadol Extra")
 
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:
         config = AppConfig(

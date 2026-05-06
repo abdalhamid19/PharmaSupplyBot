@@ -1,8 +1,13 @@
 import unittest
 from unittest.mock import patch
 
+from src.core.matching_models import (
+    CandidateMatchDiagnostic,
+    MatchDecision,
+    MatchScoreBreakdown,
+    SearchMatch,
+)
 from src.core.utils.excel import Item
-from src.core.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
 from src.tawreed.tawreed_match_logs import (
     OrderItemSummary,
     append_order_result_summary,
@@ -18,6 +23,8 @@ class TawreedMatchLogsTests(unittest.TestCase):
             reason="Matched product is unavailable.",
             ordered_total_qty=2,
             matched_product_name="Panadol Extra 24 Tabs",
+            matched_product_english_name="Panadol Extra 24 Tabs",
+            matched_product_arabic_name="بنادول اكسترا 24 قرص",
             matched_query="Panadol Extra",
             selected_discount_percent="35%",
             selected_store_name="Abu Amira",
@@ -39,6 +46,8 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "status": "matched-but-unavailable",
             "reason": "Matched product is unavailable.",
             "matched_product_name": "Panadol Extra 24 Tabs",
+            "matched_product_english_name": "Panadol Extra 24 Tabs",
+            "matched_product_arabic_name": "بنادول اكسترا 24 قرص",
             "matched_query": "Panadol Extra",
             "selected_discount_percent": "35%",
             "selected_store_name": "Abu Amira",
@@ -47,10 +56,16 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "elapsed_seconds": 0.0,
             "match_elapsed_seconds": 0.0,
         }
-        append_csv.assert_called_once_with("wardany", "order_result_summary", [expected_row])
-        append_xlsx.assert_called_once_with("wardany", "order_result_summary", [expected_row])
+        append_csv.assert_called_once_with(
+            "wardany", "order_result_summary", [expected_row]
+        )
+        append_xlsx.assert_called_once_with(
+            "wardany", "order_result_summary", [expected_row]
+        )
 
-    def test_should_write_detailed_match_log_skips_clean_high_overlap_accept(self) -> None:
+    def test_should_write_detailed_match_log_skips_clean_high_overlap_accept(
+        self,
+    ) -> None:
         candidate = {"productNameEn": "Panadol Extra 24 Tabs", "productName": ""}
         decision = MatchDecision(
             best_match=SearchMatch(

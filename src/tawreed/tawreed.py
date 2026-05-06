@@ -2,41 +2,31 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import time
+from pathlib import Path
+from typing import Iterable
 
 from playwright.sync_api import Page, sync_playwright
 
-from ..core.config.config_models import AppConfig, ProfileConfig
-from ..core.utils.excel import Item
 from ..core.cart_removal_items import CartRemovalItem
+from ..core.config.config_models import AppConfig, ProfileConfig
+from ..core.matching_models import MatchDecision
+from ..core.utils.excel import Item
 from .selectors import _selectors
 from .tawreed_artifacts import dump_artifacts
-from .tawreed_checkout import confirm_order
 from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
+from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
+from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
 from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_products_flow import add_item_from_products_page
-from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
-
 from .tawreed_session import (
-    auth_temp_state_path,
-    attempt_env_login,
     close_browser,
     close_context,
-    discard_session_state,
     ensure_logged_in,
     headless_auth_failure_message,
-    open_auth_page,
     open_order_page,
-    print_auth_instructions,
-    print_login_detection_result,
-    promote_session_state,
-    save_session_state,
-    validate_saved_session,
-    wait_for_login_detection,
-    wait_for_network_idle,
 )
 from .tawreed_strategy import max_available_warehouse_row
 
@@ -87,13 +77,12 @@ class TawreedBot:
 
     def _reset_last_item_state(self) -> None:
         """Reset internal state tracking for the next item to be processed."""
-        self.last_match_decision = None
+        self.last_match_decision: MatchDecision | None = None
         self.last_match_elapsed_seconds = 0.0
         self.last_searched_queries: list[str] = []
         self.last_selected_discount_percent = ""
         self.last_selected_store_name = ""
         self.last_ordered_total_qty = 0
-
 
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""
@@ -106,8 +95,8 @@ class TawreedBot:
     def _auth(self, wait_seconds: int, headless: bool) -> None:
         """Authenticate in either interactive or headless mode and save session state."""
         from .tawreed_session import perform_tawreed_auth
-        perform_tawreed_auth(self, wait_seconds, headless)
 
+        perform_tawreed_auth(self, wait_seconds, headless)
 
     def _headless_auth_error(self) -> Exception:
         """Return the explicit auth failure used when hosted login never leaves the login page."""
@@ -117,13 +106,18 @@ class TawreedBot:
         """Place an order by processing each item from the provided iterable."""
         with sync_playwright() as p:
             browser, context, page = open_order_page(
-                p, self.config.runtime, self.state_path, debug_browser=self.debug_browser
+                p,
+                self.config.runtime,
+                self.state_path,
+                debug_browser=self.debug_browser,
             )
             try:
                 self._run_order_session(page, items)
             except Exception as error:
                 dump_artifacts(
-                    page, self.profile_key, label="order_flow_error",
+                    page,
+                    self.profile_key,
+                    label="order_flow_error",
                     details=_artifact_details("order_flow_error", error),
                 )
                 raise
@@ -144,16 +138,18 @@ class TawreedBot:
                 return
             confirm_order(page, self.selectors, self.config.runtime.timeout_ms)
         else:
-            print(f"[{self.profile_key}] Stop requested or incomplete. Order confirmation skipped.")
-
-
-
+            print(
+                f"[{self.profile_key}] Stop requested or incomplete. Order confirmation skipped."
+            )
 
     def remove_cart_items(self, items: Iterable[CartRemovalItem]) -> None:
         """Remove the requested items from Tawreed carts."""
         with sync_playwright() as p:
             browser, context, page = open_order_page(
-                p, self.config.runtime, self.state_path, debug_browser=self.debug_browser,
+                p,
+                self.config.runtime,
+                self.state_path,
+                debug_browser=self.debug_browser,
             )
             try:
                 self._prepare_order_page(page)
@@ -170,16 +166,18 @@ class TawreedBot:
     def _handle_removal_error(self, page: Page, error: Exception) -> None:
         """Capture diagnostics for cart removal failures."""
         dump_artifacts(
-            page, self.profile_key, label="cart_removal_error",
+            page,
+            self.profile_key,
+            label="cart_removal_error",
             details=_artifact_details("cart_removal_error", error),
         )
-
 
     def _prepare_cart_page(self, page: Page) -> None:
         """Open Tawreed's cart page for cart-removal processing."""
         page.goto(self._cart_page_url(), wait_until="domcontentloaded")
         ensure_logged_in(
-            page, self.selectors,
+            page,
+            self.selectors,
             self.config.runtime.timeout_ms,
             ready_selector=self.selectors.cart_rows,
         )
@@ -205,18 +203,21 @@ class TawreedBot:
         if self._order_surface_ready(page):
             return
         go_to_orders(page, self.selectors.go_to_orders, self._order_surface_selector())
-        start_new_order(page, self.selectors.new_order, self.selectors.item_search_input)
+        start_new_order(
+            page, self.selectors.new_order, self.selectors.item_search_input
+        )
 
     def _process_items(self, page: Page, items: Iterable[Item]) -> bool:
         """Process each requested Excel item on the current order page."""
         added_any = False
         for item in items:
             if self._stop_requested():
-                print(f"[{self.profile_key}] Stop requested before item {item.code} / {item.name}.")
+                print(
+                    f"[{self.profile_key}] Stop requested before item {item.code} / {item.name}."
+                )
                 return False
             added_any = self._process_single_item(page, item) or added_any
         return added_any
-
 
     def _stop_requested(self) -> bool:
         """Return whether an external stop request has been written for this run."""
@@ -264,7 +265,9 @@ class TawreedBot:
     def _record_success(self, item: Item, started_at: float) -> None:
         """Record a successful add-to-cart summary."""
         self._record_item_summary(
-            item, status="added-to-cart", reason="Added to cart.",
+            item,
+            status="added-to-cart",
+            reason="Added to cart.",
             elapsed_seconds=time.perf_counter() - started_at,
             match_elapsed_seconds=self.last_match_elapsed_seconds,
         )
@@ -273,35 +276,49 @@ class TawreedBot:
         """Record a skipped item summary."""
         reason = str(error)
         self._record_item_summary(
-            item, status=self._skip_status(reason), reason=reason,
+            item,
+            status=self._skip_status(reason),
+            reason=reason,
             elapsed_seconds=time.perf_counter() - started_at,
             match_elapsed_seconds=self.last_match_elapsed_seconds,
         )
-        print(_console_safe(
-            f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}"
-        ))
+        print(
+            _console_safe(
+                f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}"
+            )
+        )
 
-    def _record_failure(self, page: Page, item: Item, error: Exception, started_at: float) -> None:
+    def _record_failure(
+        self, page: Page, item: Item, error: Exception, started_at: float
+    ) -> None:
         """Record a technical failure and capture diagnostic artifacts."""
+        reason = str(error)
         close_visible_dialogs(page)
-        self._record_item_summary(
-            item, status=self._failure_status(str(error)), reason=str(error),
-            elapsed_seconds=time.perf_counter() - started_at,
-            match_elapsed_seconds=self.last_match_elapsed_seconds,
-        )
-        print(_console_safe(
-            f"[{self.profile_key}] Failed item {item.code} / {item.name}: {error}"
-        ))
+        self._record_failure_summary(item, reason, started_at)
+        self._print_failed_item(item, error)
         dump_artifacts(
-            page, self.profile_key, label=f"item_error_{item.code or 'no_code'}",
-            details=_artifact_details(
-                f"item_error_{item.code or 'no_code'}", error,
-                overlay_diagnostics=visible_overlay_diagnostics(page),
-                item_code=item.code, item_name=item.name, item_qty=item.qty,
-            ),
+            page,
+            self.profile_key,
+            label=_item_error_label(item),
+            details=_item_error_details(page, item, error),
         )
 
+    def _record_failure_summary(
+        self, item: Item, reason: str, started_at: float
+    ) -> None:
+        """Append the summary row for one failed item."""
+        self._record_item_summary(
+            item,
+            self._failure_status(reason),
+            reason,
+            time.perf_counter() - started_at,
+            self.last_match_elapsed_seconds,
+        )
 
+    def _print_failed_item(self, item: Item, error: Exception) -> None:
+        """Print one console-safe failed item message."""
+        message = f"[{self.profile_key}] Failed item {item.code} / {item.name}: {error}"
+        print(_console_safe(message))
 
     def _ensure_logged_in(self, page: Page) -> None:
         """Verify that the saved session is still authenticated before ordering begins."""
@@ -368,7 +385,9 @@ class TawreedBot:
             return
 
         if mode == "max_available":
-            row_index = max_available_warehouse_row(rows, self.selectors.warehouse_available_qty)
+            row_index = max_available_warehouse_row(
+                rows, self.selectors.warehouse_available_qty
+            )
             self._click_warehouse_row(page, rows.nth(row_index))
             return
 
@@ -393,7 +412,9 @@ class TawreedBot:
     def _wait_for_warehouse_selection(self, page: Page) -> None:
         """Wait briefly for the warehouse chooser to settle after selecting a row."""
         try:
-            page.locator(self.selectors.warehouse_rows).first.wait_for(state="hidden", timeout=1000)
+            page.locator(self.selectors.warehouse_rows).first.wait_for(
+                state="hidden", timeout=1000
+            )
         except Exception:
             pass
 
@@ -417,28 +438,41 @@ class TawreedBot:
         self, status: str, reason: str, elapsed: float, match_elapsed: float
     ) -> OrderItemSummary:
         """Build a compact summary object from the current bot state."""
-        matched_name, matched_query = self._matched_summary_fields()
         return OrderItemSummary(
-            status=status, reason=reason,
+            status=status,
+            reason=reason,
             ordered_total_qty=self.last_ordered_total_qty,
-            matched_product_name=matched_name, matched_query=matched_query,
+            **self._matched_summary_name_fields(),
             selected_discount_percent=self.last_selected_discount_percent,
             selected_store_name=self.last_selected_store_name,
             searched_queries_count=len(self.last_searched_queries),
             searched_queries=" | ".join(self.last_searched_queries),
-            elapsed_seconds=elapsed, match_elapsed_seconds=match_elapsed,
+            elapsed_seconds=elapsed,
+            match_elapsed_seconds=match_elapsed,
         )
 
+    def _matched_summary_name_fields(self) -> dict[str, str]:
+        """Return named OrderItemSummary fields for the last matched product."""
+        matched_name, english_name, arabic_name, matched_query = (
+            self._matched_summary_fields()
+        )
+        return {
+            "matched_product_name": matched_name,
+            "matched_product_english_name": english_name,
+            "matched_product_arabic_name": arabic_name,
+            "matched_query": matched_query,
+        }
 
-
-    def _matched_summary_fields(self) -> tuple[str, str]:
+    def _matched_summary_fields(self) -> tuple[str, str, str, str]:
         """Return matched product summary fields from the last recorded match decision."""
         decision = self.last_match_decision
         if not decision or not decision.best_match:
-            return "", ""
+            return "", "", "", ""
         candidate = decision.best_match.data
-        product_name = str(candidate.get("productNameEn") or candidate.get("productName") or "")
-        return product_name, decision.best_match.query
+        english_name = str(candidate.get("productNameEn") or "")
+        arabic_name = str(candidate.get("productName") or "")
+        product_name = english_name or arabic_name
+        return product_name, english_name, arabic_name, decision.best_match.query
 
     def _skip_status(self, reason: str) -> str:
         """Return the structured summary status for one skipped item."""
@@ -454,6 +488,23 @@ class TawreedBot:
         if "No matching product found" in reason:
             return "no-results"
         return "failed"
+
+
+def _item_error_label(item: Item) -> str:
+    """Return the artifact label for one failed item."""
+    return f"item_error_{item.code or 'no_code'}"
+
+
+def _item_error_details(page: Page, item: Item, error: Exception) -> str:
+    """Build diagnostic artifact details for one failed item."""
+    return _artifact_details(
+        _item_error_label(item),
+        error,
+        overlay_diagnostics=visible_overlay_diagnostics(page),
+        item_code=item.code,
+        item_name=item.name,
+        item_qty=item.qty,
+    )
 
 
 def _artifact_details(label: str, error: Exception, **extra: object) -> str:
