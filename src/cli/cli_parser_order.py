@@ -51,7 +51,7 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
     argument_parser.add_argument(
         "--fast-search",
         action="store_true",
-        help="Stop after the first acceptable product match instead of probing extra query variants",
+        help="Stop after the first acceptable product match",
     )
     argument_parser.add_argument(
         "--item-workers",

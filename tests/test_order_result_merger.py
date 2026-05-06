@@ -37,10 +37,26 @@ class MergeWorkerSummariesTests(unittest.TestCase):
         self.assertEqual(merged[0]["col1"], "a")
         self.assertEqual(merged[1]["col1"], "b")
 
+    def test_empty_worker_file_merges_to_header_only_summary(self) -> None:
+        """A header-only worker file produces an empty canonical summary."""
+        self._write_header_only_csv("order_result_summary.worker_0.csv")
+        merge_worker_summaries("testprofile", "order_result_summary")
+        merged = self._read_csv("order_result_summary.csv")
+        self.assertEqual(merged, [])
+
     def test_no_worker_files_leaves_no_output(self) -> None:
         """When no worker files exist the merger does nothing."""
         merge_worker_summaries("testprofile", "order_result_summary")
         self.assertFalse((self.artifacts_dir / "order_result_summary.csv").exists())
+
+    def test_schema_mismatch_between_workers_fails_loudly(self) -> None:
+        """Different worker CSV schemas raise instead of silently corrupting rows."""
+        self._write_csv("order_result_summary.worker_0.csv", ["x", "1"])
+        self._write_header_only_csv(
+            "order_result_summary.worker_1.csv", ["col1", "bad"]
+        )
+        with self.assertRaisesRegex(ValueError, "schema mismatch"):
+            merge_worker_summaries("testprofile", "order_result_summary")
 
     def test_removes_worker_files_after_merge(self) -> None:
         """Worker partition files are cleaned up after a successful merge."""
@@ -62,6 +78,17 @@ class MergeWorkerSummariesTests(unittest.TestCase):
             writer = csv.DictWriter(f, fieldnames=["col1", "col2"])
             writer.writeheader()
             writer.writerow({"col1": row_values[0], "col2": row_values[1]})
+
+    def _write_header_only_csv(
+        self,
+        name: str,
+        fieldnames: list[str] | None = None,
+    ) -> None:
+        """Write a worker CSV with only headers."""
+        path = self.artifacts_dir / name
+        with path.open("w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames or ["col1", "col2"])
+            writer.writeheader()
 
     def _read_csv(self, name: str) -> list[dict]:
         """Read the canonical CSV file."""

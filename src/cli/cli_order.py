@@ -11,24 +11,27 @@ from pathlib import Path
 from typing import Any
 
 from ..core.config.config_models import AppConfig, ProfileConfig
-from ..core.utils.chunking import split_into_chunks
-from ..core.utils.excel import load_items_from_excel
 from ..core.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     filter_prevented_order_items,
     is_prevented_items_excel_path,
     load_prevented_items,
 )
+from ..core.utils.chunking import split_into_chunks
+from ..core.utils.excel import load_items_from_excel
 from ..tawreed.order_result_merger import merge_worker_summaries
 from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import build_bot, invalid_session_exit, require_state_file
+from .item_worker_pool import report_worker_results, resolve_item_workers
 
 
 def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Place orders from Excel for the selected profiles."""
     _apply_order_overrides(app_config, args)
-    profiles = app_config.profiles_to_run(profile=args.profile, all_profiles=args.all_profiles)
+    profiles = app_config.profiles_to_run(
+        profile=args.profile, all_profiles=args.all_profiles
+    )
     _execute_profiles(app_config, profiles, args)
     return 0
 
@@ -45,7 +48,19 @@ def _execute_profiles(
             _run_single_profile(app_config, profile_key, profile, args)
         return
 
-    print(f"Running {len(profiles)} profiles in parallel (max_workers={max_workers})...")
+    _run_parallel_profiles(app_config, profiles, args, max_workers)
+
+
+def _run_parallel_profiles(
+    app_config: AppConfig,
+    profiles: list[tuple[str, ProfileConfig]],
+    args: argparse.Namespace,
+    max_workers: int,
+) -> None:
+    """Submit profile-level order runs to the configured thread pool."""
+    print(
+        f"Running {len(profiles)} profiles in parallel (max_workers={max_workers})..."
+    )
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(_run_single_profile, app_config, pk, p, args)
@@ -78,7 +93,7 @@ def _run_single_profile(
     profile_items = _ensure_non_empty_items(profile_key, profile_items)
     if profile_items is None:
         return
-    item_workers = _resolve_item_workers(app_config, args)
+    item_workers = resolve_item_workers(app_config, args)
     if item_workers > 1:
         _run_parallel_order(app_config, profile_key, profile_items, args, item_workers)
         return
@@ -107,10 +122,14 @@ def _apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> N
         app_config.warehouse_strategy["mode"] = str(warehouse_mode)
     min_discount_percent = getattr(args, "min_discount_percent", None)
     if min_discount_percent is not None:
-        app_config.warehouse_strategy["min_discount_percent"] = float(min_discount_percent)
+        app_config.warehouse_strategy["min_discount_percent"] = float(
+            min_discount_percent
+        )
 
 
-def _load_order_items(app_config: AppConfig, args: argparse.Namespace) -> Iterable[Item]:
+def _load_order_items(
+    app_config: AppConfig, args: argparse.Namespace
+) -> Iterable[Item]:
     """Load and filter order items iteratively."""
     excel_path = Path(args.excel)
     items = load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
@@ -191,12 +210,6 @@ def _run_profile_order(
         raise invalid_session_exit(base_url, profile_key, error) from error
 
 
-def _resolve_item_workers(app_config: AppConfig, args: argparse.Namespace) -> int:
-    """Return the effective item-level worker count for this run."""
-    cli_value = getattr(args, "item_workers", None)
-    return cli_value if cli_value is not None else app_config.runtime.item_workers
-
-
 def _run_parallel_order(
     app_config: AppConfig,
     profile_key: str,
@@ -215,7 +228,7 @@ def _run_parallel_order(
     with ctx.Pool(processes=len(chunks)) as pool:
         results = pool.map(run_order_chunk, payloads)
     merge_worker_summaries(profile_key, "order_result_summary")
-    _report_worker_results(app_config.base_url, profile_key, results)
+    report_worker_results(app_config.base_url, profile_key, results)
 
 
 def _build_order_payloads(
@@ -247,13 +260,3 @@ def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
         "warehouse_mode": getattr(args, "warehouse_mode", None),
         "min_discount_percent": getattr(args, "min_discount_percent", None),
     }
-
-
-def _report_worker_results(base_url: str, profile_key: str, results: list[dict]) -> None:
-    """Log worker outcomes and raise on session-invalid failures."""
-    for result in results:
-        if result.get("status") == "session_invalid":
-            error = SessionInvalidError(result.get("error", ""))
-            raise invalid_session_exit(base_url, profile_key, error) from None
-        if result.get("status") == "error":
-            print(f"[{profile_key}] Worker error: {result.get('error', '')}")

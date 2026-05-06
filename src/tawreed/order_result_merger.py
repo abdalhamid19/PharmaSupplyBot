@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import csv
+import re
 from pathlib import Path
 
 from openpyxl import Workbook
+
+_WORKER_RE = re.compile(r"\.worker_(\d+)\.csv$")
 
 
 def merge_worker_summaries(profile_key: str, base_label: str) -> None:
     """Concatenate worker CSV/XLSX partitions into one canonical summary file."""
     artifacts_dir = Path("artifacts") / profile_key
-    worker_csv_files = sorted(artifacts_dir.glob(f"{base_label}.worker_*.csv"))
+    worker_csv_files = sorted(
+        artifacts_dir.glob(f"{base_label}.worker_*.csv"), key=_worker_sort_key
+    )
     if not worker_csv_files:
         return
     rows, fieldnames = _collect_worker_csv_rows(worker_csv_files)
@@ -21,16 +26,33 @@ def merge_worker_summaries(profile_key: str, base_label: str) -> None:
 
 
 def _collect_worker_csv_rows(paths: list[Path]) -> tuple[list[dict], list[str]]:
-    """Read all worker CSV files and return rows with the canonical fieldnames."""
+    """Read all worker CSV files and reject incompatible schemas."""
     rows: list[dict[str, str]] = []
     fieldnames: list[str] = []
     for path in paths:
         with path.open("r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
-            if not fieldnames and reader.fieldnames:
-                fieldnames = list(reader.fieldnames)
+            current = list(reader.fieldnames or [])
+            fieldnames = _merge_fieldnames(fieldnames, current, path)
             rows.extend(reader)
     return rows, fieldnames
+
+
+def _merge_fieldnames(expected: list[str], current: list[str], path: Path) -> list[str]:
+    """Return canonical fieldnames or raise on worker schema mismatch."""
+    if not current:
+        return expected
+    if not expected:
+        return current
+    if expected != current:
+        raise ValueError(f"Worker summary schema mismatch in {path}")
+    return expected
+
+
+def _worker_sort_key(path: Path) -> tuple[int, str]:
+    """Return a numeric worker-id sort key for stable merge ordering."""
+    match = _WORKER_RE.search(path.name)
+    return (int(match.group(1)) if match else 10**9, path.name)
 
 
 def _write_merged_csv(target: Path, fieldnames: list[str], rows: list[dict]) -> None:

@@ -5,29 +5,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-
 def run_order_chunk(payload: dict[str, Any]) -> dict[str, Any]:
     """Process one chunk of order items in an isolated subprocess."""
-    from ..core.config.config import load_config
     from ..core.utils.excel import Item
-    from ..tawreed.tawreed import TawreedBot
-    from ..tawreed.tawreed_session import SessionInvalidError
-    from .cli_shared import build_bot
 
-    config, profile_key, bot = _build_worker_bot(payload)
+    profile_key, bot = _build_worker_bot(payload)
     items = [Item(code=r[0], name=r[1], qty=r[2]) for r in payload["items"]]
-    return _execute_order(bot, items, profile_key, config.base_url)
+    return _execute_order(bot, items, profile_key)
 
 
 def run_cart_removal_chunk(payload: dict[str, Any]) -> dict[str, Any]:
     """Process one chunk of cart-removal items in an isolated subprocess."""
     from ..core.cart_removal_items import CartRemovalItem
-    from ..tawreed.tawreed_session import SessionInvalidError
-    from .cli_shared import build_bot
 
-    config, profile_key, bot = _build_worker_bot(payload)
+    profile_key, bot = _build_worker_bot(payload)
     items = [CartRemovalItem(code=r[0], name=r[1]) for r in payload["items"]]
-    return _execute_cart_removal(bot, items, profile_key, config.base_url)
+    return _execute_cart_removal(bot, items, profile_key)
 
 
 def _build_worker_bot(payload: dict[str, Any]):
@@ -35,27 +28,30 @@ def _build_worker_bot(payload: dict[str, Any]):
     from ..core.config.config import load_config
     from .cli_shared import build_bot
 
-    config_path = Path(payload["config_path"])
-    config = load_config(config_path)
+    config = load_config(Path(payload["config_path"]))
     profile_key = payload["profile_key"]
     options = payload.get("options", {})
     _apply_warehouse_overrides(config, options)
-    profile = config.profiles[profile_key]
-    worker_id = payload["worker_id"]
-
     bot = build_bot(
         config,
         profile_key,
-        profile,
-        debug_browser=options.get("debug_browser", False),
-        stop_flag_path=_opt_path(options.get("stop_flag")),
-        fast_search=options.get("fast_search", False),
-        summary_label_suffix=f"worker_{worker_id}",
+        config.profiles[profile_key],
+        **_build_bot_options(options, payload["worker_id"]),
     )
-    return config, profile_key, bot
+    return profile_key, bot
 
 
-def _execute_order(bot, items, profile_key, base_url) -> dict[str, Any]:
+def _build_bot_options(options: dict[str, Any], worker_id: int) -> dict[str, Any]:
+    """Return keyword arguments used to build one worker bot."""
+    return {
+        "debug_browser": options.get("debug_browser", False),
+        "stop_flag_path": _opt_path(options.get("stop_flag")),
+        "fast_search": options.get("fast_search", False),
+        "summary_label_suffix": f"worker_{worker_id}",
+    }
+
+
+def _execute_order(bot, items, profile_key) -> dict[str, Any]:
     """Run the order flow and return a structured result."""
     from ..tawreed.tawreed_session import SessionInvalidError
 
@@ -63,12 +59,16 @@ def _execute_order(bot, items, profile_key, base_url) -> dict[str, Any]:
         bot.place_order_from_items(iter(items))
         return {"status": "ok", "profile_key": profile_key}
     except SessionInvalidError as err:
-        return {"status": "session_invalid", "profile_key": profile_key, "error": str(err)}
+        return {
+            "status": "session_invalid",
+            "profile_key": profile_key,
+            "error": str(err),
+        }
     except Exception as err:
         return {"status": "error", "profile_key": profile_key, "error": str(err)}
 
 
-def _execute_cart_removal(bot, items, profile_key, base_url) -> dict[str, Any]:
+def _execute_cart_removal(bot, items, profile_key) -> dict[str, Any]:
     """Run the cart-removal flow and return a structured result."""
     from ..tawreed.tawreed_session import SessionInvalidError
 
@@ -76,7 +76,11 @@ def _execute_cart_removal(bot, items, profile_key, base_url) -> dict[str, Any]:
         bot.remove_cart_items(iter(items))
         return {"status": "ok", "profile_key": profile_key}
     except SessionInvalidError as err:
-        return {"status": "session_invalid", "profile_key": profile_key, "error": str(err)}
+        return {
+            "status": "session_invalid",
+            "profile_key": profile_key,
+            "error": str(err),
+        }
     except Exception as err:
         return {"status": "error", "profile_key": profile_key, "error": str(err)}
 
