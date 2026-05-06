@@ -104,7 +104,21 @@ Linux / macOS (bash):
 python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --fast-search
 ```
 
-### 5. تشغيل كل الصيدليات المعرفة في `config.yaml`
+### 5. تشغيل مطابقة الأصناف فقط بدون إضافة للسلة
+
+استخدم `--match-only` لتشغيل خوارزمية المطابقة وتسجيل النتائج في `artifacts/<profile>/order_result_summary.csv` وملفات `match_log` بدون الضغط على زر السلة أو إضافة أي صنف. هذا الوضع مفيد لمراجعة وتحسين خوارزمية التطابق بأمان.
+
+Windows PowerShell:
+```powershell
+py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --match-only
+```
+
+Linux / macOS (bash):
+```bash
+python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --match-only
+```
+
+### 6. تشغيل كل الصيدليات المعرفة في `config.yaml`
 
 Windows PowerShell:
 ```powershell
@@ -116,7 +130,7 @@ Linux / macOS (bash):
 python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
 ```
 
-### 6. فتح المتصفح أثناء التشغيل للتشخيص
+### 7. فتح المتصفح أثناء التشغيل للتشخيص
 
 Windows PowerShell:
 ```powershell
@@ -128,7 +142,7 @@ Linux / macOS (bash):
 python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
-### 7. تشغيل أكثر من worker للأصناف داخل نفس الصيدلية
+### 8. تشغيل أكثر من worker للأصناف داخل نفس الصيدلية
 
 استخدم `--item-workers N` لتقسيم ملف Excel الواحد على أكثر من عملية Chromium معزولة لنفس الـ profile. القيمة الافتراضية `1`، ويمكن ضبطها أيضًا من `runtime.item_workers` داخل `config.yaml`. ابدأ بقيمة صغيرة مثل `2`، ولا ترفعها كثيرًا لأن كل worker يفتح Chromium مستقل ويستخدم نفس جلسة `state/<profile>.json` للقراءة فقط.
 
@@ -142,7 +156,7 @@ Linux / macOS (bash):
 python3 run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany --item-workers 2
 ```
 
-### 8. حذف أصناف من سلة المشتريات
+### 9. حذف أصناف من سلة المشتريات
 
 ضع ملف الحذف داخل `data/input/remove_items/` ويجب أن يحتوي على الأعمدة:
 `كود` و`إسم الصنف`.
@@ -157,7 +171,7 @@ Windows PowerShell:
 py run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
 ```
 
-### 9. تشغيل واجهة Streamlit
+### 10. تشغيل واجهة Streamlit
 
 الرابط الأونلاين:
 ```text
@@ -213,6 +227,7 @@ rule_audit_ok
 
 - افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
 - استخدم `--fast-search` لتقليل زمن البحث عن الصنف؛ يتوقف عند أول نتيجة مطابقة مقبولة بدل تجربة صيغ إضافية.
+- استخدم `--match-only` لتسجيل نتائج المطابقة فقط بدون إضافة أي صنف إلى السلة.
 - استخدم `--item-workers N` لتشغيل order/remove-cart بالتوازي داخل profile واحد. عند التوازي تُكتب ملخصات مؤقتة بصيغة `*.worker_<id>.*` ثم تُدمج في الملخص الأساسي بعد انتهاء workers.
 - اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
   - `runtime.submit_order: true` داخل `config.yaml`

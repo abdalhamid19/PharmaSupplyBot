@@ -20,6 +20,8 @@ from ..core.prevented_items import (
 )
 from .streamlit_uploads import available_excel_options
 
+OrderRunFields = tuple[str, str, int, bool, bool, bool, bool, float]
+
 
 def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
     """Return the submitted order form values."""
@@ -49,7 +51,7 @@ def _order_form_values(
     input_mode: str,
     excel_path_str: str,
     upload: object,
-    run_fields: tuple[str, str, int, bool, bool, bool, float],
+    run_fields: OrderRunFields,
     item_workers: int,
     prevented_items_path: Path | None,
 ) -> dict[str, object]:
@@ -67,19 +69,17 @@ def _order_form_values(
     return values
 
 
-def _order_run_values(
-    run_fields: tuple[str, str, int, bool, bool, bool, float],
-) -> dict[str, object]:
+def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
     """Build values related to the selected order run target/options."""
-    profile_mode, profile_key, limit, debug_browser, resume, high_disc, min_disc = (
-        run_fields
-    )
+    profile_mode, profile_key, limit, debug_browser, resume, match_only = run_fields[:6]
+    high_disc, min_disc = run_fields[6:]
     return {
         "profile_mode": profile_mode,
         "profile_key": profile_key,
         "limit": int(limit),
         "debug_browser": bool(debug_browser),
         "resume": bool(resume),
+        "match_only": bool(match_only),
         "highest_discount": bool(high_disc),
         "min_discount_percent": float(min_disc),
     }
@@ -232,7 +232,7 @@ def order_excel_options(
     ]
 
 
-def profile_run_fields(app_config) -> tuple[str, str, int, bool, bool, bool, float]:
+def profile_run_fields(app_config) -> OrderRunFields:
     """Return the order form fields related to profile execution."""
     profile_mode = st.radio(
         "Run target", ["Single profile", "All profiles"], horizontal=True
@@ -240,6 +240,7 @@ def profile_run_fields(app_config) -> tuple[str, str, int, bool, bool, bool, flo
     profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=50)
     resume = st.checkbox("Resume from previous summary", value=True)
+    match_only = st.checkbox("Match only without adding to cart", value=False)
     highest_discount = st.checkbox("Highest discount only", value=False)
     min_discount = st.number_input(
         "Minimum discount percent",
@@ -255,6 +256,7 @@ def profile_run_fields(app_config) -> tuple[str, str, int, bool, bool, bool, flo
         int(limit),
         bool(debug_browser),
         bool(resume),
+        bool(match_only),
         bool(highest_discount),
         float(min_discount),
     )

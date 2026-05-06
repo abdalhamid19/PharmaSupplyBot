@@ -60,6 +60,24 @@ class StreamlitOrderTests(unittest.TestCase):
         self.assertIn("--min-discount-percent", command)
         self.assertEqual(command[command.index("--min-discount-percent") + 1], "12")
 
+    def test_order_command_adds_match_only_flag(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "resume": False,
+                "match_only": True,
+                "highest_discount": False,
+                "min_discount_percent": 0,
+            },
+            Path("data/input/order_items/ddd.xlsx"),
+        )
+
+        self.assertIn("--match-only", command)
+
     def test_order_command_adds_item_workers_when_parallel(self) -> None:
         command = order_command(
             Path("config.yaml"),
@@ -197,7 +215,16 @@ class StreamlitOrderTests(unittest.TestCase):
             ),
             patch(
                 "src.ui.streamlit_order_form.profile_run_fields",
-                return_value=("Single profile", "wardany", 5, False, True, False, 0),
+                return_value=(
+                    "Single profile",
+                    "wardany",
+                    5,
+                    False,
+                    True,
+                    True,
+                    False,
+                    0,
+                ),
             ),
             patch("src.ui.streamlit_order_form.item_workers_field", return_value=2),
         ):
@@ -207,6 +234,7 @@ class StreamlitOrderTests(unittest.TestCase):
             values["prevented_items_excel"], str(DEFAULT_PREVENTED_ITEMS_PATH)
         )
         self.assertEqual(values["item_workers"], 2)
+        self.assertTrue(values["match_only"])
 
     def test_add_and_save_prevented_item_persists_new_item(self) -> None:
         with TemporaryDirectory() as temp_dir:
