@@ -1,76 +1,100 @@
 """Store selection and discount calculation for Tawreed orders."""
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
-from .tawreed_constants import (
-    DISCOUNT_KEYS, NESTED_NAME_KEYS, NESTED_STORE_KEYS, STORE_NAME_KEYS
-)
+
+from .tawreed_pricing import discount_value_as_percent, first_discount_value
+from .tawreed_store_summary import store_name
+
 
 @dataclass(frozen=True)
 class StoreChoice:
     """One precomputed store candidate for split-quantity selection."""
+
     index: int
     store: dict[str, Any]
     identity: str
     available_quantity: int
     discount_percent: float
 
-def choose_next_store_for_remaining_quantity(
-    stores: list[dict[str, Any]], remaining_qty: int, min_discount_percent: float = 0.0,
-) -> StoreChoice | None:
-    """Select the best available store based on discount and availability."""
-    choices = _resolve_store_choices(stores)
-    valid_choices = [
-        c for c in choices
-        if c.available_quantity > 0 and c.discount_percent >= min_discount_percent
-    ]
-    if not valid_choices: return None
-    valid_choices.sort(key=lambda c: c.discount_percent, reverse=True)
-    return valid_choices[0]
 
-def _resolve_store_choices(stores: list[dict[str, Any]]) -> list[StoreChoice]:
-    """Map raw store API objects into a list of comparable StoreChoice objects."""
-    return [_store_choice(i, s) for i, s in enumerate(stores)]
+def available_store_choices(
+    stores: list[dict[str, Any]],
+    used_store_ids: set[str] | None = None,
+    min_discount_percent: float = 0.0,
+) -> list[StoreChoice]:
+    """Return unused stores that have stock and satisfy the minimum discount."""
+    used_ids = used_store_ids or set()
+    return [
+        choice
+        for choice in _all_store_choices(stores)
+        if choice.identity not in used_ids
+        if choice.available_quantity > 0
+        if choice.discount_percent >= min_discount_percent
+    ]
+
+
+def choose_next_store_for_remaining_quantity(
+    stores: list[dict[str, Any]],
+    used_store_ids: set[str] | None = None,
+    mode: str = "first_available",
+    skip_exception_cls: type[Exception] = RuntimeError,
+    min_discount_percent: float = 0.0,
+) -> StoreChoice | None:
+    """Choose the next store for a remaining item quantity."""
+    choices = available_store_choices(stores, used_store_ids, min_discount_percent)
+    if choices:
+        return _select_choice(choices, mode)
+    if available_store_choices(stores, None, min_discount_percent):
+        return None
+    raise skip_exception_cls(_empty_selection_reason(min_discount_percent))
+
+
+def _select_choice(choices: list[StoreChoice], mode: str) -> StoreChoice:
+    if mode == "first_available":
+        return choices[0]
+    if mode == "max_available":
+        return max(choices, key=lambda c: (c.available_quantity, c.discount_percent))
+    if mode == "max_discount":
+        return max(choices, key=lambda c: (c.discount_percent, c.available_quantity))
+    raise ValueError(f"Unknown warehouse strategy mode: {mode}")
+
+
+def _all_store_choices(stores: list[dict[str, Any]]) -> list[StoreChoice]:
+    return [_store_choice(index, store) for index, store in enumerate(stores)]
+
 
 def _store_choice(index: int, store: dict[str, Any]) -> StoreChoice:
-    """Create a single StoreChoice from a raw store dictionary."""
     return StoreChoice(
-        index=index, store=store, identity=_store_name(store),
-        available_quantity=int(store.get("availableQuantity", 0)),
-        discount_percent=_first_discount_value(store),
+        index=index,
+        store=store,
+        identity=_store_identity(index, store),
+        available_quantity=_available_quantity(store),
+        discount_percent=_discount_percent(store),
     )
 
-def _store_name(store: dict[str, Any]) -> str:
-    """Extract a human-readable name for the store from various possible API keys."""
-    for key in STORE_NAME_KEYS:
-        if store.get(key): return str(store[key])
-    for nested_key in NESTED_STORE_KEYS:
-        nested = store.get(nested_key)
-        if isinstance(nested, dict):
-            for name_key in NESTED_NAME_KEYS:
-                if nested.get(name_key): return str(nested[name_key])
-    return "Unknown Store"
 
-def _first_discount_value(store: dict[str, Any]) -> float:
-    """Extract the primary discount percentage value from the store API data."""
-    for key, value in store.items():
-        if _is_discount_key(key):
-            discount = _discount_value(value)
-            if discount > 0: return discount
-    return 0.0
+def _store_identity(index: int, store: dict[str, Any]) -> str:
+    for key in ("storeProductId", "productStoreId", "storeId", "supplierId", "id"):
+        value = str(store.get(key) or "").strip()
+        if value:
+            return f"{key}:{value}"
+    return f"storeName:{store_name(store)}:{index}"
 
-def _discount_value(value: Any) -> float:
-    """Parse a discount value into a float percentage."""
-    try: return float(value)
-    except (ValueError, TypeError): return 0.0
 
-def _is_discount_key(key: str) -> bool:
-    """Return whether the provided key likely represents a discount percentage."""
-    k = key.lower()
-    return any(dk.lower() in k for dk in DISCOUNT_KEYS)
+def _available_quantity(store: dict[str, Any]) -> int:
+    try:
+        return int(float(str(store.get("availableQuantity") or 0).replace(",", "")))
+    except (TypeError, ValueError):
+        return 0
 
-def _is_name_key(key: str) -> bool:
-    """Return whether the provided key likely represents a store or product name."""
-    k = key.lower()
-    return "name" in k or "title" in k
 
+def _discount_percent(store: dict[str, Any]) -> float:
+    return max(0.0, discount_value_as_percent(first_discount_value(store)))
+
+
+def _empty_selection_reason(min_discount_percent: float) -> str:
+    if min_discount_percent > 0:
+        return f"No available store meets minimum discount {min_discount_percent:g}%."
+    return "All available stores for this product are out of stock."
