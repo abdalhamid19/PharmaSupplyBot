@@ -45,6 +45,30 @@ class CliCommandsTests(unittest.TestCase):
 
         self.assertEqual(remaining, [items[1]])
 
+    def test_resumable_match_only_uses_match_only_summary(self) -> None:
+        items = [
+            Item(code="1", name="Panadol", qty=1),
+            Item(code="2", name="Devarol", qty=2),
+        ]
+        args: Any = SimpleNamespace(resume=True, match_only=True)
+
+        with TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                summary_dir = Path("artifacts") / "wardany"
+                summary_dir.mkdir(parents=True)
+                (summary_dir / "match_only_summary.csv").write_text(
+                    "item_code,item_name,status\n1,Panadol,matched-only\n",
+                    encoding="utf-8",
+                )
+                with patch("src.cli.cli_order.require_state_file"):
+                    remaining = list(prepared_order_items("wardany", items, args))
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(remaining, [items[1]])
+
     def test_load_order_items_filters_prevented_items(self) -> None:
         items = [
             Item(code="1", name="Blocked", qty=1),
