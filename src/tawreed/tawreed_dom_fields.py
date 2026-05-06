@@ -16,7 +16,8 @@ def _dom_candidate(
     lines, query: str, s_count: int, c_count: int, row
 ) -> dict[str, Any]:
     return {
-        "productNameEn": _fallback_english_name(query, lines[0]),
+        "productNameEn": "",
+        "productNameEnFallback": _fallback_english_name(query, lines[0]),
         "productNameEnSynthetic": True,
         "productName": lines[0],
         "productsCount": s_count,
@@ -93,8 +94,6 @@ def _row_unavailable_message(row) -> str:
 
 
 class _SuppressAll:
-    def __enter__(self):
-        pass
+    def __enter__(self): pass
 
-    def __exit__(self, t, v, tb):
-        return True
+    def __exit__(self, t, v, tb): return True

@@ -275,8 +275,10 @@ def _candidate_texts(candidate: dict[str, Any]) -> list[str]:
 
 
 def _candidate_english_name(candidate: dict[str, Any]) -> str:
-    """Return the raw English candidate name."""
-    return str(candidate.get("productNameEn") or "")
+    """Return the raw English candidate name used for matching."""
+    return str(
+        candidate.get("productNameEn") or candidate.get("productNameEnFallback") or ""
+    )
 
 
 def _best_sequence_score(

@@ -172,7 +172,7 @@ class TawreedBotTests(unittest.TestCase):
         self.assertEqual(summary.matched_product_arabic_name, "بنادول اكسترا 24 قرص")
         self.assertEqual(summary.matched_query, "Panadol Extra")
 
-    def test_build_item_summary_includes_synthetic_dom_english_name(self) -> None:
+    def test_build_item_summary_omits_dom_fallback_english_name(self) -> None:
         bot = self._bot()
         bot.last_match_decision = MatchDecision(
             best_match=SearchMatch(
@@ -180,7 +180,8 @@ class TawreedBotTests(unittest.TestCase):
                 row_index=0,
                 score=16.0,
                 data={
-                    "productNameEn": "BEBELAC AR MILK",
+                    "productNameEn": "",
+                    "productNameEnFallback": "BEBELAC AR MILK",
                     "productNameEnSynthetic": True,
                     "productName": "لبن بيبلاك بريماتيور",
                 },
@@ -196,7 +197,7 @@ class TawreedBotTests(unittest.TestCase):
             match_elapsed=0.5,
         )
 
-        self.assertEqual(summary.matched_product_english_name, "BEBELAC AR MILK")
+        self.assertEqual(summary.matched_product_english_name, "")
         self.assertEqual(summary.matched_product_arabic_name, "لبن بيبلاك بريماتيور")
 
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:

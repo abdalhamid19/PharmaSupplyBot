@@ -164,8 +164,9 @@ def _candidate(english_name: str, arabic_name: str, qty: int = 3) -> dict[str, o
 
 
 def _synthetic_candidate(english_name: str, arabic_name: str) -> dict[str, object]:
-    """Return a DOM fallback product candidate with a synthetic English name."""
-    candidate = _candidate(english_name, arabic_name)
+    """Return a DOM fallback product candidate with no real English name."""
+    candidate = _candidate("", arabic_name)
+    candidate["productNameEnFallback"] = english_name
     candidate["productNameEnSynthetic"] = True
     return candidate
 
