@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import time
+from pathlib import Path
 
 import streamlit as st
 
@@ -14,7 +14,9 @@ from .streamlit_state import ensure_default_state_files, missing_state_profiles
 from .streamlit_uploads import resolve_excel_path
 
 
-def render_remove_cart_tab(app_config, default_profile: str | None, config_path: Path) -> None:
+def render_remove_cart_tab(
+    app_config, default_profile: str | None, config_path: Path
+) -> None:
     """Render cart-removal execution controls."""
     st.subheader("Remove Cart Items")
     if not default_profile:
@@ -25,7 +27,9 @@ def render_remove_cart_tab(app_config, default_profile: str | None, config_path:
     submitted, form_values = remove_cart_form_values(app_config)
     if not submitted:
         return
-    excel_path = resolve_excel_path(form_values["excel_path_str"], form_values["upload"])
+    excel_path = resolve_excel_path(
+        form_values["excel_path_str"], form_values["upload"]
+    )
     if excel_path is None:
         st.error("Please choose or upload an Excel file.")
         return
@@ -46,9 +50,12 @@ def remove_cart_form_values(app_config) -> tuple[bool, dict[str, object]]:
             if input_mode == "Upload file"
             else None
         )
-        profile_mode = st.radio("Run target", ["Single profile", "All profiles"], horizontal=True)
+        profile_mode = st.radio(
+            "Run target", ["Single profile", "All profiles"], horizontal=True
+        )
         profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
         debug_browser = st.checkbox("Debug browser", value=False)
+        item_workers = remove_cart_item_workers_field(app_config)
         submitted = st.form_submit_button("Remove Cart Items")
     return bool(submitted), {
         "input_mode": input_mode,
@@ -57,6 +64,7 @@ def remove_cart_form_values(app_config) -> tuple[bool, dict[str, object]]:
         "profile_mode": str(profile_mode),
         "profile_key": str(profile_key),
         "debug_browser": bool(debug_browser),
+        "item_workers": int(item_workers),
     }
 
 
@@ -86,10 +94,7 @@ def run_remove_cart_submission(
     if not prepare_remove_cart_state_files(app_config, form_values):
         return
     command = remove_cart_command(config_path, form_values, excel_path)
-    output_path = remove_cart_output_path()
-    state = start_cli_subprocess(command, output_path)
-    state.update({"command": command})
-    st.session_state["remove_cart_process"] = state
+    start_remove_cart_process(command, remove_cart_stop_flag_path())
     st.success("Cart-removal flow started.")
     st.rerun()
 
@@ -107,7 +112,22 @@ def remove_cart_command(
         command.append("--all-profiles")
     if form_values.get("debug_browser"):
         command.append("--debug-browser")
+    item_workers = int(form_values.get("item_workers") or 1)
+    if item_workers > 1:
+        command.extend(["--item-workers", str(item_workers)])
     return command
+
+
+def start_remove_cart_process(command: list[str], stop_flag_path: Path) -> None:
+    """Start one remove-cart command and remember its process-control state."""
+    stop_flag_path.parent.mkdir(parents=True, exist_ok=True)
+    if stop_flag_path.exists():
+        stop_flag_path.unlink()
+    command = [*command, "--stop-flag", str(stop_flag_path)]
+    output_path = remove_cart_output_path()
+    state = start_cli_subprocess(command, output_path)
+    state.update({"command": command, "stop_flag_path": str(stop_flag_path)})
+    st.session_state["remove_cart_process"] = state
 
 
 def prepare_remove_cart_state_files(app_config, form_values: dict[str, object]) -> bool:
@@ -122,7 +142,9 @@ def prepare_remove_cart_state_files(app_config, form_values: dict[str, object]) 
     return False
 
 
-def remove_cart_target_profile_keys(app_config, form_values: dict[str, object]) -> list[str]:
+def remove_cart_target_profile_keys(
+    app_config, form_values: dict[str, object]
+) -> list[str]:
     """Return profiles targeted by one remove-cart submission."""
     if form_values["profile_mode"] == "Single profile":
         return [str(form_values["profile_key"])]
@@ -139,8 +161,16 @@ def render_running_remove_cart_controls() -> bool:
     output_text = remove_cart_process_output(Path(state["output_path"]))
     if returncode is None:
         st.warning("Cart-removal flow is running.")
-        if st.button("Refresh Remove Status"):
-            st.rerun()
+        col_stop, col_refresh = st.columns(2)
+        with col_stop:
+            if st.button("Stop Remove Cart", type="primary"):
+                Path(state["stop_flag_path"]).write_text(
+                    "stop requested\n", encoding="utf-8"
+                )
+                st.info("Stop requested. Workers will stop before the next item.")
+        with col_refresh:
+            if st.button("Refresh Remove Status"):
+                st.rerun()
         if output_text:
             st.code(output_text[-4000:], language="text")
         return True
@@ -152,7 +182,9 @@ def render_running_remove_cart_controls() -> bool:
             "command": " ".join(state["command"]),
             "output": output_text,
             "error_type": "ProcessError" if returncode else "",
-            "error_message": f"Exited with status code {returncode}." if returncode else "",
+            "error_message": f"Exited with status code {returncode}."
+            if returncode
+            else "",
         }
     )
     render_remove_cart_summary()
@@ -168,11 +200,31 @@ def render_remove_cart_summary() -> None:
         st.dataframe(rows[-20:], use_container_width=True, hide_index=True)
 
 
+def remove_cart_item_workers_field(app_config) -> int:
+    """Return the requested item-level worker count for one cart-removal run."""
+    runtime = getattr(app_config, "runtime", None)
+    configured = int(getattr(runtime, "item_workers", 1) or 1)
+    return int(
+        st.number_input(
+            "Item workers",
+            min_value=1,
+            max_value=4,
+            value=max(1, min(configured, 4)),
+            help="Split this remove Excel across isolated Chromium workers.",
+        )
+    )
+
+
 def remove_cart_output_path() -> Path:
     """Return a unique output path for the current remove-cart run."""
     output_dir = ARTIFACTS_DIR / "run_control"
     output_dir.mkdir(parents=True, exist_ok=True)
     return output_dir / f"remove_cart_output_{int(time.time())}.log"
+
+
+def remove_cart_stop_flag_path() -> Path:
+    """Return the shared stop-request flag path for Streamlit remove-cart runs."""
+    return ARTIFACTS_DIR / "run_control" / "remove_cart_stop.flag"
 
 
 def remove_cart_process_output(output_path: Path) -> str:
