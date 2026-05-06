@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 import openpyxl
 
@@ -44,7 +44,7 @@ def _read_item_rows(path: Path, config: ExcelConfig) -> Iterable[tuple]:
     with open(path, "rb") as f:
         workbook = openpyxl.load_workbook(f, read_only=True, data_only=True)
         try:
-            sheet = workbook.active
+            sheet = cast(Any, workbook.active)
             indices = _resolve_col_indices(sheet, header_row_index, config)
 
             # Iterate rows starting after header
@@ -57,43 +57,62 @@ def _read_item_rows(path: Path, config: ExcelConfig) -> Iterable[tuple]:
 def _resolve_col_indices(sheet, header_index, config) -> list[int]:
     """Map required Excel columns to their numeric sheet indices."""
     header_row = list(
-        sheet.iter_rows(min_row=header_index + 1, max_row=header_index + 1, values_only=True)
+        sheet.iter_rows(
+            min_row=header_index + 1, max_row=header_index + 1, values_only=True
+        )
     )[0]
-    col_map = {_normalize_header(cell): idx for idx, cell in enumerate(header_row) if cell}
+    col_map = {
+        _normalize_header(cell): idx for idx, cell in enumerate(header_row) if cell
+    }
     required = [config.code_col, config.name_col, config.qty_col]
     aliases = _required_column_aliases(config)
     indices = [_first_matching_index(col_map, aliases[column]) for column in required]
 
-    if any(idx is None for idx in indices):
-        missing = [col for col, idx in zip(required, indices) if idx is None]
-        found = [str(cell).strip() for cell in header_row if cell]
-        raise ValueError(
-            f"Missing required Excel columns: {missing}. "
-            f"Expected: {required}. Found: {found}"
-        )
+    missing = [col for col, idx in zip(required, indices) if idx is None]
+    if missing:
+        _raise_missing_columns(missing, required, header_row)
+    return [idx for idx in indices if idx is not None]
 
-    return indices
+
+def _raise_missing_columns(missing: list[str], required: list[str], header_row) -> None:
+    """Raise a detailed error for missing configured Excel columns."""
+    found = [str(cell).strip() for cell in header_row if cell]
+    raise ValueError(
+        f"Missing required Excel columns: {missing}. "
+        f"Expected: {required}. Found: {found}"
+    )
 
 
 def _detect_header_row(path: Path, config: ExcelConfig) -> int | None:
     """Find the likely header row in report-style exports using openpyxl."""
     aliases = _required_column_aliases(config)
-    required = [aliases[config.code_col], aliases[config.name_col], aliases[config.qty_col]]
+    required = [
+        aliases[config.code_col],
+        aliases[config.name_col],
+        aliases[config.qty_col],
+    ]
     identity = [aliases[config.code_col], aliases[config.name_col]]
-    best_partial: int | None = None
     with open(path, "rb") as f:
         workbook = openpyxl.load_workbook(f, read_only=True, data_only=True)
         try:
-            sheet = workbook.active
-            for row_index, row in enumerate(sheet.iter_rows(max_row=20, values_only=True)):
-                values = {_normalize_header(value) for value in row if value is not None}
-                if all(values.intersection(column_aliases) for column_aliases in required):
-                    return row_index
-                if best_partial is None and all(
-                    values.intersection(column_aliases) for column_aliases in identity
-                ):
-                    best_partial = row_index
-        finally: workbook.close()
+            return _detect_header_row_in_sheet(workbook.active, required, identity)
+        finally:
+            workbook.close()
+
+
+def _detect_header_row_in_sheet(sheet, required, identity) -> int | None:
+    """Find a complete or partial header row in one worksheet."""
+    best_partial: int | None = None
+    for row_index, row in enumerate(
+        cast(Any, sheet).iter_rows(max_row=20, values_only=True)
+    ):
+        values = {_normalize_header(value) for value in row if value is not None}
+        if all(values.intersection(column_aliases) for column_aliases in required):
+            return row_index
+        if best_partial is None and all(
+            values.intersection(column_aliases) for column_aliases in identity
+        ):
+            best_partial = row_index
     return best_partial
 
 
@@ -113,7 +132,8 @@ def _column_aliases(primary: str, alternatives: set[str]) -> list[str]:
     """Normalize one configured header plus known local report variants."""
     aliases = [_normalize_header(primary)]
     aliases.extend(
-        alias for alias in sorted({_normalize_header(value) for value in alternatives})
+        alias
+        for alias in sorted({_normalize_header(value) for value in alternatives})
         if alias not in aliases
     )
     return aliases
@@ -130,7 +150,6 @@ def _first_matching_index(col_map: dict[str, int], aliases: list[str]) -> int | 
         if alias in col_map:
             return col_map[alias]
     return None
-
 
 
 def _row_tuple_to_item(row: tuple, config: ExcelConfig) -> Item | None:
@@ -162,4 +181,3 @@ def _to_int(x: Any) -> int:
         if not s:
             return 0
         return int(float(s))
-

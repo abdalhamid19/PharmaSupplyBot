@@ -67,6 +67,8 @@ def _write_merged_xlsx(target: Path, fieldnames: list[str], rows: list[dict]) ->
     """Write the merged rows into the canonical XLSX summary."""
     workbook = Workbook()
     worksheet = workbook.active
+    if worksheet is None:
+        raise RuntimeError("Failed to create merged summary worksheet.")
     worksheet.append(fieldnames)
     for row in rows:
         worksheet.append([row.get(field, "") for field in fieldnames])

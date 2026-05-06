@@ -112,10 +112,18 @@ def remove_cart_command(
         command.append("--all-profiles")
     if form_values.get("debug_browser"):
         command.append("--debug-browser")
-    item_workers = int(form_values.get("item_workers") or 1)
+    item_workers = _form_int(form_values, "item_workers", 1)
     if item_workers > 1:
         command.extend(["--item-workers", str(item_workers)])
     return command
+
+
+def _form_int(values: dict[str, object], key: str, default: int) -> int:
+    """Return one integer form value with an empty-safe fallback."""
+    value = values.get(key)
+    if value is None or value == "":
+        return default
+    return int(value)
 
 
 def start_remove_cart_process(command: list[str], stop_flag_path: Path) -> None:
@@ -238,6 +246,8 @@ def close_remove_cart_process_output(state: dict[str, object]) -> None:
     """Close the stored process output file handle if it is still open."""
     output_file = state.get("output_file")
     try:
-        output_file.close()
+        close = getattr(output_file, "close", None)
+        if callable(close):
+            close()
     except Exception:
         pass

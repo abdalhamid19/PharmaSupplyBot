@@ -6,12 +6,15 @@ import csv
 import os
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import patch
 
 from src.cli.cli_cart_removal import run_remove_cart_command
 from src.core.cart_removal_items import CartRemovalItem
+from src.core.config.config_models import AppConfig
 
 
 class ItemWorkerPoolTests(unittest.TestCase):
@@ -79,7 +82,9 @@ class ItemWorkerPoolTests(unittest.TestCase):
                 "src.cli.item_worker_runner.run_cart_removal_chunk", self._fake_worker
             ),
         ):
-            return run_remove_cart_command(app_config, args)
+            return run_remove_cart_command(
+                cast(AppConfig, app_config), cast(Namespace, args)
+            )
 
     def _fake_worker(self, payload: dict) -> dict:
         """Write a fake per-worker CSV unless a stop flag already exists."""
