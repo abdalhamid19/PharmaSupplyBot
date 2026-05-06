@@ -106,7 +106,9 @@ python3 run.py order --excel "data/input/order_items/shortage_report_total_20260
 
 ### 5. تشغيل مطابقة الأصناف فقط بدون إضافة للسلة
 
-استخدم `--match-only` لتشغيل خوارزمية المطابقة وتسجيل النتائج في `artifacts/<profile>/order_result_summary.csv` وملفات `match_log` بدون الضغط على زر السلة أو إضافة أي صنف. هذا الوضع مفيد لمراجعة وتحسين خوارزمية التطابق بأمان.
+استخدم `--match-only` لتشغيل خوارزمية المطابقة وتسجيل النتائج في ملف مستقل هو `artifacts/<profile>/match_only_summary.csv` بدون الضغط على زر السلة أو إضافة أي صنف. هذا الوضع مفيد لمراجعة وتحسين خوارزمية التطابق بأمان.
+
+ملف `match_only_summary.csv` يحتوي صفًا لكل مرشح تم تقييمه، ويتضمن بيانات Tawreed/API المهمة مثل `productId` و`storeProductId` و`productNameEn` و`productName` و`availableQuantity` و`productsCount` و`storeName` و`discountPercent` و`salePrice` و`retailPrice`، بالإضافة إلى درجات التطابق وسبب القبول/الرفض ونسخة JSON مضغوطة من المرشح داخل `api_raw_candidate_json`.
 
 Windows PowerShell:
 ```powershell
@@ -227,7 +229,7 @@ rule_audit_ok
 
 - افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
 - استخدم `--fast-search` لتقليل زمن البحث عن الصنف؛ يتوقف عند أول نتيجة مطابقة مقبولة بدل تجربة صيغ إضافية.
-- استخدم `--match-only` لتسجيل نتائج المطابقة فقط بدون إضافة أي صنف إلى السلة.
+- استخدم `--match-only` لتسجيل نتائج المطابقة فقط في `match_only_summary.csv` بدون إضافة أي صنف إلى السلة.
 - استخدم `--item-workers N` لتشغيل order/remove-cart بالتوازي داخل profile واحد. عند التوازي تُكتب ملخصات مؤقتة بصيغة `*.worker_<id>.*` ثم تُدمج في الملخص الأساسي بعد انتهاء workers.
 - اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
   - `runtime.submit_order: true` داخل `config.yaml`
@@ -258,9 +260,11 @@ py run.py auth --profile wardany
 - `artifacts/<profile>/match_log_all.csv`
   سجل CSV لكل مرشحي المطابقة
 - `artifacts/<profile>/order_result_summary.csv`
-  الملخص الأساسي لنتائج التشغيل، وهو المصدر الأحدث المعتمد للتحليل
+  الملخص الأساسي لنتائج تشغيل الطلبات والإضافة للسلة
+- `artifacts/<profile>/match_only_summary.csv`
+  ملخص مستقل لتشغيل `--match-only`، ويحتوي مرشحي المطابقة وبيانات Tawreed/API المفيدة للتحليل
 - `artifacts/<profile>/order_result_summary.xlsx`
-  نسخة Excel من ملخص النتائج إذا كانت موجودة
+  نسخة Excel من ملخص نتائج الطلبات إذا كانت موجودة
 - `streamlit_app.py`
   واجهة Streamlit لتشغيل `auth` و`order` ومراجعة النتائج
 

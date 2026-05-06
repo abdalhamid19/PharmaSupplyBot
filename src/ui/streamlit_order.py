@@ -18,6 +18,7 @@ from .streamlit_shared import (
     ARTIFACTS_DIR,
     csv_row_count,
     load_new_summary_rows,
+    match_only_summary_csv_path,
     summary_csv_path,
 )
 from .streamlit_state import (
@@ -70,7 +71,7 @@ def run_order_submission(
     """Run one order submission and render its summary output."""
     if not prepare_order_state_files(app_config, form_values):
         return
-    summary_path = summary_csv_path(default_profile)
+    summary_path = order_run_summary_csv_path(default_profile, form_values)
     previous_row_count = csv_row_count(summary_path)
     command = order_command(config_path, form_values, excel_path)
     start_order_process(
@@ -198,6 +199,15 @@ def target_profile_keys(app_config, form_values: dict[str, object]) -> list[str]
     if form_values["profile_mode"] == "Single profile":
         return [str(form_values["profile_key"])]
     return list(app_config.profiles.keys())
+
+
+def order_run_summary_csv_path(
+    profile_key: str, form_values: dict[str, object]
+) -> Path:
+    """Return the CSV summary watched for one Streamlit order run."""
+    if form_values.get("match_only"):
+        return match_only_summary_csv_path(profile_key)
+    return summary_csv_path(profile_key)
 
 
 def order_command(

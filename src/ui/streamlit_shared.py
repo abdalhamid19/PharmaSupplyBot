@@ -8,7 +8,6 @@ import pandas as pd
 import streamlit as st
 
 
-
 def inject_custom_css() -> None:
     """Inject custom CSS into the Streamlit app for a premium look."""
     css_path = Path(__file__).parent / "index.css"
@@ -87,3 +86,8 @@ def summary_csv_path(profile_key: str) -> Path:
 def summary_xlsx_path(profile_key: str) -> Path:
     """Return the order-result summary XLSX path for one profile."""
     return ARTIFACTS_DIR / profile_key / "order_result_summary.xlsx"
+
+
+def match_only_summary_csv_path(profile_key: str) -> Path:
+    """Return the dedicated match-only summary CSV path for one profile."""
+    return ARTIFACTS_DIR / profile_key / "match_only_summary.csv"

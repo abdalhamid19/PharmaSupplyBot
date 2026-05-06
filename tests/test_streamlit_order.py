@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from src.core.prevented_items import PreventedItem, load_prevented_items
 from src.ui import streamlit_order
-from src.ui.streamlit_order import order_command
+from src.ui.streamlit_order import order_command, order_run_summary_csv_path
 from src.ui.streamlit_order_form import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     add_and_save_prevented_item,
@@ -77,6 +77,11 @@ class StreamlitOrderTests(unittest.TestCase):
         )
 
         self.assertIn("--match-only", command)
+
+    def test_order_run_summary_path_uses_match_only_summary(self) -> None:
+        path = order_run_summary_csv_path("wardany", {"match_only": True})
+
+        self.assertEqual(path, Path("artifacts") / "wardany" / "match_only_summary.csv")
 
     def test_order_command_adds_item_workers_when_parallel(self) -> None:
         command = order_command(
