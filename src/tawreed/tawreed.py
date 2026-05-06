@@ -19,6 +19,7 @@ from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
 from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
+from .tawreed_match_only_summary import append_match_only_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_products_flow import add_item_from_products_page
 from .tawreed_search_logic import require_product_match
@@ -332,10 +333,10 @@ class TawreedBot:
             return True
         except _SkipItem as error:
             close_visible_dialogs(page)
-            self._record_skip(item, error, started_at)
+            self._record_match_only_skip(item, error, started_at)
             return False
         except Exception as error:
-            self._record_failure(page, item, error, started_at)
+            self._record_match_only_failure(page, item, error, started_at)
             return False
 
     def _record_success(self, item: Item, started_at: float) -> None:
@@ -350,12 +351,51 @@ class TawreedBot:
 
     def _record_match_only_success(self, item: Item, started_at: float) -> None:
         """Record a successful product match that did not touch the cart."""
-        self._record_item_summary(
+        self._record_match_only_summary(
             item,
             status="matched-only",
             reason="Matched product only; item was not added to cart.",
             elapsed_seconds=time.perf_counter() - started_at,
             match_elapsed_seconds=self.last_match_elapsed_seconds,
+        )
+
+    def _record_match_only_skip(
+        self, item: Item, error: _SkipItem, started_at: float
+    ) -> None:
+        """Record a skipped item during match-only mode."""
+        reason = str(error)
+        self._record_match_only_summary(
+            item,
+            self._skip_status(reason),
+            reason,
+            time.perf_counter() - started_at,
+            self.last_match_elapsed_seconds,
+        )
+        print(
+            _console_safe(
+                f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}"
+            )
+        )
+
+    def _record_match_only_failure(
+        self, page: Page, item: Item, error: Exception, started_at: float
+    ) -> None:
+        """Record a failed match-only item and capture diagnostics."""
+        reason = str(error)
+        close_visible_dialogs(page)
+        self._record_match_only_summary(
+            item,
+            self._failure_status(reason),
+            reason,
+            time.perf_counter() - started_at,
+            self.last_match_elapsed_seconds,
+        )
+        self._print_failed_item(item, error)
+        dump_artifacts(
+            page,
+            self.profile_key,
+            _item_error_label(item),
+            _item_error_details(page, item, error),
         )
 
     def _record_skip(self, item: Item, error: _SkipItem, started_at: float) -> None:
@@ -525,6 +565,26 @@ class TawreedBot:
         )
         append_order_result_summary(
             self.profile_key, item, summary, label_suffix=self.summary_label_suffix
+        )
+
+    def _record_match_only_summary(
+        self,
+        item: Item,
+        status: str,
+        reason: str,
+        elapsed_seconds: float,
+        match_elapsed_seconds: float,
+    ) -> None:
+        """Append one detailed match-only summary for the processed item."""
+        summary = self._build_item_summary(
+            status, reason, elapsed_seconds, match_elapsed_seconds
+        )
+        append_match_only_summary(
+            self.profile_key,
+            item,
+            summary,
+            self.last_match_decision,
+            label_suffix=self.summary_label_suffix,
         )
 
     def _build_item_summary(

@@ -159,7 +159,7 @@ class TawreedBotTests(unittest.TestCase):
         with (
             patch("src.tawreed.tawreed.close_visible_dialogs") as cleanup,
             patch("src.tawreed.tawreed.require_product_match") as require_match,
-            patch.object(bot, "_record_item_summary") as record_summary,
+            patch("src.tawreed.tawreed.append_match_only_summary") as append_summary,
             patch.object(bot, "_add_item") as add_item,
         ):
             require_match.return_value = (match, "Panadol")
@@ -169,8 +169,10 @@ class TawreedBotTests(unittest.TestCase):
         add_item.assert_not_called()
         cleanup.assert_called()
         require_match.assert_called_once_with(bot, page, item, require_available=False)
-        record_summary.assert_called_once()
-        self.assertEqual(record_summary.call_args.kwargs["status"], "matched-only")
+        append_summary.assert_called_once()
+        summary = append_summary.call_args.args[2]
+        self.assertEqual(summary.status, "matched-only")
+        self.assertEqual(summary.ordered_total_qty, 0)
 
     def test_build_item_summary_populates_matched_names_by_language(self) -> None:
         bot = self._bot()

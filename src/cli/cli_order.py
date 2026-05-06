@@ -21,6 +21,7 @@ from ..core.utils.chunking import split_into_chunks
 from ..core.utils.excel import Item, load_items_from_excel
 from ..tawreed.order_result_merger import merge_worker_summaries
 from ..tawreed.tawreed import TawreedBot
+from ..tawreed.tawreed_match_only_summary import MATCH_ONLY_SUMMARY_LABEL
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import build_bot, invalid_session_exit, require_state_file
 from .item_worker_pool import report_worker_results, resolve_item_workers
@@ -190,7 +191,7 @@ def _prepared_order_items(
     if not bool(getattr(args, "resume", False)):
         yield from items
         return
-    processed_keys = _processed_summary_item_keys(profile_key)
+    processed_keys = _processed_summary_item_keys(profile_key, _summary_label(args))
     for item in items:
         if _item_key(item.code, item.name) not in processed_keys:
             yield item
@@ -216,9 +217,18 @@ def _match_only(args: argparse.Namespace) -> bool:
     return bool(getattr(args, "match_only", False))
 
 
-def _processed_summary_item_keys(profile_key: str) -> set[tuple[str, str]]:
-    """Return item keys already written to the profile order summary."""
-    summary_path = Path("artifacts") / profile_key / "order_result_summary.csv"
+def _summary_label(args: argparse.Namespace) -> str:
+    """Return the canonical summary label for the requested order mode."""
+    if _match_only(args):
+        return MATCH_ONLY_SUMMARY_LABEL
+    return "order_result_summary"
+
+
+def _processed_summary_item_keys(
+    profile_key: str, summary_label: str = "order_result_summary"
+) -> set[tuple[str, str]]:
+    """Return item keys already written to the active profile summary."""
+    summary_path = Path("artifacts") / profile_key / f"{summary_label}.csv"
     if not summary_path.exists():
         return set()
     with summary_path.open("r", encoding="utf-8", newline="") as summary_file:
@@ -293,7 +303,7 @@ def _run_parallel_order(
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
         results = pool.map(run_order_chunk, payloads)
-    merge_worker_summaries(profile_key, "order_result_summary")
+    merge_worker_summaries(profile_key, _summary_label(args))
     report_worker_results(app_config.base_url, profile_key, results)
 
 

@@ -13,6 +13,8 @@ from src.tawreed.tawreed_match_logs import (
     append_order_result_summary,
     should_write_detailed_match_log,
 )
+from src.tawreed.tawreed_match_only_rows import match_only_summary_rows
+from src.tawreed.tawreed_match_only_summary import append_match_only_summary
 
 
 class TawreedMatchLogsTests(unittest.TestCase):
@@ -63,6 +65,43 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "wardany", "order_result_summary", [expected_row]
         )
 
+    def test_match_only_summary_rows_include_api_payload_and_scores(self) -> None:
+        item = Item(code="123", name="Panadol Extra", qty=2)
+        candidate = {
+            "productId": 99,
+            "storeProductId": 1001,
+            "productNameEn": "Panadol Extra 24 Tabs",
+            "productName": "بنادول اكسترا 24 قرص",
+            "availableQuantity": 12,
+            "discountPercent": 31,
+            "salePrice": 20.5,
+        }
+        decision = _accepted_decision(candidate)
+        summary = OrderItemSummary(status="matched-only", reason="match only")
+
+        rows = match_only_summary_rows(item, summary, decision)
+
+        self.assertEqual(rows[0]["api_productId"], 99)
+        self.assertEqual(rows[0]["api_storeProductId"], 1001)
+        self.assertEqual(rows[0]["api_discountPercent"], 31)
+        self.assertEqual(rows[0]["candidate_source"], "site_api")
+        self.assertTrue(rows[0]["is_best_match"])
+        raw_candidate_json = str(rows[0]["api_raw_candidate_json"])
+        self.assertIn("Panadol Extra", raw_candidate_json)
+
+    def test_append_match_only_summary_writes_independent_csv(self) -> None:
+        item = Item(code="123", name="Panadol Extra", qty=2)
+        summary = OrderItemSummary(status="matched-only", reason="match only")
+
+        with patch(
+            "src.tawreed.tawreed_match_only_summary.append_csv_artifact"
+        ) as append_csv:
+            append_match_only_summary("wardany", item, summary, None, "worker_0")
+
+        append_csv.assert_called_once()
+        self.assertEqual(append_csv.call_args.args[1], "match_only_summary")
+        self.assertEqual(append_csv.call_args.kwargs["label_suffix"], "worker_0")
+
     def test_should_write_detailed_match_log_skips_clean_high_overlap_accept(
         self,
     ) -> None:
@@ -100,6 +139,27 @@ class TawreedMatchLogsTests(unittest.TestCase):
         )
 
         self.assertTrue(should_write_detailed_match_log(decision))
+
+
+def _accepted_decision(candidate: dict[str, object]) -> MatchDecision:
+    """Return an accepted decision fixture for summary-row tests."""
+    return MatchDecision(
+        best_match=SearchMatch("Panadol Extra", 0, 22.5, candidate),
+        diagnostics=[
+            CandidateMatchDiagnostic(
+                "Panadol Extra",
+                0,
+                22.5,
+                (22.5, 1, 1.0, 1, 10, 10),
+                True,
+                "high_token_overlap",
+                "",
+                MatchScoreBreakdown(0.95, 1.0, 0.0, 2.0, 1.0, 22.5),
+                candidate,
+            )
+        ],
+        final_reason="Accepted",
+    )
 
 
 if __name__ == "__main__":

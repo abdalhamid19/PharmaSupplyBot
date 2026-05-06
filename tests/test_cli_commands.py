@@ -10,6 +10,7 @@ from src.cli.cli_cart_removal import run_remove_cart_command
 from src.cli.cli_order import (
     _load_order_items as load_order_items,
     _prepared_order_items as prepared_order_items,
+    _run_parallel_order as run_parallel_order,
     _run_single_profile as run_single_profile,
 )
 from src.cli.cli_shared import invalid_session_exit
@@ -187,6 +188,39 @@ class CliCommandsTests(unittest.TestCase):
 
         self.assertEqual(load.call_args.kwargs["limit"], 0)
 
+    def test_parallel_match_only_merges_match_only_summary(self) -> None:
+        items = [
+            Item(code="1", name="Panadol", qty=1),
+            Item(code="2", name="Devarol", qty=1),
+        ]
+        args: Any = SimpleNamespace(
+            config="config.yaml",
+            match_only=True,
+            debug_browser=False,
+            fast_search=False,
+            stop_flag=None,
+            warehouse_mode=None,
+            min_discount_percent=None,
+        )
+        app_config: Any = SimpleNamespace(base_url="https://seller.tawreed.io")
+
+        with (
+            patch(
+                "src.cli.cli_order.multiprocessing.get_context",
+                return_value=_InlineContext(),
+            ),
+            patch(
+                "src.cli.item_worker_runner.run_order_chunk",
+                return_value={"status": "ok"},
+            ),
+            patch("src.cli.cli_order.merge_worker_summaries") as merge,
+            patch("src.cli.cli_order.report_worker_results") as report,
+        ):
+            run_parallel_order(app_config, "wardany", items, args, item_workers=2)
+
+        merge.assert_called_once_with("wardany", "match_only_summary")
+        report.assert_called_once()
+
     def test_prepared_order_items_requires_state_then_applies_resume(self) -> None:
         items = [Item(code="1", name="Panadol", qty=1)]
         args: Any = SimpleNamespace(resume=False)
@@ -247,6 +281,25 @@ class CliCommandsTests(unittest.TestCase):
 
 def _app_config() -> Any:
     return SimpleNamespace(excel=SimpleNamespace())
+
+
+class _InlineContext:
+    def Pool(self, processes: int):
+        return _InlinePool(processes)
+
+
+class _InlinePool:
+    def __init__(self, processes: int) -> None:
+        self.processes = processes
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return False
+
+    def map(self, func, payloads):
+        return [func(payload) for payload in payloads]
 
 
 if __name__ == "__main__":
