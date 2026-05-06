@@ -30,22 +30,44 @@ _GENERIC_IDENTITY_TOKENS = {
     "CAP",
     "CAPS",
     "COUGH",
+    "BAG",
+    "BAGS",
+    "CAPSULE",
+    "CAPSULES",
+    "CREAM",
+    "DROP",
+    "DROPS",
     "EFF",
+    "EYE",
+    "FILTER",
     "FLAVOR",
     "FLAVOUR",
     "G",
+    "GEL",
     "GM",
+    "IMP",
+    "INJ",
+    "INJECTION",
+    "LOTION",
     "MCG",
     "MG",
     "MILK",
     "ML",
     "O",
+    "OINTMENT",
     "ORAL",
+    "POWDER",
+    "SHAMPOO",
+    "SOAP",
     "SOLN",
     "SOLUTION",
+    "SPRAY",
     "SYRUP",
     "TAB",
     "TABS",
+    "TABLET",
+    "TABLETS",
+    "VIAL",
 }
 
 from .config.config_models import MatchingConfig
@@ -646,15 +668,15 @@ def _lexical_or_threshold_acceptance(
 
 
 def _candidate_variant_rejection(query: str, candidate: dict[str, Any]) -> str:
-    """Return a rejection reason when Arabic names contradict key query tokens."""
-    arabic_name = _normalized_arabic_name(candidate)
-    if not arabic_name:
-        return ""
+    """Return a rejection reason when candidate names contradict key query tokens."""
     query_tokens = set(_normalized_tokens(query))
     reasons = _synthetic_name_rejection_reasons(query_tokens, candidate)
-    reasons.extend(_missing_arabic_token_reasons(query_tokens, arabic_name))
-    if _vitacid_c_calcium_conflict(query_tokens, arabic_name):
-        reasons.append("Arabic name contains calcium for VITACID C query")
+    reasons.extend(_missing_english_identity_reasons(query_tokens, candidate))
+    arabic_name = _normalized_arabic_name(candidate)
+    if arabic_name:
+        reasons.extend(_missing_arabic_token_reasons(query_tokens, arabic_name))
+        if _vitacid_c_calcium_conflict(query_tokens, arabic_name):
+            reasons.append("Arabic name contains calcium for VITACID C query")
     return "; ".join(reasons)
 
 
@@ -671,10 +693,19 @@ def _synthetic_name_rejection_reasons(
     """Return rejection reasons when a synthetic English name is too generic."""
     if not candidate.get("productNameEnSynthetic"):
         return []
+    if _missing_english_identity_reasons(query_tokens, candidate):
+        return ["Synthetic English name missing requested identity token"]
+    return []
+
+
+def _missing_english_identity_reasons(
+    query_tokens: set[str], candidate: dict[str, Any]
+) -> list[str]:
+    """Return reasons for candidates missing requested English identity tokens."""
     candidate_tokens = set(_normalized_tokens(_candidate_english_name(candidate)))
     identity_tokens = _identity_tokens(query_tokens)
     if identity_tokens and not identity_tokens & candidate_tokens:
-        return ["Synthetic English name missing requested identity token"]
+        return ["English name missing requested identity token"]
     return []
 
 

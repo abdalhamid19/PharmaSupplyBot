@@ -176,6 +176,18 @@ class ProductMatchingQueryTests(unittest.TestCase):
             decision.best_match.data["productNameEn"], "POLYFRESH 2% EYE DROPS 10 ML"
         )
 
+    def test_short_fallback_query_still_requires_original_identity(self) -> None:
+        item = Item(code="89590", name="***IMP***ENDOXAN 1 GM I.V. VIAL", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [("1 GM", [_candidate("PARACETAMOL 1 GM / 100 ML VIAL", "باراسيتامول")])],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn(
+            "English name missing requested identity token", decision.final_reason
+        )
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""
