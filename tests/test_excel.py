@@ -1,11 +1,11 @@
+import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
 
 import pandas as pd
 
 from src.core.config.config_models import ExcelConfig
-from src.core.utils.excel import load_items_from_excel
+from src.core.utils.excel import load_items_from_excel, load_match_only_items_from_excel
 
 
 class ExcelTests(unittest.TestCase):
@@ -32,9 +32,9 @@ class ExcelTests(unittest.TestCase):
         config = ExcelConfig(code_col="code", name_col="name", qty_col="qty")
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "orders.xlsx"
-            pd.DataFrame(
-                [{"code": 123, "name": "ASPIRIN", "qty": 3}]
-            ).to_excel(path, index=False)
+            pd.DataFrame([{"code": 123, "name": "ASPIRIN", "qty": 3}]).to_excel(
+                path, index=False
+            )
 
             items = list(load_items_from_excel(path, config))
 
@@ -77,8 +77,25 @@ class ExcelTests(unittest.TestCase):
 
         self.assertIn("qty", str(context.exception))
 
+    def test_match_only_loader_accepts_two_column_catalog(self) -> None:
+        config = ExcelConfig(code_col="كود", name_col="إسم الصنف", qty_col="كمية النقص")
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "all_drug.xlsx"
+            pd.DataFrame([{"الكود": 22773, "إسم الصنف": "RIRI MILK"}]).to_excel(
+                path, index=False
+            )
+
+            items = list(load_match_only_items_from_excel(path, config))
+
+        self.assertEqual(
+            [(item.code, item.name, item.qty) for item in items],
+            [("22773", "RIRI MILK", 1)],
+        )
+
     def test_load_items_coerces_and_limits_quantities_in_single_pass(self) -> None:
-        config = ExcelConfig(code_col="code", name_col="name", qty_col="qty", min_qty=1, max_qty=4)
+        config = ExcelConfig(
+            code_col="code", name_col="name", qty_col="qty", min_qty=1, max_qty=4
+        )
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "orders.xlsx"
             pd.DataFrame(
@@ -91,7 +108,9 @@ class ExcelTests(unittest.TestCase):
 
             items = list(load_items_from_excel(path, config))
 
-        self.assertEqual([(item.code, item.qty) for item in items], [("123", 3), ("124", 4)])
+        self.assertEqual(
+            [(item.code, item.qty) for item in items], [("123", 3), ("124", 4)]
+        )
 
 
 if __name__ == "__main__":

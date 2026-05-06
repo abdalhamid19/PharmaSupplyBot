@@ -24,8 +24,22 @@ def load_items_from_excel(
     path: Path, config: ExcelConfig, limit: int = 0
 ) -> Iterable[Item]:
     """Yield order items from an Excel sheet using the configured column mapping."""
+    yield from _limited_items(_read_item_rows(path, config), config, limit)
+
+
+def load_match_only_items_from_excel(
+    path: Path, config: ExcelConfig, limit: int = 0
+) -> Iterable[Item]:
+    """Yield match-only items from code/name catalog sheets without quantities."""
+    yield from _limited_items(_read_match_only_rows(path, config), config, limit)
+
+
+def _limited_items(
+    rows: Iterable[tuple], config: ExcelConfig, limit: int = 0
+) -> Iterable[Item]:
+    """Yield converted rows until the optional processing limit is reached."""
     count = 0
-    for row in _read_item_rows(path, config):
+    for row in rows:
         item = _row_tuple_to_item(row, config)
         if item is None:
             continue
@@ -54,24 +68,54 @@ def _read_item_rows(path: Path, config: ExcelConfig) -> Iterable[tuple]:
             workbook.close()
 
 
-def _resolve_col_indices(sheet, header_index, config) -> list[int]:
+def _read_match_only_rows(path: Path, config: ExcelConfig) -> Iterable[tuple]:
+    """Yield code, name, and a default quantity from two-column catalog sheets."""
+    header_row_index = _detect_header_row(path, config) or 0
+    with open(path, "rb") as f:
+        workbook = openpyxl.load_workbook(f, read_only=True, data_only=True)
+        try:
+            sheet = cast(Any, workbook.active)
+            indices = _resolve_col_indices(sheet, header_row_index, config, True)
+            for row in sheet.iter_rows(min_row=header_row_index + 2, values_only=True):
+                yield (row[indices[0]], row[indices[1]], 1)
+        finally:
+            workbook.close()
+
+
+def _resolve_col_indices(
+    sheet, header_index, config, match_only: bool = False
+) -> list[int]:
     """Map required Excel columns to their numeric sheet indices."""
-    header_row = list(
-        sheet.iter_rows(
-            min_row=header_index + 1, max_row=header_index + 1, values_only=True
-        )
-    )[0]
-    col_map = {
-        _normalize_header(cell): idx for idx, cell in enumerate(header_row) if cell
-    }
-    required = [config.code_col, config.name_col, config.qty_col]
+    header_row = _sheet_header_row(sheet, header_index)
+    col_map = _header_col_map(header_row)
+    required = _required_columns(config, match_only)
     aliases = _required_column_aliases(config)
     indices = [_first_matching_index(col_map, aliases[column]) for column in required]
-
     missing = [col for col, idx in zip(required, indices) if idx is None]
     if missing:
         _raise_missing_columns(missing, required, header_row)
     return [idx for idx in indices if idx is not None]
+
+
+def _sheet_header_row(sheet, header_index) -> list:
+    """Return the detected header row values."""
+    return list(
+        sheet.iter_rows(
+            min_row=header_index + 1, max_row=header_index + 1, values_only=True
+        )
+    )[0]
+
+
+def _header_col_map(header_row) -> dict[str, int]:
+    """Return normalized header labels mapped to sheet indices."""
+    return {_normalize_header(cell): idx for idx, cell in enumerate(header_row) if cell}
+
+
+def _required_columns(config: ExcelConfig, match_only: bool) -> list[str]:
+    """Return the Excel columns required for the requested load mode."""
+    if match_only:
+        return [config.code_col, config.name_col]
+    return [config.code_col, config.name_col, config.qty_col]
 
 
 def _raise_missing_columns(missing: list[str], required: list[str], header_row) -> None:

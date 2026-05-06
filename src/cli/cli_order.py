@@ -18,7 +18,11 @@ from ..core.prevented_items import (
     load_prevented_items,
 )
 from ..core.utils.chunking import split_into_chunks
-from ..core.utils.excel import Item, load_items_from_excel
+from ..core.utils.excel import (
+    Item,
+    load_items_from_excel,
+    load_match_only_items_from_excel,
+)
 from ..tawreed.order_result_merger import merge_worker_summaries
 from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_match_only_summary import MATCH_ONLY_SUMMARY_LABEL
@@ -151,15 +155,31 @@ def _load_order_items(
     prevented_path = _prevented_items_path(args)
     _reject_prevented_excel_as_order_source(excel_path, prevented_path)
     has_prevented_filter = bool(prevented_path and prevented_path.is_file())
-    items = load_items_from_excel(
+    items = _load_items_for_order_mode(
         excel_path,
-        app_config.excel,
-        limit=_excel_load_limit(args, has_prevented_filter),
+        app_config,
+        args,
+        has_prevented_filter,
     )
     if has_prevented_filter and prevented_path is not None:
         prevented_items = load_prevented_items(prevented_path)
         items = filter_prevented_order_items(items, prevented_items)
     return items
+
+
+def _load_items_for_order_mode(
+    excel_path: Path,
+    app_config: AppConfig,
+    args: argparse.Namespace,
+    has_prevented_filter: bool,
+) -> Iterable[Item]:
+    """Load items with a two-column catalog fallback in match-only mode."""
+    limit = _excel_load_limit(args, has_prevented_filter)
+    if _match_only(args):
+        return load_match_only_items_from_excel(
+            excel_path, app_config.excel, limit=limit
+        )
+    return load_items_from_excel(excel_path, app_config.excel, limit=limit)
 
 
 def _excel_load_limit(args: argparse.Namespace, has_prevented_filter: bool) -> int:

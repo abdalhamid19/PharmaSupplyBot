@@ -9,8 +9,14 @@ from unittest.mock import patch
 from src.cli.cli_cart_removal import run_remove_cart_command
 from src.cli.cli_order import (
     _load_order_items as load_order_items,
+)
+from src.cli.cli_order import (
     _prepared_order_items as prepared_order_items,
+)
+from src.cli.cli_order import (
     _run_parallel_order as run_parallel_order,
+)
+from src.cli.cli_order import (
     _run_single_profile as run_single_profile,
 )
 from src.cli.cli_shared import invalid_session_exit
@@ -135,7 +141,9 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli.cli_order.load_items_from_excel", return_value=items),
+            patch(
+                "src.cli.cli_order.load_match_only_items_from_excel", return_value=items
+            ),
             patch("pathlib.Path.is_file", return_value=False),
             patch("src.cli.cli_order.require_state_file"),
             patch("src.cli.cli_order._order_bot", return_value=object()) as build_bot,
