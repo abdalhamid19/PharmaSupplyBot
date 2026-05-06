@@ -38,7 +38,7 @@ class PreventedItemsTests(unittest.TestCase):
             ],
         )
 
-    def test_filter_prevented_order_items_requires_matching_code_and_name(self) -> None:
+    def test_filter_prevented_order_items_blocks_matching_name_only(self) -> None:
         items = [
             Item(code="47273", name="DEVAROL", qty=1),
             Item(code="47273", name="IVERZINE LOTION 6O ML", qty=1),
@@ -61,7 +61,7 @@ class PreventedItemsTests(unittest.TestCase):
 
         self.assertEqual(allowed_items, [items[1]])
 
-    def test_filter_prevented_order_items_skips_matching_name_when_item_has_no_code(
+    def test_filter_prevented_order_items_blocks_matching_name_regardless_code(
         self,
     ) -> None:
         items = [
@@ -73,7 +73,7 @@ class PreventedItemsTests(unittest.TestCase):
 
         allowed_items = list(filter_prevented_order_items(items, prevented_items))
 
-        self.assertEqual(allowed_items, [items[1], items[2]])
+        self.assertEqual(allowed_items, [items[2]])
 
     def test_add_remove_and_save_prevented_items(self) -> None:
         prevented_items = [PreventedItem(code="1", name="Panadol")]

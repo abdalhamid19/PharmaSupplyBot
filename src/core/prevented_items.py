@@ -127,7 +127,6 @@ def filter_prevented_order_items(
     prevented_items: list[PreventedItem],
 ) -> Iterable[Item]:
     """Yield order items excluding any products in the prevented list."""
-    blocked_pairs = {normalized_prevented_key(item) for item in prevented_items}
     blocked_codes = {normalize_code(item.code) for item in prevented_items if item.code}
     code_only_blocks = {
         normalize_code(item.code)
@@ -138,25 +137,26 @@ def filter_prevented_order_items(
 
     for item in items:
         if not _is_prevented_order_item(
-            item, blocked_pairs, blocked_codes, code_only_blocks, blocked_names
+            item, blocked_codes, code_only_blocks, blocked_names
         ):
             yield item
 
 
 def _is_prevented_order_item(
     item: Item,
-    blocked_pairs: set[tuple[str, str]],
     blocked_codes: set[str],
     code_only_blocks: set[str],
     blocked_names: set[str],
 ) -> bool:
     """Return whether one order item is blocked by the prevented list."""
     item_code, item_name = normalized_key(item.code, item.name)
+    if item_name in blocked_names:
+        return True
     if item_code and item_name:
-        return (item_code, item_name) in blocked_pairs or item_code in code_only_blocks
+        return item_code in code_only_blocks
     if item_code:
         return item_code in blocked_codes
-    return item_name in blocked_names
+    return False
 
 
 def is_prevented_items_excel_path(
