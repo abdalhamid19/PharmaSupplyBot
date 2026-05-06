@@ -144,6 +144,38 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("APPLE", decision.final_reason)
 
+    def test_semantic_conflict_rejects_isis_detox_for_anise(self) -> None:
+        item = Item(code="87778", name="ISIS ANISE 20BAGS", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [(item.name, [_candidate("ISIS DETOX 20 BAGS", "ايزيس ديتوكس 20 فتلة")])],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("Semantic token conflict", decision.final_reason)
+
+    def test_unrequested_advanced_variant_loses_to_plain_polyfresh(self) -> None:
+        item = Item(code="12345", name="POLYFRESH EYE DROPS 10 ML", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _candidate(
+                            "POLYFRESH ADVANCED EYE DROPS 10 ML", "بولى فريش 10 مل"
+                        ),
+                        _candidate("POLYFRESH 2% EYE DROPS 10 ML", "بولى فريش 10 مل"),
+                    ],
+                )
+            ],
+        )
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(
+            decision.best_match.data["productNameEn"], "POLYFRESH 2% EYE DROPS 10 ML"
+        )
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

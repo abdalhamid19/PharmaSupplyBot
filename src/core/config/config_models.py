@@ -45,8 +45,12 @@ class MatchingConfig:
     high_overlap_threshold: float = 0.85
     medium_score_threshold: float = 12.0
     medium_overlap_threshold: float = 0.6
-    numeric_score_threshold: float = 16.0
+    numeric_score_threshold: float = 20.0
     numeric_overlap_threshold: float = 0.45
+    numeric_score_weight: float = 4.0
+    critical_token_penalty: float = 2.0
+    distinguishing_token_penalty: float = 3.0
+    semantic_mismatch_penalty: float = 10.0
 
 
 @dataclass(frozen=True)

@@ -25,6 +25,9 @@ class MatchScoreBreakdown:
     numeric_overlap: float
     exact_bonus: float
     availability_bonus: float
+    critical_penalty: float
+    extra_token_penalty: float
+    semantic_penalty: float
     total_score: float
 
 

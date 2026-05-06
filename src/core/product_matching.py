@@ -55,6 +55,7 @@ from .matching_models import (
     MatchScoreBreakdown,
     SearchMatch,
 )
+from .matching_penalties import compatibility_rejection_reason, penalty_breakdown
 from .matching_rules import acceptance_details, default_matching_config
 from .utils.excel import Item
 
@@ -94,11 +95,19 @@ def _match_score_breakdown(
     query: str, candidate: dict[str, Any]
 ) -> MatchScoreBreakdown:
     """Return the detailed score breakdown for one Tawreed search result."""
+    return _match_score_breakdown_for_config(
+        query, candidate, default_matching_config()
+    )
+
+
+def _match_score_breakdown_for_config(
+    query: str, candidate: dict[str, Any], matching_config: MatchingConfig
+) -> MatchScoreBreakdown:
+    """Return a score breakdown using the requested matching configuration."""
     candidate_texts = _candidate_texts(candidate)
     if not candidate_texts:
         return _empty_breakdown()
-
-    return _scored_breakdown(query, candidate, candidate_texts)
+    return _scored_breakdown(query, candidate, candidate_texts, matching_config)
 
 
 def _match_sort_key(
@@ -401,6 +410,9 @@ def _empty_breakdown() -> MatchScoreBreakdown:
         numeric_overlap=0.0,
         exact_bonus=0.0,
         availability_bonus=-999.0,
+        critical_penalty=0.0,
+        extra_token_penalty=0.0,
+        semantic_penalty=0.0,
         total_score=-999.0,
     )
 
@@ -409,16 +421,28 @@ def _scored_breakdown(
     query: str,
     candidate: dict[str, Any],
     candidate_texts: list[str],
+    matching_config: MatchingConfig,
 ) -> MatchScoreBreakdown:
     """Return the weighted scoring breakdown for one usable candidate."""
-    score_components = _score_components(query, candidate, candidate_texts)
+    components = _score_components(query, candidate, candidate_texts, matching_config)
+    total_score = _total_score(components, matching_config)
+    return _breakdown_from_components(components, total_score)
+
+
+def _breakdown_from_components(
+    components: dict[str, float], total_score: float
+) -> MatchScoreBreakdown:
+    """Return a score-breakdown dataclass from raw components."""
     return MatchScoreBreakdown(
-        sequence_score=score_components["sequence_score"],
-        overlap_score=score_components["overlap_score"],
-        numeric_overlap=score_components["numeric_overlap"],
-        exact_bonus=score_components["exact_bonus"],
-        availability_bonus=score_components["availability_bonus"],
-        total_score=_total_score(**score_components),
+        sequence_score=components["sequence_score"],
+        overlap_score=components["overlap_score"],
+        numeric_overlap=components["numeric_overlap"],
+        exact_bonus=components["exact_bonus"],
+        availability_bonus=components["availability_bonus"],
+        critical_penalty=components["critical_penalty"],
+        extra_token_penalty=components["extra_token_penalty"],
+        semantic_penalty=components["semantic_penalty"],
+        total_score=total_score,
     )
 
 
@@ -426,32 +450,48 @@ def _score_components(
     query: str,
     candidate: dict[str, Any],
     candidate_texts: list[str],
+    matching_config: MatchingConfig,
 ) -> dict[str, float]:
     """Return the raw score components for one usable candidate."""
     normalized_query = _normalize_text(query or "")
-    return {
+    candidate_name = _candidate_english_name(candidate)
+    components = {
         "sequence_score": _best_sequence_score(normalized_query, candidate_texts),
         "overlap_score": _best_overlap_score(normalized_query, candidate_texts),
         "numeric_overlap": _numeric_overlap_score(normalized_query, candidate_texts),
         "exact_bonus": _exact_or_contained_bonus(normalized_query, candidate_texts),
         "availability_bonus": _availability_bonus(candidate),
     }
+    components.update(_lexical_penalties(query, candidate_name, matching_config))
+    return components
+
+
+def _lexical_penalties(
+    query: str, candidate_name: str, matching_config: MatchingConfig
+) -> dict[str, float]:
+    """Return configured lexical penalties for one candidate."""
+    return penalty_breakdown(
+        query,
+        candidate_name,
+        matching_config.critical_token_penalty,
+        matching_config.distinguishing_token_penalty,
+        matching_config.semantic_mismatch_penalty,
+    )
 
 
 def _total_score(
-    sequence_score: float,
-    overlap_score: float,
-    numeric_overlap: float,
-    exact_bonus: float,
-    availability_bonus: float,
+    score_components: dict[str, float], matching_config: MatchingConfig
 ) -> float:
     """Return the weighted final score for one candidate."""
     return (
-        (sequence_score * 5.0)
-        + (overlap_score * 8.0)
-        + (numeric_overlap * 6.0)
-        + exact_bonus
-        + availability_bonus
+        (score_components["sequence_score"] * 5.0)
+        + (score_components["overlap_score"] * 8.0)
+        + (score_components["numeric_overlap"] * matching_config.numeric_score_weight)
+        + score_components["exact_bonus"]
+        + score_components["availability_bonus"]
+        + score_components["critical_penalty"]
+        + score_components["extra_token_penalty"]
+        + score_components["semantic_penalty"]
     )
 
 
@@ -544,7 +584,7 @@ def _candidate_diagnostic(
     matching_config: MatchingConfig,
 ) -> CandidateMatchDiagnostic:
     """Return one diagnostic record for a candidate result row."""
-    breakdown = _match_score_breakdown(score_query, result)
+    breakdown = _match_score_breakdown_for_config(score_query, result, matching_config)
     acceptance = _diagnostic_acceptance(score_query, result, breakdown, matching_config)
     return _diagnostic_record(
         query, row_index, result, score_query, breakdown, acceptance
@@ -583,11 +623,25 @@ def _diagnostic_acceptance(
     variant_rejection = _candidate_variant_rejection(score_query, result)
     if variant_rejection:
         return False, "", variant_rejection
+    return _lexical_or_threshold_acceptance(
+        score_query, result, breakdown, matching_config
+    )
+
+
+def _lexical_or_threshold_acceptance(
+    score_query: str,
+    result: dict[str, Any],
+    breakdown: MatchScoreBreakdown,
+    matching_config: MatchingConfig,
+) -> tuple[bool, str, str]:
+    """Return lexical rejection or the standard threshold acceptance outcome."""
+    lexical_rejection = compatibility_rejection_reason(
+        score_query, _candidate_english_name(result)
+    )
+    if lexical_rejection:
+        return False, "", lexical_rejection
     return _acceptance_details(
-        score_query,
-        result,
-        breakdown.total_score,
-        matching_config,
+        score_query, result, breakdown.total_score, matching_config
     )
 
 

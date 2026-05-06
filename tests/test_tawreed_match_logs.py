@@ -122,7 +122,9 @@ class TawreedMatchLogsTests(unittest.TestCase):
                     accepted=True,
                     accepted_reason="high_token_overlap",
                     rejection_reason="",
-                    breakdown=MatchScoreBreakdown(0.95, 1.0, 0.0, 2.0, 1.0, 22.5),
+                    breakdown=MatchScoreBreakdown(
+                        0.95, 1.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0.0, 22.5
+                    ),
                     candidate=candidate,
                 )
             ],
@@ -154,7 +156,7 @@ def _accepted_decision(candidate: dict[str, object]) -> MatchDecision:
                 True,
                 "high_token_overlap",
                 "",
-                MatchScoreBreakdown(0.95, 1.0, 0.0, 2.0, 1.0, 22.5),
+                MatchScoreBreakdown(0.95, 1.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0.0, 22.5),
                 candidate,
             )
         ],

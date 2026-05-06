@@ -6,7 +6,6 @@ from typing import Any
 
 from .config_models import ExcelConfig, MatchingConfig, ProfileConfig, RuntimeConfig
 
-
 DEFAULT_BASE_URL = "https://seller.tawreed.io/#/login"
 DEFAULT_CODE_COLUMN = "كود"
 DEFAULT_NAME_COLUMN = "إسم الصنف"
@@ -61,11 +60,41 @@ def build_runtime_config(raw_values: dict[str, Any]) -> RuntimeConfig:
 def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
     """Build product-matching thresholds from the optional YAML section."""
     matching_values = dict(raw_values.get("matching", {}))
-    return MatchingConfig(
-        exact_match_accept=bool(matching_values.get("exact_match_accept", True)),
-        high_overlap_threshold=float(matching_values.get("high_overlap_threshold", 0.85)),
-        medium_score_threshold=float(matching_values.get("medium_score_threshold", 12.0)),
-        medium_overlap_threshold=float(matching_values.get("medium_overlap_threshold", 0.6)),
-        numeric_score_threshold=float(matching_values.get("numeric_score_threshold", 16.0)),
-        numeric_overlap_threshold=float(matching_values.get("numeric_overlap_threshold", 0.45)),
+    default_config = MatchingConfig()
+    kwargs = _matching_float_values(matching_values, default_config)
+    kwargs["exact_match_accept"] = bool(
+        _matching_value(matching_values, default_config, "exact_match_accept")
     )
+    return MatchingConfig(**kwargs)
+
+
+def _matching_float_values(
+    matching_values: dict[str, Any], default_config: MatchingConfig
+) -> dict[str, float]:
+    """Return all float matching settings parsed from raw config."""
+    names = (
+        "high_overlap_threshold",
+        "medium_score_threshold",
+        "medium_overlap_threshold",
+        "numeric_score_threshold",
+        "numeric_overlap_threshold",
+        "numeric_score_weight",
+        "critical_token_penalty",
+        "distinguishing_token_penalty",
+        "semantic_mismatch_penalty",
+    )
+    return {
+        name: _matching_float(matching_values, default_config, name) for name in names
+    }
+
+
+def _matching_float(
+    matching_values, default_config: MatchingConfig, name: str
+) -> float:
+    """Return one matching configuration value coerced to float."""
+    return float(_matching_value(matching_values, default_config, name))
+
+
+def _matching_value(matching_values, default_config: MatchingConfig, name: str) -> Any:
+    """Return one configured matching value with dataclass defaults."""
+    return matching_values.get(name, getattr(default_config, name))
