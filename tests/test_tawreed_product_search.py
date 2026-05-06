@@ -30,7 +30,7 @@ class TawreedProductSearchTests(unittest.TestCase):
         """Nested search payload data is flattened to product candidates."""
         payload = {
             "data": {
-                "items": [
+                "content": [
                     {
                         "productName": "فيتاسيد سي 1 جم 12 اقراص فوار",
                         "productNameEn": "VITACID C 1 GM 12 EFF. TAB.",

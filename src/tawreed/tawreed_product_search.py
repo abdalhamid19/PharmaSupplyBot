@@ -16,7 +16,7 @@ PRODUCT_SEARCH_INPUT_SELECTOR = (
     "input[placeholder*='بحث'], "
     "input[placeholder*='Search']"
 )
-_PRODUCT_LIST_KEYS = ("data", "items", "products", "result", "results", "storeProducts")
+_PRODUCT_LIST_KEYS = ("data", "content", "items", "products", "result", "results", "storeProducts")
 
 
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
