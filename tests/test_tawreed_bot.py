@@ -168,7 +168,6 @@ class TawreedBotTests(unittest.TestCase):
             match_elapsed=0.5,
         )
 
-        self.assertEqual(summary.matched_product_name, "Panadol Extra 24 Tabs")
         self.assertEqual(summary.matched_product_english_name, "Panadol Extra 24 Tabs")
         self.assertEqual(summary.matched_product_arabic_name, "بنادول اكسترا 24 قرص")
         self.assertEqual(summary.matched_query, "Panadol Extra")

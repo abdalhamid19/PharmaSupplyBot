@@ -21,7 +21,6 @@ class OrderItemSummary:
     status: str
     reason: str
     ordered_total_qty: int = 0
-    matched_product_name: str = ""
     matched_product_english_name: str = ""
     matched_product_arabic_name: str = ""
     matched_query: str = ""
@@ -82,7 +81,6 @@ def append_order_result_summary(
         "ordered_total_qty": summary.ordered_total_qty,
         "status": summary.status,
         "reason": summary.reason,
-        "matched_product_name": summary.matched_product_name,
         "matched_product_english_name": summary.matched_product_english_name,
         "matched_product_arabic_name": summary.matched_product_arabic_name,
         "matched_query": summary.matched_query,

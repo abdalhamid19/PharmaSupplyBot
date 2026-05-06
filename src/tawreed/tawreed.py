@@ -453,26 +453,22 @@ class TawreedBot:
 
     def _matched_summary_name_fields(self) -> dict[str, str]:
         """Return named OrderItemSummary fields for the last matched product."""
-        matched_name, english_name, arabic_name, matched_query = (
-            self._matched_summary_fields()
-        )
+        english_name, arabic_name, matched_query = self._matched_summary_fields()
         return {
-            "matched_product_name": matched_name,
             "matched_product_english_name": english_name,
             "matched_product_arabic_name": arabic_name,
             "matched_query": matched_query,
         }
 
-    def _matched_summary_fields(self) -> tuple[str, str, str, str]:
+    def _matched_summary_fields(self) -> tuple[str, str, str]:
         """Return matched product summary fields from the last recorded match decision."""
         decision = self.last_match_decision
         if not decision or not decision.best_match:
-            return "", "", "", ""
+            return "", "", ""
         candidate = decision.best_match.data
         english_name = str(candidate.get("productNameEn") or "")
         arabic_name = str(candidate.get("productName") or "")
-        product_name = english_name or arabic_name
-        return product_name, english_name, arabic_name, decision.best_match.query
+        return english_name, arabic_name, decision.best_match.query
 
     def _skip_status(self, reason: str) -> str:
         """Return the structured summary status for one skipped item."""

@@ -68,7 +68,7 @@ def top_slowest_rows(rows: list[dict[str, str]]) -> pd.DataFrame:
         "status",
         "elapsed_seconds",
         "match_elapsed_seconds",
-        "matched_product_name",
+        "matched_product_english_name",
     ]
     visible = [column for column in columns if column in dataframe.columns]
-    return dataframe[visible] if visible else dataframe
+    return dataframe.loc[:, visible] if visible else dataframe
