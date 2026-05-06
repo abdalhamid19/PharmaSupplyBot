@@ -9,8 +9,8 @@ import streamlit as st
 
 from ..core.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
-    PREVENTED_ITEMS_DIR,
     PREVENTED_CODE_COLUMN,
+    PREVENTED_ITEMS_DIR,
     PREVENTED_NAME_COLUMN,
     PreventedItem,
     add_prevented_item,
@@ -29,24 +29,59 @@ def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
     return bool(submitted), values
 
 
-def order_form_fields(app_config, prevented_items_path: Path | None = None) -> dict[str, object]:
+def order_form_fields(
+    app_config, prevented_items_path: Path | None = None
+) -> dict[str, object]:
     """Return the order form field values."""
     input_mode, excel_path_str, upload = excel_source_fields()
-    profile_mode, profile_key, limit, debug_browser, resume, highest_discount, min_discount = (
-        profile_run_fields(app_config)
+    run_fields = profile_run_fields(app_config)
+    return _order_form_values(
+        input_mode,
+        excel_path_str,
+        upload,
+        run_fields,
+        item_workers_field(app_config),
+        prevented_items_path,
     )
-    return {
+
+
+def _order_form_values(
+    input_mode: str,
+    excel_path_str: str,
+    upload: object,
+    run_fields: tuple[str, str, int, bool, bool, bool, float],
+    item_workers: int,
+    prevented_items_path: Path | None,
+) -> dict[str, object]:
+    """Build serializable order form values from collected widget fields."""
+    values = {
         "input_mode": input_mode,
         "excel_path_str": excel_path_str,
         "upload": upload,
+        "item_workers": int(item_workers),
+        "prevented_items_excel": str(
+            prevented_items_path or DEFAULT_PREVENTED_ITEMS_PATH
+        ),
+    }
+    values.update(_order_run_values(run_fields))
+    return values
+
+
+def _order_run_values(
+    run_fields: tuple[str, str, int, bool, bool, bool, float],
+) -> dict[str, object]:
+    """Build values related to the selected order run target/options."""
+    profile_mode, profile_key, limit, debug_browser, resume, high_disc, min_disc = (
+        run_fields
+    )
+    return {
         "profile_mode": profile_mode,
         "profile_key": profile_key,
         "limit": int(limit),
         "debug_browser": bool(debug_browser),
         "resume": bool(resume),
-        "highest_discount": bool(highest_discount),
-        "min_discount_percent": float(min_discount),
-        "prevented_items_excel": str(prevented_items_path or DEFAULT_PREVENTED_ITEMS_PATH),
+        "highest_discount": bool(high_disc),
+        "min_discount_percent": float(min_disc),
     }
 
 
@@ -80,7 +115,9 @@ def render_prevented_items_manager(
     return path
 
 
-def persist_uploaded_prevented_items(uploaded_file, path: Path = DEFAULT_PREVENTED_ITEMS_PATH) -> Path:
+def persist_uploaded_prevented_items(
+    uploaded_file, path: Path = DEFAULT_PREVENTED_ITEMS_PATH
+) -> Path:
     """Persist an uploaded prevented-items XLSX as the active saved list."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(uploaded_file.getvalue())
@@ -197,7 +234,9 @@ def order_excel_options(
 
 def profile_run_fields(app_config) -> tuple[str, str, int, bool, bool, bool, float]:
     """Return the order form fields related to profile execution."""
-    profile_mode = st.radio("Run target", ["Single profile", "All profiles"], horizontal=True)
+    profile_mode = st.radio(
+        "Run target", ["Single profile", "All profiles"], horizontal=True
+    )
     profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=50)
     resume = st.checkbox("Resume from previous summary", value=True)
@@ -221,6 +260,21 @@ def profile_run_fields(app_config) -> tuple[str, str, int, bool, bool, bool, flo
     )
 
 
+def item_workers_field(app_config) -> int:
+    """Return the requested item-level worker count for one order run."""
+    runtime = getattr(app_config, "runtime", None)
+    configured = int(getattr(runtime, "item_workers", 1) or 1)
+    return int(
+        st.number_input(
+            "Item workers",
+            min_value=1,
+            max_value=4,
+            value=max(1, min(configured, 4)),
+            help="Split this Excel file across isolated Chromium workers for one profile.",
+        )
+    )
+
+
 def existing_excel_path(input_mode: str, excel_options: list[str]) -> str:
     """Return the selected existing Excel path when that input mode is active."""
     if input_mode != "Existing file":
@@ -232,4 +286,8 @@ def existing_excel_path(input_mode: str, excel_options: list[str]) -> str:
 
 def uploaded_excel_file(input_mode: str):
     """Return the uploaded Excel file when upload mode is active."""
-    return st.file_uploader("Upload Excel", type=["xlsx"]) if input_mode == "Upload file" else None
+    return (
+        st.file_uploader("Upload Excel", type=["xlsx"])
+        if input_mode == "Upload file"
+        else None
+    )

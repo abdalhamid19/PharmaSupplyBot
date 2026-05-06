@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import time
+from pathlib import Path
 
 import streamlit as st
 
-from ..core.prevented_items import DEFAULT_PREVENTED_ITEMS_PATH, is_prevented_items_excel_path
+from ..core.prevented_items import (
+    DEFAULT_PREVENTED_ITEMS_PATH,
+    is_prevented_items_excel_path,
+)
 from .streamlit_order_form import order_form_values
 from .streamlit_process import render_command_result, start_cli_subprocess
 from .streamlit_results import render_fresh_run_analysis
-from .streamlit_shared import ARTIFACTS_DIR, csv_row_count, load_new_summary_rows, summary_csv_path
+from .streamlit_shared import (
+    ARTIFACTS_DIR,
+    csv_row_count,
+    load_new_summary_rows,
+    summary_csv_path,
+)
 from .streamlit_state import (
     ensure_default_state_files,
     missing_state_profiles,
@@ -19,7 +27,9 @@ from .streamlit_state import (
 from .streamlit_uploads import resolve_excel_path
 
 
-def render_order_tab(app_config, default_profile: str | None, config_path: Path) -> None:
+def render_order_tab(
+    app_config, default_profile: str | None, config_path: Path
+) -> None:
     """Render order execution controls and fresh-run analysis."""
     st.subheader("Run Order")
     if not default_profile:
@@ -30,7 +40,9 @@ def render_order_tab(app_config, default_profile: str | None, config_path: Path)
     submitted, form_values = order_form_values(app_config)
     if not submitted:
         return
-    excel_path = resolve_excel_path(form_values["excel_path_str"], form_values["upload"])
+    excel_path = resolve_excel_path(
+        form_values["excel_path_str"], form_values["upload"]
+    )
     if excel_path is None:
         st.error("Please choose or upload an Excel file.")
         return
@@ -43,7 +55,9 @@ def render_order_tab(app_config, default_profile: str | None, config_path: Path)
             "Please choose the shortage/order Excel file."
         )
         return
-    run_order_submission(app_config, default_profile, config_path, form_values, excel_path)
+    run_order_submission(
+        app_config, default_profile, config_path, form_values, excel_path
+    )
 
 
 def run_order_submission(
@@ -59,7 +73,9 @@ def run_order_submission(
     summary_path = summary_csv_path(default_profile)
     previous_row_count = csv_row_count(summary_path)
     command = order_command(config_path, form_values, excel_path)
-    start_order_process(command, summary_path, previous_row_count, order_stop_flag_path())
+    start_order_process(
+        command, summary_path, previous_row_count, order_stop_flag_path()
+    )
     st.success("Order flow started. Use Stop Order to stop after the current item.")
     st.rerun()
 
@@ -77,7 +93,9 @@ def render_running_order_controls() -> bool:
         col_stop, col_refresh = st.columns(2)
         with col_stop:
             if st.button("Stop Order", type="primary"):
-                Path(state["stop_flag_path"]).write_text("stop requested\n", encoding="utf-8")
+                Path(state["stop_flag_path"]).write_text(
+                    "stop requested\n", encoding="utf-8"
+                )
                 st.info("Stop requested. The run will stop before the next item.")
         with col_refresh:
             if st.button("Refresh Status"):
@@ -96,7 +114,9 @@ def render_running_order_controls() -> bool:
     }
     render_command_result(result)
     render_fresh_run_analysis(
-        load_new_summary_rows(Path(state["summary_path"]), int(state["previous_row_count"]))
+        load_new_summary_rows(
+            Path(state["summary_path"]), int(state["previous_row_count"])
+        )
     )
     st.session_state.pop("order_process", None)
     return False
@@ -165,7 +185,9 @@ def prepare_order_state_files(app_config, form_values: dict[str, object]) -> boo
         return True
     missing_text = ", ".join(f"`{profile_key}`" for profile_key in missing_profiles)
     st.error(f"Missing session-state JSON for: {missing_text}")
-    st.info("Upload `state/<profile>.json` from a machine where you already ran `py run.py auth`.")
+    st.info(
+        "Upload `state/<profile>.json` from a machine where you already ran `py run.py auth`."
+    )
     return False
 
 
@@ -192,6 +214,9 @@ def order_command(
         command.append("--debug-browser")
     if form_values.get("resume"):
         command.append("--resume")
+    item_workers = int(form_values.get("item_workers") or 1)
+    if item_workers > 1:
+        command.extend(["--item-workers", str(item_workers)])
     if form_values.get("highest_discount"):
         command.extend(["--warehouse-mode", "max_discount"])
     min_discount_percent = float(form_values.get("min_discount_percent") or 0)

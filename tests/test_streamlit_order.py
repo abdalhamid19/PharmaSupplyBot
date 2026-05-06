@@ -4,18 +4,18 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.ui.streamlit_order import order_command
+from src.core.prevented_items import PreventedItem, load_prevented_items
 from src.ui import streamlit_order
+from src.ui.streamlit_order import order_command
 from src.ui.streamlit_order_form import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     add_and_save_prevented_item,
-    order_form_fields,
     order_excel_options,
-    prevented_excel_options,
+    order_form_fields,
     persist_existing_prevented_items_file,
     persist_uploaded_prevented_items,
+    prevented_excel_options,
 )
-from src.core.prevented_items import PreventedItem, load_prevented_items
 
 
 class _FakeUpload:
@@ -60,6 +60,43 @@ class StreamlitOrderTests(unittest.TestCase):
         self.assertIn("--min-discount-percent", command)
         self.assertEqual(command[command.index("--min-discount-percent") + 1], "12")
 
+    def test_order_command_adds_item_workers_when_parallel(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "resume": False,
+                "highest_discount": False,
+                "min_discount_percent": 0,
+                "item_workers": 3,
+            },
+            Path("data/input/order_items/ddd.xlsx"),
+        )
+
+        self.assertIn("--item-workers", command)
+        self.assertEqual(command[command.index("--item-workers") + 1], "3")
+
+    def test_order_command_omits_default_item_workers(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "resume": False,
+                "highest_discount": False,
+                "min_discount_percent": 0,
+                "item_workers": 1,
+            },
+            Path("data/input/order_items/ddd.xlsx"),
+        )
+
+        self.assertNotIn("--item-workers", command)
+
     def test_order_command_adds_resume(self) -> None:
         command = order_command(
             Path("config.yaml"),
@@ -102,7 +139,9 @@ class StreamlitOrderTests(unittest.TestCase):
     def test_persist_uploaded_prevented_items_saves_active_list(self) -> None:
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "drugprevented.xlsx"
-            saved_path = persist_uploaded_prevented_items(_FakeUpload(b"xlsx-bytes"), path)
+            saved_path = persist_uploaded_prevented_items(
+                _FakeUpload(b"xlsx-bytes"), path
+            )
 
             self.assertEqual(saved_path, path)
             self.assertEqual(path.read_bytes(), b"xlsx-bytes")
@@ -127,7 +166,9 @@ class StreamlitOrderTests(unittest.TestCase):
         ):
             options = order_excel_options()
 
-        self.assertEqual(options, ["data/input/order_items/shortage_report_total_20260426.xlsx"])
+        self.assertEqual(
+            options, ["data/input/order_items/shortage_report_total_20260426.xlsx"]
+        )
 
     def test_prevented_excel_options_reads_prevented_items_directory(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -136,7 +177,9 @@ class StreamlitOrderTests(unittest.TestCase):
             prevented_path = prevented_dir / "drugprevented.xlsx"
             prevented_path.write_bytes(b"")
 
-            with patch("src.ui.streamlit_order_form.PREVENTED_ITEMS_DIR", prevented_dir):
+            with patch(
+                "src.ui.streamlit_order_form.PREVENTED_ITEMS_DIR", prevented_dir
+            ):
                 options = prevented_excel_options(prevented_path)
 
         self.assertEqual(options, [str(prevented_path)])
@@ -145,16 +188,24 @@ class StreamlitOrderTests(unittest.TestCase):
         with (
             patch(
                 "src.ui.streamlit_order_form.excel_source_fields",
-                return_value=("Existing file", "data/input/order_items/orders.xlsx", None),
+                return_value=(
+                    "Existing file",
+                    "data/input/order_items/orders.xlsx",
+                    None,
+                ),
             ),
             patch(
                 "src.ui.streamlit_order_form.profile_run_fields",
                 return_value=("Single profile", "wardany", 5, False, True, False, 0),
             ),
+            patch("src.ui.streamlit_order_form.item_workers_field", return_value=2),
         ):
             values = order_form_fields(object())
 
-        self.assertEqual(values["prevented_items_excel"], str(DEFAULT_PREVENTED_ITEMS_PATH))
+        self.assertEqual(
+            values["prevented_items_excel"], str(DEFAULT_PREVENTED_ITEMS_PATH)
+        )
+        self.assertEqual(values["item_workers"], 2)
 
     def test_add_and_save_prevented_item_persists_new_item(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -169,7 +220,10 @@ class StreamlitOrderTests(unittest.TestCase):
 
         self.assertEqual(
             updated_items,
-            [PreventedItem(code="1", name="Panadol"), PreventedItem(code="2", name="Devarol")],
+            [
+                PreventedItem(code="1", name="Panadol"),
+                PreventedItem(code="2", name="Devarol"),
+            ],
         )
         self.assertEqual(reloaded_items, updated_items)
 
@@ -180,8 +234,14 @@ class StreamlitOrderTests(unittest.TestCase):
             "prevented_items_excel": "data/input/prevented_items/drugprevented.xlsx",
         }
         with (
-            patch("src.ui.streamlit_order.render_running_order_controls", return_value=False),
-            patch("src.ui.streamlit_order.order_form_values", return_value=(True, form_values)),
+            patch(
+                "src.ui.streamlit_order.render_running_order_controls",
+                return_value=False,
+            ),
+            patch(
+                "src.ui.streamlit_order.order_form_values",
+                return_value=(True, form_values),
+            ),
             patch("src.ui.streamlit_order.st.subheader"),
             patch("src.ui.streamlit_order.st.error") as error,
             patch("src.ui.streamlit_order.run_order_submission") as run_submission,
