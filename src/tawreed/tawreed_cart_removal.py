@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterable
 
 from playwright.sync_api import Page
@@ -13,7 +14,24 @@ from .tawreed_constants import VISIBLE_DIALOG_SELECTOR
 from .tawreed_products_flow import require_product_match
 
 
-def remove_items_from_cart(bot, page: Page, targets: list[any]) -> None:
+@dataclass(frozen=True)
+class CartRemovalSelectors:
+    """Selectors required to remove matching rows from the Tawreed cart."""
+
+    cart_rows: str
+    cart_delete_button: str
+    cart_confirm_delete_button: str
+
+
+@dataclass(frozen=True)
+class CartRemovalTarget:
+    """One cart-removal item plus every Tawreed name accepted for matching."""
+
+    item: CartRemovalItem
+    names: list[str]
+
+
+def remove_items_from_cart(bot, page: Page, targets: list[CartRemovalTarget]) -> None:
     """Iterate through the cart and remove rows matching the requested items."""
     if not targets:
         bot.log("No cart items identified for removal.")
@@ -38,23 +56,63 @@ def _process_removal_target(bot, page, target):
         bot.profile_key,
         target.item,
         CartRemovalSummary(removed_count=count, status=status, reason=reason),
-        label_suffix=bot.summary_label_suffix,
+        label_suffix=getattr(bot, "summary_label_suffix", None),
     )
-    bot.log(f"Cart removal {target.item.code} / {target.item.name}: {reason}")
+    _log(bot, f"Cart removal {target.item.code} / {target.item.name}: {reason}")
 
 
-def _remove_matching_rows(bot, page, target) -> int:
-    """Locate and delete matching cart rows."""
+def _remove_matching_rows(bot, page, target: CartRemovalTarget) -> int:
+    """Locate and delete matching cart rows using the bot's selectors."""
+    selectors = CartRemovalSelectors(
+        bot.selectors.cart_rows,
+        bot.selectors.cart_delete_button,
+        bot.selectors.cart_confirm_delete_button,
+    )
+    return remove_matching_cart_rows(page, target, selectors)
+
+
+def remove_matching_cart_rows(
+    page, target: CartRemovalTarget, selectors: CartRemovalSelectors
+) -> int:
+    """Remove every visible cart row that matches the removal target."""
     count = 0
     while True:
-        idx = _find_row_idx(page, target, bot.selectors.cart_rows)
+        idx = _find_row_idx(page, target, selectors.cart_rows)
         if idx is None:
             return count
-        row = page.locator(bot.selectors.cart_rows).nth(idx)
-        row.locator(bot.selectors.cart_delete_button).click()
-        page.locator(bot.selectors.cart_confirm_delete).click()
+        count += _delete_cart_row(page, idx, selectors)
+
+
+def _delete_cart_row(page, row_index: int, selectors: CartRemovalSelectors) -> int:
+    """Delete one matching row and return whether it was removed."""
+    rows = page.locator(selectors.cart_rows)
+    before_count = rows.count()
+    row = rows.nth(row_index)
+    try:
+        click_cart_delete_button(row.locator(selectors.cart_delete_button))
+        confirm_delete_if_needed(page, selectors)
+        _wait_after_cart_delete(page)
+        return 1
+    except Exception:
+        if page.locator(selectors.cart_rows).count() < before_count:
+            return 1
+        raise
+
+
+def click_cart_delete_button(delete_button) -> None:
+    """Click one cart-row delete button."""
+    delete_button.click()
+
+
+def confirm_delete_if_needed(page, selectors: CartRemovalSelectors) -> None:
+    """Click the cart delete confirmation button when Tawreed shows one."""
+    page.locator(selectors.cart_confirm_delete_button).click()
+
+
+def _wait_after_cart_delete(page) -> None:
+    """Wait briefly after deleting a cart row when the page supports waits."""
+    if hasattr(page, "wait_for_timeout"):
         page.wait_for_timeout(1000)
-        count += 1
 
 
 def _find_row_idx(page, target, selector) -> int | None:
@@ -87,8 +145,8 @@ def resolve_cart_removal_targets(bot, page, items: Iterable[CartRemovalItem]):
                 ]
             )
         except Exception as e:
-            bot.log(f"Could not resolve name for {item.name}: {e}")
-        targets.append(_Target(item, _unique(names)))
+            _log(bot, f"Could not resolve name for {item.name}: {e}")
+        targets.append(CartRemovalTarget(item, _unique(names)))
     return targets
 
 
@@ -111,6 +169,10 @@ def _unique(names: list[str]) -> list[str]:
     return res
 
 
-class _Target:
-    def __init__(self, item, names):
-        self.item, self.names = item, names
+def _log(bot, message: str) -> None:
+    """Log through the bot when available, else print ASCII-safe text."""
+    logger = getattr(bot, "log", None)
+    if logger:
+        logger(message)
+        return
+    print(message.encode("ascii", errors="replace").decode("ascii"))
