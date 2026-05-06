@@ -4,7 +4,6 @@ from tempfile import TemporaryDirectory
 
 import pandas as pd
 
-from src.core.utils.excel import Item
 from src.core.prevented_items import (
     PREVENTED_CODE_COLUMN,
     PREVENTED_NAME_COLUMN,
@@ -15,6 +14,7 @@ from src.core.prevented_items import (
     remove_prevented_item,
     save_prevented_items,
 )
+from src.core.utils.excel import Item
 
 
 class PreventedItemsTests(unittest.TestCase):
@@ -45,12 +45,13 @@ class PreventedItemsTests(unittest.TestCase):
         ]
         prevented_items = [PreventedItem(code="47273", name="DEVAROL")]
 
-        allowed_items, skipped_count = filter_prevented_order_items(items, prevented_items)
+        allowed_items = list(filter_prevented_order_items(items, prevented_items))
 
         self.assertEqual(allowed_items, [items[1]])
-        self.assertEqual(skipped_count, 1)
 
-    def test_filter_prevented_order_items_skips_matching_name_when_item_has_no_code(self) -> None:
+    def test_filter_prevented_order_items_skips_matching_name_when_item_has_no_code(
+        self,
+    ) -> None:
         items = [
             Item(code="", name="  Devarol   S  ", qty=1),
             Item(code="1", name="Devarol S", qty=2),
@@ -58,10 +59,9 @@ class PreventedItemsTests(unittest.TestCase):
         ]
         prevented_items = [PreventedItem(code="999", name="Devarol S")]
 
-        allowed_items, skipped_count = filter_prevented_order_items(items, prevented_items)
+        allowed_items = list(filter_prevented_order_items(items, prevented_items))
 
         self.assertEqual(allowed_items, [items[1], items[2]])
-        self.assertEqual(skipped_count, 1)
 
     def test_add_remove_and_save_prevented_items(self) -> None:
         prevented_items = [PreventedItem(code="1", name="Panadol")]

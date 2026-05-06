@@ -14,7 +14,9 @@ from src.core.cart_removal_items import (
 
 
 class CartRemovalItemsTests(unittest.TestCase):
-    def test_load_cart_removal_items_reads_expected_columns_and_normalizes_code(self) -> None:
+    def test_load_cart_removal_items_reads_expected_columns_and_normalizes_code(
+        self,
+    ) -> None:
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "remove.xlsx"
             pd.DataFrame(
@@ -26,7 +28,7 @@ class CartRemovalItemsTests(unittest.TestCase):
                 ]
             ).to_excel(path, index=False)
 
-            items = load_cart_removal_items(path)
+            items = list(load_cart_removal_items(path))
 
         self.assertEqual(
             items,

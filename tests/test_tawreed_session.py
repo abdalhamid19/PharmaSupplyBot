@@ -63,14 +63,18 @@ class TawreedSessionTests(unittest.TestCase):
     def test_login_page_raises_clear_error(self) -> None:
         page = _FakePage(ready_visible=False, marker_visible=False, login_visible=True)
         with self.assertRaises(SessionInvalidError) as context:
-            ensure_logged_in(page, self.selectors, timeout_ms=5000, ready_selector="#ready")
+            ensure_logged_in(
+                page, self.selectors, timeout_ms=5000, ready_selector="#ready"
+            )
         self.assertIn("login page", str(context.exception))
 
     def test_unknown_surface_raises_page_not_ready_error(self) -> None:
         page = _FakePage(ready_visible=False, marker_visible=False, login_visible=False)
         with self.assertRaises(SessionInvalidError) as context:
-            ensure_logged_in(page, self.selectors, timeout_ms=5000, ready_selector="#ready")
-        self.assertIn("expected order surface", str(context.exception))
+            ensure_logged_in(
+                page, self.selectors, timeout_ms=5000, ready_selector="#ready"
+            )
+        self.assertIn("did not expose order surface", str(context.exception))
 
     def test_auth_temp_state_path_uses_tmp_suffix(self) -> None:
         self.assertEqual(

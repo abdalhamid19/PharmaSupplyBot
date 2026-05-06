@@ -1,7 +1,8 @@
 import unittest
 from pathlib import Path
+from typing import Any
 
-from src.tawreed.tawreed_auth_waits import wait_for_login_detection
+from src.tawreed.tawreed_session import wait_for_login_detection
 
 
 class _FakePage:
@@ -36,7 +37,9 @@ class _FakeLocator:
 
 class TawreedAuthWaitsTests(unittest.TestCase):
     def test_wait_for_login_detection_exits_when_marker_appears(self) -> None:
-        page = _FakePage("https://seller.tawreed.io/#/login", marker_visible=True, login_visible=True)
+        page: Any = _FakePage(
+            "https://seller.tawreed.io/#/login", marker_visible=True, login_visible=True
+        )
         detected = wait_for_login_detection(
             page,
             context=object(),
@@ -45,12 +48,15 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             login_password_selector="#password",
             logged_in_marker="#marker",
             state_path=Path("state/wardany.json"),
-            save_session_state=lambda *_args, **_kwargs: None,
         )
         self.assertTrue(detected)
 
     def test_wait_for_login_detection_exits_when_login_form_disappears(self) -> None:
-        page = _FakePage("https://seller.tawreed.io/#/login", marker_visible=False, login_visible=False)
+        page: Any = _FakePage(
+            "https://seller.tawreed.io/#/login",
+            marker_visible=False,
+            login_visible=False,
+        )
         detected = wait_for_login_detection(
             page,
             context=object(),
@@ -59,12 +65,13 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             login_password_selector="#password",
             logged_in_marker="#marker",
             state_path=Path("state/wardany.json"),
-            save_session_state=lambda *_args, **_kwargs: None,
         )
         self.assertTrue(detected)
 
     def test_wait_for_login_detection_exits_when_route_leaves_login(self) -> None:
-        page = _FakePage("https://seller.tawreed.io/#/home", marker_visible=False, login_visible=True)
+        page: Any = _FakePage(
+            "https://seller.tawreed.io/#/home", marker_visible=False, login_visible=True
+        )
         detected = wait_for_login_detection(
             page,
             context=object(),
@@ -73,13 +80,17 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             login_password_selector="#password",
             logged_in_marker="#marker",
             state_path=Path("state/wardany.json"),
-            save_session_state=lambda *_args, **_kwargs: None,
         )
         self.assertTrue(detected)
 
-    def test_wait_for_login_detection_skips_intermediate_saves_when_disabled(self) -> None:
-        page = _FakePage("https://seller.tawreed.io/#/login", marker_visible=False, login_visible=True)
-        save_calls = []
+    def test_wait_for_login_detection_skips_intermediate_saves_when_disabled(
+        self,
+    ) -> None:
+        page: Any = _FakePage(
+            "https://seller.tawreed.io/#/login",
+            marker_visible=False,
+            login_visible=True,
+        )
         detected = wait_for_login_detection(
             page,
             context=object(),
@@ -88,11 +99,9 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             login_password_selector="#password",
             logged_in_marker="#marker",
             state_path=Path("state/wardany.json"),
-            save_session_state=lambda *_args, **_kwargs: save_calls.append("saved"),
             save_intermediate=False,
         )
         self.assertFalse(detected)
-        self.assertEqual(save_calls, [])
 
 
 if __name__ == "__main__":

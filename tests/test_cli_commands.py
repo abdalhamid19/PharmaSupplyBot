@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 from src.cli.cli_cart_removal import run_remove_cart_command
@@ -20,7 +21,7 @@ class CliCommandsTests(unittest.TestCase):
             Item(code="1", name="Panadol", qty=1),
             Item(code="", name="Devarol", qty=2),
         ]
-        args = SimpleNamespace(resume=True)
+        args: Any = SimpleNamespace(resume=True)
 
         with TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
@@ -35,7 +36,8 @@ class CliCommandsTests(unittest.TestCase):
 
                 with patch("src.cli.cli_order.require_state_file"):
                     from src.cli.cli_order import _prepared_order_items
-                    remaining = _prepared_order_items("wardany", items, args)
+
+                    remaining = list(_prepared_order_items("wardany", items, args))
             finally:
                 os.chdir(original_cwd)
 
@@ -46,7 +48,7 @@ class CliCommandsTests(unittest.TestCase):
             Item(code="1", name="Blocked", qty=1),
             Item(code="2", name="Allowed", qty=1),
         ]
-        args = SimpleNamespace(
+        args: Any = SimpleNamespace(
             excel="data/input/order_items/orders.xlsx",
             limit=0,
             prevented_items_excel="data/input/prevented_items/drugprevented.xlsx",
@@ -60,13 +62,13 @@ class CliCommandsTests(unittest.TestCase):
                 return_value=[SimpleNamespace(code="1", name="Blocked")],
             ),
         ):
-            allowed_items = load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
+            allowed_items = list(load_order_items(_app_config(), args))
 
         self.assertEqual(allowed_items, [items[1]])
 
     def test_load_order_items_ignores_missing_prevented_items_file(self) -> None:
         items = [Item(code="1", name="Allowed", qty=1)]
-        args = SimpleNamespace(
+        args: Any = SimpleNamespace(
             excel="data/input/order_items/orders.xlsx",
             limit=0,
             prevented_items_excel="data/input/prevented_items/missing.xlsx",
@@ -76,37 +78,41 @@ class CliCommandsTests(unittest.TestCase):
             patch("src.cli.cli_order.load_items_from_excel", return_value=items),
             patch("pathlib.Path.is_file", return_value=False),
         ):
-            allowed_items = load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
+            allowed_items = list(load_order_items(_app_config(), args))
 
         self.assertEqual(allowed_items, items)
 
     def test_load_order_items_rejects_prevented_file_as_order_excel(self) -> None:
-        args = SimpleNamespace(
+        args: Any = SimpleNamespace(
             excel="data/input/prevented_items/drugprevented.xlsx",
             limit=0,
             prevented_items_excel="data/input/prevented_items/drugprevented.xlsx",
         )
 
         with self.assertRaisesRegex(SystemExit, "Order Excel cannot be"):
-            load_order_items(SimpleNamespace(excel=SimpleNamespace()), args)
+            load_order_items(_app_config(), args)
 
     def test_prepared_order_items_requires_state_then_applies_resume(self) -> None:
         items = [Item(code="1", name="Panadol", qty=1)]
-        args = SimpleNamespace(resume=False)
+        args: Any = SimpleNamespace(resume=False)
 
         with (
             patch("src.cli.cli_order.require_state_file") as require_state,
         ):
-            prepared = prepared_order_items("wardany", items, args)
+            prepared = list(prepared_order_items("wardany", items, args))
 
         self.assertEqual(prepared, items)
         require_state.assert_called_once_with("wardany")
 
-    def test_invalid_session_exit_opens_reauth_and_returns_standard_message(self) -> None:
-        error = SimpleNamespace()
+    def test_invalid_session_exit_opens_reauth_and_returns_standard_message(
+        self,
+    ) -> None:
+        error: Any = SimpleNamespace()
 
         with patch("src.cli.cli_shared.open_reauth_in_browser") as reauth:
-            exit_error = invalid_session_exit("https://seller.tawreed.io", "wardany", error)
+            exit_error = invalid_session_exit(
+                "https://seller.tawreed.io", "wardany", error
+            )
 
         reauth.assert_called_once_with("https://seller.tawreed.io", "wardany")
         self.assertIsInstance(exit_error, SystemExit)
@@ -114,12 +120,14 @@ class CliCommandsTests(unittest.TestCase):
 
     def test_run_remove_cart_command_invokes_bot_for_selected_profile(self) -> None:
         profile = SimpleNamespace()
-        app_config = SimpleNamespace(
+        app_config: Any = SimpleNamespace(
             base_url="https://seller.tawreed.io/#/login",
             profiles={"wardany": profile},
-            profiles_to_run=lambda profile=None, all_profiles=False: [("wardany", profile)],
+            profiles_to_run=lambda profile=None, all_profiles=False: [
+                ("wardany", profile)
+            ],
         )
-        args = SimpleNamespace(
+        args: Any = SimpleNamespace(
             excel="data/input/remove_items/remove.xlsx",
             profile="wardany",
             all_profiles=False,
@@ -127,7 +135,10 @@ class CliCommandsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.cli.cli_cart_removal.load_cart_removal_items", return_value=[object()]) as load_items,
+            patch(
+                "src.cli.cli_cart_removal.load_cart_removal_items",
+                return_value=[object()],
+            ) as load_items,
             patch("src.cli.cli_cart_removal.require_state_file"),
             patch("src.cli.cli_cart_removal.build_bot") as build_bot,
         ):
@@ -137,6 +148,10 @@ class CliCommandsTests(unittest.TestCase):
         self.assertEqual(result, 0)
         load_items.assert_called_once()
         bot.remove_cart_items.assert_called_once()
+
+
+def _app_config() -> Any:
+    return SimpleNamespace(excel=SimpleNamespace())
 
 
 if __name__ == "__main__":

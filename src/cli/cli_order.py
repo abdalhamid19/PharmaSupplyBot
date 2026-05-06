@@ -8,7 +8,7 @@ import csv
 import itertools
 import multiprocessing
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.prevented_items import (
@@ -18,7 +18,7 @@ from ..core.prevented_items import (
     load_prevented_items,
 )
 from ..core.utils.chunking import split_into_chunks
-from ..core.utils.excel import load_items_from_excel
+from ..core.utils.excel import Item, load_items_from_excel
 from ..tawreed.order_result_merger import merge_worker_summaries
 from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_session import SessionInvalidError
@@ -132,6 +132,7 @@ def _load_order_items(
 ) -> Iterable[Item]:
     """Load and filter order items iteratively."""
     excel_path = Path(args.excel)
+    _reject_prevented_excel_as_order_source(excel_path, _prevented_items_path(args))
     items = load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
     prevented_path = _prevented_items_path(args)
     if prevented_path and prevented_path.is_file():
@@ -144,6 +145,14 @@ def _prevented_items_path(args: argparse.Namespace) -> Path | None:
     """Return the configured prevented-items Excel path when one is enabled."""
     value = getattr(args, "prevented_items_excel", DEFAULT_PREVENTED_ITEMS_PATH)
     return Path(value) if value else None
+
+
+def _reject_prevented_excel_as_order_source(
+    excel_path: Path, prevented_path: Path | None
+) -> None:
+    """Stop accidental ordering from the prevented-items management file."""
+    if prevented_path and is_prevented_items_excel_path(excel_path, prevented_path):
+        raise SystemExit("Order Excel cannot be the prevented-items Excel file.")
 
 
 def _prepared_order_items(
