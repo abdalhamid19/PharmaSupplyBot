@@ -38,12 +38,24 @@ class PreventedItemsTests(unittest.TestCase):
             ],
         )
 
-    def test_filter_prevented_order_items_skips_matching_code(self) -> None:
+    def test_filter_prevented_order_items_requires_matching_code_and_name(self) -> None:
         items = [
-            Item(code="47273", name="Different Name", qty=1),
+            Item(code="47273", name="DEVAROL", qty=1),
+            Item(code="47273", name="IVERZINE LOTION 6O ML", qty=1),
             Item(code="1", name="Allowed", qty=2),
         ]
         prevented_items = [PreventedItem(code="47273", name="DEVAROL")]
+
+        allowed_items = list(filter_prevented_order_items(items, prevented_items))
+
+        self.assertEqual(allowed_items, [items[1], items[2]])
+
+    def test_filter_prevented_order_items_blocks_code_only_entries(self) -> None:
+        items = [
+            Item(code="47273", name="IVERZINE LOTION 6O ML", qty=1),
+            Item(code="1", name="Allowed", qty=2),
+        ]
+        prevented_items = [PreventedItem(code="47273", name="")]
 
         allowed_items = list(filter_prevented_order_items(items, prevented_items))
 

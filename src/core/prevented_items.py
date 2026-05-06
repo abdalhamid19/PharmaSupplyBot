@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import openpyxl
 
@@ -24,38 +24,58 @@ class PreventedItem:
     name: str
 
 
-def load_prevented_items(path: Path = DEFAULT_PREVENTED_ITEMS_PATH) -> list[PreventedItem]:
+def load_prevented_items(
+    path: Path = DEFAULT_PREVENTED_ITEMS_PATH,
+) -> list[PreventedItem]:
     """Load prevented items from an XLSX file using openpyxl."""
-    if not path.exists(): return []
+    if not path.exists():
+        return []
     with open(path, "rb") as f:
         workbook = openpyxl.load_workbook(f, read_only=True, data_only=True)
         try:
             sheet = workbook.active
+            if sheet is None:
+                return []
             rows = sheet.iter_rows(min_row=1, values_only=True)
             return _parse_prevented_rows(rows, path)
-        finally: workbook.close()
+        finally:
+            workbook.close()
 
 
 def _parse_prevented_rows(rows, path) -> list[PreventedItem]:
     """Extract and validate prevented items from Excel rows."""
-    header = [str(cell).strip() if cell else "" for cell in next(rows)]
-    try:
-        code_idx = header.index(PREVENTED_CODE_COLUMN)
-        name_idx = header.index(PREVENTED_NAME_COLUMN)
-    except ValueError:
-        raise KeyError(f"Missing columns in {path}. Found: {header}")
+    code_idx, name_idx = _prevented_column_indices(next(rows), path)
     items: list[PreventedItem] = []
     seen_keys: set[tuple[str, str]] = set()
     for row in rows:
-        code, name = display_code_text(row[code_idx]), normalized_cell_text(row[name_idx])
-        if not code and not name: continue
-        item = PreventedItem(code=code, name=name)
+        item = _prevented_item_from_row(row, code_idx, name_idx)
+        if item is None:
+            continue
         key = normalized_prevented_key(item)
         if key not in seen_keys:
             seen_keys.add(key)
             items.append(item)
     return items
 
+
+def _prevented_column_indices(header_row, path) -> tuple[int, int]:
+    """Return prevented Excel code/name column indices."""
+    header = [str(cell).strip() if cell else "" for cell in header_row]
+    try:
+        return header.index(PREVENTED_CODE_COLUMN), header.index(PREVENTED_NAME_COLUMN)
+    except ValueError:
+        raise KeyError(f"Missing columns in {path}. Found: {header}")
+
+
+def _prevented_item_from_row(
+    row: tuple[object, ...], code_idx: int, name_idx: int
+) -> PreventedItem | None:
+    """Return one prevented item from a raw Excel row when populated."""
+    code = display_code_text(row[code_idx])
+    name = normalized_cell_text(row[name_idx])
+    if not code and not name:
+        return None
+    return PreventedItem(code=code, name=name)
 
 
 def save_prevented_items(
@@ -66,6 +86,8 @@ def save_prevented_items(
     path.parent.mkdir(parents=True, exist_ok=True)
     workbook = openpyxl.Workbook()
     sheet = workbook.active
+    if sheet is None:
+        raise RuntimeError("Could not create prevented-items worksheet.")
     sheet.append([PREVENTED_CODE_COLUMN, PREVENTED_NAME_COLUMN])
     for item in prevented_items:
         sheet.append([item.code, item.name])
@@ -105,20 +127,36 @@ def filter_prevented_order_items(
     prevented_items: list[PreventedItem],
 ) -> Iterable[Item]:
     """Yield order items excluding any products in the prevented list."""
-    blocked_codes = {
-        normalize_code(i.code) for i in prevented_items if normalize_code(i.code)
+    blocked_pairs = {normalized_prevented_key(item) for item in prevented_items}
+    blocked_codes = {normalize_code(item.code) for item in prevented_items if item.code}
+    code_only_blocks = {
+        normalize_code(item.code)
+        for item in prevented_items
+        if item.code and not item.name
     }
-    blocked_names = {
-        normalize_name(i.name) for i in prevented_items if normalize_name(i.name)
-    }
+    blocked_names = {normalize_name(item.name) for item in prevented_items if item.name}
 
     for item in items:
-        item_code = normalize_code(item.code)
-        item_name = normalize_name(item.name)
-        is_prevented = (item_code in blocked_codes) if item_code else (item_name in blocked_names)
-
-        if not is_prevented:
+        if not _is_prevented_order_item(
+            item, blocked_pairs, blocked_codes, code_only_blocks, blocked_names
+        ):
             yield item
+
+
+def _is_prevented_order_item(
+    item: Item,
+    blocked_pairs: set[tuple[str, str]],
+    blocked_codes: set[str],
+    code_only_blocks: set[str],
+    blocked_names: set[str],
+) -> bool:
+    """Return whether one order item is blocked by the prevented list."""
+    item_code, item_name = normalized_key(item.code, item.name)
+    if item_code and item_name:
+        return (item_code, item_name) in blocked_pairs or item_code in code_only_blocks
+    if item_code:
+        return item_code in blocked_codes
+    return item_name in blocked_names
 
 
 def is_prevented_items_excel_path(
@@ -161,7 +199,6 @@ def normalized_cell_text(value: object) -> str:
     return str(value).strip()
 
 
-
 def display_code_text(value: object) -> str:
     """Return code text suitable for saving/displaying."""
     text = normalized_cell_text(value)
@@ -173,23 +210,3 @@ def display_code_text(value: object) -> str:
 def _normalized_path(path: Path) -> Path:
     """Return an absolute path for reliable same-file comparisons."""
     return path.expanduser().resolve(strict=False)
-
-
-def _require_prevented_columns(dataframe: pd.DataFrame) -> None:
-    """Ensure the prevented-items sheet has the expected columns."""
-    for column_name in (PREVENTED_CODE_COLUMN, PREVENTED_NAME_COLUMN):
-        if column_name in dataframe.columns:
-            continue
-        raise KeyError(
-            f"Missing required column '{column_name}' in prevented-items Excel. "
-            f"Found: {list(dataframe.columns)}"
-        )
-
-
-def _row_to_prevented_item(row: Any) -> PreventedItem | None:
-    """Convert one XLSX row into a prevented item."""
-    code = display_code_text(row.get(PREVENTED_CODE_COLUMN, ""))
-    name = normalized_cell_text(row.get(PREVENTED_NAME_COLUMN, ""))
-    if not code and not name:
-        return None
-    return PreventedItem(code=code, name=name)
