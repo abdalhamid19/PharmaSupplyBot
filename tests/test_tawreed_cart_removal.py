@@ -84,7 +84,9 @@ class TawreedCartRemovalTests(unittest.TestCase):
         self.assertEqual(removed_count, 2)
         self.assertEqual([row.deleted for row in rows], [True, True, False])
 
-    def test_remove_matching_cart_rows_counts_row_removed_despite_click_error(self) -> None:
+    def test_remove_matching_cart_rows_counts_row_removed_despite_click_error(
+        self,
+    ) -> None:
         rows = [_FakeRow("Supplier A DEVAROL")]
         page = _FakePage(rows)
         selectors = CartRemovalSelectors("rows", "delete", "confirm")
@@ -97,7 +99,10 @@ class TawreedCartRemovalTests(unittest.TestCase):
             rows[0].deleted = True
             raise RuntimeError("element detached")
 
-        with patch("src.tawreed.tawreed_cart_removal.click_cart_delete_button", side_effect=detach_row_after_click_error):
+        with patch(
+            "src.tawreed.tawreed_cart_removal.click_cart_delete_button",
+            side_effect=detach_row_after_click_error,
+        ):
             removed_count = remove_matching_cart_rows(page, target, selectors)
 
         self.assertEqual(removed_count, 1)
@@ -142,7 +147,9 @@ class TawreedCartRemovalTests(unittest.TestCase):
             names=["DEVAROL", "ديفارول"],
         )
 
-        with patch("src.tawreed.tawreed_cart_removal.append_cart_removal_summary") as append_summary:
+        with patch(
+            "src.tawreed.tawreed_cart_removal.append_cart_removal_summary"
+        ) as append_summary:
             remove_items_from_cart(bot, page, [target])
 
         summary = append_summary.call_args.args[2]
@@ -163,18 +170,25 @@ class TawreedCartRemovalTests(unittest.TestCase):
             },
         )()
 
-        with patch("src.tawreed.tawreed_cart_removal.require_product_match", return_value=(match, "DEVAROL")):
+        with patch(
+            "src.tawreed.tawreed_cart_removal.require_product_match",
+            return_value=(match, "DEVAROL"),
+        ) as product_match:
             targets = resolve_cart_removal_targets(bot, object(), [item])
 
         self.assertEqual(targets[0].item, item)
         self.assertIn("ديفارول اس 200000 وحده 1 امبول", targets[0].names)
+        self.assertFalse(product_match.call_args.kwargs["require_available"])
 
     def test_resolve_cart_removal_targets_prints_arabic_failures_safely(self) -> None:
         bot = type("Bot", (), {"profile_key": "wardany"})()
         item = CartRemovalItem(code="91976", name="عسل حريمي")
 
         with (
-            patch("src.tawreed.tawreed_cart_removal.require_product_match", side_effect=RuntimeError("لا يوجد")),
+            patch(
+                "src.tawreed.tawreed_cart_removal.require_product_match",
+                side_effect=RuntimeError("لا يوجد"),
+            ),
             patch("builtins.print") as print_call,
         ):
             targets = resolve_cart_removal_targets(bot, object(), [item])

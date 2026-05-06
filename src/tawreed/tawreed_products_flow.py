@@ -20,7 +20,7 @@ from .tawreed_dom_parsing import dom_search_results
 from .tawreed_waits import wait_for_table_overlay_to_clear, wait_for_row_to_settle
 from .tawreed_selections import stores_from_payload
 from .tawreed_constants import MAX_DOM_SEARCH_ROWS, STORE_DETAILS_ENDPOINT
-from .tawreed_search_logic import PRODUCT_SEARCH_INPUT_SELECTOR
+from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR
 
 def add_item_from_products_page(bot, page: Page, item: Item) -> None:
     """Add one item using the Tawreed products page search-and-store selection flow."""

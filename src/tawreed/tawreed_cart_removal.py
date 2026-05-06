@@ -101,12 +101,26 @@ def _delete_cart_row(page, row_index: int, selectors: CartRemovalSelectors) -> i
 
 def click_cart_delete_button(delete_button) -> None:
     """Click one cart-row delete button."""
-    delete_button.click()
+    delete_button.first.click()
 
 
 def confirm_delete_if_needed(page, selectors: CartRemovalSelectors) -> None:
-    """Click the cart delete confirmation button when Tawreed shows one."""
-    page.locator(selectors.cart_confirm_delete_button).click()
+    """Click the cart delete confirmation button inside the visible dialog."""
+    dialog = _visible_confirmation_dialog(page)
+    if dialog is None:
+        return
+    dialog.locator(selectors.cart_confirm_delete_button).last.click(timeout=3000)
+
+
+def _visible_confirmation_dialog(page):
+    """Return the active PrimeNG dialog when a delete confirmation is visible."""
+    dialogs = page.locator(VISIBLE_DIALOG_SELECTOR)
+    try:
+        if dialogs.count() > 0:
+            return dialogs.last
+    except Exception:
+        return None
+    return None
 
 
 def _wait_after_cart_delete(page) -> None:
@@ -137,7 +151,7 @@ def resolve_cart_removal_targets(bot, page, items: Iterable[CartRemovalItem]):
         names = [item.name]
         try:
             it = Item(code=item.code, name=item.name, qty=1)
-            match, _ = require_product_match(bot, page, it)
+            match, _ = require_product_match(bot, page, it, require_available=False)
             names.extend(
                 [
                     str(match.data.get(k) or "")
