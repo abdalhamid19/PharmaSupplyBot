@@ -453,22 +453,35 @@ class TawreedBot:
 
     def _matched_summary_name_fields(self) -> dict[str, str]:
         """Return named OrderItemSummary fields for the last matched product."""
-        english_name, arabic_name, matched_query = self._matched_summary_fields()
+        english_name, english_source, arabic_name, matched_query = (
+            self._matched_summary_fields()
+        )
         return {
             "matched_product_english_name": english_name,
+            "matched_product_english_name_source": english_source,
             "matched_product_arabic_name": arabic_name,
             "matched_query": matched_query,
         }
 
-    def _matched_summary_fields(self) -> tuple[str, str, str]:
+    def _matched_summary_fields(self) -> tuple[str, str, str, str]:
         """Return matched product summary fields from the last recorded match decision."""
         decision = self.last_match_decision
         if not decision or not decision.best_match:
-            return "", "", ""
+            return "", "", "", ""
         candidate = decision.best_match.data
-        english_name = str(candidate.get("productNameEn") or "")
+        english_name, english_source = self._matched_english_name(candidate)
         arabic_name = str(candidate.get("productName") or "")
-        return english_name, arabic_name, decision.best_match.query
+        return english_name, english_source, arabic_name, decision.best_match.query
+
+    def _matched_english_name(self, candidate: dict[str, object]) -> tuple[str, str]:
+        """Return matched English name and whether it came from site or fallback."""
+        site_name = str(candidate.get("productNameEn") or "")
+        if site_name:
+            return site_name, "site"
+        fallback = str(candidate.get("productNameEnFallback") or "")
+        if fallback:
+            return fallback, "fallback"
+        return "", ""
 
     def _skip_status(self, reason: str) -> str:
         """Return the structured summary status for one skipped item."""
