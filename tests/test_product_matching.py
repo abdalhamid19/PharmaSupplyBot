@@ -125,6 +125,25 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("VAG", decision.final_reason)
 
+    def test_apple_flavor_requires_arabic_flavor_marker(self) -> None:
+        item = Item(code="80111", name="Pedialyte Apple Flavour oral solution", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _synthetic_candidate(
+                            "PEDIALYTE ORAL SOLUTION 200", "بيديالايت محلول جفاف 200 مل"
+                        )
+                    ],
+                )
+            ],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("APPLE", decision.final_reason)
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

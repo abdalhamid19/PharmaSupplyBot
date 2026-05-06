@@ -14,6 +14,7 @@ _ARABIC_NON_WORD_RE = re.compile(r"[^\w\u0600-\u06FF]+")
 _ARABIC_WHITESPACE_RE = re.compile(r"\s+")
 MAX_SEARCH_QUERY_VARIANTS = 24
 _ARABIC_REQUIRED_TOKEN_ALIASES = {
+    "APPLE": ("تفاح", "ابل"),
     "AR": ("ايه ار", "اي ار", "ارتجاع"),
     "DOUCHE": ("دش", "غسول", "مهبل"),
     "EFF": ("فوار",),
