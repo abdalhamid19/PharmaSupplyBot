@@ -1,10 +1,14 @@
 import unittest
+from typing import cast
 from unittest.mock import patch
+
+from playwright.sync_api import Page
 
 from src.core.cart_removal_items import CartRemovalItem
 from src.tawreed.tawreed_cart_removal import (
     CartRemovalSelectors,
     CartRemovalTarget,
+    confirm_delete_if_needed,
     remove_items_from_cart,
     remove_matching_cart_rows,
     resolve_cart_removal_targets,
@@ -61,7 +65,65 @@ class _FakePage:
         return self.rows
 
 
+class _FakeConfirmButton:
+    def __init__(self):
+        self.clicked = False
+        self.timeout = None
+
+    @property
+    def last(self):
+        return self
+
+    def click(self, timeout=None):
+        self.clicked = True
+        self.timeout = timeout
+
+
+class _FakeDialog:
+    def __init__(self, button):
+        self.button = button
+        self.selector = ""
+
+    def locator(self, selector):
+        self.selector = selector
+        return self.button
+
+
+class _FakeDialogs:
+    def __init__(self, dialog):
+        self.dialog = dialog
+
+    @property
+    def last(self):
+        return self.dialog
+
+    def count(self):
+        return 1
+
+
+class _FakeDialogPage:
+    def __init__(self, dialog):
+        self.dialogs = _FakeDialogs(dialog)
+        self.selector = ""
+
+    def locator(self, selector):
+        self.selector = selector
+        return self.dialogs
+
+
 class TawreedCartRemovalTests(unittest.TestCase):
+    def test_confirm_delete_clicks_button_inside_visible_dialog(self) -> None:
+        button = _FakeConfirmButton()
+        dialog = _FakeDialog(button)
+        page = _FakeDialogPage(dialog)
+        selectors = CartRemovalSelectors("rows", "delete", "confirm")
+
+        confirm_delete_if_needed(page, selectors)
+
+        self.assertTrue(button.clicked)
+        self.assertEqual(button.timeout, 3000)
+        self.assertEqual(dialog.selector, "confirm")
+
     def test_remove_matching_cart_rows_deletes_all_matching_suppliers(self) -> None:
         rows = [
             _FakeRow("Supplier A DEVAROL"),
@@ -150,7 +212,7 @@ class TawreedCartRemovalTests(unittest.TestCase):
         with patch(
             "src.tawreed.tawreed_cart_removal.append_cart_removal_summary"
         ) as append_summary:
-            remove_items_from_cart(bot, page, [target])
+            remove_items_from_cart(bot, cast(Page, page), [target])
 
         summary = append_summary.call_args.args[2]
         self.assertEqual(summary.removed_count, 0)
