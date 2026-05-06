@@ -1,6 +1,9 @@
 import unittest
 
-from src.core.product_matching import _search_queries_for_item
+from src.core.product_matching import (
+    _search_queries_for_item,
+    explain_best_product_match,
+)
 from src.core.utils.excel import Item
 
 
@@ -26,6 +29,126 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertGreaterEqual(len(queries), 4)
         self.assertIn("73368", queries)
         self.assertIn("CREAM", queries)
+
+    def test_search_queries_fix_common_zero_ocr_in_pack_size(self) -> None:
+        item = Item(code="47273", name="IVERZINE LOTION 6O ML", qty=1)
+
+        queries = _search_queries_for_item(item)
+
+        self.assertIn("IVERZINE LOTION 60 ML", queries)
+
+    def test_arabic_variant_guard_rejects_wrong_bebelac_ar_row(self) -> None:
+        item = Item(code="80131", name="BEBELAC AR MILK", qty=1)
+        decision = explain_best_product_match(item, [(item.name, _bebelac_results())])
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(
+            decision.best_match.data["productName"], "بيبيلاك ايه ار لبن 400 جم"
+        )
+
+    def test_arabic_variant_guard_rejects_wrong_iverzine_form(self) -> None:
+        item = Item(code="47273", name="IVERZINE LOTION 6O ML", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        {
+                            "productNameEn": "IVERZINE LOTION O ML 6 24",
+                            "productName": "ايفرزين 6 مجم 24 اقراص",
+                            "availableQuantity": 5,
+                            "productsCount": 5,
+                        }
+                    ],
+                )
+            ],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("LOTION", decision.final_reason)
+
+    def test_arabic_variant_guard_rejects_vitacid_calcium(self) -> None:
+        item = Item(code="73368", name="VITACID C EFF 12 TAB", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _candidate(
+                            "VITACID C EFF TAB 12", "فيتاسيد كالسيوم 12 اقراص فوار"
+                        )
+                    ],
+                )
+            ],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("calcium", decision.final_reason)
+
+    def test_synthetic_dom_match_rejects_generic_syrup_query(self) -> None:
+        item = Item(code="73387", name="IVYPRONT COUGH 100 ML SYRUP", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _synthetic_candidate(
+                            "ML SYRUP 1 100", "ابيكسيدون 1 مجم / مل شراب 100 مل"
+                        )
+                    ],
+                )
+            ],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("identity token", decision.final_reason)
+
+    def test_vaginal_douche_requires_arabic_variant_marker(self) -> None:
+        item = Item(code="73328", name="BETADINE VAG DOUCHE 120 ML", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _synthetic_candidate(
+                            "BETADINE VAG DOUCHE 120", "بيتادين محلول مطهر 120 مل"
+                        )
+                    ],
+                )
+            ],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("VAG", decision.final_reason)
+
+
+def _bebelac_results() -> list[dict[str, object]]:
+    """Return Bebelac candidates with one false high-scoring row and one real row."""
+    return [
+        _candidate("BEBELAC AR MILK", "لبن بيبلاك بريماتيور", 1),
+        _candidate("BEBELAC AR MILK 400", "بيبيلاك ايه ار لبن 400 جم", 0),
+    ]
+
+
+def _candidate(english_name: str, arabic_name: str, qty: int = 3) -> dict[str, object]:
+    """Return a Tawreed-style product candidate."""
+    return {
+        "productNameEn": english_name,
+        "productName": arabic_name,
+        "availableQuantity": qty,
+        "productsCount": qty,
+    }
+
+
+def _synthetic_candidate(english_name: str, arabic_name: str) -> dict[str, object]:
+    """Return a DOM fallback product candidate with a synthetic English name."""
+    candidate = _candidate(english_name, arabic_name)
+    candidate["productNameEnSynthetic"] = True
+    return candidate
 
 
 if __name__ == "__main__":

@@ -6,10 +6,46 @@ import re
 from difflib import SequenceMatcher
 from typing import Any, Iterable
 
+_OCR_ZERO_RE = re.compile(r"(?<=\d)[Oo](?=\b|[^A-Za-z0-9])")
 _TOKEN_BOUNDARY_RE = re.compile(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)")
 _NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
 _WHITESPACE_RE = re.compile(r"\s+")
+_ARABIC_NON_WORD_RE = re.compile(r"[^\w\u0600-\u06FF]+")
+_ARABIC_WHITESPACE_RE = re.compile(r"\s+")
 MAX_SEARCH_QUERY_VARIANTS = 24
+_ARABIC_REQUIRED_TOKEN_ALIASES = {
+    "AR": ("ايه ار", "اي ار", "ارتجاع"),
+    "DOUCHE": ("دش", "غسول", "مهبل"),
+    "EFF": ("فوار",),
+    "LOTION": ("لوشن", "لوسيون"),
+    "ML": ("مل", "مللي", "ميللي"),
+    "VAG": ("مهبل", "المهبل", "نسائي"),
+    "VAGINAL": ("مهبل", "المهبل", "نسائي"),
+}
+_GENERIC_IDENTITY_TOKENS = {
+    "ANTISEPTIC",
+    "AMP",
+    "AMPS",
+    "CAP",
+    "CAPS",
+    "COUGH",
+    "EFF",
+    "FLAVOR",
+    "FLAVOUR",
+    "G",
+    "GM",
+    "MCG",
+    "MG",
+    "MILK",
+    "ML",
+    "O",
+    "ORAL",
+    "SOLN",
+    "SOLUTION",
+    "SYRUP",
+    "TAB",
+    "TABS",
+}
 
 from .config.config_models import MatchingConfig
 from .matching_models import (
@@ -24,7 +60,7 @@ from .utils.excel import Item
 
 def _normalize_text(value: str) -> str:
     """Normalize product text so Arabic and English matching stay stable."""
-    text = str(value or "").upper()
+    text = _OCR_ZERO_RE.sub("0", str(value or "")).upper()
     text = _TOKEN_BOUNDARY_RE.sub(" ", text)
     text = _NON_ALNUM_RE.sub(" ", text)
     return _WHITESPACE_RE.sub(" ", text).strip()
@@ -416,26 +452,62 @@ def _total_score(
     )
 
 
-def _decision_from_diagnostics(diagnostics: list[CandidateMatchDiagnostic]) -> MatchDecision:
+def _decision_from_diagnostics(
+    diagnostics: list[CandidateMatchDiagnostic],
+) -> MatchDecision:
     """Return the final match decision for an already-scored diagnostic list."""
     if not diagnostics:
-        return MatchDecision(
-            best_match=None,
-            diagnostics=[],
-            final_reason="No search candidates were returned.",
-        )
-    best_diagnostic = max(diagnostics, key=lambda diagnostic: diagnostic.sort_key)
-    if not best_diagnostic.accepted:
-        return MatchDecision(
-            best_match=None,
-            diagnostics=diagnostics,
-            final_reason=_rejected_decision_reason(best_diagnostic),
-        )
+        return _empty_match_decision()
+    sorted_diagnostics = sorted(
+        diagnostics, key=lambda diagnostic: diagnostic.sort_key, reverse=True
+    )
+    best_accepted = _best_accepted_diagnostic(sorted_diagnostics)
+    if best_accepted is None:
+        return _rejected_match_decision(diagnostics, sorted_diagnostics[0])
+    return _accepted_match_decision(diagnostics, best_accepted)
+
+
+def _empty_match_decision() -> MatchDecision:
+    """Return the no-candidates match decision."""
+    return MatchDecision(
+        best_match=None,
+        diagnostics=[],
+        final_reason="No search candidates were returned.",
+    )
+
+
+def _rejected_match_decision(
+    diagnostics: list[CandidateMatchDiagnostic],
+    best_diagnostic: CandidateMatchDiagnostic,
+) -> MatchDecision:
+    """Return a rejected match decision for the highest-ranked candidate."""
+    return MatchDecision(
+        best_match=None,
+        diagnostics=diagnostics,
+        final_reason=_rejected_decision_reason(best_diagnostic),
+    )
+
+
+def _accepted_match_decision(
+    diagnostics: list[CandidateMatchDiagnostic],
+    best_diagnostic: CandidateMatchDiagnostic,
+) -> MatchDecision:
+    """Return an accepted match decision for the highest-ranked accepted row."""
     return MatchDecision(
         best_match=_search_match(best_diagnostic),
         diagnostics=diagnostics,
         final_reason=_accepted_decision_reason(best_diagnostic),
     )
+
+
+def _best_accepted_diagnostic(
+    diagnostics: list[CandidateMatchDiagnostic],
+) -> CandidateMatchDiagnostic | None:
+    """Return the highest-ranked accepted diagnostic, if any."""
+    for diagnostic in diagnostics:
+        if diagnostic.accepted:
+            return diagnostic
+    return None
 
 
 def _rejected_decision_reason(best_diagnostic: CandidateMatchDiagnostic) -> str:
@@ -505,12 +577,73 @@ def _diagnostic_acceptance(
     matching_config: MatchingConfig,
 ) -> tuple[bool, str, str]:
     """Return the acceptance outcome for one candidate diagnostic."""
+    variant_rejection = _candidate_variant_rejection(score_query, result)
+    if variant_rejection:
+        return False, "", variant_rejection
     return _acceptance_details(
         score_query,
         result,
         breakdown.total_score,
         matching_config,
     )
+
+
+def _candidate_variant_rejection(query: str, candidate: dict[str, Any]) -> str:
+    """Return a rejection reason when Arabic names contradict key query tokens."""
+    arabic_name = _normalized_arabic_name(candidate)
+    if not arabic_name:
+        return ""
+    query_tokens = set(_normalized_tokens(query))
+    reasons = _synthetic_name_rejection_reasons(query_tokens, candidate)
+    reasons.extend(_missing_arabic_token_reasons(query_tokens, arabic_name))
+    if _vitacid_c_calcium_conflict(query_tokens, arabic_name):
+        reasons.append("Arabic name contains calcium for VITACID C query")
+    return "; ".join(reasons)
+
+
+def _normalized_arabic_name(candidate: dict[str, Any]) -> str:
+    """Return a whitespace-normalized Arabic candidate name."""
+    raw_name = str(candidate.get("productName") or "").strip()
+    spaced_name = _ARABIC_NON_WORD_RE.sub(" ", raw_name)
+    return _ARABIC_WHITESPACE_RE.sub(" ", spaced_name).strip()
+
+
+def _synthetic_name_rejection_reasons(
+    query_tokens: set[str], candidate: dict[str, Any]
+) -> list[str]:
+    """Return rejection reasons when a synthetic English name is too generic."""
+    if not candidate.get("productNameEnSynthetic"):
+        return []
+    candidate_tokens = set(_normalized_tokens(_candidate_english_name(candidate)))
+    identity_tokens = _identity_tokens(query_tokens)
+    if identity_tokens and not identity_tokens & candidate_tokens:
+        return ["Synthetic English name missing requested identity token"]
+    return []
+
+
+def _identity_tokens(tokens: set[str]) -> set[str]:
+    """Return non-generic tokens that should identify the requested product."""
+    return {
+        token
+        for token in tokens
+        if len(token) > 1
+        and not token.isdigit()
+        and token not in _GENERIC_IDENTITY_TOKENS
+    }
+
+
+def _missing_arabic_token_reasons(tokens: set[str], arabic_name: str) -> list[str]:
+    """Return reasons for required query tokens missing from the Arabic name."""
+    reasons: list[str] = []
+    for token, aliases in _ARABIC_REQUIRED_TOKEN_ALIASES.items():
+        if token in tokens and not any(alias in arabic_name for alias in aliases):
+            reasons.append(f"Arabic name missing marker for {token}")
+    return reasons
+
+
+def _vitacid_c_calcium_conflict(tokens: set[str], arabic_name: str) -> bool:
+    """Return whether a Vitacid-C query was matched to a calcium product."""
+    return "VITACID" in tokens and "C" in tokens and "كالسيوم" in arabic_name
 
 
 def _matching_rule_helpers() -> tuple:

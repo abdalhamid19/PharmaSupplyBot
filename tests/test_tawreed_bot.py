@@ -172,6 +172,33 @@ class TawreedBotTests(unittest.TestCase):
         self.assertEqual(summary.matched_product_arabic_name, "بنادول اكسترا 24 قرص")
         self.assertEqual(summary.matched_query, "Panadol Extra")
 
+    def test_build_item_summary_includes_synthetic_dom_english_name(self) -> None:
+        bot = self._bot()
+        bot.last_match_decision = MatchDecision(
+            best_match=SearchMatch(
+                query="BEBELAC AR MILK",
+                row_index=0,
+                score=16.0,
+                data={
+                    "productNameEn": "BEBELAC AR MILK",
+                    "productNameEnSynthetic": True,
+                    "productName": "لبن بيبلاك بريماتيور",
+                },
+            ),
+            diagnostics=[],
+            final_reason="Accepted",
+        )
+
+        summary = bot._build_item_summary(
+            status="added-to-cart",
+            reason="Added to cart.",
+            elapsed=1.0,
+            match_elapsed=0.5,
+        )
+
+        self.assertEqual(summary.matched_product_english_name, "BEBELAC AR MILK")
+        self.assertEqual(summary.matched_product_arabic_name, "لبن بيبلاك بريماتيور")
+
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:
         config = AppConfig(
             base_url="https://seller.tawreed.io/#/login",
