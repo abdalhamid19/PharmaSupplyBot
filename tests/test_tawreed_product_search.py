@@ -26,6 +26,23 @@ class TawreedProductSearchTests(unittest.TestCase):
 
         self.assertEqual(candidates[0]["productNameEn"], "VITACID C 1 GM 12 EFF. TAB.")
 
+    def test_api_candidates_handles_nested_payload_data(self) -> None:
+        """Nested search payload data is flattened to product candidates."""
+        payload = {
+            "data": {
+                "items": [
+                    {
+                        "productName": "فيتاسيد سي 1 جم 12 اقراص فوار",
+                        "productNameEn": "VITACID C 1 GM 12 EFF. TAB.",
+                    }
+                ]
+            }
+        }
+
+        candidates = _api_candidates(payload)
+
+        self.assertEqual(candidates[0]["productNameEn"], "VITACID C 1 GM 12 EFF. TAB.")
+
     def test_search_response_pattern_matches_tawreed_search_endpoint(self) -> None:
         """Search response matcher targets the Tawreed product-search endpoint."""
         pattern = _search_response_pattern()

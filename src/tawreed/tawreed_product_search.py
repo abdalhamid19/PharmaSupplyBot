@@ -16,6 +16,7 @@ PRODUCT_SEARCH_INPUT_SELECTOR = (
     "input[placeholder*='بحث'], "
     "input[placeholder*='Search']"
 )
+_PRODUCT_LIST_KEYS = ("data", "items", "products", "result", "results", "storeProducts")
 
 
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
@@ -40,7 +41,6 @@ def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
 def _submit_product_search_with_api(
     page: Page, query: str
 ) -> list[dict[str, Any]] | None:
-    """Submit one product search and return API candidates when captured."""
     try:
         with page.expect_response(_search_response_pattern(), timeout=3000) as resp:
             _submit_product_search(page, query)
@@ -49,14 +49,34 @@ def _submit_product_search_with_api(
         return None
 
 
-def _search_response_pattern():
-    """Return the API response URL pattern for Tawreed product search."""
-    return re.compile(f".*{PRODUCT_SEARCH_ENDPOINT}.*")
+def _search_response_pattern(): return re.compile(f".*{PRODUCT_SEARCH_ENDPOINT}.*")
 
 
-def _api_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Return product candidates from a Tawreed search API payload."""
-    return list(payload.get("data", []) or [])
+def _api_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]: return _product_dicts(payload)
+
+
+def _product_dicts(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, list):
+        return [item for item in value if _is_product_dict(item)]
+    if not isinstance(value, dict):
+        return []
+    if _is_product_dict(value):
+        return [value]
+    return _first_nested_product_list(value)
+
+
+def _first_nested_product_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    for key in _PRODUCT_LIST_KEYS:
+        candidates = _product_dicts(payload.get(key))
+        if candidates:
+            return candidates
+    return []
+
+
+def _is_product_dict(value: Any) -> bool:
+    return isinstance(value, dict) and bool(
+        value.get("productName") or value.get("productNameEn")
+    )
 
 
 def _submit_product_search(page: Page, query: str) -> None:
