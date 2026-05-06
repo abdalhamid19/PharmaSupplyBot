@@ -9,9 +9,9 @@ from typing import Any, Iterable
 _TOKEN_BOUNDARY_RE = re.compile(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)")
 _NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
 _WHITESPACE_RE = re.compile(r"\s+")
+MAX_SEARCH_QUERY_VARIANTS = 24
 
 from .config.config_models import MatchingConfig
-from .utils.excel import Item
 from .matching_models import (
     CandidateMatchDiagnostic,
     MatchDecision,
@@ -19,6 +19,7 @@ from .matching_models import (
     SearchMatch,
 )
 from .matching_rules import acceptance_details, default_matching_config
+from .utils.excel import Item
 
 
 def _normalize_text(value: str) -> str:
@@ -52,7 +53,9 @@ def _match_score(query: str, candidate: dict[str, Any]) -> float:
     return _match_score_breakdown(query, candidate).total_score
 
 
-def _match_score_breakdown(query: str, candidate: dict[str, Any]) -> MatchScoreBreakdown:
+def _match_score_breakdown(
+    query: str, candidate: dict[str, Any]
+) -> MatchScoreBreakdown:
     """Return the detailed score breakdown for one Tawreed search result."""
     candidate_texts = _candidate_texts(candidate)
     if not candidate_texts:
@@ -126,20 +129,55 @@ def _search_queries_for_item(item: Item) -> list[str]:
     normalized_name = _normalize_search_query(name)
     tokens = name.split()
     normalized_tokens = normalized_name.split()
-    return _unique_non_empty(
-        [
-            name,
-            normalized_name,
-            " ".join(tokens[:4]),
-            " ".join(normalized_tokens[:4]),
-            " ".join(tokens[:3]),
-            " ".join(normalized_tokens[:3]),
-            " ".join(tokens[:2]),
-            " ".join(normalized_tokens[:2]),
-            tokens[0] if tokens else "",
-            normalized_tokens[0] if normalized_tokens else "",
-        ]
-    )
+    queries = _priority_search_queries(name, normalized_name, tokens, normalized_tokens)
+    queries.extend(_fallback_search_queries(item.code, tokens, normalized_tokens))
+    return _unique_non_empty(queries)[:MAX_SEARCH_QUERY_VARIANTS]
+
+
+def _priority_search_queries(
+    name: str, normalized_name: str, tokens: list[str], normalized_tokens: list[str]
+) -> list[str]:
+    """Return high-signal full-name and leading-token query variants."""
+    return [
+        name,
+        normalized_name,
+        " ".join(tokens[:4]),
+        " ".join(normalized_tokens[:4]),
+        " ".join(tokens[:3]),
+        " ".join(normalized_tokens[:3]),
+        " ".join(tokens[:2]),
+        " ".join(normalized_tokens[:2]),
+        tokens[0] if tokens else "",
+        normalized_tokens[0] if normalized_tokens else "",
+    ]
+
+
+def _fallback_search_queries(
+    code: object, tokens: list[str], normalized_tokens: list[str]
+) -> list[str]:
+    """Return extra bounded fallback queries when priority variants do not match."""
+    fallback = [_normalized_item_code(code)]
+    fallback.extend(_token_window_queries(normalized_tokens or tokens, window_size=2))
+    fallback.extend(normalized_tokens or tokens)
+    return fallback
+
+
+def _token_window_queries(tokens: list[str], window_size: int) -> list[str]:
+    """Return contiguous token-window query variants."""
+    if len(tokens) <= window_size:
+        return []
+    return [
+        " ".join(tokens[index : index + window_size])
+        for index in range(1, len(tokens) - window_size + 1)
+    ]
+
+
+def _normalized_item_code(code: object) -> str:
+    """Return a code search query when the Excel item code looks usable."""
+    text = str(code or "").strip()
+    if text.lower() in {"", "nan", "none"}:
+        return ""
+    return text[:-2] if text.endswith(".0") else text
 
 
 def _normalize_search_query(value: str) -> str:
@@ -153,7 +191,9 @@ def find_best_product_match(
     matching_config: MatchingConfig | None = None,
 ) -> SearchMatch | None:
     """Return the highest-ranked acceptable search result across all generated queries."""
-    return explain_best_product_match(item, search_results_by_query, matching_config).best_match
+    return explain_best_product_match(
+        item, search_results_by_query, matching_config
+    ).best_match
 
 
 def explain_best_product_match(
@@ -202,7 +242,9 @@ def _candidate_english_name(candidate: dict[str, Any]) -> str:
     return str(candidate.get("productNameEn") or "")
 
 
-def _best_sequence_score(normalized_query: str, candidate_texts: Iterable[str]) -> float:
+def _best_sequence_score(
+    normalized_query: str, candidate_texts: Iterable[str]
+) -> float:
     """Return the best sequence similarity against all candidate names."""
     return max(
         SequenceMatcher(None, normalized_query, candidate_text).ratio()
@@ -220,7 +262,9 @@ def _best_overlap_score(normalized_query: str, candidate_texts: Iterable[str]) -
     )
 
 
-def _numeric_overlap_score(normalized_query: str, candidate_texts: Iterable[str]) -> float:
+def _numeric_overlap_score(
+    normalized_query: str, candidate_texts: Iterable[str]
+) -> float:
     """Return how well numeric tokens in the query appear in candidate names."""
     query_numeric_tokens = _numeric_tokens(normalized_query)
     if not query_numeric_tokens:
@@ -247,10 +291,14 @@ def _numeric_overlap_ratio(
     candidate_numeric_tokens: set[str],
 ) -> float:
     """Return the fraction of query numeric tokens found in the candidate."""
-    return len(query_numeric_tokens & candidate_numeric_tokens) / max(1, len(query_numeric_tokens))
+    return len(query_numeric_tokens & candidate_numeric_tokens) / max(
+        1, len(query_numeric_tokens)
+    )
 
 
-def _exact_or_contained_bonus(normalized_query: str, candidate_texts: Iterable[str]) -> float:
+def _exact_or_contained_bonus(
+    normalized_query: str, candidate_texts: Iterable[str]
+) -> float:
     """Return the exact-match bonus when one text strongly contains the other."""
     if not normalized_query:
         return 0.0
@@ -423,7 +471,9 @@ def _candidate_diagnostic(
     """Return one diagnostic record for a candidate result row."""
     breakdown = _match_score_breakdown(score_query, result)
     acceptance = _diagnostic_acceptance(score_query, result, breakdown, matching_config)
-    return _diagnostic_record(query, row_index, result, score_query, breakdown, acceptance)
+    return _diagnostic_record(
+        query, row_index, result, score_query, breakdown, acceptance
+    )
 
 
 def _diagnostic_record(
@@ -471,6 +521,7 @@ def _matching_rule_helpers() -> tuple:
         _best_candidate_overlap,
         _numeric_match_count,
     )
+
 
 def _iter_results(
     search_results_by_query: list[tuple[str, list[dict[str, Any]]]],
