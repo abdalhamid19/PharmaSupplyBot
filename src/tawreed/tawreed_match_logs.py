@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..core.utils.excel import Item
 from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
+from ..core.utils.excel import Item
 from .tawreed_artifacts import (
     append_csv_artifact,
-    append_xlsx_artifact,
     append_text_artifact,
+    append_xlsx_artifact,
     write_text_artifact,
 )
 
@@ -43,7 +43,9 @@ def write_match_log(bot, item: Item, decision: MatchDecision) -> None:
         "match_log_all",
         match_log_section_separator(item) + log_content,
     )
-    append_csv_artifact(bot.profile_key, "match_log_all", match_log_csv_rows(item, decision))
+    append_csv_artifact(
+        bot.profile_key, "match_log_all", match_log_csv_rows(item, decision)
+    )
 
 
 def should_write_detailed_match_log(decision: MatchDecision) -> bool:
@@ -87,14 +89,24 @@ def append_order_result_summary(
         "elapsed_seconds": round(summary.elapsed_seconds, 3),
         "match_elapsed_seconds": round(summary.match_elapsed_seconds, 3),
     }
-    append_csv_artifact(profile_key, "order_result_summary", [row], label_suffix=label_suffix)
-    append_xlsx_artifact(profile_key, "order_result_summary", [row], label_suffix=label_suffix)
+    if label_suffix:
+        append_csv_artifact(
+            profile_key, "order_result_summary", [row], label_suffix=label_suffix
+        )
+        append_xlsx_artifact(
+            profile_key, "order_result_summary", [row], label_suffix=label_suffix
+        )
+        return
+    append_csv_artifact(profile_key, "order_result_summary", [row])
+    append_xlsx_artifact(profile_key, "order_result_summary", [row])
 
 
 def match_log_content(item: Item, decision: MatchDecision) -> str:
     """Build the detailed product-matching log content for one item."""
     lines = _match_log_header_lines(item, decision)
-    for candidate_index, diagnostic in enumerate(_sorted_diagnostics(decision), start=1):
+    for candidate_index, diagnostic in enumerate(
+        _sorted_diagnostics(decision), start=1
+    ):
         lines.extend(candidate_log_lines(candidate_index, diagnostic))
     return "\n".join(lines) + "\n"
 
@@ -136,9 +148,7 @@ def candidate_log_lines(
     breakdown = diagnostic.breakdown
     candidate_names = candidate_name_fields(diagnostic)
     lines = _candidate_identity_lines(candidate_index, diagnostic, candidate_names)
-    lines.extend(
-        _candidate_score_lines(diagnostic, breakdown)
-    )
+    lines.extend(_candidate_score_lines(diagnostic, breakdown))
     return lines
 
 
@@ -249,12 +259,16 @@ def _best_match_csv_fields(decision: MatchDecision) -> dict[str, object]:
     """Return the shared CSV columns derived from the final best match."""
     return {
         "best_match_query": decision.best_match.query if decision.best_match else "",
-        "best_match_row_index": decision.best_match.row_index if decision.best_match else "",
+        "best_match_row_index": decision.best_match.row_index
+        if decision.best_match
+        else "",
         "best_match_score": decision.best_match.score if decision.best_match else "",
     }
 
 
-def _score_csv_fields(diagnostic: CandidateMatchDiagnostic, breakdown) -> dict[str, object]:
+def _score_csv_fields(
+    diagnostic: CandidateMatchDiagnostic, breakdown
+) -> dict[str, object]:
     """Return the score-related CSV columns for one candidate."""
     return {
         "total_score": round(diagnostic.score, 6),
@@ -311,4 +325,6 @@ def match_log_section_separator(item: Item) -> str:
 
 def _sorted_diagnostics(decision: MatchDecision) -> list[CandidateMatchDiagnostic]:
     """Return candidate diagnostics sorted from best to worst match."""
-    return sorted(decision.diagnostics, key=lambda current: current.sort_key, reverse=True)
+    return sorted(
+        decision.diagnostics, key=lambda current: current.sort_key, reverse=True
+    )

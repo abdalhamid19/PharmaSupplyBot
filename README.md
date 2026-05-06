@@ -128,7 +128,21 @@ Linux / macOS (bash):
 python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
 ```
 
-### 6. حذف أصناف من سلة المشتريات
+### 7. تشغيل أكثر من worker للأصناف داخل نفس الصيدلية
+
+استخدم `--item-workers N` لتقسيم ملف Excel الواحد على أكثر من عملية Chromium معزولة لنفس الـ profile. القيمة الافتراضية `1`، ويمكن ضبطها أيضًا من `runtime.item_workers` داخل `config.yaml`. ابدأ بقيمة صغيرة مثل `2`، ولا ترفعها كثيرًا لأن كل worker يفتح Chromium مستقل ويستخدم نفس جلسة `state/<profile>.json` للقراءة فقط.
+
+Windows PowerShell:
+```powershell
+py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 10 --item-workers 2
+```
+
+Linux / macOS (bash):
+```bash
+python3 run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany --item-workers 2
+```
+
+### 8. حذف أصناف من سلة المشتريات
 
 ضع ملف الحذف داخل `data/input/remove_items/` ويجب أن يحتوي على الأعمدة:
 `كود` و`إسم الصنف`.
@@ -143,7 +157,7 @@ Windows PowerShell:
 py run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
 ```
 
-### 7. تشغيل واجهة Streamlit
+### 9. تشغيل واجهة Streamlit
 
 الرابط الأونلاين:
 ```text
@@ -199,6 +213,7 @@ rule_audit_ok
 
 - افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
 - استخدم `--fast-search` لتقليل زمن البحث عن الصنف؛ يتوقف عند أول نتيجة مطابقة مقبولة بدل تجربة صيغ إضافية.
+- استخدم `--item-workers N` لتشغيل order/remove-cart بالتوازي داخل profile واحد. عند التوازي تُكتب ملخصات مؤقتة بصيغة `*.worker_<id>.*` ثم تُدمج في الملخص الأساسي بعد انتهاء workers.
 - اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
   - `runtime.submit_order: true` داخل `config.yaml`
 - إذا كانت الجلسة منتهية أو غير صالحة، سيطلب منك البرنامج إعادة تنفيذ:
