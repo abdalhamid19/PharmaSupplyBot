@@ -54,6 +54,11 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
         help="Stop after the first acceptable product match",
     )
     argument_parser.add_argument(
+        "--match-only",
+        action="store_true",
+        help="Only run product matching and never add matched items to the cart",
+    )
+    argument_parser.add_argument(
         "--item-workers",
         type=int,
         default=None,

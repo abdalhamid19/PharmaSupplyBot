@@ -5,13 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .item_worker_execution import execute_cart_removal_worker, execute_order_worker
+
+
 def run_order_chunk(payload: dict[str, Any]) -> dict[str, Any]:
     """Process one chunk of order items in an isolated subprocess."""
     from ..core.utils.excel import Item
 
     profile_key, bot = _build_worker_bot(payload)
     items = [Item(code=r[0], name=r[1], qty=r[2]) for r in payload["items"]]
-    return _execute_order(bot, items, profile_key)
+    return execute_order_worker(bot, items, profile_key)
 
 
 def run_cart_removal_chunk(payload: dict[str, Any]) -> dict[str, Any]:
@@ -20,7 +23,7 @@ def run_cart_removal_chunk(payload: dict[str, Any]) -> dict[str, Any]:
 
     profile_key, bot = _build_worker_bot(payload)
     items = [CartRemovalItem(code=r[0], name=r[1]) for r in payload["items"]]
-    return _execute_cart_removal(bot, items, profile_key)
+    return execute_cart_removal_worker(bot, items, profile_key)
 
 
 def _build_worker_bot(payload: dict[str, Any]):
@@ -48,41 +51,8 @@ def _build_bot_options(options: dict[str, Any], worker_id: int) -> dict[str, Any
         "stop_flag_path": _opt_path(options.get("stop_flag")),
         "fast_search": options.get("fast_search", False),
         "summary_label_suffix": f"worker_{worker_id}",
+        "match_only": options.get("match_only", False),
     }
-
-
-def _execute_order(bot, items, profile_key) -> dict[str, Any]:
-    """Run the order flow and return a structured result."""
-    from ..tawreed.tawreed_session import SessionInvalidError
-
-    try:
-        bot.place_order_from_items(iter(items))
-        return {"status": "ok", "profile_key": profile_key}
-    except SessionInvalidError as err:
-        return {
-            "status": "session_invalid",
-            "profile_key": profile_key,
-            "error": str(err),
-        }
-    except Exception as err:
-        return {"status": "error", "profile_key": profile_key, "error": str(err)}
-
-
-def _execute_cart_removal(bot, items, profile_key) -> dict[str, Any]:
-    """Run the cart-removal flow and return a structured result."""
-    from ..tawreed.tawreed_session import SessionInvalidError
-
-    try:
-        bot.remove_cart_items(iter(items))
-        return {"status": "ok", "profile_key": profile_key}
-    except SessionInvalidError as err:
-        return {
-            "status": "session_invalid",
-            "profile_key": profile_key,
-            "error": str(err),
-        }
-    except Exception as err:
-        return {"status": "error", "profile_key": profile_key, "error": str(err)}
 
 
 def _apply_warehouse_overrides(config, options: dict) -> None:

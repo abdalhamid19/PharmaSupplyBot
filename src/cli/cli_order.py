@@ -99,7 +99,21 @@ def _run_single_profile(
         _run_parallel_order(app_config, profile_key, profile_items, args, item_workers)
         return
     bot = _order_bot(app_config, profile_key, profile, args)
-    _run_profile_order(app_config.base_url, profile_key, bot, profile_items)
+    _run_profile_items(app_config, profile_key, bot, profile_items, args)
+
+
+def _run_profile_items(
+    app_config: AppConfig,
+    profile_key: str,
+    bot: TawreedBot,
+    items: Iterable[Item],
+    args: argparse.Namespace,
+) -> None:
+    """Run one profile through the requested order mode."""
+    if _match_only(args):
+        _run_profile_match_only(app_config.base_url, profile_key, bot, items)
+        return
+    _run_profile_order(app_config.base_url, profile_key, bot, items)
 
 
 def _ensure_non_empty_items(
@@ -197,6 +211,11 @@ def _order_item_limit(args: argparse.Namespace) -> int:
     return int(getattr(args, "limit", 0) or 0)
 
 
+def _match_only(args: argparse.Namespace) -> bool:
+    """Return whether this order run should only evaluate product matches."""
+    return bool(getattr(args, "match_only", False))
+
+
 def _processed_summary_item_keys(profile_key: str) -> set[tuple[str, str]]:
     """Return item keys already written to the profile order summary."""
     summary_path = Path("artifacts") / profile_key / "order_result_summary.csv"
@@ -247,6 +266,16 @@ def _run_profile_order(
         raise invalid_session_exit(base_url, profile_key, error) from error
 
 
+def _run_profile_match_only(
+    base_url: str, profile_key: str, bot: TawreedBot, items: Iterable[Item]
+) -> None:
+    """Run product matching only and handle session-expiry failures uniformly."""
+    try:
+        bot.match_items_only(items)
+    except SessionInvalidError as error:
+        raise invalid_session_exit(base_url, profile_key, error) from error
+
+
 def _run_parallel_order(
     app_config: AppConfig,
     profile_key: str,
@@ -293,6 +322,7 @@ def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "fast_search": bool(getattr(args, "fast_search", False)),
+        "match_only": _match_only(args),
         "stop_flag": getattr(args, "stop_flag", None),
         "warehouse_mode": getattr(args, "warehouse_mode", None),
         "min_discount_percent": getattr(args, "min_discount_percent", None),

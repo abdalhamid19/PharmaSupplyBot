@@ -145,6 +145,33 @@ class TawreedBotTests(unittest.TestCase):
                 details = dump_artifacts.call_args.kwargs["details"]
                 self.assertIn("overlay_diagnostics=overlay_panels=1", details)
 
+    def test_match_only_item_records_summary_without_adding_to_cart(self) -> None:
+        bot = self._bot()
+        item = Item(code="1", name="Panadol", qty=3)
+        page: Any = _FakePage("https://seller.tawreed.io/#/catalog/store-products/dv/")
+        match = SearchMatch(
+            query="Panadol",
+            row_index=0,
+            score=20.0,
+            data={"productNameEn": "Panadol", "productName": "بنادول"},
+        )
+
+        with (
+            patch("src.tawreed.tawreed.close_visible_dialogs") as cleanup,
+            patch("src.tawreed.tawreed.require_product_match") as require_match,
+            patch.object(bot, "_record_item_summary") as record_summary,
+            patch.object(bot, "_add_item") as add_item,
+        ):
+            require_match.return_value = (match, "Panadol")
+            processed = bot._process_single_match_only_item(page, item)
+
+        self.assertTrue(processed)
+        add_item.assert_not_called()
+        cleanup.assert_called()
+        require_match.assert_called_once_with(bot, page, item, require_available=False)
+        record_summary.assert_called_once()
+        self.assertEqual(record_summary.call_args.kwargs["status"], "matched-only")
+
     def test_build_item_summary_populates_matched_names_by_language(self) -> None:
         bot = self._bot()
         bot.last_match_decision = MatchDecision(

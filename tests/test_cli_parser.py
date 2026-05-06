@@ -83,6 +83,20 @@ class CliParserTests(unittest.TestCase):
 
         self.assertTrue(args.fast_search)
 
+    def test_order_accepts_match_only_flag(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--match-only",
+            ]
+        )
+
+        self.assertTrue(args.match_only)
+
     def test_order_accepts_prevented_items_excel_override(self) -> None:
         args = build_parser().parse_args(
             [

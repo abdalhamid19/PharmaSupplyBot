@@ -93,6 +93,37 @@ class CliCommandsTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "Order Excel cannot be"):
             load_order_items(_app_config(), args)
 
+    def test_run_single_profile_uses_match_only_flow(self) -> None:
+        items = [Item(code="1", name="Panadol", qty=1)]
+        args: Any = SimpleNamespace(
+            excel="data/input/order_items/orders.xlsx",
+            limit=0,
+            resume=False,
+            item_workers=1,
+            match_only=True,
+            prevented_items_excel="data/input/prevented_items/missing.xlsx",
+        )
+        app_config: Any = SimpleNamespace(
+            base_url="https://seller.tawreed.io/#/login",
+            excel=SimpleNamespace(),
+            runtime=SimpleNamespace(item_workers=1),
+        )
+
+        with (
+            patch("src.cli.cli_order.load_items_from_excel", return_value=items),
+            patch("pathlib.Path.is_file", return_value=False),
+            patch("src.cli.cli_order.require_state_file"),
+            patch("src.cli.cli_order._order_bot", return_value=object()) as build_bot,
+            patch("src.cli.cli_order._run_profile_order") as run_order,
+            patch("src.cli.cli_order._run_profile_match_only") as run_match_only,
+        ):
+            profile: Any = SimpleNamespace()
+            run_single_profile(app_config, "wardany", profile, args)
+
+        build_bot.assert_called_once()
+        run_order.assert_not_called()
+        run_match_only.assert_called_once()
+
     def test_run_single_profile_limits_after_resume_skips_previous_rows(self) -> None:
         items = [
             Item(code=str(index), name=f"Item {index}", qty=1) for index in range(20)

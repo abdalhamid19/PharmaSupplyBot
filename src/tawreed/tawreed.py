@@ -21,6 +21,7 @@ from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
 from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_products_flow import add_item_from_products_page
+from .tawreed_search_logic import require_product_match
 from .tawreed_session import (
     close_browser,
     close_context,
@@ -56,6 +57,7 @@ class TawreedBot:
         stop_flag_path: Path | None = None,
         fast_search: bool = False,
         summary_label_suffix: str | None = None,
+        match_only: bool = False,
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
@@ -66,6 +68,7 @@ class TawreedBot:
         self.stop_flag_path = stop_flag_path
         self.fast_search = fast_search
         self.summary_label_suffix = summary_label_suffix
+        self.match_only = match_only
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
         self.no_results_exception = _NoResultsItem
@@ -142,6 +145,33 @@ class TawreedBot:
                 f"[{self.profile_key}] Stop requested or incomplete. Order confirmation skipped."
             )
 
+    def match_items_only(self, items: Iterable[Item]) -> None:
+        """Match Tawreed products for each item without adding anything to the cart."""
+        with sync_playwright() as p:
+            browser, context, page = open_order_page(
+                p,
+                self.config.runtime,
+                self.state_path,
+                debug_browser=self.debug_browser,
+            )
+            try:
+                self._run_match_only_session(page, items)
+            except Exception as error:
+                self._handle_match_only_error(page, error)
+                raise
+            finally:
+                close_context(context)
+                close_browser(browser)
+
+    def _handle_match_only_error(self, page: Page, error: Exception) -> None:
+        """Capture diagnostics for match-only failures."""
+        dump_artifacts(
+            page,
+            self.profile_key,
+            label="match_only_flow_error",
+            details=_artifact_details("match_only_flow_error", error),
+        )
+
     def remove_cart_items(self, items: Iterable[CartRemovalItem]) -> None:
         """Remove the requested items from Tawreed carts."""
         with sync_playwright() as p:
@@ -211,13 +241,41 @@ class TawreedBot:
         """Process each requested Excel item on the current order page."""
         added_any = False
         for item in items:
-            if self._stop_requested():
-                print(
-                    f"[{self.profile_key}] Stop requested before item {item.code} / {item.name}."
-                )
+            if self._stop_before_item(item):
                 return False
             added_any = self._process_single_item(page, item) or added_any
         return added_any
+
+    def _run_match_only_session(self, page: Page, items: Iterable[Item]) -> None:
+        """Prepare Tawreed and process item matching without cart actions."""
+        self._prepare_order_page(page)
+        completed = self._process_match_only_items(page, items)
+        if completed and not self._stop_requested():
+            print(f"[{self.profile_key}] Match-only run completed. Cart was unchanged.")
+        else:
+            print(
+                f"[{self.profile_key}] Stop requested or incomplete. Matching stopped."
+            )
+
+    def _process_match_only_items(self, page: Page, items: Iterable[Item]) -> bool:
+        """Run matching only for each requested Excel item."""
+        matched_any = False
+        for item in items:
+            if self._stop_before_item(item):
+                return False
+            matched_any = (
+                self._process_single_match_only_item(page, item) or matched_any
+            )
+        return matched_any
+
+    def _stop_before_item(self, item: Item) -> bool:
+        """Return True and print a diagnostic when a run should stop before an item."""
+        if not self._stop_requested():
+            return False
+        print(
+            f"[{self.profile_key}] Stop requested before item {item.code} / {item.name}."
+        )
+        return True
 
     def _stop_requested(self) -> bool:
         """Return whether an external stop request has been written for this run."""
@@ -262,12 +320,40 @@ class TawreedBot:
             self._record_failure(page, item, error, started_at)
             return False
 
+    def _process_single_match_only_item(self, page: Page, item: Item) -> bool:
+        """Match one item without running any add-to-cart action."""
+        started_at = time.perf_counter()
+        self._reset_last_item_state()
+        try:
+            close_visible_dialogs(page)
+            self._match_item_only(page, item)
+            close_visible_dialogs(page)
+            self._record_match_only_success(item, started_at)
+            return True
+        except _SkipItem as error:
+            close_visible_dialogs(page)
+            self._record_skip(item, error, started_at)
+            return False
+        except Exception as error:
+            self._record_failure(page, item, error, started_at)
+            return False
+
     def _record_success(self, item: Item, started_at: float) -> None:
         """Record a successful add-to-cart summary."""
         self._record_item_summary(
             item,
             status="added-to-cart",
             reason="Added to cart.",
+            elapsed_seconds=time.perf_counter() - started_at,
+            match_elapsed_seconds=self.last_match_elapsed_seconds,
+        )
+
+    def _record_match_only_success(self, item: Item, started_at: float) -> None:
+        """Record a successful product match that did not touch the cart."""
+        self._record_item_summary(
+            item,
+            status="matched-only",
+            reason="Matched product only; item was not added to cart.",
             elapsed_seconds=time.perf_counter() - started_at,
             match_elapsed_seconds=self.last_match_elapsed_seconds,
         )
@@ -336,6 +422,13 @@ class TawreedBot:
             return
 
         self._add_item_with_configured_flow(page, item)
+
+    def _match_item_only(self, page: Page, item: Item) -> None:
+        """Run Tawreed matching for one item without opening the cart dialog."""
+        if not self._is_products_page(page):
+            raise RuntimeError("Match-only mode requires Tawreed products page flow.")
+        match, _ = require_product_match(self, page, item, require_available=False)
+        self.log(f"Match-only accepted {item.code} / {item.name}: {match.query}")
 
     def _is_products_page(self, page: Page) -> bool:
         """Return whether the current page is Tawreed's products ordering page."""
@@ -486,7 +579,10 @@ class TawreedBot:
     def _skip_status(self, reason: str) -> str:
         """Return the structured summary status for one skipped item."""
         lowered = reason.lower()
-        if "no matching product found" in lowered:
+        if (
+            "no matching product found" in lowered
+            or "no decisive match found" in lowered
+        ):
             return "no-results"
         if "unavailable" in lowered or "out of stock" in lowered:
             return "matched-but-unavailable"
@@ -494,7 +590,7 @@ class TawreedBot:
 
     def _failure_status(self, reason: str) -> str:
         """Return the structured summary status for one failed item."""
-        if "No matching product found" in reason:
+        if "No matching product found" in reason or "No decisive match found" in reason:
             return "no-results"
         return "failed"
 

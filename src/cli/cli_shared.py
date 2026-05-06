@@ -13,21 +13,21 @@ def build_bot(
     app_config: AppConfig,
     profile_key: str,
     profile: ProfileConfig,
-    debug_browser: bool = False,
-    stop_flag_path: Path | None = None,
-    fast_search: bool = False,
-    summary_label_suffix: str | None = None,
+    debug_browser: bool = False, stop_flag_path: Path | None = None,
+    fast_search: bool = False, summary_label_suffix: str | None = None,
+    match_only: bool = False,
 ) -> TawreedBot:
     """Create a Tawreed bot instance for one profile."""
     return TawreedBot(
-        config=app_config,
-        profile_key=profile_key,
-        profile=profile,
-        state_path=state_path(profile_key),
+        app_config,
+        profile_key,
+        profile,
+        state_path(profile_key),
         debug_browser=debug_browser,
         stop_flag_path=stop_flag_path,
         fast_search=fast_search,
         summary_label_suffix=summary_label_suffix,
+        match_only=match_only,
     )
 
 
@@ -49,7 +49,9 @@ def state_path(profile_key: str) -> Path:
     return state_dir / f"{profile_key}.json"
 
 
-def invalid_session_exit(base_url: str, profile_key: str, error: SessionInvalidError) -> SystemExit:
+def invalid_session_exit(
+    base_url: str, profile_key: str, error: SessionInvalidError
+) -> SystemExit:
     """Return the standard session-expired CLI exit after opening browser reauth."""
     print(f"[{profile_key}] {error}")
     open_reauth_in_browser(base_url, profile_key)
