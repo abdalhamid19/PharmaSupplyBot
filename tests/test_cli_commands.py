@@ -10,6 +10,7 @@ from src.cli.cli_cart_removal import run_remove_cart_command
 from src.cli.cli_order import (
     _load_order_items as load_order_items,
     _prepared_order_items as prepared_order_items,
+    _run_single_profile as run_single_profile,
 )
 from src.cli.cli_shared import invalid_session_exit
 from src.core.utils.excel import Item
@@ -91,6 +92,69 @@ class CliCommandsTests(unittest.TestCase):
 
         with self.assertRaisesRegex(SystemExit, "Order Excel cannot be"):
             load_order_items(_app_config(), args)
+
+    def test_run_single_profile_limits_after_resume_skips_previous_rows(self) -> None:
+        items = [
+            Item(code=str(index), name=f"Item {index}", qty=1) for index in range(20)
+        ]
+        captured_items: list[Item] = []
+        args: Any = SimpleNamespace(
+            excel="data/input/order_items/orders.xlsx",
+            limit=10,
+            resume=True,
+            item_workers=1,
+            prevented_items_excel="data/input/prevented_items/missing.xlsx",
+        )
+        app_config: Any = SimpleNamespace(
+            base_url="https://seller.tawreed.io/#/login",
+            excel=SimpleNamespace(),
+            runtime=SimpleNamespace(item_workers=1),
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                summary_dir = Path("artifacts") / "wardany"
+                summary_dir.mkdir(parents=True)
+                summary_rows = [
+                    f"{index},Item {index},added-to-cart" for index in range(9)
+                ]
+                (summary_dir / "order_result_summary.csv").write_text(
+                    "item_code,item_name,status\n" + "\n".join(summary_rows) + "\n",
+                    encoding="utf-8",
+                )
+                self._run_single_profile_and_capture_items(
+                    app_config, args, items, captured_items
+                )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(captured_items, items[9:19])
+
+    def _run_single_profile_and_capture_items(
+        self,
+        app_config: Any,
+        args: Any,
+        items: list[Item],
+        captured_items: list[Item],
+    ) -> None:
+        with (
+            patch(
+                "src.cli.cli_order.load_items_from_excel", return_value=items
+            ) as load,
+            patch("pathlib.Path.is_file", return_value=False),
+            patch("src.cli.cli_order.require_state_file"),
+            patch("src.cli.cli_order._order_bot", return_value=object()),
+            patch("src.cli.cli_order._run_profile_order") as run_order,
+        ):
+            run_order.side_effect = lambda _base, _key, _bot, order_items: (
+                captured_items.extend(list(order_items))
+            )
+            profile: Any = SimpleNamespace()
+            run_single_profile(app_config, "wardany", profile, args)
+
+        self.assertEqual(load.call_args.kwargs["limit"], 0)
 
     def test_prepared_order_items_requires_state_then_applies_resume(self) -> None:
         items = [Item(code="1", name="Panadol", qty=1)]

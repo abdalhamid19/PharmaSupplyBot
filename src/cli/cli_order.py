@@ -90,6 +90,7 @@ def _run_single_profile(
     """Prepare and run a single profile order flow."""
     items = _load_order_items(app_config, args)
     profile_items = _prepared_order_items(profile_key, items, args)
+    profile_items = _limited_order_items(profile_items, args)
     profile_items = _ensure_non_empty_items(profile_key, profile_items)
     if profile_items is None:
         return
@@ -132,13 +133,25 @@ def _load_order_items(
 ) -> Iterable[Item]:
     """Load and filter order items iteratively."""
     excel_path = Path(args.excel)
-    _reject_prevented_excel_as_order_source(excel_path, _prevented_items_path(args))
-    items = load_items_from_excel(excel_path, app_config.excel, limit=args.limit)
     prevented_path = _prevented_items_path(args)
-    if prevented_path and prevented_path.is_file():
+    _reject_prevented_excel_as_order_source(excel_path, prevented_path)
+    has_prevented_filter = bool(prevented_path and prevented_path.is_file())
+    items = load_items_from_excel(
+        excel_path,
+        app_config.excel,
+        limit=_excel_load_limit(args, has_prevented_filter),
+    )
+    if has_prevented_filter and prevented_path is not None:
         prevented_items = load_prevented_items(prevented_path)
         items = filter_prevented_order_items(items, prevented_items)
     return items
+
+
+def _excel_load_limit(args: argparse.Namespace, has_prevented_filter: bool) -> int:
+    """Return the safe Excel read limit before profile-level filters run."""
+    if bool(getattr(args, "resume", False)) or has_prevented_filter:
+        return 0
+    return _order_item_limit(args)
 
 
 def _prevented_items_path(args: argparse.Namespace) -> Path | None:
@@ -167,6 +180,21 @@ def _prepared_order_items(
     for item in items:
         if _item_key(item.code, item.name) not in processed_keys:
             yield item
+
+
+def _limited_order_items(
+    items: Iterable[Item], args: argparse.Namespace
+) -> Iterable[Item]:
+    """Apply the per-run item limit after prevented/resume filters."""
+    limit = _order_item_limit(args)
+    if limit <= 0:
+        return items
+    return itertools.islice(items, limit)
+
+
+def _order_item_limit(args: argparse.Namespace) -> int:
+    """Return the requested order item processing limit."""
+    return int(getattr(args, "limit", 0) or 0)
 
 
 def _processed_summary_item_keys(profile_key: str) -> set[tuple[str, str]]:

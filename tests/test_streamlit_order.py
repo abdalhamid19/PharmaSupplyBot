@@ -79,7 +79,7 @@ class StreamlitOrderTests(unittest.TestCase):
         self.assertIn("--item-workers", command)
         self.assertEqual(command[command.index("--item-workers") + 1], "3")
 
-    def test_order_command_omits_default_item_workers(self) -> None:
+    def test_order_command_adds_single_item_worker_override(self) -> None:
         command = order_command(
             Path("config.yaml"),
             {
@@ -95,7 +95,8 @@ class StreamlitOrderTests(unittest.TestCase):
             Path("data/input/order_items/ddd.xlsx"),
         )
 
-        self.assertNotIn("--item-workers", command)
+        self.assertIn("--item-workers", command)
+        self.assertEqual(command[command.index("--item-workers") + 1], "1")
 
     def test_order_command_adds_resume(self) -> None:
         command = order_command(

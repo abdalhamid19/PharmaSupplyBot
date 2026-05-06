@@ -170,8 +170,10 @@ def order_process_output(output_path: Path) -> str:
 def close_order_process_output(state: dict[str, object]) -> None:
     """Close the stored process output file handle if it is still open."""
     output_file = state.get("output_file")
+    if output_file is None:
+        return
     try:
-        output_file.close()
+        getattr(output_file, "close")()
     except Exception:
         pass
 
@@ -214,15 +216,26 @@ def order_command(
         command.append("--debug-browser")
     if form_values.get("resume"):
         command.append("--resume")
-    item_workers = int(form_values.get("item_workers") or 1)
-    if item_workers > 1:
-        command.extend(["--item-workers", str(item_workers)])
+    item_workers = _int_form_value(form_values, "item_workers", 1)
+    command.extend(["--item-workers", str(item_workers)])
     if form_values.get("highest_discount"):
         command.extend(["--warehouse-mode", "max_discount"])
-    min_discount_percent = float(form_values.get("min_discount_percent") or 0)
+    min_discount_percent = _float_form_value(form_values, "min_discount_percent", 0.0)
     if min_discount_percent > 0:
         command.extend(["--min-discount-percent", f"{min_discount_percent:g}"])
     prevented_items_excel = str(form_values.get("prevented_items_excel") or "")
     if prevented_items_excel:
         command.extend(["--prevented-items-excel", prevented_items_excel])
     return command
+
+
+def _int_form_value(form_values: dict[str, object], key: str, default: int) -> int:
+    """Return one integer form value with a safe fallback."""
+    return int(str(form_values.get(key, default) or default))
+
+
+def _float_form_value(
+    form_values: dict[str, object], key: str, default: float
+) -> float:
+    """Return one float form value with a safe fallback."""
+    return float(str(form_values.get(key, default) or default))
