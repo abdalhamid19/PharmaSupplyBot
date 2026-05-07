@@ -173,7 +173,29 @@ Windows PowerShell:
 py run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
 ```
 
-### 10. تشغيل واجهة Streamlit
+### 10. تصدير كل أصناف Tawreed
+
+استخدم `export-products` لسحب كتالوج أصناف Tawreed المتاح للحساب المحفوظ في
+`state/<profile>.json`. ينشئ الأمر ثلاثة ملفات بنفس البيانات داخل مجلد الإخراج:
+
+- `tawreed_products.csv`
+- `tawreed_products.xlsx`
+- `tawreed_products.txt`
+
+الأعمدة الناتجة ثابتة: `product_name_ar` و`product_name_en` و`store_product_id`.
+يمكن استخدام `--limit` لاختبار عدد صغير أولًا، واتركه `0` لتصدير كل الأصناف.
+
+Windows PowerShell:
+```powershell
+py run.py export-products --profile wardany --output-dir "artifacts/{profile}" --limit 10
+```
+
+Linux / macOS (bash):
+```bash
+python3 run.py export-products --profile wardany --output-dir "artifacts/{profile}" --limit 10
+```
+
+### 11. تشغيل واجهة Streamlit
 
 الرابط الأونلاين:
 ```text
