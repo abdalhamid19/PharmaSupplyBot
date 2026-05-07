@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import patch
 
 from src.cli.cli_cart_removal import run_remove_cart_command
+from src.cli.cli_export_products import run_export_products_command
 from src.cli.cli_order import (
     _load_order_items as load_order_items,
 )
@@ -281,13 +282,7 @@ class CliCommandsTests(unittest.TestCase):
 
     def test_run_remove_cart_command_invokes_bot_for_selected_profile(self) -> None:
         profile = SimpleNamespace()
-        app_config: Any = SimpleNamespace(
-            base_url="https://seller.tawreed.io/#/login",
-            profiles={"wardany": profile},
-            profiles_to_run=lambda profile=None, all_profiles=False: [
-                ("wardany", profile)
-            ],
-        )
+        app_config = _profile_app_config(profile)
         args: Any = SimpleNamespace(
             excel="data/input/remove_items/remove.xlsx",
             profile="wardany",
@@ -310,9 +305,47 @@ class CliCommandsTests(unittest.TestCase):
         load_items.assert_called_once()
         bot.remove_cart_items.assert_called_once()
 
+    def test_run_export_products_command_invokes_export_flow(self) -> None:
+        profile = SimpleNamespace()
+        app_config = _profile_app_config(profile)
+        args: Any = SimpleNamespace(
+            profile="wardany",
+            all_profiles=False,
+            debug_browser=True,
+            output_dir="artifacts/catalog/{profile}",
+            page_size=50,
+            limit=5,
+            stem="catalog",
+        )
+
+        with (
+            patch("src.cli.cli_export_products.require_state_file"),
+            patch("src.cli.cli_export_products.build_bot") as build_bot,
+            patch("src.cli.cli_export_products.export_tawreed_products") as export,
+        ):
+            result = run_export_products_command(app_config, args)
+
+        self.assertEqual(result, 0)
+        build_bot.assert_called_once_with(app_config, "wardany", profile, True)
+        export.assert_called_once()
+        self.assertEqual(
+            export.call_args.args[1].parts, ("artifacts", "catalog", "wardany")
+        )
+        self.assertEqual(export.call_args.kwargs["page_size"], 50)
+
 
 def _app_config() -> Any:
     return SimpleNamespace(excel=SimpleNamespace())
+
+
+def _profile_app_config(profile_config: Any) -> Any:
+    return SimpleNamespace(
+        base_url="https://seller.tawreed.io/#/login",
+        profiles={"wardany": profile_config},
+        profiles_to_run=lambda profile=None, all_profiles=False: [
+            ("wardany", profile_config)
+        ],
+    )
 
 
 class _InlineContext:

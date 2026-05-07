@@ -6,6 +6,7 @@ import argparse
 
 from .cli_parser_auth import build_auth_parser
 from .cli_parser_cart import build_remove_cart_parser
+from .cli_parser_export import build_export_products_parser
 from .cli_parser_order import build_order_parser
 
 
@@ -16,4 +17,5 @@ def build_parser() -> argparse.ArgumentParser:
     build_auth_parser(subparsers)
     build_order_parser(subparsers)
     build_remove_cart_parser(subparsers)
+    build_export_products_parser(subparsers)
     return parser

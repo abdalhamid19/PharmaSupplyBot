@@ -187,6 +187,30 @@ class CliParserTests(unittest.TestCase):
         )
         self.assertEqual(args.item_workers, 2)
 
+    def test_export_products_accepts_output_options(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "export-products",
+                "--profile",
+                "wardany",
+                "--output-dir",
+                "artifacts/catalog/{profile}",
+                "--stem",
+                "catalog",
+                "--page-size",
+                "50",
+                "--limit",
+                "5",
+                "--debug-browser",
+            ]
+        )
+        self.assertEqual(args.cmd, "export-products")
+        self.assertEqual(args.output_dir, "artifacts/catalog/{profile}")
+        self.assertEqual(args.stem, "catalog")
+        self.assertEqual(args.page_size, 50)
+        self.assertEqual(args.limit, 5)
+        self.assertTrue(args.debug_browser)
+
 
 if __name__ == "__main__":
     unittest.main()
