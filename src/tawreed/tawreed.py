@@ -465,10 +465,17 @@ class TawreedBot:
 
     def _match_item_only(self, page: Page, item: Item) -> None:
         """Run Tawreed matching for one item without opening the cart dialog."""
-        if not self._is_products_page(page):
-            raise RuntimeError("Match-only mode requires Tawreed products page flow.")
+        self._ensure_match_only_surface(page)
         match, _ = require_product_match(self, page, item, require_available=False)
         self.log(f"Match-only accepted {item.code} / {item.name}: {match.query}")
+
+    def _ensure_match_only_surface(self, page: Page) -> None:
+        """Ensure match-only can use Tawreed's product-search surface."""
+        if self._is_products_page(page) or self._order_surface_ready(page):
+            return
+        self._prepare_order_page(page)
+        if not (self._is_products_page(page) or self._order_surface_ready(page)):
+            raise RuntimeError("Match-only mode requires Tawreed products page flow.")
 
     def _is_products_page(self, page: Page) -> bool:
         """Return whether the current page is Tawreed's products ordering page."""

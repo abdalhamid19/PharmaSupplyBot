@@ -174,6 +174,27 @@ class TawreedBotTests(unittest.TestCase):
         self.assertEqual(summary.status, "matched-only")
         self.assertEqual(summary.ordered_total_qty, 0)
 
+    def test_match_only_accepts_ready_search_surface_without_products_url(self) -> None:
+        bot = self._bot()
+        item = Item(code="1", name="Panadol", qty=1)
+        page: Any = _FakePage("https://seller.tawreed.io/#/purchase/orders/new")
+        match = SearchMatch(
+            query="Panadol",
+            row_index=0,
+            score=20.0,
+            data={"productNameEn": "Panadol", "productName": "بنادول"},
+        )
+
+        with (
+            patch.object(bot, "_order_surface_ready", return_value=True),
+            patch(
+                "src.tawreed.tawreed.require_product_match", return_value=(match, "")
+            ) as require_match,
+        ):
+            bot._match_item_only(page, item)
+
+        require_match.assert_called_once_with(bot, page, item, require_available=False)
+
     def test_build_item_summary_populates_matched_names_by_language(self) -> None:
         bot = self._bot()
         bot.last_match_decision = MatchDecision(
