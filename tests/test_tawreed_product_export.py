@@ -10,6 +10,9 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from src.tawreed.tawreed_product_export_collection import (
+    collect_unique_product_candidates,
+)
 from src.tawreed.tawreed_product_export_api import iter_all_product_candidates
 from src.tawreed.tawreed_product_export_searches import (
     ARABIC_EXPORT_SEARCH_TERMS,
@@ -101,6 +104,34 @@ class TawreedProductExportTests(unittest.TestCase):
         self.assertEqual([url.split("page=")[1].split("&")[0]
                           for url in page.request.urls], ["0", "1", "0"])
 
+    def test_collect_unique_product_candidates_deduplicates_search_results(self) -> None:
+        candidates = [
+            _candidate("Panadol", "بنادول", "1"),
+            _candidate("Panadol", "بنادول", "1"),
+            _candidate("Aspirin", "اسبرين", "2"),
+        ]
+
+        collection = collect_unique_product_candidates(candidates)
+
+        self.assertEqual([row["storeProductId"] for row in collection.candidates],
+                         ["1", "2"])
+        self.assertEqual(collection.scanned_count, 3)
+        self.assertEqual(collection.duplicates_removed, 1)
+
+    def test_collect_unique_product_candidates_limits_final_unique_rows(self) -> None:
+        candidates = [
+            _candidate("Panadol", "بنادول", "1"),
+            _candidate("Panadol", "بنادول", "1"),
+            _candidate("Aspirin", "اسبرين", "2"),
+        ]
+
+        collection = collect_unique_product_candidates(candidates, limit=1)
+
+        self.assertEqual([row["storeProductId"] for row in collection.candidates],
+                         ["1"])
+        self.assertEqual(collection.scanned_count, 1)
+        self.assertEqual(collection.duplicates_removed, 0)
+
 
 def _read_csv_rows(path: Path) -> list[list[str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as input_file:
@@ -128,6 +159,14 @@ def _payload(total_pages: int, *store_product_ids: str) -> dict[str, Any]:
                 for value in store_product_ids
             ],
         }
+    }
+
+
+def _candidate(name_en: str, name_ar: str, store_id: str) -> dict[str, Any]:
+    return {
+        "productNameEn": name_en,
+        "productName": name_ar,
+        "storeProductId": store_id,
     }
 
 

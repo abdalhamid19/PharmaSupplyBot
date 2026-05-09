@@ -30,9 +30,10 @@
 
 ## [ORPHANS & PENDING]
 
-- Pending: capture actual search request payloads for each export query.
+- Done: capture actual Tawreed product-search request body and reusable headers
+  for every export query before API pagination.
 - Done: define general, English, and Arabic export search terms in required order.
 - Done: fetch all API pages for each captured search request in input order.
-- Pending: apply final deduplication before row normalization and output writing.
-- Pending: apply `--limit` to the total final unique products.
+- Done: apply final deduplication before row normalization and output writing.
+- Done: apply `--limit` to the total final unique products.
 - Pending: verify `sale_price` values in CSV, XLSX, and TXT outputs.

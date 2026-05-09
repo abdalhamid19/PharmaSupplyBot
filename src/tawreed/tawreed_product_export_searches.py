@@ -21,6 +21,11 @@ ARABIC_EXPORT_SEARCH_TERMS = (
     "و", "ي",
 )
 EXPORT_SEARCH_TERMS = ("",) + ENGLISH_EXPORT_SEARCH_TERMS + ARABIC_EXPORT_SEARCH_TERMS
+EXPORT_SEARCH_GROUPS = (
+    ("general catalog pages", ("",)),
+    ("English alphabet searches", ENGLISH_EXPORT_SEARCH_TERMS),
+    ("Arabic alphabet searches", ARABIC_EXPORT_SEARCH_TERMS),
+)
 
 
 @dataclass(frozen=True)
