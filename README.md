@@ -206,12 +206,14 @@ https://mahrouspharmacies-pharmasupplybot.streamlit.app/
 
 Windows PowerShell:
 ```powershell
+cd PharmaSupplyBot
 .\.venv\Scripts\Activate.ps1
 .\.venv\Scripts\python -m streamlit run streamlit_app.py
 ```
 
 Linux / macOS (bash):
 ```bash
+cd PharmaSupplyBot
 source .venv/bin/activate
 python3 -m streamlit run streamlit_app.py
 ```
@@ -222,11 +224,13 @@ python3 -m streamlit run streamlit_app.py
 
 Windows PowerShell:
 ```powershell
+cd PharmaSupplyBot
 .\.venv\Scripts\python tools\rule_audit.py
 ```
 
 Linux / macOS (bash):
 ```bash
+cd PharmaSupplyBot
 python3 tools/rule_audit.py
 ```
 
@@ -239,6 +243,7 @@ rule_audit_ok
 قبل كل `push` نفّذ:
 
 ```bash
+cd PharmaSupplyBot
 .venv/bin/python -m unittest discover -s tests -q
 .venv/bin/python tools/rule_audit.py
 ```
