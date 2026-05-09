@@ -52,7 +52,7 @@ class TawreedProductExportTests(unittest.TestCase):
 
         self.assertEqual(set(paths.keys()), {"csv", "xlsx", "txt"})
         self.assertEqual(csv_rows[0], list(EXPORT_FIELDNAMES))
-        self.assertIn("بانادول\tPanadol\t123", txt_lines)
+        self.assertEqual(txt_lines[1].split("\t"), rows[0].values())
         self.assertEqual(xlsx_header, EXPORT_FIELDNAMES)
 
     def test_iter_all_product_candidates_pages_until_total_pages(self) -> None:
