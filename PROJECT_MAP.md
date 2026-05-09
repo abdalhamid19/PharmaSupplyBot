@@ -30,10 +30,17 @@
 
 ## [ORPHANS & PENDING]
 
-- Done: capture actual Tawreed product-search request body and reusable headers
-  for every export query before API pagination.
-- Done: define general, English, and Arabic export search terms in required order.
-- Done: fetch all API pages for each captured search request in input order.
-- Done: apply final deduplication before row normalization and output writing.
-- Done: apply `--limit` to the total final unique products.
-- Done: verify `sale_price` extraction and CSV, XLSX, and TXT output values.
+- None.
+
+## [VALIDATION]
+
+- `.venv/bin/python -m pytest tests -q`: 180 passed.
+- `.venv/bin/python tools/rule_audit.py`: rule_audit_ok.
+- Smoke run succeeded:
+  `.venv/bin/python run.py export-products --profile wardany --limit 10 --stem tawreed_products_smoke`.
+- Smoke CSV check: 10 rows, `sale_price` column present, first `sale_price=30.4`,
+  duplicate identity count 0.
+- Full run without `--limit` was attempted with stem `tawreed_products_full`, but
+  it did not reach export-stage logs after several minutes and was stopped to
+  avoid leaving Playwright running indefinitely. No full-run artifacts were
+  produced.
