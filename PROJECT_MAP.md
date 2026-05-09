@@ -22,6 +22,8 @@
 - CLI parsing and profile dispatch stay in `src/cli`.
 - Browser/session lifecycle stays in `src/tawreed/tawreed_product_export_flow.py`.
 - Product-search API pagination stays in `src/tawreed/tawreed_product_export_api.py`.
+- Ordered general/English/Arabic export search terms and captured search request
+  iteration stay in `src/tawreed/tawreed_product_export_searches.py`.
 - Row normalization stays in `src/tawreed/tawreed_product_export_rows.py`.
 - Product identity and deduplication stay in
   `src/tawreed/product_export_deduplicator.py`.
@@ -29,7 +31,8 @@
 ## [ORPHANS & PENDING]
 
 - Pending: capture actual search request payloads for each export query.
-- Pending: fetch general, English, and Arabic export searches in the required order.
+- Done: define general, English, and Arabic export search terms in required order.
+- Done: fetch all API pages for each captured search request in input order.
 - Pending: apply final deduplication before row normalization and output writing.
 - Pending: apply `--limit` to the total final unique products.
 - Pending: verify `sale_price` values in CSV, XLSX, and TXT outputs.

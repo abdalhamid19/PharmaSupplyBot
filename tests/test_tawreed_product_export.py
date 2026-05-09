@@ -11,6 +11,13 @@ from typing import Any
 from openpyxl import load_workbook
 
 from src.tawreed.tawreed_product_export_api import iter_all_product_candidates
+from src.tawreed.tawreed_product_export_searches import (
+    ARABIC_EXPORT_SEARCH_TERMS,
+    ENGLISH_EXPORT_SEARCH_TERMS,
+    EXPORT_SEARCH_TERMS,
+    ProductSearchRequest,
+    iter_product_search_candidates,
+)
 from src.tawreed.tawreed_product_export_files import write_product_export_files
 from src.tawreed.tawreed_product_export_rows import (
     EXPORT_FIELDNAMES,
@@ -72,6 +79,28 @@ class TawreedProductExportTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0]["storeProductId"], "1")
 
+    def test_export_search_terms_are_general_english_then_arabic(self) -> None:
+        self.assertEqual(EXPORT_SEARCH_TERMS[0], "")
+        self.assertEqual(EXPORT_SEARCH_TERMS[1:27], ENGLISH_EXPORT_SEARCH_TERMS)
+        self.assertEqual(EXPORT_SEARCH_TERMS[27:], ARABIC_EXPORT_SEARCH_TERMS)
+
+    def test_iter_product_search_candidates_pages_each_request_in_order(self) -> None:
+        page = _FakePage([_payload(2, "general-1"), _payload(2, "general-2"),
+                          _payload(1, "a-1")])
+        searches = iter([
+            ProductSearchRequest("", {"x-test": "1"}, {"term": ""}),
+            ProductSearchRequest("A", {"x-test": "1"}, {"term": "A"}),
+        ])
+
+        candidates = list(iter_product_search_candidates(page, searches, page_size=10))
+
+        self.assertEqual([row["storeProductId"] for row in candidates],
+                         ["general-1", "general-2", "a-1"])
+        self.assertEqual([body["term"] for body in page.request.bodies],
+                         ["", "", "A"])
+        self.assertEqual([url.split("page=")[1].split("&")[0]
+                          for url in page.request.urls], ["0", "1", "0"])
+
 
 def _read_csv_rows(path: Path) -> list[list[str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as input_file:
@@ -114,9 +143,11 @@ class _FakeRequest:
     def __init__(self, payloads: list[dict[str, Any]]) -> None:
         self.payloads = payloads
         self.urls: list[str] = []
+        self.bodies: list[dict[str, Any]] = []
 
     def post(self, url: str, data: Any, headers: dict[str, str]) -> "_FakeResponse":
         self.urls.append(url)
+        self.bodies.append(data)
         return _FakeResponse(self.payloads.pop(0))
 
 

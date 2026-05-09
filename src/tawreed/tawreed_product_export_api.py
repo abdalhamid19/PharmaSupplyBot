@@ -19,20 +19,36 @@ def iter_all_product_candidates(
     page_size: int = DEFAULT_EXPORT_PAGE_SIZE,
     limit: int = 0,
     headers: dict[str, str] | None = None,
+    request_body: dict[str, Any] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Yield Tawreed product candidates from every products API page."""
-    emitted, total_pages, page_number = 0, None, 0
-    while total_pages is None or page_number < total_pages:
-        payload = _fetch_products_page(page, page_number, page_size, headers or {})
+    emitted = 0
+    for payload in _iter_product_page_payloads(
+        page, page_size, headers or {}, request_body
+    ):
         candidates = _api_candidates(payload)
         if not candidates:
             break
-        total_pages = _total_pages_from_payload(payload)
         for candidate in candidates:
             yield candidate
             emitted += 1
             if limit and emitted >= limit:
                 return
+
+
+def _iter_product_page_payloads(
+    page: Page,
+    page_size: int,
+    headers: dict[str, str],
+    request_body: dict[str, Any] | None,
+) -> Iterator[dict[str, Any]]:
+    total_pages, page_number = None, 0
+    while total_pages is None or page_number < total_pages:
+        payload = _fetch_products_page(
+            page, page_number, page_size, headers, request_body
+        )
+        total_pages = _total_pages_from_payload(payload)
+        yield payload
         page_number += 1
 
 
@@ -51,11 +67,15 @@ def _total_pages_from_payload(payload: dict[str, Any]) -> int:
 
 
 def _fetch_products_page(
-    page: Page, page_number: int, page_size: int, headers: dict[str, str]
+    page: Page,
+    page_number: int,
+    page_size: int,
+    headers: dict[str, str],
+    request_body: dict[str, Any] | None,
 ) -> dict[str, Any]:
     response = page.request.post(
         product_export_url(page, page_number, page_size),
-        data=EXPORT_REQUEST_BODY,
+        data=request_body or EXPORT_REQUEST_BODY,
         headers=headers,
     )
     if not response.ok:
