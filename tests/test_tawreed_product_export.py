@@ -200,7 +200,9 @@ class _FakeRequest:
         self.urls: list[str] = []
         self.bodies: list[dict[str, Any]] = []
 
-    def post(self, url: str, data: Any, headers: dict[str, str]) -> "_FakeResponse":
+    def post(
+        self, url: str, data: Any, headers: dict[str, str], timeout: int
+    ) -> "_FakeResponse":
         self.urls.append(url)
         self.bodies.append(data)
         return _FakeResponse(self.payloads.pop(0))

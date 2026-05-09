@@ -7,6 +7,7 @@ from typing import Any, Iterator
 from playwright.sync_api import Page
 
 from .tawreed_constants import PRODUCT_SEARCH_ENDPOINT
+from .tawreed_product_export_retry import post_product_export_json
 from .tawreed_product_search import _api_candidates
 
 DEFAULT_EXPORT_PAGE_SIZE = 100
@@ -73,16 +74,12 @@ def _fetch_products_page(
     headers: dict[str, str],
     request_body: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    response = page.request.post(
+    return post_product_export_json(
+        page.request,
         product_export_url(page, page_number, page_size),
-        data=request_body or EXPORT_REQUEST_BODY,
-        headers=headers,
+        request_body or EXPORT_REQUEST_BODY,
+        headers,
     )
-    if not response.ok:
-        raise RuntimeError(
-            f"Tawreed products export API returned HTTP {response.status}"
-        )
-    return response.json()
 
 
 def _payload_page_data(payload: dict[str, Any]) -> dict[str, Any]:
