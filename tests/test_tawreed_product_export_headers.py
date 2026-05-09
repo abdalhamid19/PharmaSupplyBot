@@ -12,23 +12,36 @@ class TawreedProductExportHeaderTests(unittest.TestCase):
     """Validate captured Tawreed product-search request metadata."""
 
     def test_capture_product_search_request_uses_observed_body(self) -> None:
-        page = _FakeCapturePage({"mode": "error", "data": {"search": "A"}})
+        page = _FakeCapturePage({"mode": "error", "data": {"productName": "A"}})
 
         request = capture_product_search_request(page, "A")
 
         self.assertEqual(request.term, "A")
-        self.assertEqual(request.body, {"mode": "error", "data": {"search": "A"}})
+        self.assertEqual(request.body, {"mode": "error", "data": {"productName": "A"}})
         self.assertEqual(request.headers, {"x-token": "abc", "Authorization": "Bearer t"})
         self.assertEqual(page.search.actions, ["click", "fill:", "fill:A", "press:Enter"])
 
+    def test_capture_product_search_request_waits_for_matching_term(self) -> None:
+        page = _FakeCapturePage(
+            {"mode": "error", "data": {"displayType": 1}},
+            {"mode": "error", "data": {"productName": "ابيمول", "displayType": 1}},
+        )
+
+        request = capture_product_search_request(page, "ابيمول")
+
+        self.assertEqual(request.body["data"]["productName"], "ابيمول")
+
 
 class _FakeCapturePage:
-    def __init__(self, body: dict[str, Any]) -> None:
+    def __init__(self, *bodies: dict[str, Any]) -> None:
         self.search = _FakeSearch()
-        self.response = _FakeResponse(body)
+        self.responses = [_FakeResponse(body) for body in bodies]
 
     def expect_response(self, pattern: Any, timeout: int) -> "_FakeResponseContext":
-        return _FakeResponseContext(self.response)
+        matching_response = next(
+            response for response in self.responses if pattern(response)
+        )
+        return _FakeResponseContext(matching_response)
 
     def locator(self, selector: str) -> "_FakeLocator":
         return _FakeLocator(self.search)
@@ -47,6 +60,7 @@ class _FakeResponseContext:
 
 class _FakeResponse:
     def __init__(self, body: dict[str, Any]) -> None:
+        self.url = "https://api.tawreed.io/rest/v2/stores/products/search/similar5"
         self.request = _FakeRequest(body)
 
 

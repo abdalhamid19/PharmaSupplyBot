@@ -61,12 +61,16 @@ def product_export_rows(
     seen: set[tuple[str, str, str]] = set()
     for candidate in candidates:
         row = _row_from_candidate(candidate)
-        identity = (row.product_name_ar, row.product_name_en,
-                    row.store_product_id)
+        identity = _row_identity(row)
         if identity == ("", "", "") or identity in seen:
             continue
         seen.add(identity)
         yield row
+
+
+def _row_identity(row: ProductExportRow) -> tuple[str, str, str]:
+    product_key = row.store_product_id or row.product_id
+    return row.product_name_ar, row.product_name_en, product_key
 
 
 def _row_from_candidate(candidate: dict[str, Any]) -> ProductExportRow:

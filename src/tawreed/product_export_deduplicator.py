@@ -12,14 +12,14 @@ class ProductIdentity:
 
     product_name_en: str
     product_name_ar: str
-    store_product_id: str
+    product_key: str
 
     def is_valid(self) -> bool:
         """Return whether all identity components are non-empty."""
         return bool(
             self.product_name_en.strip()
             and self.product_name_ar.strip()
-            and self.store_product_id.strip()
+            and self.product_key.strip()
         )
 
 
@@ -28,8 +28,16 @@ def identity_key(product: dict[str, Any]) -> ProductIdentity:
     return ProductIdentity(
         product_name_en=str(product.get("productNameEn") or "").strip(),
         product_name_ar=str(product.get("productName") or "").strip(),
-        store_product_id=str(product.get("storeProductId") or "").strip(),
+        product_key=_product_identity_key(product),
     )
+
+
+def _product_identity_key(product: dict[str, Any]) -> str:
+    store_product_id = str(product.get("storeProductId") or "").strip()
+    if store_product_id:
+        return f"store:{store_product_id}"
+    product_id = str(product.get("productId") or "").strip()
+    return f"product:{product_id}" if product_id else ""
 
 
 def deduplicate_products(

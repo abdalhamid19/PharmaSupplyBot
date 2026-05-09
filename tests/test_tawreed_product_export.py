@@ -65,6 +65,23 @@ class TawreedProductExportTests(unittest.TestCase):
 
         self.assertEqual(rows[0].sale_price, "42.5")
 
+    def test_product_export_rows_keep_product_id_without_store_id(self) -> None:
+        candidates = [
+            {
+                "productId": 34,
+                "productName": "ابيمول 300 مجم 5 لبوس",
+                "productNameEn": "ABIMOL 300 MG 5 RECTAL SUPP.",
+                "storeProductId": None,
+                "salePrice": 15.0,
+            },
+        ]
+
+        rows = list(product_export_rows(candidates))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].product_id, "34")
+        self.assertEqual(rows[0].store_product_id, "")
+
     def test_write_product_export_files_creates_all_requested_formats(self) -> None:
         rows = [ProductExportRow("بانادول", "Panadol", "123", sale_price="42.5")]
 
@@ -102,6 +119,9 @@ class TawreedProductExportTests(unittest.TestCase):
         self.assertEqual(EXPORT_SEARCH_TERMS[0], "")
         self.assertEqual(EXPORT_SEARCH_TERMS[1:27], ENGLISH_EXPORT_SEARCH_TERMS)
         self.assertEqual(EXPORT_SEARCH_TERMS[27:], ARABIC_EXPORT_SEARCH_TERMS)
+        self.assertIn("أ", ARABIC_EXPORT_SEARCH_TERMS)
+        self.assertIn("ة", ARABIC_EXPORT_SEARCH_TERMS)
+        self.assertIn("ى", ARABIC_EXPORT_SEARCH_TERMS)
 
     def test_iter_product_search_candidates_pages_each_request_in_order(self) -> None:
         page = _FakePage([_payload(2, "general-1"), _payload(2, "general-2"),

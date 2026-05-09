@@ -16,9 +16,9 @@ ENGLISH_EXPORT_SEARCH_TERMS = tuple(
     chr(code) for code in range(ord("A"), ord("Z") + 1)
 )
 ARABIC_EXPORT_SEARCH_TERMS = (
-    "ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش",
-    "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه",
-    "و", "ي",
+    "ا", "أ", "إ", "آ", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر",
+    "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل",
+    "م", "ن", "ه", "ة", "و", "ي", "ى",
 )
 EXPORT_SEARCH_TERMS = ("",) + ENGLISH_EXPORT_SEARCH_TERMS + ARABIC_EXPORT_SEARCH_TERMS
 EXPORT_SEARCH_GROUPS = (

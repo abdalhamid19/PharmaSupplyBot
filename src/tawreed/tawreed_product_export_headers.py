@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from playwright.sync_api import Page
+from playwright.sync_api import Page, Response
 
 from .tawreed_product_export_searches import ProductSearchRequest
 from .tawreed_product_search import (
@@ -27,7 +27,10 @@ def capture_product_search_headers(page: Page) -> dict[str, str]:
 def capture_product_search_request(page: Page, term: str) -> ProductSearchRequest:
     """Return reusable Tawreed product-search metadata for one search term."""
     try:
-        with page.expect_response(_search_response_pattern(), timeout=5000) as response:
+        with page.expect_response(
+            lambda response: _is_expected_search_response(response, term),
+            timeout=5000,
+        ) as response:
             _submit_search(page, term)
         request = response.value.request
         return ProductSearchRequest(
@@ -60,6 +63,19 @@ def _request_body(request: Any) -> dict[str, Any]:
     if isinstance(body, dict):
         return body
     raise RuntimeError("Captured Tawreed product-search request body is not an object")
+
+
+def _is_expected_search_response(response: Response, term: str) -> bool:
+    if not _search_response_pattern().search(response.url):
+        return False
+    return _search_body_term(_request_body(response.request)) == term
+
+
+def _search_body_term(body: dict[str, Any]) -> str:
+    data = body.get("data")
+    if not isinstance(data, dict):
+        return ""
+    return str(data.get("productName") or "").strip()
 
 
 def _capture_error_message(term: str) -> str:

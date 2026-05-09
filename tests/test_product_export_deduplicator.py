@@ -21,7 +21,7 @@ class ProductIdentityTests(unittest.TestCase):
         identity = ProductIdentity(
             product_name_en="Paracetamol 500mg",
             product_name_ar="باراسيتامول 500 ملغ",
-            store_product_id="store-123",
+            product_key="store:store-123",
         )
         self.assertTrue(identity.is_valid())
 
@@ -30,7 +30,7 @@ class ProductIdentityTests(unittest.TestCase):
         identity = ProductIdentity(
             product_name_en="",
             product_name_ar="باراسيتامول 500 ملغ",
-            store_product_id="store-123",
+            product_key="store:store-123",
         )
         self.assertFalse(identity.is_valid())
 
@@ -39,7 +39,7 @@ class ProductIdentityTests(unittest.TestCase):
         identity = ProductIdentity(
             product_name_en="Paracetamol 500mg",
             product_name_ar="",
-            store_product_id="store-123",
+            product_key="store:store-123",
         )
         self.assertFalse(identity.is_valid())
 
@@ -48,7 +48,7 @@ class ProductIdentityTests(unittest.TestCase):
         identity = ProductIdentity(
             product_name_en="Paracetamol 500mg",
             product_name_ar="باراسيتامول 500 ملغ",
-            store_product_id="",
+            product_key="",
         )
         self.assertFalse(identity.is_valid())
 
@@ -57,7 +57,7 @@ class ProductIdentityTests(unittest.TestCase):
         identity = ProductIdentity(
             product_name_en="   ",
             product_name_ar="باراسيتامول 500 ملغ",
-            store_product_id="store-123",
+            product_key="store:store-123",
         )
         self.assertFalse(identity.is_valid())
 
@@ -85,7 +85,7 @@ class IdentityKeyTests(unittest.TestCase):
         key = identity_key(product)
         self.assertEqual(key.product_name_en, "Paracetamol 500mg")
         self.assertEqual(key.product_name_ar, "باراسيتامول 500 ملغ")
-        self.assertEqual(key.store_product_id, "store-123")
+        self.assertEqual(key.product_key, "store:store-123")
 
     def test_identity_key_strips_whitespace(self) -> None:
         """Whitespace is stripped from extracted fields."""
@@ -97,7 +97,7 @@ class IdentityKeyTests(unittest.TestCase):
         key = identity_key(product)
         self.assertEqual(key.product_name_en, "Paracetamol")
         self.assertEqual(key.product_name_ar, "باراسيتامول")
-        self.assertEqual(key.store_product_id, "store-123")
+        self.assertEqual(key.product_key, "store:store-123")
 
     def test_identity_key_handles_missing_fields(self) -> None:
         """Missing fields default to empty strings."""
@@ -105,7 +105,18 @@ class IdentityKeyTests(unittest.TestCase):
         key = identity_key(product)
         self.assertEqual(key.product_name_en, "")
         self.assertEqual(key.product_name_ar, "")
-        self.assertEqual(key.store_product_id, "")
+        self.assertEqual(key.product_key, "")
+
+    def test_identity_key_uses_product_id_when_store_product_id_missing(self) -> None:
+        """Product id is the fallback identity for products without store id."""
+        product = {
+            "productNameEn": "ABIMOL 300 MG 5 RECTAL SUPP.",
+            "productName": "ابيمول 300 مجم 5 لبوس",
+            "productId": 34,
+            "storeProductId": None,
+        }
+        key = identity_key(product)
+        self.assertEqual(key.product_key, "product:34")
 
 
 class DeduplicateProductsTests(unittest.TestCase):
@@ -208,6 +219,20 @@ class DeduplicateProductsTests(unittest.TestCase):
         names = [p["productNameEn"] for p in result]
         self.assertIn("Panadol", names)
         self.assertIn("Aspirin", names)
+
+    def test_deduplicator_keeps_products_with_product_id_only(self) -> None:
+        """Products with productId but no storeProductId are exported."""
+        products = [
+            {
+                "productId": 34,
+                "productNameEn": "ABIMOL 300 MG 5 RECTAL SUPP.",
+                "productName": "ابيمول 300 مجم 5 لبوس",
+                "storeProductId": None,
+            },
+        ]
+        result = deduplicate_products_to_list(products)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["productId"], 34)
 
     def test_deduplicator_preserves_order(self) -> None:
         """Deduplication preserves input order."""
