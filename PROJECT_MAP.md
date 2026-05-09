@@ -36,4 +36,4 @@
 - Done: fetch all API pages for each captured search request in input order.
 - Done: apply final deduplication before row normalization and output writing.
 - Done: apply `--limit` to the total final unique products.
-- Pending: verify `sale_price` values in CSV, XLSX, and TXT outputs.
+- Done: verify `sale_price` extraction and CSV, XLSX, and TXT output values.

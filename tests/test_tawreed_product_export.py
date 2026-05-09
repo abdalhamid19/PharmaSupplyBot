@@ -51,19 +51,35 @@ class TawreedProductExportTests(unittest.TestCase):
 
         self.assertEqual(rows, [ProductExportRow("بانادول", "Panadol", "123")])
 
+    def test_product_export_rows_extract_sale_price(self) -> None:
+        candidates = [
+            {
+                "productName": "بانادول",
+                "productNameEn": "Panadol",
+                "storeProductId": 123,
+                "salePrice": 42.5,
+            },
+        ]
+
+        rows = list(product_export_rows(candidates))
+
+        self.assertEqual(rows[0].sale_price, "42.5")
+
     def test_write_product_export_files_creates_all_requested_formats(self) -> None:
-        rows = [ProductExportRow("بانادول", "Panadol", "123")]
+        rows = [ProductExportRow("بانادول", "Panadol", "123", sale_price="42.5")]
 
         with TemporaryDirectory() as temp_dir:
             paths = write_product_export_files(rows, Path(temp_dir), "catalog")
             csv_rows = _read_csv_rows(paths["csv"])
             txt_lines = paths["txt"].read_text(encoding="utf-8").splitlines()
-            xlsx_header = _read_xlsx_header(paths["xlsx"])
+            xlsx_rows = _read_xlsx_rows(paths["xlsx"])
 
         self.assertEqual(set(paths.keys()), {"csv", "xlsx", "txt"})
         self.assertEqual(csv_rows[0], list(EXPORT_FIELDNAMES))
+        self.assertEqual(csv_rows[1][EXPORT_FIELDNAMES.index("sale_price")], "42.5")
         self.assertEqual(txt_lines[1].split("\t"), rows[0].values())
-        self.assertEqual(xlsx_header, EXPORT_FIELDNAMES)
+        self.assertEqual(xlsx_rows[0], EXPORT_FIELDNAMES)
+        self.assertEqual(xlsx_rows[1][EXPORT_FIELDNAMES.index("sale_price")], "42.5")
 
     def test_iter_all_product_candidates_pages_until_total_pages(self) -> None:
         page = _FakePage([_payload(2, "1"), _payload(2, "2")])
@@ -138,10 +154,10 @@ def _read_csv_rows(path: Path) -> list[list[str]]:
         return list(csv.reader(input_file))
 
 
-def _read_xlsx_header(path: Path) -> tuple[str, ...]:
+def _read_xlsx_rows(path: Path) -> list[tuple[Any, ...]]:
     workbook = load_workbook(path, read_only=True)
     try:
-        return next(workbook.active.iter_rows(values_only=True))
+        return list(workbook.active.iter_rows(values_only=True))
     finally:
         workbook.close()
 

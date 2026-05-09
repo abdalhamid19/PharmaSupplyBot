@@ -267,10 +267,17 @@ POST https://api.tawreed.io/rest/v2/product-search?sort=productName,asc&page={pa
 ## 💾 كيفية استخدام هذه البيانات
 
 ### في `export-products`
-يتم استخراج 3 حقول فقط:
+يتم استخراج الحقول التالية إلى CSV/XLSX/TXT:
 - `product_name_ar` ← `productName`
 - `product_name_en` ← `productNameEn`
 - `store_product_id` ← `storeProductId`
+- `product_id` ← `productId`
+- `available_quantity` ← `availableQuantity`
+- `sale_price` ← `salePrice`
+- `discount_percent` ← `discountPercent`
+- `currency` ← `currency`
+- `store_name` ← `storeName`
+- `supplier_name` ← `supplierName`
 
 ### في `--match-only`
 يتم استخراج جميع الحقول المذكورة أعلاه ودمجها مع:
@@ -289,7 +296,8 @@ POST https://api.tawreed.io/rest/v2/product-search?sort=productName,asc&page={pa
 ## 🚀 ملاحظات مهمة
 
 1. **التصفح**: يتم جلب البيانات صفحة تلو الأخرى بحجم محدد (افتراضيًا 100)
-2. **الفريدية**: يتم حذف التكرارات بناءً على `(productName, productNameEn, storeProductId)`
-3. **الخطأ**: إذا كانت `availableQuantity = 0`، فقد يكون المنتج غير متاح
-4. **الترتيب**: النتائج مرتبة حسب `productName` تصاعديًا
-5. **الرؤوس**: قد تحتاج بعض الطلبات إلى `Authorization` و `X-*` headers
+2. **نطاق التصدير**: يتم جلب الصفحات العامة ثم بحث `A-Z` ثم الحروف العربية
+3. **الفريدية**: يتم حذف التكرارات بناءً على `(productName, productNameEn, storeProductId)`
+4. **الخطأ**: إذا كانت `availableQuantity = 0`، فقد يكون المنتج غير متاح
+5. **الترتيب**: النتائج تحفظ بأولوية العام ثم الإنجليزي ثم العربي
+6. **الرؤوس**: قد تحتاج بعض الطلبات إلى `Authorization` و `X-*` headers
