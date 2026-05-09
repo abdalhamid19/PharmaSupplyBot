@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
 from playwright.sync_api import Page
 
+from .tawreed_product_export_searches import ProductSearchRequest
 from .tawreed_product_search import (
     PRODUCT_SEARCH_INPUT_SELECTOR,
     _search_response_pattern,
@@ -20,11 +24,47 @@ def capture_product_search_headers(page: Page) -> dict[str, str]:
         return {}
 
 
+def capture_product_search_request(page: Page, term: str) -> ProductSearchRequest:
+    """Return reusable Tawreed product-search metadata for one search term."""
+    try:
+        with page.expect_response(_search_response_pattern(), timeout=5000) as response:
+            _submit_search(page, term)
+        request = response.value.request
+        return ProductSearchRequest(
+            term=term,
+            headers=_reusable_headers(request.headers),
+            body=_request_body(request),
+        )
+    except Exception as error:
+        raise RuntimeError(_capture_error_message(term)) from error
+
+
 def _submit_blank_search(page: Page) -> None:
+    _submit_search(page, "")
+
+
+def _submit_search(page: Page, term: str) -> None:
     search = page.locator(PRODUCT_SEARCH_INPUT_SELECTOR).first
     search.click()
     search.fill("")
+    if term:
+        search.fill(term)
     search.press("Enter")
+
+
+def _request_body(request: Any) -> dict[str, Any]:
+    try:
+        body = request.post_data_json
+    except Exception:
+        body = json.loads(request.post_data or "{}")
+    if isinstance(body, dict):
+        return body
+    raise RuntimeError("Captured Tawreed product-search request body is not an object")
+
+
+def _capture_error_message(term: str) -> str:
+    label = "general export search" if not term else f"export search '{term}'"
+    return f"Could not capture Tawreed product-search request for {label}"
 
 
 def _reusable_headers(headers: dict[str, str]) -> dict[str, str]:

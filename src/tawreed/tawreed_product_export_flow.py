@@ -11,11 +11,18 @@ from .tawreed_artifacts import dump_artifacts
 from .tawreed_product_export_api import (
     DEFAULT_EXPORT_PAGE_SIZE,
     DEFAULT_EXPORT_STEM,
-    iter_all_product_candidates,
+)
+from .tawreed_product_export_collection import (
+    collect_unique_product_candidates,
+    product_export_collection_summary,
 )
 from .tawreed_product_export_files import write_product_export_files
-from .tawreed_product_export_headers import capture_product_search_headers
+from .tawreed_product_export_headers import capture_product_search_request
 from .tawreed_product_export_rows import product_export_rows
+from .tawreed_product_export_searches import (
+    EXPORT_SEARCH_GROUPS,
+    iter_product_search_candidates,
+)
 from .tawreed_session import close_browser, close_context, open_order_page
 
 
@@ -60,9 +67,19 @@ def _run_export_session(
 
 def _export_from_page(bot, page, output_dir, page_size, limit, stem) -> dict[str, Path]:
     bot._prepare_order_page(page)
-    headers = capture_product_search_headers(page)
-    candidates = iter_all_product_candidates(page, page_size, limit, headers)
-    return write_product_export_files(product_export_rows(candidates), output_dir, stem)
+    searches = _captured_search_requests(bot, page)
+    candidates = iter_product_search_candidates(page, searches, page_size)
+    collection = collect_unique_product_candidates(candidates, limit)
+    bot.log(product_export_collection_summary(collection))
+    rows = product_export_rows(collection.candidates)
+    return write_product_export_files(rows, output_dir, stem)
+
+
+def _captured_search_requests(bot, page):
+    for label, terms in EXPORT_SEARCH_GROUPS:
+        bot.log(f"Exporting Tawreed products: {label}")
+        for term in terms:
+            yield capture_product_search_request(page, term)
 
 
 def _log_export_paths(bot, paths: dict[str, Path]) -> None:
