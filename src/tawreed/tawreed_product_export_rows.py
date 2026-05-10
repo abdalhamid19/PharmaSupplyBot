@@ -81,10 +81,18 @@ def _row_from_candidate(candidate: dict[str, Any]) -> ProductExportRow:
         product_id=str(candidate.get("productId") or "").strip(),
         available_quantity=str(candidate.get("availableQuantity")
                                 or "").strip(),
-        sale_price=str(candidate.get("salePrice") or "").strip(),
+        sale_price=_field_value(candidate, "retailPrice", "salePrice"),
         discount_percent=str(candidate.get("discountPercent")
                               or "").strip(),
         currency=str(candidate.get("currency") or "").strip(),
         store_name=str(candidate.get("storeName") or "").strip(),
         supplier_name=str(candidate.get("supplierName") or "").strip(),
     )
+
+
+def _field_value(candidate: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = candidate.get(key)
+        if value not in (None, ""):
+            return str(value).strip()
+    return ""

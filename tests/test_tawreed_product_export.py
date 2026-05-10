@@ -65,6 +65,22 @@ class TawreedProductExportTests(unittest.TestCase):
 
         self.assertEqual(rows[0].sale_price, "42.5")
 
+    def test_product_export_rows_prefers_retail_price_for_sale_price(self) -> None:
+        candidates = [
+            {
+                "productName": "بانادول ادفانس 500 مجم 48 اقراص",
+                "productNameEn": "PANADOL ADVANCE 500 MG 48 F.C.TABS.",
+                "storeProductId": 1653038,
+                "salePrice": 64.39,
+                "retailPrice": 92.0,
+                "discountPercent": 30.01,
+            },
+        ]
+
+        rows = list(product_export_rows(candidates))
+
+        self.assertEqual(rows[0].sale_price, "92.0")
+
     def test_product_export_rows_keep_product_id_without_store_id(self) -> None:
         candidates = [
             {
