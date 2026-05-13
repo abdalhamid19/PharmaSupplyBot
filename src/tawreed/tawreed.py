@@ -22,6 +22,10 @@ from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
 from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
 from .tawreed_match_only_summary import append_match_only_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
+from .tawreed_order_run_artifacts import (
+    append_order_ai_trace_artifacts,
+    append_order_item_artifacts,
+)
 from .tawreed_products_flow import add_item_from_products_page
 from .tawreed_search_logic import require_product_match
 from .tawreed_session import (
@@ -115,8 +119,9 @@ class TawreedBot:
         """Append live-order AI trace and manual-review rows."""
         row = self._order_ai_trace_row(item, outcome)
         append_csv_artifact(self.profile_key, "matching_trace", [row])
-        if outcome.manual_review:
-            append_csv_artifact(self.profile_key, "manual_review", [row])
+        append_order_ai_trace_artifacts(
+            self.profile_key, item, outcome, self.summary_label_suffix
+        )
 
     def _order_ai_trace_row(self, item: Item, outcome) -> dict[str, object]:
         """Return one trace-compatible row for the AI order decision."""
@@ -633,6 +638,7 @@ class TawreedBot:
         append_order_result_summary(
             self.profile_key, item, summary, label_suffix=self.summary_label_suffix
         )
+        self._record_order_run_artifacts(item, summary)
 
     def _record_match_only_summary(
         self,
@@ -652,6 +658,18 @@ class TawreedBot:
             summary,
             self.last_match_decision,
             label_suffix=self.summary_label_suffix,
+        )
+        self._record_order_run_artifacts(item, summary)
+
+    def _record_order_run_artifacts(self, item: Item, summary: OrderItemSummary) -> None:
+        """Append per-item summary and manual-review artifacts for this run."""
+        append_order_item_artifacts(
+            self.profile_key,
+            item,
+            summary,
+            self.last_match_decision,
+            self.last_order_ai_outcome,
+            self.summary_label_suffix,
         )
 
     def _build_item_summary(

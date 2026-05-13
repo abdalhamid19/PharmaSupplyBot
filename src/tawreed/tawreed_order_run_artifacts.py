@@ -1,0 +1,77 @@
+"""Order run summary, AI trace, and manual-review artifact writers."""
+from __future__ import annotations
+
+from ..core.order_ai_trace_rows import order_ai_trace_rows
+from ..core.order_run_artifact_rows import (
+    manual_review_required,
+    manual_review_row,
+    order_item_summary_row,
+    text_block,
+)
+from ..core.utils.excel import Item
+from .tawreed_artifacts import append_csv_artifact, append_text_artifact
+from .tawreed_match_logs import OrderItemSummary
+
+
+def append_order_ai_trace_artifacts(
+    profile_key: str, item: Item, outcome, label_suffix: str | None = None
+) -> None:
+    """Append detailed AI trace rows to CSV and TXT artifacts."""
+    rows = order_ai_trace_rows(item, outcome)
+    if not rows:
+        return
+    append_csv_artifact(profile_key, "order_ai_trace", rows, label_suffix)
+    append_text_artifact(profile_key, "order_ai_trace", _text_rows("ai_trace", rows))
+
+
+def append_order_item_artifacts(
+    profile_key: str,
+    item: Item,
+    summary: OrderItemSummary,
+    decision,
+    outcome,
+    label_suffix: str | None = None,
+) -> None:
+    """Append one item summary row and optional manual-review row."""
+    row = order_item_summary_row(item, summary, decision, outcome)
+    append_csv_artifact(profile_key, "order_item_summary", [row], label_suffix)
+    append_text_artifact(profile_key, "order_item_summary", text_block("item", row))
+    append_csv_artifact(profile_key, "order_ai_trace", [_final_trace_row(row)], label_suffix)
+    append_text_artifact(
+        profile_key, "order_ai_trace", text_block("item_final", _final_trace_row(row))
+    )
+    if manual_review_required(summary.status, outcome):
+        append_manual_review_artifacts(profile_key, item, summary, decision, outcome, label_suffix)
+
+
+def append_manual_review_artifacts(
+    profile_key: str,
+    item: Item,
+    summary: OrderItemSummary,
+    decision,
+    outcome,
+    label_suffix: str | None = None,
+) -> None:
+    """Append one manual-review row to CSV and TXT artifacts."""
+    row = manual_review_row(item, summary, decision, outcome)
+    append_csv_artifact(profile_key, "manual_review", [row], label_suffix)
+    append_text_artifact(profile_key, "manual_review", text_block("manual_review", row))
+
+
+def _final_trace_row(row: dict[str, object]) -> dict[str, object]:
+    return {
+        "phase": "item_final",
+        "item_code": row["item_code"],
+        "item_name": row["item_name"],
+        "ai_status": row["ai_status"],
+        "result": row["status"],
+        "confidence": row["ai_confidence"],
+        "model_used": row["ai_model"],
+        "provider_used": row["ai_provider"],
+        "reason": row["reason"],
+        "manual_review_required": row["manual_review_required"],
+    }
+
+
+def _text_rows(title: str, rows: list[dict[str, object]]) -> str:
+    return "".join(text_block(title, row) for row in rows)
