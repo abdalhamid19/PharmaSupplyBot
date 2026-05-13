@@ -67,6 +67,7 @@ def _build_bot_options(options: dict[str, Any], worker_id: int) -> dict[str, Any
         "fast_search": options.get("fast_search", False),
         "summary_label_suffix": f"worker_{worker_id}",
         "match_only": options.get("match_only", False),
+        "order_ai_settings": options.get("order_ai_settings"),
     }
 
 

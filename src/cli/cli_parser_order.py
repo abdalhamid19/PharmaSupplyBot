@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 
+from .cli_parser_ai import add_order_ai_arguments
 from .cli_parser_shared import add_common_arguments, add_excel_argument
 
 
@@ -16,6 +17,7 @@ def build_order_parser(subparsers: argparse._SubParsersAction) -> None:
     add_common_arguments(order_parser)
     add_excel_argument(order_parser, "order", "data/input/order_items/")
     _add_order_runtime_arguments(order_parser)
+    add_order_ai_arguments(order_parser)
     _add_order_filter_arguments(order_parser)
 
 
@@ -64,6 +66,7 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
         default=None,
         help="Parallel worker processes for items within one profile (overrides config)",
     )
+
 
 
 def _add_order_filter_arguments(argument_parser: argparse.ArgumentParser) -> None:

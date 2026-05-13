@@ -97,6 +97,29 @@ class CliParserTests(unittest.TestCase):
 
         self.assertTrue(args.match_only)
 
+    def test_order_accepts_ai_matching_flags(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--ai",
+                "--provider",
+                "rotation",
+                "--review-model",
+                "rotation",
+                "--ai-accept-confidence",
+                "0.93",
+            ]
+        )
+
+        self.assertTrue(args.ai)
+        self.assertEqual(args.provider, "rotation")
+        self.assertEqual(args.review_model, "rotation")
+        self.assertEqual(args.ai_accept_confidence, 0.93)
+
     def test_order_accepts_prevented_items_excel_override(self) -> None:
         args = build_parser().parse_args(
             [

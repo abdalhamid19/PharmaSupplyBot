@@ -13,9 +13,8 @@ def build_bot(
     app_config: AppConfig,
     profile_key: str,
     profile: ProfileConfig,
-    debug_browser: bool = False, stop_flag_path: Path | None = None,
-    fast_search: bool = False, summary_label_suffix: str | None = None,
-    match_only: bool = False,
+    debug_browser: bool = False,
+    **options,
 ) -> TawreedBot:
     """Create a Tawreed bot instance for one profile."""
     return TawreedBot(
@@ -24,10 +23,7 @@ def build_bot(
         profile,
         state_path(profile_key),
         debug_browser=debug_browser,
-        stop_flag_path=stop_flag_path,
-        fast_search=fast_search,
-        summary_label_suffix=summary_label_suffix,
-        match_only=match_only,
+        **options,
     )
 
 

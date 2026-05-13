@@ -12,6 +12,7 @@ from typing import Any, Iterable
 
 from ..core.artifact_run import artifact_run, current_artifact_run
 from ..core.config.config_models import AppConfig, ProfileConfig
+from ..core.drug_matching.config import load_env
 from ..core.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     filter_prevented_order_items,
@@ -29,11 +30,13 @@ from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_match_only_summary import MATCH_ONLY_SUMMARY_LABEL
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import build_bot, invalid_session_exit, require_state_file
+from .cli_order_ai import order_ai_settings
 from .item_worker_pool import report_worker_results, resolve_item_workers
 
 
 def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Place orders from Excel for the selected profiles."""
+    load_env()
     _apply_order_overrides(app_config, args)
     profiles = app_config.profiles_to_run(
         profile=args.profile, all_profiles=args.all_profiles
@@ -308,6 +311,8 @@ def _order_bot(
         debug_browser=bool(getattr(args, "debug_browser", False)),
         stop_flag_path=Path(stop_flag) if stop_flag else None,
         fast_search=bool(getattr(args, "fast_search", False)),
+        match_only=_match_only(args),
+        order_ai_settings=order_ai_settings(args),
     )
 
 
@@ -378,6 +383,7 @@ def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "artifact_command": run.command if run else "",
         "artifact_run_id": run.run_id if run else "",
+        "order_ai_settings": order_ai_settings(args),
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": _match_only(args),
