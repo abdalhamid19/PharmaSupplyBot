@@ -10,6 +10,7 @@ from .streamlit_auth import render_auth_tab
 from .streamlit_order import render_order_tab
 from .streamlit_overview import render_overview
 from .streamlit_prevented_items import render_prevented_items_tab
+from .streamlit_product_matching import render_product_matching_tab
 from .streamlit_remove_cart import render_remove_cart_tab
 from .streamlit_results import render_results_tab
 from .streamlit_shared import APP_TITLE, FALLBACK_CONFIG_PATH, inject_custom_css, resolved_streamlit_config_path, sidebar_config_path
@@ -75,18 +76,32 @@ def first_profile_key(app_config) -> str | None:
 
 def render_main_tabs(app_config, default_profile: str | None, config_path) -> None:
     """Render the main Streamlit tabs."""
-    overview_tab, auth_tab, order_tab, prevented_items_tab, remove_cart_tab, results_tab = st.tabs(
-        ["Overview", "Auth", "Order", "Prevented items", "Remove cart items", "Results"]
+    tabs = st.tabs(
+        _main_tab_labels()
     )
+    (
+        overview_tab, auth_tab, order_tab, matching_tab,
+        prevented_items_tab, remove_cart_tab, results_tab,
+    ) = tabs
     with overview_tab:
         render_overview(app_config)
     with auth_tab:
         render_auth_tab(app_config, default_profile, config_path)
     with order_tab:
         render_order_tab(app_config, default_profile, config_path)
+    with matching_tab:
+        render_product_matching_tab(app_config, default_profile, config_path)
     with prevented_items_tab:
         render_prevented_items_tab()
     with remove_cart_tab:
         render_remove_cart_tab(app_config, default_profile, config_path)
     with results_tab:
         render_results_tab(default_profile)
+
+
+def _main_tab_labels() -> list[str]:
+    """Return Streamlit main tab labels."""
+    return [
+        "Overview", "Auth", "Order", "Product Matching",
+        "Prevented items", "Remove cart items", "Results",
+    ]
