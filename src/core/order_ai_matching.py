@@ -1,6 +1,7 @@
 """AI-assisted live order matching decisions."""
 from __future__ import annotations
 import asyncio
+import concurrent.futures
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -52,7 +53,7 @@ class OrderAiDecisionService:
             return OrderAiOutcome(decision, "ai_disabled", "AI disabled")
         if not _has_api_key(self._settings.api_config):
             return self._no_key_outcome(decision)
-        return asyncio.run(self._resolve_async(item, decision))
+        return _run_async(self._resolve_async(item, decision))
 
     async def _resolve_async(self, item: Item, decision: MatchDecision) -> OrderAiOutcome:
         verifier = self._verifier_factory(
@@ -61,7 +62,7 @@ class OrderAiDecisionService:
         try:
             return await resolve_order_ai(self._settings, verifier, item, decision)
         finally:
-            await verifier.close()
+            await _close_verifier(verifier)
 
     def _no_key_outcome(self, decision: MatchDecision) -> OrderAiOutcome:
         if decision.best_match:
@@ -71,3 +72,22 @@ class OrderAiDecisionService:
 
 def _has_api_key(config: APIConfig) -> bool:
     return bool(config.api_key or config.api_keys or config.attempt_plan)
+
+
+def _run_async(coro):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(asyncio.run, coro).result()
+
+
+async def _close_verifier(verifier) -> None:
+    close = getattr(verifier, "close", None)
+    if close:
+        await close()
+        return
+    session = getattr(verifier, "_session", None)
+    if session:
+        await session.close()

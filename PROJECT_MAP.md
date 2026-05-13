@@ -12,17 +12,24 @@
 ## [SYSTEM_FLOW]
 
 - `run.py order` keeps the live Tawreed search flow: it searches Tawreed per item,
-  evaluates candidates through `src/core/product_matching.py`, and writes order or
-  match-only summaries under `artifacts/<profile>/`.
+  evaluates candidates through `src/core/product_matching.py`, then can optionally
+  run active AI verify/search/review with strict thresholds via `--ai`.
+- Order AI is opt-in. Accepted AI decisions can correct/select the active match;
+  low-confidence or review-rejected AI decisions are blocked and written to
+  `manual_review`.
 - `run.py export-products` exports Tawreed catalog rows into
-  `artifacts/<profile>/tawreed_products.csv|xlsx|txt`.
+  `artifacts/export-products/<profile>/<run_id>/`.
 - `run.py match-products` matches an inventory Excel/CSV against an exported
-  Tawreed CSV. `--profile wardany` resolves to
-  `artifacts/wardany/tawreed_products.csv`; `--tawreed-csv` overrides it.
+  Tawreed CSV. `--profile wardany` resolves to the newest exported Tawreed
+  catalog from the new layout or legacy fallback; `--tawreed-csv` overrides it.
 - Standalone product matching runs algorithmic matching first, then optional AI
   verification, AI search, and AI review when API keys are configured.
 - Streamlit exposes the same product matching command in the `Product Matching`
   tab and runs it through the existing isolated subprocess runner.
+- Streamlit Order exposes the same order AI flags and browses command/profile/run
+  artifact folders.
+- New command outputs use `artifacts/<command>/<profile>/<run_id>/` with
+  timestamped files. Old flat outputs were moved under `artifacts/legacy/...`.
 
 ## [ARCHITECTURE]
 
@@ -32,6 +39,9 @@
 - Shared live-search scoring stays in `src/core/product_matching.py`.
 - Component parsing, indexed CSV matching, AI verification/search/review, model
   rotation, and detailed trace logging stay in `src/core/drug_matching`.
+- Live-order AI decision policy stays in `src/core/order_ai_matching.py` and
+  `src/core/order_ai_flow.py`; Tawreed only invokes it and writes trace rows.
+- Run-scoped artifact paths stay in `src/core/artifact_run.py`.
 - Shared candidate-level trace rows and async logging setup stay in
   `src/core/matching_trace.py`.
 
@@ -41,7 +51,7 @@
 
 ## [VALIDATION]
 
-- `.venv/bin/python -m unittest discover -s tests -q`: 214 passed.
+- `.venv/bin/python -m unittest discover -s tests -q`: 230 passed.
 - `.venv/bin/python tools/rule_audit.py`: rule_audit_ok.
 - Smoke run succeeded:
   `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke.csv`.

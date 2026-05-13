@@ -397,8 +397,8 @@ class MatchPipeline:
             await self.run_ai_verification()
             await self.run_ai_search_unmatched()
             await self.run_ai_review()
-        self.save(output_path)
-        self.save_manual_review()
+        saved_path = self.save(output_path)
+        self.save_manual_review(_manual_review_path(saved_path))
         self.print_stats()
         return self._results
 
@@ -419,3 +419,9 @@ def _read_table(path: str | Path) -> pd.DataFrame:
     if source_path.suffix.lower() in {".xlsx", ".xlsm", ".xls"}:
         return pd.read_excel(source_path, dtype=str)
     return pd.read_csv(source_path, encoding="utf-8-sig", dtype=str)
+
+
+def _manual_review_path(output_path: str) -> str:
+    """Return a manual-review path next to the main output CSV."""
+    path = Path(output_path)
+    return str(path.with_name(f"{path.stem}_manual_review{path.suffix}"))

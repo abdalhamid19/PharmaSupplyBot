@@ -106,7 +106,9 @@ python3 run.py order --excel "data/input/order_items/shortage_report_total_20260
 
 ### 5. تشغيل مطابقة الأصناف فقط بدون إضافة للسلة
 
-استخدم `--match-only` لتشغيل خوارزمية المطابقة وتسجيل النتائج في ملف مستقل هو `artifacts/<profile>/match_only_summary.csv` بدون الضغط على زر السلة أو إضافة أي صنف. هذا الوضع مفيد لمراجعة وتحسين خوارزمية التطابق بأمان.
+استخدم `--match-only` لتشغيل خوارزمية المطابقة وتسجيل النتائج داخل
+`artifacts/order/<profile>/<run_id>/` بدون الضغط على زر السلة أو إضافة أي صنف.
+هذا الوضع مفيد لمراجعة وتحسين خوارزمية التطابق بأمان.
 
 ملف `match_only_summary.csv` يحتوي صفًا لكل مرشح تم تقييمه، ويتضمن بيانات Tawreed/API المهمة مثل `productId` و`storeProductId` و`productNameEn` و`productName` و`availableQuantity` و`productsCount` و`storeName` و`discountPercent` و`salePrice` و`retailPrice`، بالإضافة إلى درجات التطابق وسبب القبول/الرفض ونسخة JSON مضغوطة من المرشح داخل `api_raw_candidate_json`.
 
@@ -118,6 +120,16 @@ py run.py order --excel "data/input/order_items/shortage_report_total_20260422.x
 Linux / macOS (bash):
 ```bash
 python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --match-only
+```
+
+يمكن تفعيل AI Matching داخل order اختيارياً. عند القبول بثقة كافية يمكن للـ AI
+تأكيد أو اختيار match نشط، أما الثقة المنخفضة أو رفض review فيذهب إلى
+`manual_review` ولا يدخل السلة:
+
+```bash
+python3 run.py order --profile wardany \
+  --excel "data/input/order_items/shortage_report_total_20260502.xlsx" \
+  --limit 1 --match-only --ai --provider rotation --review-model rotation
 ```
 
 ### 6. تشغيل كل الصيدليات المعرفة في `config.yaml`
@@ -176,11 +188,11 @@ py run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wa
 ### 10. تصدير كل أصناف Tawreed
 
 استخدم `export-products` لسحب كتالوج أصناف Tawreed المتاح للحساب المحفوظ في
-`state/<profile>.json`. ينشئ الأمر ثلاثة ملفات بنفس البيانات داخل مجلد الإخراج:
+`state/<profile>.json`. ينشئ الأمر ثلاثة ملفات بنفس البيانات داخل مجلد تشغيل:
 
-- `tawreed_products.csv`
-- `tawreed_products.xlsx`
-- `tawreed_products.txt`
+- `artifacts/export-products/<profile>/<run_id>/tawreed_products_<run_id>.csv`
+- `artifacts/export-products/<profile>/<run_id>/tawreed_products_<run_id>.xlsx`
+- `artifacts/export-products/<profile>/<run_id>/tawreed_products_<run_id>.txt`
 
 الأعمدة الناتجة ثابتة: `product_name_ar` و`product_name_en` و`store_product_id`.
 يمكن استخدام `--limit` لاختبار عدد صغير أولًا، واتركه `0` لتصدير كل الأصناف.
@@ -197,8 +209,8 @@ python3 run.py export-products --profile wardany --output-dir "artifacts/{profil
 
 ### 11. مطابقة ملف أصناف مع كتالوج Tawreed المصدر
 
-استخدم `match-products` لمطابقة ملف مخزون/نواقص مع أحدث ملف
-`artifacts/<profile>/tawreed_products.csv`. يعمل الأمر بالخوارزمية فقط عند
+استخدم `match-products` لمطابقة ملف مخزون/نواقص مع أحدث Tawreed catalog في
+`artifacts/export-products/<profile>/...` أو legacy fallback. يعمل الأمر بالخوارزمية فقط عند
 استخدام `--no-ai`، أو يحاول مراحل AI عند توفر مفاتيح API في `.env`.
 
 Linux / macOS (bash):
@@ -216,7 +228,19 @@ py run.py match-products --profile wardany `
 ```
 
 ينشئ الأمر ملف نتائج CSV وملف manual review، وعند تفعيل `--trace` يكتب trace
-تفصيليًا داخل `artifacts/matching/trace/`.
+تفصيليًا داخل `artifacts/match-products/<profile>/<run_id>/`.
+
+## تنظيم artifacts
+
+كل أمر جديد يكتب داخل مجلد تشغيل مستقل:
+
+- `artifacts/order/<profile>/<run_id>/`
+- `artifacts/match-products/<profile>/<run_id>/`
+- `artifacts/export-products/<profile>/<run_id>/`
+- `artifacts/remove-cart/<profile>/<run_id>/`
+- `artifacts/run-control/<command>/`
+
+الملفات القديمة نُقلت إلى `artifacts/legacy/...` بدل حذفها.
 
 ### 12. تشغيل واجهة Streamlit
 

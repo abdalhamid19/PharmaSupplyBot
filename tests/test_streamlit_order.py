@@ -107,7 +107,10 @@ class StreamlitOrderTests(unittest.TestCase):
         self.assertEqual(command[command.index("--ai-accept-confidence") + 1], "0.93")
 
     def test_order_run_summary_path_uses_match_only_summary(self) -> None:
-        path = order_run_summary_csv_path("wardany", {"match_only": True})
+        with TemporaryDirectory() as temp_dir:
+            artifacts = Path(temp_dir) / "artifacts"
+            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
+                path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, Path("artifacts") / "wardany" / "match_only_summary.csv")
 
