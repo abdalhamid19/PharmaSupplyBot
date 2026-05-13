@@ -37,6 +37,27 @@ class OrderRunArtifactsTests(unittest.TestCase):
             self.assertEqual(rows[0]["ai_status"], "ai_verified")
             self.assertEqual(rows[0]["ai_verified"], "True")
 
+    def test_ai_trace_writes_api_attempt_columns(self) -> None:
+        """AI trace artifacts include provider attempt metadata."""
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            with artifact_run("order", "wardany", "20260513_2030", root):
+                append_order_ai_trace_artifacts(
+                    "wardany", self._item(), self._ai_outcome_with_attempts()
+                )
+            rows = self._csv_rows(
+                root
+                / "order"
+                / "wardany"
+                / "20260513_2030"
+                / "order_ai_trace_20260513_2030.csv"
+            )
+
+        attempt = next(row for row in rows if row["phase"] == "api_attempt_verify")
+        self.assertEqual(attempt["provider"], "groq")
+        self.assertEqual(attempt["model"], "openai/gpt-oss-120b")
+        self.assertEqual(attempt["status"], "429")
+
     def test_manual_review_is_written_for_no_results(self) -> None:
         """No-results item summaries create manual-review artifacts."""
         with TemporaryDirectory() as temp_dir:
@@ -67,6 +88,28 @@ class OrderRunArtifactsTests(unittest.TestCase):
         return OrderAiOutcome(
             self._decision(), "ai_verified", "ok", 0.96,
             verify_result={"reason": "ok", "confidence": 0.96, "model_used": "m1"},
+        )
+
+    def _ai_outcome_with_attempts(self) -> OrderAiOutcome:
+        return OrderAiOutcome(
+            self._decision(),
+            "ai_verified",
+            "ok",
+            0.96,
+            verify_result={
+                "reason": "ok",
+                "confidence": 0.96,
+                "model_used": "m1",
+                "_api_attempts": [
+                    {
+                        "attempt": 1,
+                        "provider": "groq",
+                        "model": "openai/gpt-oss-120b",
+                        "status": 429,
+                        "decision": "rate_limited",
+                    }
+                ],
+            },
         )
 
     @staticmethod

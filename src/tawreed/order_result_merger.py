@@ -56,8 +56,18 @@ def _merge_fieldnames(
     if not expected:
         return current
     if expected != current:
-        raise ValueError(f"Worker summary schema mismatch in {path}")
+        return _union_fieldnames(expected, current)
     return expected
+
+
+def _union_fieldnames(expected: list[str], current: list[str]) -> list[str]:
+    merged = list(expected)
+    seen = set(merged)
+    for field in current:
+        if field not in seen:
+            merged.append(field)
+            seen.add(field)
+    return merged
 def _worker_sort_key(path: Path) -> tuple[int, str]:
     match = _WORKER_RE.search(path.name)
     return (int(match.group(1)) if match else 10**9, path.name)

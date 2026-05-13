@@ -48,12 +48,35 @@ class MergeOrderWorkerArtifactsTests(unittest.TestCase):
         )
         self.assertFalse(list(self.artifacts_dir.glob("order_ai_trace_worker_*.*")))
 
+    def test_merges_worker_partitions_with_union_schema(self) -> None:
+        """Worker CSV files can contain different AI attempt metadata columns."""
+        self._write_rows(
+            "order_ai_trace_worker_0.csv",
+            [{"phase": "ai_verify", "provider": "groq"}],
+        )
+        self._write_rows(
+            "order_ai_trace_worker_1.csv",
+            [{"phase": "api_attempt_review", "model": "m1", "error_code": "429"}],
+        )
+
+        merge_order_worker_artifacts("wardany", ("order_ai_trace",))
+
+        rows = self._read_csv("order_ai_trace.csv")
+        self.assertEqual(rows[0]["provider"], "groq")
+        self.assertEqual(rows[0]["model"], "")
+        self.assertEqual(rows[1]["model"], "m1")
+        self.assertEqual(rows[1]["error_code"], "429")
+
     def _write_csv(self, name: str, phase: str) -> None:
+        self._write_rows(name, [{"phase": phase}])
+
+    def _write_rows(self, name: str, rows: list[dict[str, str]]) -> None:
         path = self.artifacts_dir / name
         with path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["phase"])
+            fieldnames = list(rows[0])
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerow({"phase": phase})
+            writer.writerows(rows)
 
     def _read_csv(self, name: str) -> list[dict[str, str]]:
         path = self.artifacts_dir / name
