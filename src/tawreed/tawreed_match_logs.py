@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..core.matching_trace import decision_trace_rows
 from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_artifacts import (
@@ -46,7 +47,7 @@ def write_match_log(bot, item: Item, decision: MatchDecision) -> None:
         match_log_section_separator(item) + log_content,
     )
     append_csv_artifact(
-        bot.profile_key, "match_log_all", match_log_csv_rows(item, decision)
+        bot.profile_key, "matching_trace", decision_trace_rows(item, decision)
     )
 
 

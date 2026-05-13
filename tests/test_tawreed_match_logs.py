@@ -11,6 +11,7 @@ from src.core.utils.excel import Item
 from src.tawreed.tawreed_match_logs import (
     OrderItemSummary,
     append_order_result_summary,
+    write_match_log,
     should_write_detailed_match_log,
 )
 from src.tawreed.tawreed_match_only_rows import match_only_summary_rows
@@ -141,6 +142,24 @@ class TawreedMatchLogsTests(unittest.TestCase):
         )
 
         self.assertTrue(should_write_detailed_match_log(decision))
+
+    def test_write_match_log_uses_unified_matching_trace_csv(self) -> None:
+        item = Item(code="123", name="Panadol Extra", qty=2)
+        decision = MatchDecision(
+            best_match=None,
+            diagnostics=[],
+            final_reason="No search candidates were returned.",
+        )
+        bot = type("Bot", (), {"profile_key": "wardany"})()
+
+        with (
+            patch("src.tawreed.tawreed_match_logs.write_text_artifact"),
+            patch("src.tawreed.tawreed_match_logs.append_text_artifact"),
+            patch("src.tawreed.tawreed_match_logs.append_csv_artifact") as append_csv,
+        ):
+            write_match_log(bot, item, decision)
+
+        self.assertEqual(append_csv.call_args.args[1], "matching_trace")
 
 
 def _accepted_decision(candidate: dict[str, object]) -> MatchDecision:
