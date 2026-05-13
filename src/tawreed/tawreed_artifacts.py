@@ -33,9 +33,14 @@ def write_text_artifact(profile_key: str, label: str, content: str) -> Path:
     return artifact_path
 
 
-def append_text_artifact(profile_key: str, label: str, content: str) -> Path:
+def append_text_artifact(
+    profile_key: str,
+    label: str,
+    content: str,
+    label_suffix: str | None = None,
+) -> Path:
     """Append plain-text diagnostic content to a profile artifact."""
-    artifact_path = _artifact_path(profile_key, label, None, ".txt")
+    artifact_path = _artifact_path(profile_key, label, label_suffix, ".txt")
     with artifact_path.open("a", encoding="utf-8") as artifact_file:
         artifact_file.write(content)
     return artifact_path

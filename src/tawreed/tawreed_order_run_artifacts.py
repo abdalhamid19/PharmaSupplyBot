@@ -21,7 +21,9 @@ def append_order_ai_trace_artifacts(
     if not rows:
         return
     append_csv_artifact(profile_key, "order_ai_trace", rows, label_suffix)
-    append_text_artifact(profile_key, "order_ai_trace", _text_rows("ai_trace", rows))
+    append_text_artifact(
+        profile_key, "order_ai_trace", _text_rows("ai_trace", rows), label_suffix
+    )
 
 
 def append_order_item_artifacts(
@@ -34,12 +36,8 @@ def append_order_item_artifacts(
 ) -> None:
     """Append one item summary row and optional manual-review row."""
     row = order_item_summary_row(item, summary, decision, outcome)
-    append_csv_artifact(profile_key, "order_item_summary", [row], label_suffix)
-    append_text_artifact(profile_key, "order_item_summary", text_block("item", row))
-    append_csv_artifact(profile_key, "order_ai_trace", [_final_trace_row(row)], label_suffix)
-    append_text_artifact(
-        profile_key, "order_ai_trace", text_block("item_final", _final_trace_row(row))
-    )
+    _append_item_summary_row(profile_key, row, label_suffix)
+    _append_final_trace_row(profile_key, row, label_suffix)
     if manual_review_required(summary.status, outcome):
         append_manual_review_artifacts(profile_key, item, summary, decision, outcome, label_suffix)
 
@@ -55,7 +53,9 @@ def append_manual_review_artifacts(
     """Append one manual-review row to CSV and TXT artifacts."""
     row = manual_review_row(item, summary, decision, outcome)
     append_csv_artifact(profile_key, "manual_review", [row], label_suffix)
-    append_text_artifact(profile_key, "manual_review", text_block("manual_review", row))
+    append_text_artifact(
+        profile_key, "manual_review", text_block("manual_review", row), label_suffix
+    )
 
 
 def _final_trace_row(row: dict[str, object]) -> dict[str, object]:
@@ -71,6 +71,25 @@ def _final_trace_row(row: dict[str, object]) -> dict[str, object]:
         "reason": row["reason"],
         "manual_review_required": row["manual_review_required"],
     }
+
+
+def _append_item_summary_row(
+    profile_key: str, row: dict[str, object], label_suffix: str | None
+) -> None:
+    append_csv_artifact(profile_key, "order_item_summary", [row], label_suffix)
+    append_text_artifact(
+        profile_key, "order_item_summary", text_block("item", row), label_suffix
+    )
+
+
+def _append_final_trace_row(
+    profile_key: str, row: dict[str, object], label_suffix: str | None
+) -> None:
+    final_row = _final_trace_row(row)
+    append_csv_artifact(profile_key, "order_ai_trace", [final_row], label_suffix)
+    append_text_artifact(
+        profile_key, "order_ai_trace", text_block("item_final", final_row), label_suffix
+    )
 
 
 def _text_rows(title: str, rows: list[dict[str, object]]) -> str:

@@ -247,11 +247,15 @@ class CliCommandsTests(unittest.TestCase):
                 return_value={"status": "ok"},
             ),
             patch("src.cli.cli_order.merge_worker_summaries") as merge,
+            patch("src.cli.cli_order.merge_order_worker_artifacts") as merge_order,
             patch("src.cli.cli_order.report_worker_results") as report,
         ):
             run_parallel_order(app_config, "wardany", items, args, item_workers=2)
 
         merge.assert_called_once_with("wardany", "match_only_summary")
+        merge_order.assert_called_once_with(
+            "wardany", ("order_item_summary", "order_ai_trace", "manual_review")
+        )
         report.assert_called_once()
 
     def test_prepared_order_items_requires_state_then_applies_resume(self) -> None:

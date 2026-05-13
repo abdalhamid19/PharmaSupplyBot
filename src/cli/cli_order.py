@@ -26,6 +26,7 @@ from ..core.utils.excel import (
     load_match_only_items_from_excel,
 )
 from ..tawreed.order_result_merger import merge_worker_summaries
+from ..tawreed.order_worker_artifact_merger import merge_order_worker_artifacts
 from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_match_only_summary import MATCH_ONLY_SUMMARY_LABEL
 from ..tawreed.tawreed_session import SessionInvalidError
@@ -353,8 +354,16 @@ def _run_parallel_order(
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
         results = pool.map(run_order_chunk, payloads)
-    merge_worker_summaries(profile_key, _summary_label(args))
+    _merge_order_worker_outputs(profile_key, args)
     report_worker_results(app_config.base_url, profile_key, results)
+
+
+def _merge_order_worker_outputs(profile_key: str, args: argparse.Namespace) -> None:
+    """Merge all order worker output partitions for the active run."""
+    merge_worker_summaries(profile_key, _summary_label(args))
+    merge_order_worker_artifacts(
+        profile_key, ("order_item_summary", "order_ai_trace", "manual_review")
+    )
 
 
 def _build_order_payloads(
