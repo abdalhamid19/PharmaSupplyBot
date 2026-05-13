@@ -26,8 +26,69 @@ def render_results_tab(default_profile: str | None) -> None:
     if not default_profile:
         st.warning("No profiles found in config.")
         return
+    if render_command_run_results():
+        return
     profile_key = st.selectbox("Artifacts profile", profile_selector_options(), index=0)
     render_selected_profile_results(profile_key)
+
+
+def render_command_run_results() -> bool:
+    """Render new command/profile/run artifact folders when present."""
+    commands = command_options()
+    if not commands:
+        return False
+    command = st.selectbox("Command", commands, index=0)
+    profile_key = st.selectbox("Profile", command_profile_options(command), index=0)
+    run_id = st.selectbox("Run", command_run_options(command, profile_key), index=0)
+    run_dir = ARTIFACTS_DIR / command / profile_key / run_id
+    render_run_dir_results(command, profile_key, run_dir)
+    return True
+
+
+def command_options() -> list[str]:
+    """Return artifact commands that have run folders."""
+    names = ["order", "match-products", "export-products", "remove-cart"]
+    return [name for name in names if (ARTIFACTS_DIR / name).is_dir()]
+
+
+def command_profile_options(command: str) -> list[str]:
+    """Return profile folders for one artifact command."""
+    root = ARTIFACTS_DIR / command
+    profiles = sorted(path.name for path in root.iterdir() if path.is_dir())
+    return profiles or ["wardany"]
+
+
+def command_run_options(command: str, profile_key: str) -> list[str]:
+    """Return run folders for one command/profile pair."""
+    root = ARTIFACTS_DIR / command / profile_key
+    runs = sorted((path.name for path in root.iterdir() if path.is_dir()), reverse=True)
+    return runs or [""]
+
+
+def render_run_dir_results(command: str, profile_key: str, run_dir: Path) -> None:
+    """Render files and summaries from one command run directory."""
+    st.caption(f"{command} / {profile_key} / {run_dir.name}")
+    summary_rows = run_summary_rows(run_dir)
+    if summary_rows:
+        render_timing_metrics(summary_rows)
+        st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+    render_recent_run_files(run_dir)
+
+
+def run_summary_rows(run_dir: Path) -> list[dict[str, str]]:
+    """Return rows from the first summary CSV in one run directory."""
+    paths = sorted(run_dir.glob("*summary*.csv"))
+    return load_csv_rows(paths[0]) if paths else []
+
+
+def render_recent_run_files(run_dir: Path) -> None:
+    """Render recent files from one run directory."""
+    files = sorted(run_dir.glob("*"), key=lambda path: path.stat().st_mtime, reverse=True)
+    rows = [
+        {"name": path.name, "size_kb": round(path.stat().st_size / 1024, 1)}
+        for path in files[:30]
+    ]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
 def render_selected_profile_results(profile_key: str) -> None:

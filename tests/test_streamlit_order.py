@@ -78,10 +78,50 @@ class StreamlitOrderTests(unittest.TestCase):
 
         self.assertIn("--match-only", command)
 
+    def test_order_command_adds_ai_flags(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "resume": False,
+                "highest_discount": False,
+                "min_discount_percent": 0,
+                "enable_order_ai": True,
+                "ai_provider": "rotation",
+                "ai_review_model": "rotation",
+                "ai_concurrency": 2,
+                "ai_verify_policy": "score",
+                "ai_search_policy": "safe",
+                "ai_accept_confidence": 0.93,
+                "ai_review_threshold": 0.97,
+            },
+            Path("data/input/order_items/ddd.xlsx"),
+        )
+
+        self.assertIn("--ai", command)
+        self.assertEqual(command[command.index("--provider") + 1], "rotation")
+        self.assertEqual(command[command.index("--review-model") + 1], "rotation")
+        self.assertEqual(command[command.index("--ai-accept-confidence") + 1], "0.93")
+
     def test_order_run_summary_path_uses_match_only_summary(self) -> None:
         path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, Path("artifacts") / "wardany" / "match_only_summary.csv")
+
+    def test_order_run_summary_path_uses_newest_run_folder(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            artifacts = Path(temp_dir) / "artifacts"
+            run_dir = artifacts / "order/wardany/20260513_1900"
+            run_dir.mkdir(parents=True)
+            summary = run_dir / "match_only_summary_20260513_1900.csv"
+            summary.write_text("item_code\n1\n", encoding="utf-8")
+            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
+                path = order_run_summary_csv_path("wardany", {"match_only": True})
+
+        self.assertEqual(path, summary)
 
     def test_order_command_adds_item_workers_when_parallel(self) -> None:
         command = order_command(

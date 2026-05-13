@@ -37,7 +37,7 @@ def order_form_fields(
     """Return the order form field values."""
     input_mode, excel_path_str, upload = excel_source_fields()
     run_fields = profile_run_fields(app_config)
-    return _order_form_values(
+    values = _order_form_values(
         input_mode,
         excel_path_str,
         upload,
@@ -45,6 +45,46 @@ def order_form_fields(
         item_workers_field(app_config),
         prevented_items_path,
     )
+    values.update(ai_matching_fields())
+    return values
+
+
+def ai_matching_fields() -> dict[str, object]:
+    """Return Streamlit controls for live-order AI matching."""
+    with st.expander("AI Matching", expanded=False):
+        enabled = st.checkbox("Enable AI matching", value=False)
+        values = _ai_provider_fields()
+        values.update(_ai_policy_fields())
+    return {"enable_order_ai": bool(enabled), **values}
+
+
+def _ai_provider_fields() -> dict[str, object]:
+    provider = st.selectbox(
+        "Provider",
+        ["openrouter", "rotation", "opencode", "groq", "github", "custom"],
+        index=0,
+    )
+    return {
+        "ai_provider": str(provider),
+        "ai_model": str(st.text_input("Model", value="")),
+        "ai_review_model": str(st.text_input("Review model", value="")),
+        "ai_concurrency": int(st.number_input("AI concurrency", min_value=1, value=5)),
+    }
+
+
+def _ai_policy_fields() -> dict[str, object]:
+    verify_policy = st.selectbox("Verify policy", ["score", "all"], index=0)
+    search_policy = st.selectbox(
+        "Search policy", ["review-candidates", "safe", "expanded"], index=0
+    )
+    accept_conf = st.number_input("Accept confidence", value=0.9, step=0.01)
+    review_threshold = st.number_input("Review threshold", value=0.95, step=0.01)
+    return {
+        "ai_verify_policy": str(verify_policy),
+        "ai_search_policy": str(search_policy),
+        "ai_accept_confidence": float(accept_conf),
+        "ai_review_threshold": float(review_threshold),
+    }
 
 
 def _order_form_values(
