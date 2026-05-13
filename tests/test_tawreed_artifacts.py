@@ -1,3 +1,4 @@
+import csv
 import os
 import unittest
 from pathlib import Path
@@ -5,10 +6,49 @@ from tempfile import TemporaryDirectory
 
 from openpyxl import Workbook, load_workbook
 
-from src.tawreed.tawreed_artifacts import append_xlsx_artifact
+from src.tawreed.tawreed_artifacts import append_csv_artifact, append_xlsx_artifact
 
 
 class TawreedArtifactsTests(unittest.TestCase):
+    def test_append_csv_artifact_keeps_union_schema_for_mixed_rows(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                append_csv_artifact(
+                    "wardany",
+                    "order_ai_trace",
+                    [
+                        {"phase": "ai_final", "item_code": "1", "ai_status": "ok"},
+                        {
+                            "phase": "api_attempt_verify",
+                            "item_code": "1",
+                            "provider": "groq",
+                            "status": 429,
+                        },
+                    ],
+                )
+                append_csv_artifact(
+                    "wardany",
+                    "order_ai_trace",
+                    [{"phase": "api_attempt_review", "model": "m1"}],
+                )
+                path = Path("artifacts") / "wardany" / "order_ai_trace.csv"
+                with path.open("r", encoding="utf-8", newline="") as f:
+                    reader = csv.DictReader(f)
+                    fieldnames = reader.fieldnames
+                    rows = list(reader)
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(
+            fieldnames,
+            ["phase", "item_code", "ai_status", "provider", "status", "model"],
+        )
+        self.assertEqual(rows[0]["ai_status"], "ok")
+        self.assertEqual(rows[1]["provider"], "groq")
+        self.assertEqual(rows[2]["model"], "m1")
+
     def test_append_xlsx_artifact_rewrites_changed_headers(self) -> None:
         with TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

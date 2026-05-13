@@ -56,7 +56,7 @@ def append_csv_artifact(
     if not rows:
         return None
     artifact_path = _artifact_path(profile_key, label, label_suffix, ".csv")
-    fieldnames = list(rows[0].keys())
+    fieldnames = _csv_artifact_fieldnames(artifact_path, rows)
     _ensure_csv_schema(artifact_path, fieldnames)
     _append_csv_rows(artifact_path, fieldnames, rows)
     return artifact_path
@@ -73,8 +73,8 @@ def append_xlsx_artifact(
         return None
     try:
         artifact_path = _artifact_path(profile_key, label, label_suffix, ".xlsx")
-        fieldnames = list(rows[0].keys())
         workbook, worksheet = _open_or_create_workbook(artifact_path)
+        fieldnames = _xlsx_artifact_fieldnames(worksheet, rows)
         _ensure_xlsx_header_row(worksheet, fieldnames)
         _append_xlsx_rows(worksheet, fieldnames, rows)
         workbook.save(artifact_path)
@@ -107,6 +107,33 @@ def _ensure_csv_schema(artifact_path: Path, fieldnames: list[str]) -> None:
     existing_fieldnames = _csv_header_fieldnames(artifact_path)
     if existing_fieldnames and existing_fieldnames != fieldnames:
         _rewrite_csv_artifact_with_fieldnames(artifact_path, fieldnames)
+
+
+def _csv_artifact_fieldnames(
+    artifact_path: Path, rows: list[dict[str, object]]
+) -> list[str]:
+    """Return existing CSV columns plus any new row keys in first-seen order."""
+    fieldnames = _csv_header_fieldnames(artifact_path) if artifact_path.exists() else []
+    return _merge_row_fieldnames(fieldnames, rows)
+
+
+def _xlsx_artifact_fieldnames(worksheet, rows: list[dict[str, object]]) -> list[str]:
+    """Return existing XLSX columns plus any new row keys in first-seen order."""
+    return _merge_row_fieldnames(_merge_row_fieldnames([], rows), _xlsx_rows(worksheet))
+
+
+def _merge_row_fieldnames(
+    fieldnames: list[str], rows: list[dict[str, object]]
+) -> list[str]:
+    """Return fieldnames extended with keys that appear in the supplied rows."""
+    merged = list(fieldnames)
+    seen = set(merged)
+    for row in rows:
+        for key in row:
+            if key not in seen:
+                merged.append(key)
+                seen.add(key)
+    return merged
 
 
 def _append_csv_rows(
@@ -191,6 +218,12 @@ def _xlsx_header_fieldnames(worksheet) -> list[str]:
         for i in range(1, worksheet.max_column + 1)
     ]
     return [str(v) for v in values if v not in (None, "")]
+
+
+def _xlsx_rows(worksheet) -> list[dict[str, object]]:
+    """Return lightweight placeholder rows for existing XLSX columns."""
+    fieldnames = _xlsx_header_fieldnames(worksheet)
+    return [dict.fromkeys(fieldnames, "")]
 
 
 def _rewrite_xlsx_worksheet_with_fieldnames(
