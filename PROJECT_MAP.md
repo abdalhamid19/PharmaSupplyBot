@@ -43,6 +43,8 @@
 - Streamlit presentation and subprocess orchestration stay in `src/ui`.
 - Tawreed browser automation stays in `src/tawreed`.
 - Shared live-search scoring stays in `src/core/product_matching.py`.
+- Shared item code/name normalization stays in `src/core/item_text.py` and is
+  reused by prevented-items and cart-removal input handling.
 - Component parsing, indexed CSV matching, AI verification/search/review, model
   rotation, and detailed trace logging stay in `src/core/drug_matching`.
 - Live-order AI decision policy stays in `src/core/order_ai_matching.py` and
@@ -73,7 +75,7 @@
 
 - `.venv/bin/python -m unittest discover -s tests -q`: 238 passed.
 - `.venv/bin/python tools/rule_audit.py`: `rule_audit_ok`,
-  `baseline_violations_remaining:161`.
+  `baseline_violations_remaining:160`.
 - CLI help checks succeeded for `run.py`, `order`, `remove-cart`,
   `export-products`, and `match-products`.
 - Smoke run succeeded:
@@ -86,3 +88,5 @@
   `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search --ai --provider custom --api-key ''`.
 - Read-only export smoke succeeded:
   `.venv/bin/python run.py export-products --profile wardany --limit 5`.
+- Post-cleanup regression check succeeded:
+  `.venv/bin/python -m unittest tests.test_cart_removal_items tests.test_prevented_items -q`.

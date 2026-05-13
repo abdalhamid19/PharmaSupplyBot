@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import openpyxl
+
+from .item_text import (
+    display_code_text,
+    normalize_name,
+    normalized_cell_text,
+    normalized_key,
+)
 
 REMOVE_ITEMS_DIR = Path("data/input") / "remove_items"
 DEFAULT_REMOVE_ITEMS_PATH = REMOVE_ITEMS_DIR / "remove.xlsx"
@@ -67,59 +74,3 @@ def cart_row_matches_names(row_text: str, names: list[str]) -> bool:
         if normalized_name and normalized_name in normalized_text:
             return True
     return False
-
-
-def normalized_key(code: object, name: object) -> tuple[str, str]:
-    """Return a normalized comparable product key."""
-    return normalize_code(code), normalize_name(name)
-
-
-def normalize_code(value: object) -> str:
-    """Return a stable code string for comparisons."""
-    text = normalized_cell_text(value).lower()
-    if text in {"nan", "none"}:
-        return ""
-    if text.endswith(".0"):
-        return text[:-2]
-    return text
-
-
-def normalize_name(value: object) -> str:
-    """Return a stable item-name string for comparisons."""
-    return " ".join(normalized_cell_text(value).lower().split())
-
-
-def normalized_cell_text(value: object) -> str:
-    """Return spreadsheet cell text safely without pandas artifacts."""
-    if value is None or (isinstance(value, float) and value != value):
-        return ""
-    return str(value).strip()
-
-
-
-def display_code_text(value: object) -> str:
-    """Return code text suitable for display and reports."""
-    text = normalized_cell_text(value)
-    if text.endswith(".0"):
-        return text[:-2]
-    return text
-
-
-def _require_remove_columns(dataframe: pd.DataFrame) -> None:
-    """Ensure the removal sheet has the expected columns."""
-    for column_name in (REMOVE_CODE_COLUMN, REMOVE_NAME_COLUMN):
-        if column_name in dataframe.columns:
-            continue
-        raise KeyError(
-            f"Missing required column '{column_name}' in cart-removal Excel. "
-            f"Found: {list(dataframe.columns)}"
-        )
-
-
-def _row_to_cart_removal_item(row: Any) -> CartRemovalItem | None:
-    """Convert one XLSX row into a cart-removal item."""
-    code = display_code_text(row.get(REMOVE_CODE_COLUMN, ""))
-    name = normalized_cell_text(row.get(REMOVE_NAME_COLUMN, ""))
-    if not name:
-        return None
-    return CartRemovalItem(code=code, name=name)
