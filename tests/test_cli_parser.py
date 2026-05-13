@@ -211,6 +211,33 @@ class CliParserTests(unittest.TestCase):
         self.assertEqual(args.limit, 5)
         self.assertTrue(args.debug_browser)
 
+    def test_match_products_accepts_ai_and_trace_options(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "match-products",
+                "--profile",
+                "wardany",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--limit",
+                "5",
+                "--trace",
+                "--no-ai",
+                "--provider",
+                "rotation",
+                "--review-model",
+                "rotation",
+                "--concurrency",
+                "4",
+            ]
+        )
+
+        self.assertEqual(args.cmd, "match-products")
+        self.assertTrue(args.trace)
+        self.assertTrue(args.no_ai)
+        self.assertEqual(args.provider, "rotation")
+        self.assertEqual(args.concurrency, 4)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from src.cli.cli_commands import (
     run_auth_command,
     run_export_products_command,
+    run_match_products_command,
     run_order_command,
     run_remove_cart_command,
 )
@@ -30,6 +31,8 @@ def main() -> int:
         return run_remove_cart_command(app_config, args)
     if args.cmd == "export-products":
         return run_export_products_command(app_config, args)
+    if args.cmd == "match-products":
+        return run_match_products_command(app_config, args)
     raise AssertionError("unreachable")
 
 
