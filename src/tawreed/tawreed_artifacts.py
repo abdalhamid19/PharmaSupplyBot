@@ -8,14 +8,16 @@ from pathlib import Path
 from openpyxl import Workbook, load_workbook
 from playwright.sync_api import Page
 
+from ..core.artifact_run import artifact_filename, current_artifact_run
+
 
 def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") -> None:
     """Persist screenshot, HTML, and URL artifacts for debugging failures."""
     try:
         artifacts_dir = _artifacts_dir(profile_key)
-        screenshot_path = artifacts_dir / f"{label}.png"
-        html_path = artifacts_dir / f"{label}.html"
-        text_path = artifacts_dir / f"{label}.txt"
+        screenshot_path = _artifact_path(profile_key, label, None, ".png")
+        html_path = _artifact_path(profile_key, label, None, ".html")
+        text_path = _artifact_path(profile_key, label, None, ".txt")
         _write_screenshot_artifact(page, screenshot_path)
         _write_html_artifact(page, html_path)
         _write_text_artifact(page, text_path, details)
@@ -26,16 +28,14 @@ def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") 
 
 def write_text_artifact(profile_key: str, label: str, content: str) -> Path:
     """Write a plain-text diagnostic artifact for the active profile."""
-    artifacts_dir = _artifacts_dir(profile_key)
-    artifact_path = artifacts_dir / f"{label}.txt"
+    artifact_path = _artifact_path(profile_key, label, None, ".txt")
     artifact_path.write_text(content, encoding="utf-8")
     return artifact_path
 
 
 def append_text_artifact(profile_key: str, label: str, content: str) -> Path:
     """Append plain-text diagnostic content to a profile artifact."""
-    artifacts_dir = _artifacts_dir(profile_key)
-    artifact_path = artifacts_dir / f"{label}.txt"
+    artifact_path = _artifact_path(profile_key, label, None, ".txt")
     with artifact_path.open("a", encoding="utf-8") as artifact_file:
         artifact_file.write(content)
     return artifact_path
@@ -88,6 +88,9 @@ def _artifact_path(
     profile_key: str, label: str, label_suffix: str | None, extension: str
 ) -> Path:
     """Return the fully-qualified artifact path for one label."""
+    active = current_artifact_run()
+    if active:
+        return active.directory / artifact_filename(label, extension, label_suffix)
     effective_label = f"{label}.{label_suffix}" if label_suffix else label
     return _artifacts_dir(profile_key) / f"{effective_label}{extension}"
 
@@ -123,7 +126,8 @@ def _append_xlsx_rows(
 
 def _artifacts_dir(profile_key: str) -> Path:
     """Return the artifacts directory for the active profile, creating it if needed."""
-    artifacts_dir = Path("artifacts") / profile_key
+    active = current_artifact_run()
+    artifacts_dir = active.directory if active else Path("artifacts") / profile_key
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     return artifacts_dir
 

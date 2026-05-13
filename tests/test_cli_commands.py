@@ -328,10 +328,10 @@ class CliCommandsTests(unittest.TestCase):
         self.assertEqual(result, 0)
         build_bot.assert_called_once_with(app_config, "wardany", profile, True)
         export.assert_called_once()
-        self.assertEqual(
-            export.call_args.args[1].parts, ("artifacts", "catalog", "wardany")
-        )
+        output_parts = export.call_args.args[1].parts
+        self.assertEqual(output_parts[:3], ("artifacts", "export-products", "wardany"))
         self.assertEqual(export.call_args.kwargs["page_size"], 50)
+        self.assertTrue(export.call_args.kwargs["stem"].startswith("catalog_"))
 
 
 def _app_config() -> Any:

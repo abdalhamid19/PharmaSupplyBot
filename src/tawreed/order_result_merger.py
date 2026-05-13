@@ -1,32 +1,44 @@
 """Merge per-worker summary artifacts into the canonical profile summary."""
-
 from __future__ import annotations
-
 import csv
 import re
 from pathlib import Path
-
 from openpyxl import Workbook
-
-_WORKER_RE = re.compile(r"\.worker_(\d+)\.csv$")
-
-
+from ..core.artifact_run import artifact_filename, current_artifact_run
+_WORKER_RE = re.compile(r"(?:\.|_)worker_(\d+)(?:_|\.)")
+_WORKER_PATTERNS = (
+    "{label}.worker_*.csv",
+    "{label}.worker_*.xlsx",
+    "{label}_worker_*.csv",
+    "{label}_worker_*.xlsx",
+)
 def merge_worker_summaries(profile_key: str, base_label: str) -> None:
     """Concatenate worker CSV/XLSX partitions into one canonical summary file."""
-    artifacts_dir = Path("artifacts") / profile_key
+    artifacts_dir = _summary_dir(profile_key)
     worker_csv_files = sorted(
-        artifacts_dir.glob(f"{base_label}.worker_*.csv"), key=_worker_sort_key
+        _worker_csv_files(artifacts_dir, base_label), key=_worker_sort_key
     )
     if not worker_csv_files:
         return
     rows, fieldnames = _collect_worker_csv_rows(worker_csv_files)
-    _write_merged_csv(artifacts_dir / f"{base_label}.csv", fieldnames, rows)
-    _write_merged_xlsx(artifacts_dir / f"{base_label}.xlsx", fieldnames, rows)
+    csv_target = _target_path(artifacts_dir, base_label, ".csv")
+    xlsx_target = _target_path(artifacts_dir, base_label, ".xlsx")
+    _write_merged_csv(csv_target, fieldnames, rows)
+    _write_merged_xlsx(xlsx_target, fieldnames, rows)
     _remove_worker_files(artifacts_dir, base_label)
-
-
+def _summary_dir(profile_key: str) -> Path:
+    active = current_artifact_run()
+    directory = active.directory if active else Path("artifacts") / profile_key
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+def _worker_csv_files(artifacts_dir: Path, base_label: str) -> list[Path]:
+    patterns = (f"{base_label}.worker_*.csv", f"{base_label}_worker_*.csv")
+    return [path for pattern in patterns for path in artifacts_dir.glob(pattern)]
+def _target_path(artifacts_dir: Path, base_label: str, extension: str) -> Path:
+    if current_artifact_run():
+        return artifacts_dir / artifact_filename(base_label, extension)
+    return artifacts_dir / f"{base_label}{extension}"
 def _collect_worker_csv_rows(paths: list[Path]) -> tuple[list[dict], list[str]]:
-    """Read all worker CSV files and reject incompatible schemas."""
     rows: list[dict[str, str]] = []
     fieldnames: list[str] = []
     for path in paths:
@@ -36,10 +48,9 @@ def _collect_worker_csv_rows(paths: list[Path]) -> tuple[list[dict], list[str]]:
             fieldnames = _merge_fieldnames(fieldnames, current, path)
             rows.extend(reader)
     return rows, fieldnames
-
-
-def _merge_fieldnames(expected: list[str], current: list[str], path: Path) -> list[str]:
-    """Return canonical fieldnames or raise on worker schema mismatch."""
+def _merge_fieldnames(
+    expected: list[str], current: list[str], path: Path
+) -> list[str]:
     if not current:
         return expected
     if not expected:
@@ -47,24 +58,15 @@ def _merge_fieldnames(expected: list[str], current: list[str], path: Path) -> li
     if expected != current:
         raise ValueError(f"Worker summary schema mismatch in {path}")
     return expected
-
-
 def _worker_sort_key(path: Path) -> tuple[int, str]:
-    """Return a numeric worker-id sort key for stable merge ordering."""
     match = _WORKER_RE.search(path.name)
     return (int(match.group(1)) if match else 10**9, path.name)
-
-
 def _write_merged_csv(target: Path, fieldnames: list[str], rows: list[dict]) -> None:
-    """Write the merged rows into the canonical CSV summary."""
     with target.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-
-
 def _write_merged_xlsx(target: Path, fieldnames: list[str], rows: list[dict]) -> None:
-    """Write the merged rows into the canonical XLSX summary."""
     workbook = Workbook()
     worksheet = workbook.active
     if worksheet is None:
@@ -73,12 +75,10 @@ def _write_merged_xlsx(target: Path, fieldnames: list[str], rows: list[dict]) ->
     for row in rows:
         worksheet.append([row.get(field, "") for field in fieldnames])
     workbook.save(target)
-
-
 def _remove_worker_files(artifacts_dir: Path, base_label: str) -> None:
-    """Delete per-worker CSV and XLSX partition files after successful merge."""
-    for pattern in (f"{base_label}.worker_*.csv", f"{base_label}.worker_*.xlsx"):
-        for path in artifacts_dir.glob(pattern):
+    for pattern in _WORKER_PATTERNS:
+        rendered = pattern.format(label=base_label)
+        for path in artifacts_dir.glob(rendered):
             try:
                 path.unlink()
             except Exception:

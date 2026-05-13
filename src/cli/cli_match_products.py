@@ -6,6 +6,7 @@ import argparse
 import asyncio
 from pathlib import Path
 
+from ..core.artifact_run import artifact_filename, artifact_run, current_artifact_run
 from ..core.config.config_models import AppConfig
 from ..core.drug_matching.ai_rotation import configured_attempts
 from ..core.drug_matching.config import (
@@ -26,10 +27,12 @@ def run_match_products_command(app_config: AppConfig, args: argparse.Namespace) 
     setup_logging("INFO")
     logger, listener = configure_async_logging("INFO")
     try:
-        pipeline = _pipeline_from_args(args)
-        logger.info("Starting product matching")
-        results = asyncio.run(_run_pipeline(pipeline, args))
-        logger.info("Matched %s rows", len(results))
+        with artifact_run("match-products", _match_profile(args)) as run:
+            print(f"[{run.profile_key}] Artifact run: {run.directory}")
+            pipeline = _pipeline_from_args(args)
+            logger.info("Starting product matching")
+            results = asyncio.run(_run_pipeline(pipeline, args))
+            logger.info("Matched %s rows", len(results))
     finally:
         listener.stop()
     return 0
@@ -47,7 +50,8 @@ def _pipeline_from_args(args: argparse.Namespace) -> MatchPipeline:
         end=end,
     )
     if args.trace:
-        pipeline._trace = MatchTraceLog(enabled=True)
+        run = current_artifact_run()
+        pipeline._trace = MatchTraceLog(log_dir=str(run.directory) if run else None, enabled=True)
     return pipeline
 
 
@@ -57,9 +61,22 @@ async def _run_pipeline(pipeline: MatchPipeline, args: argparse.Namespace):
     return await pipeline.run_full(
         drugs_path=drugs_path,
         tawreed_path=tawreed_path,
-        output_path=args.output,
+        output_path=args.output or _default_output_path(),
         skip_ai=bool(args.no_ai),
     )
+
+
+def _match_profile(args: argparse.Namespace) -> str:
+    """Return the artifact profile key for standalone matching."""
+    return str(args.profile or "default")
+
+
+def _default_output_path() -> str | None:
+    """Return the default run-scoped match-products output path."""
+    run = current_artifact_run()
+    if not run:
+        return None
+    return str(run.directory / artifact_filename("match_products", ".csv"))
 
 
 def _matching_config(args: argparse.Namespace) -> MatchingConfig:
@@ -114,8 +131,19 @@ def _tawreed_products_path(args: argparse.Namespace) -> Path:
     if args.tawreed_csv:
         return Path(args.tawreed_csv)
     if args.profile:
-        return Path("artifacts") / str(args.profile) / "tawreed_products.csv"
+        path = _latest_tawreed_catalog(str(args.profile))
+        if path:
+            return path
     raise SystemExit("Provide --tawreed-csv or --profile for match-products.")
+
+
+def _latest_tawreed_catalog(profile_key: str) -> Path | None:
+    """Return the newest Tawreed catalog from new, old, or legacy layouts."""
+    paths = list(Path("artifacts/export-products").glob(f"{profile_key}/*/tawreed_products*.csv"))
+    paths.append(Path("artifacts") / profile_key / "tawreed_products.csv")
+    paths.extend(Path("artifacts/legacy").glob(f"{profile_key}/*/tawreed_products.csv"))
+    existing = [path for path in paths if path.exists()]
+    return max(existing, key=lambda path: path.stat().st_mtime) if existing else None
 
 
 def _search_policy_values(args: argparse.Namespace) -> tuple[float, float, int]:

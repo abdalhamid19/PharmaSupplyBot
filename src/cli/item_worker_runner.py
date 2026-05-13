@@ -14,7 +14,8 @@ def run_order_chunk(payload: dict[str, Any]) -> dict[str, Any]:
 
     profile_key, bot = _build_worker_bot(payload)
     items = [Item(code=r[0], name=r[1], qty=r[2]) for r in payload["items"]]
-    return execute_order_worker(bot, items, profile_key)
+    with _worker_artifact_run(payload, profile_key):
+        return execute_order_worker(bot, items, profile_key)
 
 
 def run_cart_removal_chunk(payload: dict[str, Any]) -> dict[str, Any]:
@@ -23,7 +24,21 @@ def run_cart_removal_chunk(payload: dict[str, Any]) -> dict[str, Any]:
 
     profile_key, bot = _build_worker_bot(payload)
     items = [CartRemovalItem(code=r[0], name=r[1]) for r in payload["items"]]
-    return execute_cart_removal_worker(bot, items, profile_key)
+    with _worker_artifact_run(payload, profile_key):
+        return execute_cart_removal_worker(bot, items, profile_key)
+
+
+def _worker_artifact_run(payload: dict[str, Any], profile_key: str):
+    """Return a run context for subprocess artifact writes."""
+    from contextlib import nullcontext
+    from ..core.artifact_run import artifact_run
+
+    options = payload.get("options", {})
+    command = options.get("artifact_command")
+    run_id = options.get("artifact_run_id")
+    if command and run_id:
+        return artifact_run(str(command), profile_key, str(run_id))
+    return nullcontext()
 
 
 def _build_worker_bot(payload: dict[str, Any]):

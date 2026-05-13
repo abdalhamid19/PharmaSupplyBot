@@ -7,6 +7,7 @@ import multiprocessing
 from pathlib import Path
 from typing import Any
 
+from ..core.artifact_run import artifact_run
 from ..core.cart_removal_items import load_cart_removal_items
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.utils.chunking import split_into_chunks
@@ -27,19 +28,27 @@ def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> 
         profile=args.profile, all_profiles=args.all_profiles
     )
     for profile_key, profile in profiles:
-        require_state_file(profile_key)
-        items = list(load_cart_removal_items(Path(args.excel)))
-        item_workers = resolve_item_workers(app_config, args)
-        if item_workers > 1 and len(items) > 1:
-            _run_parallel_cart_removal(
-                app_config, profile_key, items, args, item_workers
-            )
-        else:
-            bot = _remove_cart_bot(app_config, profile_key, profile, args)
-            _run_profile_cart_removal(
-                app_config.base_url, profile_key, bot, iter(items)
-            )
+        with artifact_run("remove-cart", profile_key) as run:
+            print(f"[{profile_key}] Artifact run: {run.directory}")
+            _run_remove_cart_profile(app_config, profile_key, profile, args)
     return 0
+
+
+def _run_remove_cart_profile(
+    app_config: AppConfig,
+    profile_key: str,
+    profile: ProfileConfig,
+    args: argparse.Namespace,
+) -> None:
+    """Run one cart-removal profile with the active artifact context."""
+    require_state_file(profile_key)
+    items = list(load_cart_removal_items(Path(args.excel)))
+    item_workers = resolve_item_workers(app_config, args)
+    if item_workers > 1 and len(items) > 1:
+        _run_parallel_cart_removal(app_config, profile_key, items, args, item_workers)
+        return
+    bot = _remove_cart_bot(app_config, profile_key, profile, args)
+    _run_profile_cart_removal(app_config.base_url, profile_key, bot, iter(items))
 
 
 def _remove_cart_bot(

@@ -26,7 +26,7 @@ class ItemWorkerPoolTests(unittest.TestCase):
         self._original_cwd = os.getcwd()
         os.chdir(self._tmp.name)
         self.profile = "testprofile"
-        self.artifacts_dir = Path("artifacts") / self.profile
+        self.artifacts_dir = Path("artifacts") / "remove-cart" / self.profile
         self.written_worker_ids: list[int] = []
         self.payload_lengths: list[int] = []
 
@@ -43,10 +43,10 @@ class ItemWorkerPoolTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(self.payload_lengths, [2, 2, 1])
         self.assertEqual(self.written_worker_ids, [0, 1, 2])
-        rows = self._read_csv(self.artifacts_dir / "cart_removal_summary.csv")
+        rows = self._read_csv(next(self.artifacts_dir.glob("*/cart_removal_summary_*.csv")))
         self.assertEqual([row["item_code"] for row in rows], ["0", "1", "2", "3", "4"])
         self.assertFalse(
-            list(self.artifacts_dir.glob("cart_removal_summary.worker_*.csv"))
+            list(self.artifacts_dir.glob("*/cart_removal_summary_worker_*.csv"))
         )
 
     def test_stop_flag_short_circuits_remaining_workers(self) -> None:
@@ -58,7 +58,7 @@ class ItemWorkerPoolTests(unittest.TestCase):
         self.assertTrue(stop_flag.exists())
         self.assertEqual(self.payload_lengths, [2, 2])
         self.assertEqual(self.written_worker_ids, [0])
-        rows = self._read_csv(self.artifacts_dir / "cart_removal_summary.csv")
+        rows = self._read_csv(next(self.artifacts_dir.glob("*/cart_removal_summary_*.csv")))
         self.assertEqual([row["item_code"] for row in rows], ["0", "1"])
 
     def _run_command(
@@ -102,8 +102,11 @@ class ItemWorkerPoolTests(unittest.TestCase):
         """Write one fake worker partition summary."""
         worker_id = int(payload["worker_id"])
         self.written_worker_ids.append(worker_id)
-        self.artifacts_dir.mkdir(parents=True, exist_ok=True)
-        path = self.artifacts_dir / f"cart_removal_summary.worker_{worker_id}.csv"
+        options = payload.get("options", {})
+        run_id = options.get("artifact_run_id", "")
+        directory = self.artifacts_dir / run_id
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"cart_removal_summary_worker_{worker_id}_{run_id}.csv"
         with path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(
                 f, fieldnames=["item_code", "item_name", "worker_id"]

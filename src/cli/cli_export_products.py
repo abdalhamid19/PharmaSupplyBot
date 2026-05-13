@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from ..core.artifact_run import artifact_run
 from ..core.config.config_models import AppConfig
 from ..tawreed.tawreed_product_export_api import DEFAULT_EXPORT_PAGE_SIZE
 from ..tawreed.tawreed_product_export_flow import export_tawreed_products
@@ -18,23 +19,28 @@ def run_export_products_command(app_config: AppConfig, args: argparse.Namespace)
         profile=args.profile, all_profiles=args.all_profiles
     )
     for profile_key, profile in profiles:
-        require_state_file(profile_key)
-        bot = build_bot(app_config, profile_key, profile, args.debug_browser)
-        try:
-            export_tawreed_products(
-                bot,
-                _profile_output_dir(args.output_dir, profile_key),
-                page_size=_positive_page_size(args.page_size),
-                limit=max(int(args.limit), 0),
-                stem=str(args.stem),
-            )
-        except SessionInvalidError as error:
-            raise invalid_session_exit(app_config.base_url, profile_key, error)
+        with artifact_run("export-products", profile_key) as run:
+            print(f"[{profile_key}] Artifact run: {run.directory}")
+            _run_export_profile(app_config, profile_key, profile, args, run)
     return 0
 
 
-def _profile_output_dir(template: str, profile_key: str) -> Path:
-    return Path(template.format(profile=profile_key))
+def _run_export_profile(
+    app_config: AppConfig, profile_key: str, profile, args: argparse.Namespace, run
+) -> None:
+    """Export one profile into its active run directory."""
+    require_state_file(profile_key)
+    bot = build_bot(app_config, profile_key, profile, args.debug_browser)
+    try:
+        export_tawreed_products(
+            bot,
+            run.directory,
+            page_size=_positive_page_size(args.page_size),
+            limit=max(int(args.limit), 0),
+            stem=f"{args.stem}_{run.run_id}",
+        )
+    except SessionInvalidError as error:
+        raise invalid_session_exit(app_config.base_url, profile_key, error)
 
 
 def _positive_page_size(value: int) -> int:

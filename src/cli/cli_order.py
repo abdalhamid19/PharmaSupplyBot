@@ -10,6 +10,7 @@ import multiprocessing
 from pathlib import Path
 from typing import Any, Iterable
 
+from ..core.artifact_run import artifact_run, current_artifact_run
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
@@ -93,6 +94,15 @@ def _run_single_profile(
     args: argparse.Namespace,
 ) -> None:
     """Prepare and run a single profile order flow."""
+    with artifact_run("order", profile_key) as run:
+        print(f"[{profile_key}] Artifact run: {run.directory}")
+        _run_single_profile_items(app_config, profile_key, profile, args)
+
+
+def _run_single_profile_items(
+    app_config: AppConfig, profile_key: str, profile: ProfileConfig, args: argparse.Namespace
+) -> None:
+    """Run a profile once its artifact context is active."""
     items = _load_order_items(app_config, args)
     profile_items = _prepared_order_items(profile_key, items, args)
     profile_items = _limited_order_items(profile_items, args)
@@ -248,8 +258,8 @@ def _processed_summary_item_keys(
     profile_key: str, summary_label: str = "order_result_summary"
 ) -> set[tuple[str, str]]:
     """Return item keys already written to the active profile summary."""
-    summary_path = Path("artifacts") / profile_key / f"{summary_label}.csv"
-    if not summary_path.exists():
+    summary_path = _latest_summary_path(profile_key, summary_label)
+    if summary_path is None:
         return set()
     with summary_path.open("r", encoding="utf-8", newline="") as summary_file:
         reader = csv.DictReader(summary_file)
@@ -257,6 +267,21 @@ def _processed_summary_item_keys(
             _item_key(row.get("item_code", ""), row.get("item_name", ""))
             for row in reader
         }
+
+
+def _latest_summary_path(profile_key: str, summary_label: str) -> Path | None:
+    """Return the newest summary path from active, command, or legacy layouts."""
+    active = current_artifact_run()
+    paths: list[Path] = []
+    if active:
+        paths.extend(active.directory.glob(f"{summary_label}*.csv"))
+    paths.extend(Path("artifacts/order").glob(f"{profile_key}/*/{summary_label}*.csv"))
+    paths.append(Path("artifacts") / profile_key / f"{summary_label}.csv")
+    paths.extend(Path("artifacts/legacy").glob(f"{profile_key}/*/{summary_label}.csv"))
+    existing = [path for path in paths if path.exists()]
+    if not existing:
+        return None
+    return max(existing, key=lambda path: path.stat().st_mtime)
 
 
 def _item_key(code: object, name: object) -> tuple[str, str]:
@@ -349,7 +374,10 @@ def _build_order_payloads(
 
 def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
     """Extract serializable worker options from the CLI namespace."""
+    run = current_artifact_run()
     return {
+        "artifact_command": run.command if run else "",
+        "artifact_run_id": run.run_id if run else "",
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": _match_only(args),

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from ..core.artifact_run import current_artifact_run
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import invalid_session_exit
 
@@ -45,7 +46,10 @@ def _cart_payload(
 
 def _cart_options(args: object) -> dict[str, Any]:
     """Return serializable cart-removal worker options."""
+    run = current_artifact_run()
     return {
+        "artifact_command": run.command if run else "",
+        "artifact_run_id": run.run_id if run else "",
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "stop_flag": getattr(args, "stop_flag", None),
     }
