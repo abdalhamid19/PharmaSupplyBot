@@ -4,7 +4,8 @@
 
 - Python 3.12.3 runtime in `.venv`.
 - Playwright 1.59.0 for Tawreed browser/session automation.
-- pandas 3.0.2 and openpyxl 3.1.5 for spreadsheet input/output.
+- pandas 3.0.2 and openpyxl 3.1.5 for spreadsheet input/output. PyPI latest on
+  2026-05-13 is pandas 3.0.3 and openpyxl 3.1.5.
 - rapidfuzz 3.14.5 for component-aware drug matching and indexed fuzzy search.
 - aiohttp 3.13.5 for optional async AI verification/search/review calls.
 - PyYAML 6.0.3, python-dotenv 1.2.2, and Streamlit 1.57.0 for config and UI.
@@ -20,6 +21,8 @@
 - Each order run writes `order_item_summary_<run_id>.csv/.txt`,
   `order_ai_trace_<run_id>.csv/.txt`, and `manual_review_<run_id>.csv/.txt`
   when review rows exist.
+- Order AI trace rows can mix final, phase-level, and provider-attempt metadata;
+  artifact writers keep a union CSV schema so retry/status columns are preserved.
 - `run.py export-products` exports Tawreed catalog rows into
   `artifacts/export-products/<profile>/<run_id>/`.
 - `run.py match-products` matches an inventory Excel/CSV against an exported
@@ -49,18 +52,27 @@
 - Order artifact writing and worker partition merging stay in
   `src/tawreed/tawreed_order_run_artifacts.py` and
   `src/tawreed/order_worker_artifact_merger.py`.
+- Artifact CSV/XLSX schema normalization stays in `src/tawreed/tawreed_artifacts.py`;
+  worker CSV union merging stays in `src/tawreed/order_result_merger.py`.
 - Run-scoped artifact paths stay in `src/core/artifact_run.py`.
 - Shared candidate-level trace rows and async logging setup stay in
   `src/core/matching_trace.py`.
 
 ## [ORPHANS & PENDING]
 
-- None.
+- Last failed live run `artifacts/run-control/order/order_output_1778696048.log`
+  exposed artifact schema failures, not a matching decision failure. Regression
+  tests now cover mixed order AI trace rows and mixed worker schemas.
+- `tools/list_all_violations.py` still reports baseline size/docstring debt; this
+  is tracked for staged cleanup after the runtime fix.
 
 ## [VALIDATION]
 
-- `.venv/bin/python -m unittest discover -s tests -q`: 235 passed.
-- `.venv/bin/python tools/rule_audit.py`: rule_audit_ok.
+- Focused regression checks passed after the artifact schema fix:
+  `.venv/bin/python -m unittest tests.test_tawreed_artifacts tests.test_order_run_artifacts tests.test_order_worker_artifact_merger -q`.
+- Full validation is pending after the staged runtime fix.
+- Previous baseline before the fix: `.venv/bin/python -m unittest discover -s tests -q`
+  passed 235 tests and `.venv/bin/python tools/rule_audit.py` returned `rule_audit_ok`.
 - Smoke run succeeded:
   `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke.csv`.
 - AI-disabled smoke run succeeded without API keys and logged AI skip reasons:
