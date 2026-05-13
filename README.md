@@ -195,7 +195,30 @@ Linux / macOS (bash):
 python3 run.py export-products --profile wardany --output-dir "artifacts/{profile}" --limit 10
 ```
 
-### 11. تشغيل واجهة Streamlit
+### 11. مطابقة ملف أصناف مع كتالوج Tawreed المصدر
+
+استخدم `match-products` لمطابقة ملف مخزون/نواقص مع أحدث ملف
+`artifacts/<profile>/tawreed_products.csv`. يعمل الأمر بالخوارزمية فقط عند
+استخدام `--no-ai`، أو يحاول مراحل AI عند توفر مفاتيح API في `.env`.
+
+Linux / macOS (bash):
+```bash
+python3 run.py match-products --profile wardany \
+  --excel "data/input/order_items/shortage_report_total_20260502.xlsx" \
+  --limit 5 --no-ai --trace
+```
+
+Windows PowerShell:
+```powershell
+py run.py match-products --profile wardany `
+  --excel "data/input/order_items/shortage_report_total_20260502.xlsx" `
+  --limit 5 --no-ai --trace
+```
+
+ينشئ الأمر ملف نتائج CSV وملف manual review، وعند تفعيل `--trace` يكتب trace
+تفصيليًا داخل `artifacts/matching/trace/`.
+
+### 12. تشغيل واجهة Streamlit
 
 الرابط الأونلاين:
 ```text
@@ -336,4 +359,3 @@ py run.py auth --profile wardany
 - محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
 - المطابقة تعتمد على خوارزميات نصية مرنة (Fuzzy matching) يمكن ضبط معاملاتها من الإعدادات.
 - البرنامج يدعم الاستكمال (Resume) حيث يتخطى الأصناف التي تم طلبها بنجاح في نفس اليوم.
-
