@@ -72,13 +72,40 @@ def render_run_dir_results(command: str, profile_key: str, run_dir: Path) -> Non
     if summary_rows:
         render_timing_metrics(summary_rows)
         st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+    render_run_table(run_dir, "Manual Review", "manual_review_*.csv")
+    render_run_table(run_dir, "Order AI Trace", "order_ai_trace_*.csv")
     render_recent_run_files(run_dir)
 
 
 def run_summary_rows(run_dir: Path) -> list[dict[str, str]]:
-    """Return rows from the first summary CSV in one run directory."""
-    paths = sorted(run_dir.glob("*summary*.csv"))
-    return load_csv_rows(paths[0]) if paths else []
+    """Return rows from the preferred summary CSV in one run directory."""
+    path = preferred_run_summary_path(run_dir)
+    return load_csv_rows(path) if path else []
+
+
+def preferred_run_summary_path(run_dir: Path) -> Path | None:
+    """Return the most useful summary file for a command run."""
+    for pattern in (
+        "order_item_summary_*.csv",
+        "match_only_summary_*.csv",
+        "order_result_summary_*.csv",
+        "*summary*.csv",
+    ):
+        paths = sorted(run_dir.glob(pattern))
+        if paths:
+            return paths[0]
+    return None
+
+
+def render_run_table(run_dir: Path, title: str, pattern: str) -> None:
+    """Render an optional run-scoped CSV table."""
+    paths = sorted(run_dir.glob(pattern))
+    if not paths:
+        return
+    rows = load_csv_rows(paths[0])
+    if rows:
+        st.subheader(title)
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 
 def render_recent_run_files(run_dir: Path) -> None:

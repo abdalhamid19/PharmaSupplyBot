@@ -38,6 +38,21 @@ class StreamlitResultsTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Refusing"):
                     streamlit_results.safe_profile_artifact_paths(outside_dir)
 
+    def test_run_summary_rows_prefers_order_item_summary(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir) / "run"
+            run_dir.mkdir()
+            (run_dir / "match_only_summary_20260513_2030.csv").write_text(
+                "kind\nold\n", encoding="utf-8"
+            )
+            (run_dir / "order_item_summary_20260513_2030.csv").write_text(
+                "kind\nnew\n", encoding="utf-8"
+            )
+
+            rows = streamlit_results.run_summary_rows(run_dir)
+
+        self.assertEqual(rows[0]["kind"], "new")
+
 
 if __name__ == "__main__":
     unittest.main()
