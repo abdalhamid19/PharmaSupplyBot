@@ -30,7 +30,7 @@ def require_product_match(
         if match:
             return match, query
 
-    return _handle_no_match(bot, item, queries, results)
+    return _handle_no_match(bot, item, queries, results, require_available)
 
 
 def _search_one_query(
@@ -47,16 +47,43 @@ def _search_one_query(
     is_final = decisive_match(
         bot, item, decision, started_at, queries, require_available
     )
-    return match if is_final else None
+    if not is_final:
+        return None
+    return bot.last_match_decision.best_match if bot.last_match_decision else match
 
 
 def _handle_no_match(
-    bot, item: Item, queries: list[str], results: list[tuple[str, list]]
+    bot,
+    item: Item,
+    queries: list[str],
+    results: list[tuple[str, list]],
+    require_available: bool,
 ):
     """Record and raise a descriptive error when all search attempts fail."""
     decision = explain_best_product_match(item, results, bot.config.matching)
+    decision = bot.resolve_order_ai_decision(item, decision)
     write_match_log(bot, item, decision)
+    if decision.best_match:
+        return _accepted_no_match_result(bot, item, decision, require_available)
 
     raise bot.no_results_exception(
         f"No decisive match found for '{item.name}' after {len(queries)} queries."
     )
+
+
+def _accepted_no_match_result(bot, item: Item, decision, require_available: bool):
+    """Return an AI-selected match from the no-match path after stock checks."""
+    match = decision.best_match
+    if require_available and _available_quantity(match.data) <= 0:
+        raise bot.skip_item_exception(
+            f"Matched product is out of stock for '{item.name}'."
+        )
+    return match, match.query
+
+
+def _available_quantity(candidate: dict[str, Any]) -> int:
+    """Return available quantity from a Tawreed candidate."""
+    try:
+        return int(candidate.get("availableQuantity") or 0)
+    except (TypeError, ValueError):
+        return 0

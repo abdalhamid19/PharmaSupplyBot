@@ -11,9 +11,10 @@ from playwright.sync_api import Page, sync_playwright
 from ..core.cart_removal_items import CartRemovalItem
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.matching_models import MatchDecision
+from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
 from .selectors import _selectors
-from .tawreed_artifacts import dump_artifacts
+from .tawreed_artifacts import append_csv_artifact, dump_artifacts
 from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
 from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
@@ -59,6 +60,7 @@ class TawreedBot:
         fast_search: bool = False,
         summary_label_suffix: str | None = None,
         match_only: bool = False,
+        order_ai_settings: OrderAiSettings | None = None,
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
@@ -70,6 +72,8 @@ class TawreedBot:
         self.fast_search = fast_search
         self.summary_label_suffix = summary_label_suffix
         self.match_only = match_only
+        self.order_ai_settings = order_ai_settings or OrderAiSettings()
+        self.order_ai_service = self._build_order_ai_service()
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
         self.no_results_exception = _NoResultsItem
@@ -87,6 +91,62 @@ class TawreedBot:
         self.last_selected_discount_percent = ""
         self.last_selected_store_name = ""
         self.last_ordered_total_qty = 0
+        self.last_order_ai_outcome = None
+
+    def _build_order_ai_service(self):
+        """Return the optional live-order AI decision service."""
+        if not self.order_ai_settings.enabled:
+            return None
+        return OrderAiDecisionService(self.order_ai_settings)
+
+    def resolve_order_ai_decision(
+        self, item: Item, decision: MatchDecision
+    ) -> MatchDecision:
+        """Apply opt-in AI verification/search and persist trace rows."""
+        if not self.order_ai_service:
+            return decision
+        outcome = self.order_ai_service.resolve(item, decision)
+        self.last_order_ai_outcome = outcome
+        self._record_order_ai_rows(item, outcome)
+        self.last_match_decision = outcome.decision
+        return outcome.decision
+
+    def _record_order_ai_rows(self, item: Item, outcome) -> None:
+        """Append live-order AI trace and manual-review rows."""
+        row = self._order_ai_trace_row(item, outcome)
+        append_csv_artifact(self.profile_key, "matching_trace", [row])
+        if outcome.manual_review:
+            append_csv_artifact(self.profile_key, "manual_review", [row])
+
+    def _order_ai_trace_row(self, item: Item, outcome) -> dict[str, object]:
+        """Return one trace-compatible row for the AI order decision."""
+        match = outcome.decision.best_match
+        return {
+            "phase": "order_ai",
+            "item_code": item.code,
+            "item_name": item.name,
+            "item_qty": item.qty,
+            "final_status": outcome.status,
+            "final_reason": outcome.reason,
+            **self._order_ai_candidate_fields(match, outcome),
+            "selection_reason": outcome.reason,
+        }
+
+    def _order_ai_candidate_fields(self, match, outcome) -> dict[str, object]:
+        """Return candidate columns for one AI trace row."""
+        candidate = match.data if match else {}
+        return {
+            "candidate_rank": "",
+            "candidate_name_en": candidate.get("productNameEn", ""),
+            "candidate_name_ar": candidate.get("productName", ""),
+            "candidate_id": candidate.get("storeProductId", ""),
+            "candidate_score": round(outcome.confidence, 6),
+            "accepted": bool(match and not outcome.manual_review),
+            "accepted_reason": outcome.status,
+            "rejection_reason": outcome.reason if outcome.manual_review else "",
+            "query": match.query if match else "",
+            "row_index": match.row_index if match else "",
+        }
 
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""

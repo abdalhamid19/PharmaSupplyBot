@@ -56,6 +56,9 @@ def _record_final_match(
     require_available: bool,
 ) -> None:
     """Record final match timing/logs and optionally reject unavailable matches."""
+    decision = bot.resolve_order_ai_decision(item, decision)
+    if not decision.best_match:
+        raise bot.skip_item_exception("AI matching requires manual review.")
     bot.last_match_elapsed_seconds = time.perf_counter() - started_at
     write_match_log(bot, item, decision)
     if require_available and _available_quantity(decision) <= 0:
