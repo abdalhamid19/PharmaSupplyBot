@@ -65,23 +65,24 @@
   tests now cover mixed order AI trace rows and mixed worker schemas.
 - `tools/list_all_violations.py` still reports baseline size/docstring debt; this
   is tracked for staged cleanup after the runtime fix.
+- Safe `remove-cart` live smoke did not remove anything, but the saved Tawreed
+  session did not expose the order surface for that command. Re-run
+  `run.py auth --profile wardany` before the next cart-removal live check.
 
 ## [VALIDATION]
 
-- Focused regression checks passed after the artifact schema fix:
-  `.venv/bin/python -m unittest tests.test_tawreed_artifacts tests.test_order_run_artifacts tests.test_order_worker_artifact_merger -q`.
-- Full validation is pending after the staged runtime fix.
-- Previous baseline before the fix: `.venv/bin/python -m unittest discover -s tests -q`
-  passed 235 tests and `.venv/bin/python tools/rule_audit.py` returned `rule_audit_ok`.
+- `.venv/bin/python -m unittest discover -s tests -q`: 238 passed.
+- `.venv/bin/python tools/rule_audit.py`: `rule_audit_ok`,
+  `baseline_violations_remaining:161`.
+- CLI help checks succeeded for `run.py`, `order`, `remove-cart`,
+  `export-products`, and `match-products`.
 - Smoke run succeeded:
-  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke.csv`.
-- AI-disabled smoke run succeeded without API keys and logged AI skip reasons:
-  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --output artifacts/wardany/match_products_ai_smoke.csv`.
-- CLI help checks succeeded for `run.py`, `order`, `match-products`, and
-  `export-products`.
+  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke_after_schema_fix.csv`.
 - Streamlit started locally on `http://127.0.0.1:8502` and returned HTTP 200.
 - Safe live smoke succeeded without changing the cart:
   `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search`.
 - Safe AI order smoke succeeded without API keys and wrote `order_ai_trace` plus
   `order_item_summary` CSV/TXT files:
   `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search --ai --provider custom --api-key ''`.
+- Read-only export smoke succeeded:
+  `.venv/bin/python run.py export-products --profile wardany --limit 5`.

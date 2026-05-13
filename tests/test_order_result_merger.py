@@ -49,14 +49,18 @@ class MergeWorkerSummariesTests(unittest.TestCase):
         merge_worker_summaries("testprofile", "order_result_summary")
         self.assertFalse((self.artifacts_dir / "order_result_summary.csv").exists())
 
-    def test_schema_mismatch_between_workers_fails_loudly(self) -> None:
-        """Different worker CSV schemas raise instead of silently corrupting rows."""
+    def test_schema_mismatch_between_workers_uses_union_schema(self) -> None:
+        """Different worker CSV schemas are merged without dropping columns."""
         self._write_csv("order_result_summary.worker_0.csv", ["x", "1"])
         self._write_header_only_csv(
             "order_result_summary.worker_1.csv", ["col1", "bad"]
         )
-        with self.assertRaisesRegex(ValueError, "schema mismatch"):
-            merge_worker_summaries("testprofile", "order_result_summary")
+        merge_worker_summaries("testprofile", "order_result_summary")
+
+        merged = self._read_csv("order_result_summary.csv")
+        self.assertEqual(merged[0]["col1"], "x")
+        self.assertEqual(merged[0]["col2"], "1")
+        self.assertEqual(merged[0]["bad"], "")
 
     def test_removes_worker_files_after_merge(self) -> None:
         """Worker partition files are cleaned up after a successful merge."""
