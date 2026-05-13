@@ -112,6 +112,11 @@ python3 run.py order --excel "data/input/order_items/shortage_report_total_20260
 
 ملف `match_only_summary.csv` يحتوي صفًا لكل مرشح تم تقييمه، ويتضمن بيانات Tawreed/API المهمة مثل `productId` و`storeProductId` و`productNameEn` و`productName` و`availableQuantity` و`productsCount` و`storeName` و`discountPercent` و`salePrice` و`retailPrice`، بالإضافة إلى درجات التطابق وسبب القبول/الرفض ونسخة JSON مضغوطة من المرشح داخل `api_raw_candidate_json`.
 
+كل تشغيل order يضيف أيضًا ملفات مراجعة سهلة داخل نفس مجلد التشغيل:
+`order_item_summary_<run_id>.csv/.txt` كسطر مختصر لكل صنف،
+`order_ai_trace_<run_id>.csv/.txt` كتتبع تفصيلي لقرارات AI ونتائج API،
+و`manual_review_<run_id>.csv/.txt` للأصناف التي تحتاج مراجعة يدوية.
+
 Windows PowerShell:
 ```powershell
 py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --match-only
@@ -240,6 +245,16 @@ py run.py match-products --profile wardany `
 - `artifacts/remove-cart/<profile>/<run_id>/`
 - `artifacts/run-control/<command>/`
 
+داخل `artifacts/order/<profile>/<run_id>/` تظهر الملفات التالية عند توفر بياناتها:
+
+- `order_item_summary_<run_id>.csv/.txt`: صف واحد مختصر لكل صنف يوضح هل تم
+  العثور على match، اسم المنتج المختار، هل تم AI verify/search/review، درجات
+  الثقة، والحركة النهائية.
+- `order_ai_trace_<run_id>.csv/.txt`: تتبع تفصيلي لكل صنف مع تركيز على AI،
+  ويشمل مراحل verify/search/review ومحاولات provider/model عندما تكون متاحة.
+- `manual_review_<run_id>.csv/.txt`: الأصناف المرفوضة أو منخفضة الثقة أو غير
+  المتاحة، مع حقول جاهزة لقرار المراجعة اليدوية.
+
 الملفات القديمة نُقلت إلى `artifacts/legacy/...` بدل حذفها.
 
 ### 12. تشغيل واجهة Streamlit
@@ -327,18 +342,16 @@ py run.py auth --profile wardany
   ملفات Excel الخاصة بالأصناف الممنوعة من الطلب، والافتراضي `drugprevented.xlsx`
 - `data/input/remove_items/`
   ملفات Excel التي تحتوي الأصناف المطلوب حذفها من سلة مشتريات توريد
-- `artifacts/<profile>/`
-  صور وHTML وlogs تشخيصية عند الفشل
-- `artifacts/<profile>/match_log_all.txt`
-  سجل نصي لكل مرشحي المطابقة
-- `artifacts/<profile>/match_log_all.csv`
-  سجل CSV لكل مرشحي المطابقة
-- `artifacts/<profile>/order_result_summary.csv`
-  الملخص الأساسي لنتائج تشغيل الطلبات والإضافة للسلة
-- `artifacts/<profile>/match_only_summary.csv`
-  ملخص مستقل لتشغيل `--match-only`، ويحتوي مرشحي المطابقة وبيانات Tawreed/API المفيدة للتحليل
-- `artifacts/<profile>/order_result_summary.xlsx`
-  نسخة Excel من ملخص نتائج الطلبات إذا كانت موجودة
+- `artifacts/<command>/<profile>/<run_id>/`
+  مجلدات تشغيل مستقلة لكل أمر مع أسماء ملفات موقّتة.
+- `artifacts/order/<profile>/<run_id>/order_item_summary_*.csv`
+  الملخص الأساسي لنتائج تشغيل الطلبات أو `--match-only`.
+- `artifacts/order/<profile>/<run_id>/order_ai_trace_*.csv`
+  سجل تفصيلي لكل مراحل المطابقة وAI الخاصة بالـ order.
+- `artifacts/order/<profile>/<run_id>/manual_review_*.csv`
+  قائمة الأصناف التي تحتاج قرارًا يدويًا قبل الطلب.
+- `artifacts/legacy/`
+  مخرجات البنية القديمة بعد الترحيل.
 - `streamlit_app.py`
   واجهة Streamlit لتشغيل `auth` و`order` ومراجعة النتائج
 
@@ -346,7 +359,7 @@ py run.py auth --profile wardany
 
 - محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
 - المطابقة بين اسم Excel ونتائج Tawreed تعتمد على الاسم فقط، وليس على كود الصنف الداخلي للصيدلية.
-- عند فشل صنف تقنيًا، تُحفظ artifacts داخل `artifacts/<profile>/`.
+- عند فشل صنف تقنيًا، تُحفظ artifacts داخل مجلد تشغيل الأمر الحالي.
 
 
 في تبويب `Results`:

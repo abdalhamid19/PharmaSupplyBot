@@ -17,6 +17,9 @@
 - Order AI is opt-in. Accepted AI decisions can correct/select the active match;
   low-confidence or review-rejected AI decisions are blocked and written to
   `manual_review`.
+- Each order run writes `order_item_summary_<run_id>.csv/.txt`,
+  `order_ai_trace_<run_id>.csv/.txt`, and `manual_review_<run_id>.csv/.txt`
+  when review rows exist.
 - `run.py export-products` exports Tawreed catalog rows into
   `artifacts/export-products/<profile>/<run_id>/`.
 - `run.py match-products` matches an inventory Excel/CSV against an exported
@@ -41,6 +44,11 @@
   rotation, and detailed trace logging stay in `src/core/drug_matching`.
 - Live-order AI decision policy stays in `src/core/order_ai_matching.py` and
   `src/core/order_ai_flow.py`; Tawreed only invokes it and writes trace rows.
+- Order AI artifact row shaping stays in `src/core/order_ai_trace_rows.py` and
+  `src/core/order_run_artifact_rows.py`.
+- Order artifact writing and worker partition merging stay in
+  `src/tawreed/tawreed_order_run_artifacts.py` and
+  `src/tawreed/order_worker_artifact_merger.py`.
 - Run-scoped artifact paths stay in `src/core/artifact_run.py`.
 - Shared candidate-level trace rows and async logging setup stay in
   `src/core/matching_trace.py`.
@@ -51,7 +59,7 @@
 
 ## [VALIDATION]
 
-- `.venv/bin/python -m unittest discover -s tests -q`: 230 passed.
+- `.venv/bin/python -m unittest discover -s tests -q`: 235 passed.
 - `.venv/bin/python tools/rule_audit.py`: rule_audit_ok.
 - Smoke run succeeded:
   `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke.csv`.
@@ -62,3 +70,6 @@
 - Streamlit started locally on `http://127.0.0.1:8502` and returned HTTP 200.
 - Safe live smoke succeeded without changing the cart:
   `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search`.
+- Safe AI order smoke succeeded without API keys and wrote `order_ai_trace` plus
+  `order_item_summary` CSV/TXT files:
+  `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search --ai --provider custom --api-key ''`.
