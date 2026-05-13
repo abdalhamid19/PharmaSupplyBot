@@ -34,6 +34,9 @@ class OrderAiOutcome:
     reason: str
     confidence: float = 0.0
     manual_review: bool = False
+    verify_result: dict = field(default_factory=dict)
+    search_result: dict = field(default_factory=dict)
+    review_result: dict = field(default_factory=dict)
 
 
 class OrderAiDecisionService:
@@ -67,7 +70,7 @@ class OrderAiDecisionService:
     def _no_key_outcome(self, decision: MatchDecision) -> OrderAiOutcome:
         if decision.best_match:
             return OrderAiOutcome(decision, "ai_skipped", "no_api_key", 0.0)
-        return self._manual(decision, "ai_skipped", "no_api_key")
+        return OrderAiOutcome(decision, "ai_skipped", "no_api_key", 0.0, True)
 
 
 def _has_api_key(config: APIConfig) -> bool:

@@ -53,11 +53,18 @@ class OrderAiMatchingTests(unittest.TestCase):
         self.assertIsNotNone(outcome.decision.best_match)
         self.assertFalse(outcome.manual_review)
 
+    def test_no_api_key_without_match_goes_to_manual_review(self) -> None:
+        """AI without credentials cannot invent a match."""
+        outcome = self._service(APIConfig()).resolve(self._item(), self._decision(False))
+        self.assertEqual(outcome.status, "ai_skipped")
+        self.assertTrue(outcome.manual_review)
+
     def test_verify_accepts_high_confidence_match(self) -> None:
         """High-confidence AI verification keeps the deterministic match active."""
         outcome = self._service(self._api()).resolve(self._item(), self._decision(True))
         self.assertEqual(outcome.status, "ai_verified")
         self.assertIsNotNone(outcome.decision.best_match)
+        self.assertEqual(outcome.verify_result["reason"], "ok")
 
     def test_reject_moves_to_manual_review_when_search_fails(self) -> None:
         """Rejected deterministic match blocks active ordering without AI replacement."""
@@ -65,6 +72,7 @@ class OrderAiMatchingTests(unittest.TestCase):
         outcome = self._service(self._api()).resolve(self._item(), self._decision(True))
         self.assertTrue(outcome.manual_review)
         self.assertEqual(outcome.status, "ai_rejected")
+        self.assertEqual(outcome.verify_result["reason"], "mismatch")
 
     def test_ai_search_can_accept_replacement(self) -> None:
         """AI search can select a candidate when deterministic matching has no winner."""
@@ -77,6 +85,7 @@ class OrderAiMatchingTests(unittest.TestCase):
         outcome = self._service(self._api()).resolve(self._item(), self._decision(False))
         self.assertEqual(outcome.status, "ai_search_accepted")
         self.assertEqual(outcome.decision.best_match.score, 91.0)
+        self.assertEqual(outcome.search_result["reason"], "better")
 
     def test_review_rejection_blocks_ai_selection(self) -> None:
         """A review model disagreement forces manual review."""
@@ -96,6 +105,7 @@ class OrderAiMatchingTests(unittest.TestCase):
         )
         self.assertEqual(outcome.status, "ai_review_rejected")
         self.assertTrue(outcome.manual_review)
+        self.assertEqual(outcome.review_result["reason"], "review reject")
 
     def _service(self, api_config):
         settings = OrderAiSettings(enabled=True, api_config=api_config)
