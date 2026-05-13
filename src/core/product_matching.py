@@ -71,6 +71,7 @@ _GENERIC_IDENTITY_TOKENS = {
 }
 
 from .config.config_models import MatchingConfig
+from .drug_matching.normalizer import components_match, parse_drug
 from .matching_models import (
     CandidateMatchDiagnostic,
     MatchDecision,
@@ -645,9 +646,30 @@ def _diagnostic_acceptance(
     variant_rejection = _candidate_variant_rejection(score_query, result)
     if variant_rejection:
         return False, "", variant_rejection
-    return _lexical_or_threshold_acceptance(
+    lexical_acceptance = _lexical_or_threshold_acceptance(
         score_query, result, breakdown, matching_config
     )
+    if lexical_acceptance[2]:
+        return lexical_acceptance
+    component_rejection = _candidate_component_rejection(score_query, result)
+    if component_rejection:
+        return False, "", component_rejection
+    return lexical_acceptance
+
+
+def _candidate_component_rejection(query: str, candidate: dict[str, Any]) -> str:
+    """Return a rejection reason when parsed drug components are incompatible."""
+    candidate_name = _candidate_english_name(candidate)
+    if not candidate_name:
+        return ""
+    requested = parse_drug(query)
+    offered = parse_drug(candidate_name)
+    if not requested.brand or not offered.brand:
+        return ""
+    is_match, reason = components_match(requested, offered)
+    if is_match:
+        return ""
+    return f"Component mismatch: {reason}"
 
 
 def _lexical_or_threshold_acceptance(
