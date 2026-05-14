@@ -186,6 +186,8 @@ def normalize(name: str) -> str:
     name = re.sub(r"\b(SYRP|SYP)\b", "SYRUP", name)
     name = re.sub(r"\bVAG\b", "VAGINAL", name)
     name = name.replace("*", " / ")
+    name = re.sub(r"(?<=\d)O(?=\s*ML\b)", "0", name)
+    name = re.sub(r"(?<=%)([A-Z])", r" \1", name)
     # Split compact drug notation before parsing: PANADOL20MG -> PANADOL 20 MG, 30TAB -> 30 TAB
     name = re.sub(r"([A-Z])(?=\d)", r"\1 ", name)
     name = re.sub(r"(?<=\d)([A-Z])", r" \1", name)
@@ -462,6 +464,12 @@ def _modifier_is_optional(modifier: str, d_words: set[str], m_words: set[str]):
         {"SPRAY", "SPRAYS", "DOSES"} & m_words
     ):
         return True
+    if modifier == "NASAL" and (
+        {"DROPS", "DROP", "EYE"} & d_words
+    ) and (
+        {"DROPS", "DROP", "EYE"} & m_words
+    ):
+        return True
     if modifier == "VAGINAL" and (
         {"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"} & d_words
     ) and (
@@ -539,9 +547,26 @@ def _forms_compatible(left: str, right: str) -> bool:
     return False
 
 
+def _known_brand_variant_match(
+    d: DrugComponents, m: DrugComponents, d_clean: str, m_clean: str
+) -> bool:
+    d_words = set(d.normalized.split())
+    m_words = set(m.normalized.split())
+    if {d_clean, m_clean} == {"EPOETIN", "EPOETINSEDICO"}:
+        return True
+    if d.product_class == m.product_class == "baby_food":
+        if "BEBELAC" in d_words and "BEBELAC" in m_words:
+            return ("BEBEJUNIOR" in d_words) == ("BEBEJUNIOR" in m_words)
+    if "CONCOR" in d_words and "CONCOR" in m_words:
+        return "PLUS" in d_words and "PLUS" in m_words
+    return False
+
+
 def _dosage_compatible(d: DrugComponents, m: DrugComponents) -> bool:
     d_parts = _dosage_parts(d.dosage_nums)
     m_parts = _dosage_parts(m.dosage_nums)
+    if _concor_plus_dosage_compatible(d_parts, m_parts, d, m):
+        return True
     if tuple(sorted(d_parts, key=float)) == tuple(sorted(m_parts, key=float)):
         return True
     if _summed_combo_matches_single(d_parts, m_parts):
@@ -556,6 +581,17 @@ def _dosage_compatible(d: DrugComponents, m: DrugComponents) -> bool:
     if len(m_parts) == 1 and len(d_parts) > 1 and m_parts[0] == d_parts[0]:
         return True
     return False
+
+
+def _concor_plus_dosage_compatible(
+    left: list[str], right: list[str], d: DrugComponents, m: DrugComponents
+) -> bool:
+    words = set(d.normalized.split()) | set(m.normalized.split())
+    if not {"CONCOR", "PLUS"} <= words:
+        return False
+    if not left or not right:
+        return False
+    return left[0] == right[0]
 
 
 def _liquid_total_matches_per_5(
@@ -624,6 +660,17 @@ def _unmatched_numeric_signals(c: DrugComponents) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _component_numeric_signals(c: DrugComponents) -> tuple[str, ...]:
+    signals = list(_unmatched_numeric_signals(c))
+    words = set(c.normalized.split())
+    if c.product_class == "baby_food" and "BEBEJUNIOR" in words and "+" in words:
+        try:
+            signals.remove("1")
+        except ValueError:
+            pass
+    return tuple(signals)
+
+
 def components_match(
     d: DrugComponents,
     m: DrugComponents,
@@ -662,6 +709,7 @@ def components_match(
         return False, "different_age_group"
 
     if d_clean and m_clean:
+        brand_exception = _known_brand_variant_match(d, m, d_clean, m_clean)
         shorter = min(len(d_clean), len(m_clean))
         prefix_len = min(
             len(d_clean), len(m_clean),
@@ -672,16 +720,21 @@ def components_match(
             if (
                 d_clean not in m_clean and m_clean not in d_clean
                 and fuzz.ratio(d_clean, m_clean) < 86
+                and not brand_exception
             ):
                 return False, "different_brand"
 
         if d_clean != m_clean and d_clean not in m_clean and m_clean not in d_clean:
-            if fuzz.ratio(d_clean, m_clean) < 86:
+            if fuzz.ratio(d_clean, m_clean) < 86 and not brand_exception:
                 return False, "different_brand"
         if d_clean != m_clean and (d_clean in m_clean or m_clean in d_clean):
             shorter = min(len(d_clean), len(m_clean))
             longer = max(len(d_clean), len(m_clean))
-            if longer - shorter > 2 and fuzz.ratio(d_clean, m_clean) < 86:
+            if (
+                longer - shorter > 2
+                and fuzz.ratio(d_clean, m_clean) < 86
+                and not brand_exception
+            ):
                 return False, "different_brand"
 
     if (
@@ -698,8 +751,8 @@ def components_match(
             return False, "different_dosage"
         dosage_checked_compatible = True
     if not dosage_checked_compatible:
-        d_numeric = _unmatched_numeric_signals(d)
-        m_numeric = _unmatched_numeric_signals(m)
+        d_numeric = _component_numeric_signals(d)
+        m_numeric = _component_numeric_signals(m)
         if d_numeric and m.dosage_nums:
             return False, "different_dosage"
         if m_numeric and d.dosage_nums:

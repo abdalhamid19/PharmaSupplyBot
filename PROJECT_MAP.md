@@ -64,6 +64,9 @@
   `5MG` or `30TAB`, reducing false numeric mismatches.
 - Liquid per-dose markers such as `100 MG / 5 ML` do not block otherwise valid
   fuzzy matches when the requested item already contains an ML volume.
+- Component parsing now covers audited false-negative formats for compact
+  percent/form tokens, OCR `6O ML` volumes, `CONCOR PLUS`, `EPOETIN SEDICO`,
+  `BEBELAC BEBEJUNIOR`, and generic eye/nasal drops wording.
 - Order AI artifact row shaping stays in `src/core/order_ai_trace_rows.py` and
   `src/core/order_run_artifact_rows.py`.
 - Order winner artifact fields stay in `src/core/order_winner_fields.py` and
@@ -112,4 +115,7 @@
   rule audit as the repeated post-phase baseline.
 - Phase 9 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 248 unit tests plus
+  compileall and rule audit.
+- Phase 10 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 249 unit tests plus
   compileall and rule audit.

@@ -166,6 +166,24 @@ class NormalizerTests(unittest.TestCase):
                 self.assertTrue(is_ok)
                 self.assertEqual(reason, "ok")
 
+    def test_components_match_accepts_audited_false_negative_formats(self) -> None:
+        cases = [
+            ("ECTOMETHRIN 5%LOTION 50 ML", "ECTOMETHRIN 5 % LOTION 50 ML"),
+            ("IVERZINE LOTION 6O ML", "IVERZINE 1 % LOTION 60 ML"),
+            ("CONCOR 5 PLUS 30TAB", "CONCOR PLUS 5 / 12.5 MG 30 F.C. TABLETS"),
+            ("EPOETIN 4000 IU VIAL", "EPOETIN SEDICO 4000 I.U. / ML VIAL."),
+            (
+                "BEBELAC BEBEJUNIOR 3 MILK 400 GM",
+                "BEBELAC 3 (BEBEJUNIOR 1 +) MILK 400 GM",
+            ),
+            ("PRISOLINE DROPS", "PRISOLINE EYE / NASAL DROPS 15 ML"),
+        ]
+        for left, right in cases:
+            with self.subTest(left=left, right=right):
+                is_ok, reason = components_match(parse_drug(left), parse_drug(right))
+                self.assertTrue(is_ok)
+                self.assertEqual(reason, "ok")
+
 
 if __name__ == "__main__":
     unittest.main()
