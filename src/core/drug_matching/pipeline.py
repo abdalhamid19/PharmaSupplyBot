@@ -306,6 +306,9 @@ class MatchPipeline:
         )
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         review = self._manual_review_rows().copy()
+        review["manual_review_reason"] = review.apply(
+            _manual_review_reason_column, axis=1,
+        )
         review["manual_decision"] = ""
         review["manual_reason"] = ""
         review["correct_store_product_id"] = ""
@@ -425,3 +428,30 @@ def _manual_review_path(output_path: str) -> str:
     """Return a manual-review path next to the main output CSV."""
     path = Path(output_path)
     return str(path.with_name(f"{path.stem}_manual_review{path.suffix}"))
+
+
+def _manual_review_reason_column(row: pd.Series) -> str:
+    """Build a human-readable reason explaining why this row needs review."""
+    parts: list[str] = []
+    verified = str(row.get("verified", "") or "")
+    has_match = bool(row.get("matched_product_name_en"))
+
+    if not has_match:
+        parts.append("no_match_found")
+    elif verified == "ai_rejected":
+        parts.append("ai_rejected_match")
+    elif verified == "ai_review_rejected":
+        parts.append("ai_review_rejected_match")
+    elif verified in ("ai_confirmed", "ai_corrected", "ai_found"):
+        parts.append("low_confidence_ai_match")
+    else:
+        score = pd.to_numeric(row.get("match_score", 0), errors="coerce")
+        if pd.notna(score) and score < 90:
+            parts.append(f"uncertain_score({score:.0f})")
+
+    # Expose internal AI component reason if present
+    component = str(row.get("_ai_component_reason", "") or "")
+    if component and component.lower() not in {"", "nan", "ok"}:
+        parts.append(f"component:{component}")
+
+    return "; ".join(parts) if parts else "needs_review"

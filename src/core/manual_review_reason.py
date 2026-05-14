@@ -42,8 +42,31 @@ def _manual_review_detail(summary_reason: str, outcome) -> str:
     for result in (review, search, verify):
         reason = str(result.get("reason", "") or "")
         if reason and reason not in detail:
-            return f"{detail} | {reason}" if detail else reason
+            detail = f"{detail} | {reason}" if detail else reason
+            break
+    # Append hard_conflicts from AI results if present
+    conflicts = _collect_hard_conflicts(verify, search, review)
+    if conflicts:
+        conflict_text = f"hard_conflicts: {', '.join(conflicts)}"
+        if conflict_text not in detail:
+            detail = f"{detail} | {conflict_text}" if detail else conflict_text
     return detail
+
+
+def _collect_hard_conflicts(*results: dict) -> list[str]:
+    """Collect unique hard_conflicts from multiple AI result dicts."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for result in results:
+        raw = result.get("hard_conflicts") or []
+        if isinstance(raw, str):
+            raw = [c.strip() for c in raw.split(",") if c.strip()]
+        for conflict in raw:
+            lower = conflict.lower()
+            if lower not in seen:
+                seen.add(lower)
+                out.append(conflict)
+    return out
 
 
 def _blocking_phase(outcome, summary_status: str) -> str:
