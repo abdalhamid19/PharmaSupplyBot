@@ -8,6 +8,7 @@ import shutil
 import pandas as pd
 import streamlit as st
 
+from ..core.order_ai_run_summary import summarize_order_ai_rows
 from .streamlit_shared import (
     ARTIFACTS_DIR,
     load_csv_rows,
@@ -109,7 +110,16 @@ def render_run_table(run_dir: Path, title: str, pattern: str) -> None:
             render_manual_review_editor(rows, run_dir)
             return
         st.subheader(title)
+        if title == "Order AI Trace":
+            render_order_ai_trace_summary(rows)
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+def render_order_ai_trace_summary(rows: list[dict[str, str]]) -> None:
+    """Render compact AI/API trace grouping before the full table."""
+    summary = summarize_order_ai_rows(rows)
+    if summary:
+        st.dataframe(pd.DataFrame(summary), use_container_width=True, hide_index=True)
 
 
 def render_recent_run_files(run_dir: Path) -> None:
