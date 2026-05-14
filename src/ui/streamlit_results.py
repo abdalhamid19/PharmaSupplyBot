@@ -16,6 +16,7 @@ from .streamlit_shared import (
     summary_csv_path,
     summary_xlsx_path,
 )
+from .streamlit_manual_review import render_manual_review_editor
 from .streamlit_summary_views import render_summary_views
 from .streamlit_timing_view import render_timing_metrics
 
@@ -104,6 +105,9 @@ def render_run_table(run_dir: Path, title: str, pattern: str) -> None:
         return
     rows = load_csv_rows(paths[0])
     if rows:
+        if title == "Manual Review":
+            render_manual_review_editor(rows, run_dir)
+            return
         st.subheader(title)
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
