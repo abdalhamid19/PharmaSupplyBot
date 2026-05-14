@@ -48,6 +48,9 @@
 - Shared live-search scoring stays in `src/core/product_matching.py`.
 - Shared candidate id normalization stays in `src/core/candidate_identity.py` so
   matching, AI, and artifacts agree on orderable Tawreed ids.
+- Candidate ids are orderable only when they come from Tawreed store-product
+  fields such as `storeProductId`/`productStoreId` or their nested metadata
+  aliases; generic `id` is not treated as safe for cart actions.
 - Shared item code/name normalization stays in `src/core/item_text.py` and is
   reused by prevented-items and cart-removal input handling.
 - Component parsing, indexed CSV matching, AI verification/search/review, model
@@ -62,6 +65,11 @@
   `src/core/drug_matching/ai_provider_cooldown.py`; repeated provider
   rate-limit or invalid JSON attempts disable that provider's rotation attempts
   for the active verifier.
+- Tawreed live search uses a bounded per-item query cache in
+  `src/tawreed/tawreed_query_cache.py`; candidate de-duplication happens before
+  scoring and trace emission.
+- AI JSON parsing repairs common fenced/trailing-comma JSON while leaving
+  unparseable prose rejected for safety.
 - Manual-review correction import stays in `src/core/manual_review_hints.py`.
   Runtime learning uses `src/core/manual_review_store.py` with a local SQLite
   file ignored by git, and `src/core/manual_review_runtime.py` applies saved
@@ -82,6 +90,9 @@
   `5MG` or `30TAB`, reducing false numeric mismatches.
 - Liquid per-dose markers such as `100 MG / 5 ML` do not block otherwise valid
   fuzzy matches when the requested item already contains an ML volume.
+- Injectable `GM` strengths are canonically compared with `MG` strengths, and
+  unit-dose pack markers such as `2 ML 20 UNIT DOSE` do not block otherwise
+  compatible vial matches.
 - Component parsing now covers audited false-negative formats for compact
   percent/form tokens, OCR `6O ML` volumes, `CONCOR PLUS`, `EPOETIN SEDICO`,
   `BEBELAC BEBEJUNIOR`, and generic eye/nasal drops wording.
@@ -110,7 +121,9 @@
   implemented. Completed: diagnostic artifact grouping, bounded match traces,
   Tawreed API contract discovery/client, `auto/api/browser` CLI+GUI backend
   selection, SQLite manual-review learning, runtime manual-review application,
-  query caching, and candidate de-duplication.
+  guarded API final submission, actionable candidate identity, improved
+  pharmaceutical numeric/dosage rules, query caching, AI JSON repair, provider
+  cooldown, and candidate de-duplication.
 - Final order submission remains disabled unless `runtime.submit_order` is
   explicitly true.
 - Historical `tools/list_all_violations.py` baseline debt remains outside this
@@ -123,15 +136,16 @@
   `https://github.com/abdalhamid19/PharmaSupplyBot.git`. Local commits are made
   after each phase; `git push origin main` cannot complete in this environment
   without saved credentials or a token.
-- Live cart mutation checks depend on a valid Tawreed authenticated session.
-  Safe `order --match-only` and read-only export smokes do not require mutating
-  the cart.
+- Live cart mutation checks depend on a valid Tawreed authenticated session and
+  an incomplete local Tawreed API contract currently makes strict
+  `--execution-mode api` fail fast; `auto` falls back to browser automation.
+  Final order submission remains disabled unless `runtime.submit_order=true`.
 
 ## [VALIDATION]
 
-- `.venv/bin/python tools/run_unit_tests.py`: 262 passed.
+- `.venv/bin/python tools/run_unit_tests.py`: 294 passed.
 - `.venv/bin/python tools/rule_audit.py`: `rule_audit_ok`,
-  `baseline_violations_remaining:160`.
+  `baseline_violations_remaining:161`.
 - CLI help checks succeeded for `run.py`, `order`, `remove-cart`,
   `export-products`, and `match-products`.
 - Smoke run succeeded:
@@ -205,3 +219,39 @@
   item to cart with final submission disabled, and `remove-cart
   --execution-mode auto` removed that KENACOMB cart row.
 - Streamlit smoke succeeded on `http://127.0.0.1:8507` with HTTP 200.
+- Latest full remediation validation succeeded on 2026-05-14:
+  `.venv/bin/python tools/phase_validation.py` ran compileall, 294 unit tests,
+  and rule audit.
+- Limit-50 export succeeded:
+  `.venv/bin/python run.py export-products --profile wardany --limit 50`
+  wrote 50 unique rows to
+  `artifacts/export-products/wardany/20260514_1621_2/`.
+- Limit-50 standalone matching succeeded:
+  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 50 --no-ai --trace`
+  wrote `artifacts/match-products/wardany/20260514_1621/`; the limited 50-row
+  export catalog did not cover the first 50 shortage rows, so all 50 required
+  manual review in that standalone catalog comparison.
+- Limit-50 Tawreed match-only succeeded:
+  `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 50 --match-only --fast-search --execution-mode auto`
+  wrote `artifacts/order/wardany/20260514_1621_2/`, matched 20 rows, skipped 30
+  no-result rows, and left the cart unchanged.
+- AI safe smoke succeeded with configured rotation keys:
+  `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search --execution-mode auto --ai --provider rotation --concurrency 1 --no-ai-preflight`
+  wrote `artifacts/order/wardany/20260514_1629/` and left the cart unchanged.
+- Execution-mode smokes: browser match-only succeeded in
+  `artifacts/order/wardany/20260514_1629_2/`; strict API match-only failed fast
+  in `artifacts/order/wardany/20260514_1629_3/` because the local contract lacks
+  `product_search_url`, which is an external endpoint-discovery dependency.
+- Live add-to-cart used 20 actionable match-only rows from run `20260514_1621_2`.
+  `.venv/bin/python run.py order --profile wardany --excel artifacts/run-control/limit50_20260514_1621_2/live_add.xlsx --limit 50 --fast-search --execution-mode auto --item-workers 1`
+  wrote `artifacts/order/wardany/20260514_1626/`, added 18 rows, skipped 2
+  out-of-stock rows, and did not submit the final order because
+  `runtime.submit_order=false`.
+- Live remove-cart cleaned the same additions:
+  `.venv/bin/python run.py remove-cart --profile wardany --excel artifacts/run-control/limit50_20260514_1621_2/live_remove_added.xlsx --execution-mode auto --item-workers 1`
+  wrote `artifacts/remove-cart/wardany/20260514_1627/` and removed 18/18 rows.
+- Streamlit smoke succeeded on `http://127.0.0.1:8765` with HTTP 200.
+- Artifact comparison against `20260514_1252`: new Limit-50 match-only
+  `match_log_all` is 3.65 MB versus 63.98 MB in the 300-row audit run, new
+  `matching_trace` is 5.25 MB versus 50.60 MB, and the new no-AI/AI-smoke
+  traces recorded no `429` or `invalid_json` provider errors.
