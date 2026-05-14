@@ -40,6 +40,12 @@
   tab and runs it through the existing isolated subprocess runner.
 - Streamlit Order exposes the same order AI flags and browses command/profile/run
   artifact folders.
+- Streamlit Order exposes the matching risk policy and flagged-match action used
+  by the CLI.
+- Streamlit Manual Review can save decisions and start a current-run
+  `not_matching` cart-removal flow from edited rows.
+- Streamlit Results summarizes order AI trace phases/statuses/provider errors
+  before rendering the full trace table.
 - New command outputs use `artifacts/<command>/<profile>/<run_id>/` with
   timestamped files. Old flat outputs were moved under `artifacts/legacy/...`.
 
@@ -112,6 +118,9 @@
 - Manual-review removal source building stays in
   `src/core/manual_review_removal.py`; CLI wiring stays in
   `src/cli/cli_cart_removal_source.py`.
+- Current-run Streamlit not-matching removal helpers stay in
+  `src/ui/streamlit_manual_review_remove.py`.
+- Order AI trace grouping stays in `src/core/order_ai_run_summary.py`.
 - Aggressive matching bridge logic stays in
   `src/tawreed/tawreed_aggressive_matching.py`; the core risk selection remains
   in `src/core/matching_risk.py`.
@@ -309,3 +318,9 @@
   cart removal, and bounded matching trace output. Latest validation:
   `.venv/bin/python tools/phase_validation.py` ran compileall, 319 unit tests,
   and rule audit successfully.
+- Follow-up remediation added Streamlit aggressive matching controls, a
+  current-run Manual Review removal action, and order AI/API trace summaries.
+- Latest validation succeeded:
+  `.venv/bin/python tools/phase_validation.py --smoke` ran compileall, 323 unit
+  tests, rule audit, CLI help checks, and a match-products smoke. Streamlit
+  started on `http://127.0.0.1:8765` and returned HTTP 200.
