@@ -255,3 +255,35 @@
   `match_log_all` is 3.65 MB versus 63.98 MB in the 300-row audit run, new
   `matching_trace` is 5.25 MB versus 50.60 MB, and the new no-AI/AI-smoke
   traces recorded no `429` or `invalid_json` provider errors.
+- Latest no-results remediation validation succeeded on 2026-05-14:
+  `.venv/bin/python tools/phase_validation.py` ran compileall, 309 unit tests,
+  and rule audit. CLI help succeeded for `run.py`, `order`, `remove-cart`,
+  `export-products`, and `match-products`.
+- Limit-30 export succeeded:
+  `.venv/bin/python run.py export-products --profile wardany --limit 30`
+  wrote 30 unique rows to
+  `artifacts/export-products/wardany/20260514_2047_2/`.
+- Limit-30 standalone catalog matching succeeded:
+  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 30 --no-ai --trace`
+  wrote `artifacts/match-products/wardany/20260514_2047/`; the deliberately
+  limited 30-row export catalog did not cover the shortage rows, so standalone
+  catalog matching stayed at 0/30.
+- Limit-30 Tawreed live-search match-only succeeded:
+  `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 30 --match-only --fast-search --execution-mode auto`
+  wrote `artifacts/order/wardany/20260514_2054_2/`, matched 21 rows, separated
+  4 non-orderable rows, left 5 true no-result/manual-review rows, and left the
+  cart unchanged. For the same first 30 rows, run `20260514_1852` had 15
+  matched, 14 no-results, and 1 skipped row.
+- AI safe smoke was skipped because no AI provider keys were present in the
+  environment; this is not a product failure. API execution still falls back in
+  `auto` because the local Tawreed contract lacks externally discovered
+  `product_search_url`, `add_to_cart_url`, and `remove_cart_url` fields.
+- Live add-to-cart used 17 actionable matched rows from run `20260514_2054_2`.
+  `.venv/bin/python run.py order --profile wardany --excel artifacts/order/wardany/20260514_2054_2/live_actionable_limit30_20260514_2054_2.xlsx --limit 30 --fast-search --execution-mode auto`
+  wrote `artifacts/order/wardany/20260514_2057/`, added 17/17 rows, and did
+  not submit the final order because `runtime.submit_order=false`.
+- Live remove-cart cleaned the same additions after adding a longer Tawreed
+  session-surface wait:
+  `.venv/bin/python run.py remove-cart --profile wardany --excel artifacts/order/wardany/20260514_2054_2/live_actionable_limit30_20260514_2054_2.xlsx --execution-mode auto`
+  wrote `artifacts/remove-cart/wardany/20260514_2101/` and removed 17/17 rows.
+- Streamlit smoke succeeded on `http://localhost:8765` with HTTP 200.
