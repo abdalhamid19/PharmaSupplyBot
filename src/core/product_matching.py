@@ -722,9 +722,39 @@ def _lexical_or_threshold_acceptance(
     )
     if lexical_rejection:
         return False, "", lexical_rejection
-    return _acceptance_details(
+    acceptance = _acceptance_details(
         score_query, result, breakdown.total_score, matching_config
     )
+    return _numeric_safe_acceptance(score_query, result, acceptance)
+
+
+def _numeric_safe_acceptance(
+    query: str,
+    candidate: dict[str, Any],
+    acceptance: tuple[bool, str, str],
+) -> tuple[bool, str, str]:
+    """Reject fuzzy matches that add unrequested numeric product details."""
+    extra_tokens = _unrequested_numeric_tokens(query, _candidate_english_name(candidate))
+    if acceptance[0] and acceptance[1] != "exact_normalized_name_match" and extra_tokens:
+        tokens = ", ".join(sorted(extra_tokens))
+        return False, "", f"Candidate has unrequested numeric token: {tokens}"
+    return acceptance
+
+
+def _unrequested_numeric_tokens(query: str, candidate_name: str) -> set[str]:
+    query_tokens = _numeric_tokens(_normalize_text(query))
+    candidate_tokens = _numeric_tokens(_normalize_text(candidate_name))
+    extra_tokens = candidate_tokens - query_tokens
+    if not query_tokens and len(extra_tokens) <= 1:
+        return set()
+    if len(extra_tokens) == 1 and _single_percentage_token(extra_tokens, candidate_name):
+        return set()
+    return extra_tokens
+
+
+def _single_percentage_token(tokens: set[str], candidate_name: str) -> bool:
+    token = next(iter(tokens))
+    return f"{token}%" in str(candidate_name)
 
 
 def _candidate_variant_rejection(query: str, candidate: dict[str, Any]) -> str:

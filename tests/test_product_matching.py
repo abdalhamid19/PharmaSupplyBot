@@ -229,6 +229,15 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("Ambiguous accepted candidates", decision.final_reason)
 
+    def test_fuzzy_match_with_extra_numeric_tokens_requires_review(self) -> None:
+        item = Item(code="74881", name="OCTOZINC CAP", qty=1)
+        candidate = _candidate("OCTOZINC 25 MG 20 CAPS.", "اوكتوزنك")
+
+        decision = explain_best_product_match(item, [(item.name, [candidate])])
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("unrequested numeric token", decision.final_reason)
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""
