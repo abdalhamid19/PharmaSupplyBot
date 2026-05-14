@@ -11,7 +11,12 @@ from src.core.config.config_models import (
     ProfileConfig,
     RuntimeConfig,
 )
-from src.core.matching_models import MatchDecision, SearchMatch
+from src.core.matching_models import (
+    CandidateMatchDiagnostic,
+    MatchDecision,
+    MatchScoreBreakdown,
+    SearchMatch,
+)
 from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
 from src.tawreed.tawreed_api import TawreedApiUnavailable
@@ -287,6 +292,39 @@ class TawreedBotTests(unittest.TestCase):
         self.assertEqual(summary.matched_product_english_name, "BEBELAC AR MILK")
         self.assertEqual(summary.matched_product_english_name_source, "fallback")
         self.assertEqual(summary.matched_product_arabic_name, "لبن بيبلاك بريماتيور")
+
+    def test_no_results_with_missing_orderable_candidate_is_not_orderable(self) -> None:
+        bot = self._bot()
+        bot.last_match_decision = MatchDecision(
+            best_match=None,
+            diagnostics=[
+                CandidateMatchDiagnostic(
+                    query="POTASSIUM CHLORIDE 5 ML",
+                    row_index=0,
+                    score=19.0,
+                    sort_key=(19.0,),
+                    accepted=False,
+                    accepted_reason="",
+                    rejection_reason="Candidate missing orderable storeProductId",
+                    breakdown=MatchScoreBreakdown(1, 1, 0, 1, 1, 0, 0, 0, 19),
+                    candidate={
+                        "productNameEn": "POTASSIUM CHLORIDE I.V. 5 ML 5 AMP",
+                        "productName": "بوتاسيوم كلورايد",
+                    },
+                )
+            ],
+            final_reason="No decisive match found",
+        )
+
+        self.assertEqual(bot._skip_status("No decisive match found"), "not-orderable")
+
+    def test_ai_manual_review_skip_has_explicit_status(self) -> None:
+        bot = self._bot()
+
+        self.assertEqual(
+            bot._skip_status("AI matching requires manual review"),
+            "manual-review-required",
+        )
 
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:
         config = AppConfig(

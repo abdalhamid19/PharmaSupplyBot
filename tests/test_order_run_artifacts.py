@@ -60,19 +60,26 @@ class OrderRunArtifactsTests(unittest.TestCase):
         self.assertEqual(attempt["model"], "openai/gpt-oss-120b")
         self.assertEqual(attempt["status"], "429")
 
-    def test_manual_review_is_written_for_no_results(self) -> None:
-        """No-results item summaries create manual-review artifacts."""
+    def test_manual_review_is_written_for_reviewable_statuses(self) -> None:
+        """Reviewable item summaries create manual-review artifacts."""
+        reviewable_statuses = ("no-results", "not-orderable", "manual-review-required")
+        for status in reviewable_statuses:
+            with self.subTest(status=status):
+                self._assert_manual_review_status(status)
+
+    def _assert_manual_review_status(self, status: str) -> None:
+        """Write one summary and assert it is routed to manual review."""
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "artifacts"
             with artifact_run("order", "wardany", "20260513_2030", root):
                 append_order_item_artifacts(
-                    "wardany", self._item(), self._summary("no-results"),
+                    "wardany", self._item(), self._summary(status),
                     MatchDecision(None, [], "none"), None,
                 )
             run_dir = root / "order/wardany/20260513_2030"
             rows = self._csv_rows(run_dir / "manual_review_20260513_2030.csv")
-            self.assertEqual(rows[0]["status"], "no-results")
-            self.assertEqual(rows[0]["manual_review_reason_code"], "no-results")
+            self.assertEqual(rows[0]["status"], status)
+            self.assertEqual(rows[0]["manual_review_reason_code"], status)
             self.assertEqual(rows[0]["manual_decision"], "")
 
     @staticmethod

@@ -26,7 +26,12 @@ def manual_review_required(summary_status: str, outcome) -> bool:
     """Return whether this final item state needs human review."""
     if outcome is not None and outcome.manual_review:
         return True
-    return summary_status in {"no-results", "matched-but-unavailable"}
+    return summary_status in {
+        "no-results",
+        "matched-but-unavailable",
+        "not-orderable",
+        "manual-review-required",
+    }
 
 
 def manual_review_row(item, summary, decision, outcome) -> dict[str, object]:

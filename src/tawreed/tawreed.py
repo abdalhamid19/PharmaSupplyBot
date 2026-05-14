@@ -9,8 +9,9 @@ from typing import Iterable
 from playwright.sync_api import Page, sync_playwright
 
 from ..core.cart_removal_items import CartRemovalItem
+from ..core.candidate_identity import candidate_has_store_product_id
 from ..core.config.config_models import AppConfig, ProfileConfig
-from ..core.matching_models import MatchDecision
+from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
 from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
 from .selectors import _selectors
@@ -781,7 +782,9 @@ class TawreedBot:
             "no matching product found" in lowered
             or "no decisive match found" in lowered
         ):
-            return "no-results"
+            return self._unmatched_decision_status() or "no-results"
+        if "manual review" in lowered:
+            return "manual-review-required"
         if "unavailable" in lowered or "out of stock" in lowered:
             return "matched-but-unavailable"
         return "skipped"
@@ -789,13 +792,32 @@ class TawreedBot:
     def _failure_status(self, reason: str) -> str:
         """Return the structured summary status for one failed item."""
         if "No matching product found" in reason or "No decisive match found" in reason:
-            return "no-results"
+            return self._unmatched_decision_status() or "no-results"
         return "failed"
+
+    def _unmatched_decision_status(self) -> str:
+        """Return a more precise status for a rejected but recognized candidate."""
+        decision = self.last_match_decision
+        if not decision or decision.best_match:
+            return ""
+        if any(_diagnostic_missing_orderable_identity(row) for row in decision.diagnostics):
+            return "not-orderable"
+        return ""
 
 
 def _item_error_label(item: Item) -> str:
     """Return the artifact label for one failed item."""
     return f"item_error_{item.code or 'no_code'}"
+
+
+def _diagnostic_missing_orderable_identity(
+    diagnostic: CandidateMatchDiagnostic,
+) -> bool:
+    """Return whether a diagnostic found an otherwise acceptable non-orderable row."""
+    if candidate_has_store_product_id(diagnostic.candidate):
+        return False
+    reason = diagnostic.rejection_reason.lower()
+    return "candidate missing orderable storeproductid" in reason
 
 
 def _item_error_details(page: Page, item: Item, error: Exception) -> str:
