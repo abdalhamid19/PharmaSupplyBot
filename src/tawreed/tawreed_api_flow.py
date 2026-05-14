@@ -70,6 +70,9 @@ def _submit_order_if_enabled(bot, api: TawreedApiClient, added_any: bool) -> Non
     if not added_any or bot._stop_requested():
         print(f"[{bot.profile_key}] Stop requested or incomplete. Order confirmation skipped.")
         return
+    if getattr(bot, "match_only", False):
+        print(f"[{bot.profile_key}] Match-only run. Final order submission skipped.")
+        return
     if not bot.config.runtime.submit_order:
         print(f"[{bot.profile_key}] Items added to cart. Final order submission is disabled.")
         return

@@ -15,6 +15,30 @@ from src.tawreed.tawreed_api_contract import (
     load_api_contract,
     save_discovered_api_contract,
 )
+from src.tawreed.tawreed_api_flow import _submit_order_if_enabled
+
+
+class _FakeSubmitApi:
+    def __init__(self) -> None:
+        self.submitted = False
+
+    def submit_order(self) -> None:
+        self.submitted = True
+
+
+class _FakeSubmitBot:
+    profile_key = "wardany"
+
+    def __init__(self, submit_order: bool, match_only: bool = False) -> None:
+        from types import SimpleNamespace
+
+        self.config = SimpleNamespace(
+            runtime=SimpleNamespace(submit_order=submit_order)
+        )
+        self.match_only = match_only
+
+    def _stop_requested(self) -> bool:
+        return False
 
 
 class TawreedApiTests(unittest.TestCase):
@@ -60,6 +84,29 @@ class TawreedApiTests(unittest.TestCase):
             contract = load_api_contract(path)
 
         self.assertEqual(contract.product_search_url, "/rest/v2/product-search")
+
+    def test_api_submit_skips_when_runtime_submit_disabled(self) -> None:
+        api = _FakeSubmitApi()
+
+        _submit_order_if_enabled(_FakeSubmitBot(False), api, added_any=True)
+
+        self.assertFalse(api.submitted)
+
+    def test_api_submit_skips_match_only_even_when_submit_enabled(self) -> None:
+        api = _FakeSubmitApi()
+
+        _submit_order_if_enabled(
+            _FakeSubmitBot(submit_order=True, match_only=True), api, added_any=True
+        )
+
+        self.assertFalse(api.submitted)
+
+    def test_api_submit_runs_only_when_all_safety_gates_pass(self) -> None:
+        api = _FakeSubmitApi()
+
+        _submit_order_if_enabled(_FakeSubmitBot(True), api, added_any=True)
+
+        self.assertTrue(api.submitted)
 
 
 if __name__ == "__main__":
