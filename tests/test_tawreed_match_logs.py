@@ -9,8 +9,10 @@ from src.core.matching_models import (
 )
 from src.core.utils.excel import Item
 from src.tawreed.tawreed_match_logs import (
+    MAX_DETAILED_MATCH_CANDIDATES,
     OrderItemSummary,
     append_order_result_summary,
+    match_log_csv_rows,
     write_match_log,
     should_write_detailed_match_log,
 )
@@ -160,6 +162,32 @@ class TawreedMatchLogsTests(unittest.TestCase):
             write_match_log(bot, item, decision)
 
         self.assertEqual(append_csv.call_args.args[1], "matching_trace")
+
+    def test_match_log_csv_rows_are_bounded_for_large_candidate_sets(self) -> None:
+        item = Item(code="123", name="Panadol Extra", qty=2)
+        decision = MatchDecision(
+            best_match=None,
+            diagnostics=[
+                CandidateMatchDiagnostic(
+                    "Panadol Extra",
+                    index,
+                    float(index),
+                    (float(index),),
+                    False,
+                    "",
+                    "rejected",
+                    MatchScoreBreakdown(0, 0, 0, 0, 0, 0, 0, 0, float(index)),
+                    {"productNameEn": f"Candidate {index}"},
+                )
+                for index in range(MAX_DETAILED_MATCH_CANDIDATES + 10)
+            ],
+            final_reason="No accepted candidate",
+        )
+
+        rows = match_log_csv_rows(item, decision)
+
+        self.assertEqual(len(rows), MAX_DETAILED_MATCH_CANDIDATES)
+        self.assertEqual(rows[0]["product_name_en"], "Candidate 34")
 
 
 def _accepted_decision(candidate: dict[str, object]) -> MatchDecision:

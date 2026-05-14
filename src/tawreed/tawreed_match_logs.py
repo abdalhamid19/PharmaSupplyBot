@@ -14,6 +14,8 @@ from .tawreed_artifacts import (
     write_text_artifact,
 )
 
+MAX_DETAILED_MATCH_CANDIDATES = 25
+
 
 @dataclass(frozen=True)
 class OrderItemSummary:
@@ -332,6 +334,11 @@ def match_log_section_separator(item: Item) -> str:
 
 def _sorted_diagnostics(decision: MatchDecision) -> list[CandidateMatchDiagnostic]:
     """Return candidate diagnostics sorted from best to worst match."""
+    return sorted_diagnostics(decision)[:MAX_DETAILED_MATCH_CANDIDATES]
+
+
+def sorted_diagnostics(decision: MatchDecision) -> list[CandidateMatchDiagnostic]:
+    """Return all candidate diagnostics sorted from best to worst match."""
     return sorted(
         decision.diagnostics, key=lambda current: current.sort_key, reverse=True
     )
