@@ -102,18 +102,28 @@
 
 ## [ORPHANS & PENDING]
 
-- Last failed live run `artifacts/run-control/order/order_output_1778696048.log`
-  exposed artifact schema failures, not a matching decision failure. Regression
-  tests now cover mixed order AI trace rows and mixed worker schemas.
-- `tools/list_all_violations.py` still reports baseline size/docstring debt; this
-  is tracked for staged cleanup after the runtime fix.
-- Safe `remove-cart` live smoke did not remove anything, but the saved Tawreed
-  session did not expose the order surface for that command. Re-run
-  `run.py auth --profile wardany` before the next cart-removal live check.
+- None for the audited `20260513_2352` order and matching flow. The matching
+  defects, artifact schema failures, AI safety gaps, trace omissions, and
+  validation noise from `docs/run_audit_20260513_2352.md` and
+  `docs/matching_trace_audit_20260513_2352.md` are covered by regression tests
+  and phase validation.
+- Historical `tools/list_all_violations.py` baseline debt remains outside this
+  remediation scope; `tools/rule_audit.py` enforces that no new violations are
+  introduced.
+
+## [EXTERNAL CONSTRAINTS]
+
+- GitHub publishing depends on non-interactive credentials for
+  `https://github.com/abdalhamid19/PharmaSupplyBot.git`. Local commits are made
+  after each phase; `git push origin main` cannot complete in this environment
+  without saved credentials or a token.
+- Live cart mutation checks depend on a valid Tawreed authenticated session.
+  Safe `order --match-only` and read-only export smokes do not require mutating
+  the cart.
 
 ## [VALIDATION]
 
-- `.venv/bin/python -m unittest discover -s tests -q`: 238 passed.
+- `.venv/bin/python tools/run_unit_tests.py`: 261 passed.
 - `.venv/bin/python tools/rule_audit.py`: `rule_audit_ok`,
   `baseline_violations_remaining:160`.
 - CLI help checks succeeded for `run.py`, `order`, `remove-cart`,
@@ -165,3 +175,6 @@
 - Phase 18 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 261 unit tests plus
   compileall and rule audit after splitting order AI verification flow.
+- Phase 19 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 261 unit tests plus
+  compileall and rule audit after syncing `PROJECT_MAP.md`.
