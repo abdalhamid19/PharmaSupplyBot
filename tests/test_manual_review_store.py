@@ -45,6 +45,26 @@ class ManualReviewStoreTests(unittest.TestCase):
         self.assertFalse(decisions[0].approved)
         self.assertEqual(decisions[0].correct_product_name, "A New")
 
+    def test_decision_persists_across_store_instances(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "manual.sqlite3"
+            ManualReviewStore(db_path).upsert(
+                ManualReviewDecision(
+                    " 001.0 ",
+                    "  Panadol   Extra ",
+                    True,
+                    correct_store_product_id="store-2",
+                    correct_query="Panadol Extra 24",
+                )
+            )
+
+            decision = ManualReviewStore(db_path).lookup("001", "panadol extra")
+
+        self.assertIsNotNone(decision)
+        self.assertTrue(decision.approved)
+        self.assertEqual(decision.correct_store_product_id, "store-2")
+        self.assertEqual(decision.correct_query, "Panadol Extra 24")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,6 +48,12 @@ class ManualReviewHintsTests(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertEqual(payload[0]["store_product_id"], "s1")
 
+    def test_hint_key_normalizes_excel_code_and_whitespace(self) -> None:
+        self.assertEqual(
+            hint_key(" 001.0 ", " Panadol   Extra "),
+            hint_key("001", "panadol extra"),
+        )
+
     def test_cli_runs_as_script(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp) / "manual_review.csv"

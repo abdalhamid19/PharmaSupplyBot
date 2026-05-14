@@ -44,7 +44,7 @@ def export_manual_review_hints(input_csv: str | Path, output_json: str | Path) -
 
 def hint_key(item_code: str, item_name: str) -> tuple[str, str]:
     """Return the stable lookup key for an order item."""
-    return (_clean(item_code), _clean(item_name).upper())
+    return (_clean_code(item_code), _clean(item_name).upper())
 
 
 def _hint_from_row(row: dict) -> ManualReviewHint | None:
@@ -67,5 +67,11 @@ def _hint_from_row(row: dict) -> ManualReviewHint | None:
 
 
 def _clean(value: object) -> str:
-    text = str(value or "").strip()
+    text = " ".join(str(value or "").strip().split())
     return "" if text.lower() in {"nan", "none", "null"} else text
+
+
+def _clean_code(value: object) -> str:
+    """Return a stable item-code key for values loaded from Excel."""
+    text = _clean(value)
+    return text[:-2] if text.endswith(".0") else text
