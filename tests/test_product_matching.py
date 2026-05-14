@@ -247,6 +247,15 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["productNameEn"], candidate["productNameEn"])
 
+    def test_liquid_per_5_ml_marker_does_not_block_fuzzy_match(self) -> None:
+        item = Item(code="32158", name="SUPRAX 100MG SYRUP 30ML", qty=1)
+        candidate = _candidate("SUPRAX 100 MG / 5 ML SUSP. 30 ML", "سوبراكس 30 مل")
+
+        decision = explain_best_product_match(item, [(item.name, [candidate])])
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["productNameEn"], candidate["productNameEn"])
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

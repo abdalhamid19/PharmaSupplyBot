@@ -746,11 +746,22 @@ def _unrequested_numeric_tokens(query: str, candidate_name: str) -> set[str]:
     query_tokens = _numeric_tokens(_normalize_text(query))
     candidate_tokens = _numeric_tokens(_normalize_text(candidate_name))
     extra_tokens = candidate_tokens - query_tokens
+    extra_tokens = _ignore_liquid_per_5_marker(extra_tokens, query, candidate_name)
     if not query_tokens and len(extra_tokens) <= 1:
         return set()
     if len(extra_tokens) == 1 and _single_percentage_token(extra_tokens, candidate_name):
         return set()
     return extra_tokens
+
+
+def _ignore_liquid_per_5_marker(
+    tokens: set[str], query: str, candidate_name: str
+) -> set[str]:
+    if "5" not in tokens or "ML" not in _normalize_text(query):
+        return tokens
+    if re.search(r"\b5\s*ML\b", str(candidate_name).upper()):
+        return {token for token in tokens if token != "5"}
+    return tokens
 
 
 def _single_percentage_token(tokens: set[str], candidate_name: str) -> bool:
