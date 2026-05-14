@@ -72,5 +72,5 @@ CONFLICT_GROUPS = (
     frozenset({"ANISE", "CHAMOMILE", "CINNAMON", "CLOVE", "DETOX", "MINT"}),
     frozenset({"APPLE", "BANANA", "CHOCOLATE", "LEMON", "ORANGE", "STRAWBERRY"}),
     frozenset({"CREAM", "GEL", "LOTION", "OINTMENT", "SHAMPOO", "SOAP"}),
-    frozenset({"CAPSULE", "DROPS", "INJECTION", "SYRUP", "TABLET", "VIAL"}),
+    frozenset({"DROPS", "INJECTION", "SYRUP", "VIAL"}),
 )
