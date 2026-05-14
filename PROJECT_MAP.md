@@ -49,8 +49,9 @@
   reused by prevented-items and cart-removal input handling.
 - Component parsing, indexed CSV matching, AI verification/search/review, model
   rotation, and detailed trace logging stay in `src/core/drug_matching`.
-- Live-order AI decision policy stays in `src/core/order_ai_matching.py` and
-  `src/core/order_ai_flow.py`; Tawreed only invokes it and writes trace rows.
+- Live-order AI decision policy stays in `src/core/order_ai_matching.py`,
+  `src/core/order_ai_flow.py`, and `src/core/order_ai_verify.py`; Tawreed only
+  invokes it and writes trace rows.
 - Live-order AI safety checks stay in `src/core/order_ai_safety.py`; AI verify
   and AI search cannot activate a match without an orderable id or with a local
   component mismatch.
@@ -161,3 +162,6 @@
 - Phase 17 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 261 unit tests with
   Streamlit warning noise suppressed, plus compileall and rule audit.
+- Phase 18 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 261 unit tests plus
+  compileall and rule audit after splitting order AI verification flow.
