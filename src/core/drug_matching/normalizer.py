@@ -727,6 +727,38 @@ def _component_numeric_signals(c: DrugComponents) -> tuple[str, ...]:
     return tuple(signals)
 
 
+def _dosage_flat_set(dosage_nums: tuple[str, ...]) -> set[str]:
+    """Expand dosage_nums (may contain '/') into a flat set of canonical numbers."""
+    flat: set[str] = set()
+    for num in dosage_nums:
+        for part in num.split("/"):
+            s = part.strip()
+            if not s:
+                continue
+            flat.add(s)
+            if "." in s:
+                flat.add(str(float(s)).rstrip("0").rstrip("."))
+    return flat
+
+
+def _numeric_signals_match_dosage(
+    signals: tuple[str, ...], dosage_nums: tuple[str, ...]
+) -> bool:
+    """True when unmatched numeric signals are a subset of the other side's dosage."""
+    return all(s in _dosage_flat_set(dosage_nums) for s in signals)
+
+
+def _qty_is_misclassified_dosage(a: DrugComponents, b: DrugComponents) -> bool:
+    """True when a.qty looks like a dosage that b correctly classified.
+
+    Example: "BRUFEN 400 TAB" parsed qty='400' vs "BRUFEN 400 MG 30 TABS."
+    parsed dosage_nums=('400',), qty='30'.  Here a.qty='400' is really a dosage.
+    """
+    if not a.qty or not b.dosage_nums:
+        return False
+    return a.qty in _dosage_flat_set(b.dosage_nums)
+
+
 def components_match(
     d: DrugComponents,
     m: DrugComponents,
@@ -809,11 +841,25 @@ def components_match(
     if not dosage_checked_compatible:
         d_numeric = _component_numeric_signals(d)
         m_numeric = _component_numeric_signals(m)
+        d_matched_dosage = False
+        m_matched_dosage = False
         if d_numeric and m.dosage_nums:
-            return False, "different_dosage"
+            if _numeric_signals_match_dosage(d_numeric, m.dosage_nums):
+                d_matched_dosage = True
+            else:
+                return False, "different_dosage"
         if m_numeric and d.dosage_nums:
-            return False, "different_dosage"
-        if d_numeric and m_numeric and d_numeric != m_numeric:
+            if _numeric_signals_match_dosage(m_numeric, d.dosage_nums):
+                m_matched_dosage = True
+            else:
+                return False, "different_dosage"
+        if (
+            d_numeric
+            and m_numeric
+            and d_numeric != m_numeric
+            and not d_matched_dosage
+            and not m_matched_dosage
+        ):
             return False, "different_dosage"
 
     if d.form and m.form and not _forms_compatible(d.form, m.form):
@@ -828,7 +874,10 @@ def components_match(
     if d.qty and m.qty and d.qty != m.qty:
         if d.form == "POWDER" and m.form == "POWDER":
             return True, "ok"
-        return False, "different_quantity"
+        if _qty_is_misclassified_dosage(d, m) or _qty_is_misclassified_dosage(m, d):
+            pass
+        else:
+            return False, "different_quantity"
 
     # Volume check
     if d.volume and m.volume and d.volume != m.volume:

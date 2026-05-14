@@ -63,6 +63,52 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("unrequested numeric token", decision.final_reason)
 
+    # -- Phase 1: canonical dosage model & numeric safety regressions --
+
+    def test_phase1_pack_count_safe_when_dosage_matches(self) -> None:
+        """Extra pack count should not block when the strength already matches."""
+        cases = [
+            ("BRUFEN 400 TAB", "BRUFEN 400 MG 30 TABS."),
+            ("NEXIUM 20 MG", "NEXIUM 20 MG 14 CAPS."),
+            ("E-MOX 500MG CAP", "E MOX 500 MG 16 CAPS."),
+        ]
+        for item_name, candidate_name in cases:
+            with self.subTest(item_name=item_name):
+                decision = explain_best_product_match(
+                    Item(code="p1", name=item_name, qty=1),
+                    [(item_name, [_candidate(candidate_name, store_id="s-p1")])],
+                )
+                self.assertIsNotNone(decision.best_match)
+
+    def test_phase1_liquid_concentration_volume_safe(self) -> None:
+        """Per-ML concentration and total volume should not block when
+        strength matches."""
+        decision = explain_best_product_match(
+            Item(code="p1", name="AUGMENTIN 457 SUSP", qty=1),
+            [("AUGMENTIN 457 SUSP", [
+                _candidate("AUGMENTIN 457 MG / 5 ML SUSP 80 ML", store_id="s-p1"),
+            ])],
+        )
+        self.assertIsNotNone(decision.best_match)
+
+    def test_phase1_injection_missing_strength_still_requires_review(self) -> None:
+        """An injection whose query omits strength must NOT auto-match."""
+        decision = explain_best_product_match(
+            Item(code="p1", name="ADWIFLAM 6 AMP", qty=1),
+            [("ADWIFLAM 6 AMP", [
+                _candidate("ADWIFLAM 75 MG / 3 ML 6 AMP.", store_id="s-p1"),
+            ])],
+        )
+        self.assertIsNone(decision.best_match)
+
+    def test_phase1_missing_strength_with_pack_still_requires_review(self) -> None:
+        """Missing strength + pack count must NOT auto-match."""
+        decision = explain_best_product_match(
+            Item(code="p1", name="OCTOZINC CAP", qty=1),
+            [("OCTOZINC CAP", [_candidate("OCTOZINC 25 MG 20 CAPS.")])],
+        )
+        self.assertIsNone(decision.best_match)
+
 
 def _candidate(english_name: str, store_id: str = "store-1") -> dict[str, object]:
     """Return one Tawreed-style candidate for regression tests."""
