@@ -106,14 +106,13 @@
 
 ## [ORPHANS & PENDING]
 
-- Active remediation for `docs/full_run_program_audit_20260514_1252.md` is in
-  progress. Completed: diagnostic artifact grouping, bounded match traces,
+- Active remediation for `docs/full_run_program_audit_20260514_1252.md` is
+  implemented. Completed: diagnostic artifact grouping, bounded match traces,
   Tawreed API contract discovery/client, `auto/api/browser` CLI+GUI backend
   selection, SQLite manual-review learning, runtime manual-review application,
   query caching, and candidate de-duplication.
-- Remaining: full validation, GUI smoke, and live-safe Tawreed checks up to cart
-  add/remove only. Final order submission remains disabled unless
-  `runtime.submit_order` is explicitly true.
+- Final order submission remains disabled unless `runtime.submit_order` is
+  explicitly true.
 - Historical `tools/list_all_violations.py` baseline debt remains outside this
   remediation scope; `tools/rule_audit.py` enforces that no new violations are
   introduced.
@@ -193,3 +192,16 @@
   accepted the first item without changing the cart, and
   `.venv/bin/python tools/import_manual_review_hints.py artifacts/order/wardany/20260513_2352/manual_review_20260513_2352.csv --output artifacts/order/wardany/20260513_2352/manual_review_hints_phase20.json`
   completed with `manual_review_hints_exported:0`.
+- Latest remediation validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran compileall, 278 unit tests,
+  and rule audit.
+- Latest CLI/API-mode smoke succeeded: `order --help` and `remove-cart --help`
+  expose `--execution-mode {auto,api,browser}`.
+- Latest product matching smoke succeeded:
+  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke_execution_mode.csv`.
+- Latest live-safe Tawreed checks succeeded without final submit:
+  `order --limit 1 --match-only --execution-mode auto` matched KENACOMB with
+  browser fallback, `order --limit 1 --execution-mode auto` added one KENACOMB
+  item to cart with final submission disabled, and `remove-cart
+  --execution-mode auto` removed that KENACOMB cart row.
+- Streamlit smoke succeeded on `http://127.0.0.1:8507` with HTTP 200.
