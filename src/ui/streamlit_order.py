@@ -272,8 +272,19 @@ def order_command(
     prevented_items_excel = str(form_values.get("prevented_items_excel") or "")
     if prevented_items_excel:
         command.extend(["--prevented-items-excel", prevented_items_excel])
+    command.extend(_matching_risk_command_args(form_values))
     command.extend(_order_ai_command_args(form_values))
     return command
+
+
+def _matching_risk_command_args(form_values: dict[str, object]) -> list[str]:
+    """Return CLI arguments for safe or aggressive matching policy."""
+    return [
+        "--matching-risk-policy",
+        str(form_values.get("matching_risk_policy") or "safe"),
+        "--flagged-match-action",
+        str(form_values.get("flagged_match_action") or "manual-review-only"),
+    ]
 
 
 def _order_ai_command_args(form_values: dict[str, object]) -> list[str]:

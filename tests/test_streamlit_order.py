@@ -80,6 +80,24 @@ class StreamlitOrderTests(unittest.TestCase):
         self.assertIn("--match-only", command)
         self.assertEqual(command[command.index("--execution-mode") + 1], "api")
 
+    def test_order_command_adds_matching_risk_flags(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "highest_discount": False,
+                "matching_risk_policy": "aggressive",
+                "flagged_match_action": "add-to-cart",
+            },
+            Path("data/input/order_items/ddd.xlsx"),
+        )
+
+        self.assertEqual(command[command.index("--matching-risk-policy") + 1], "aggressive")
+        self.assertEqual(command[command.index("--flagged-match-action") + 1], "add-to-cart")
+
     def test_order_command_adds_ai_flags(self) -> None:
         command = order_command(
             Path("config.yaml"),

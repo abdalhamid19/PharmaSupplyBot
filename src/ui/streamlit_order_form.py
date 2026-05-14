@@ -46,7 +46,23 @@ def order_form_fields(
         prevented_items_path,
     )
     values.update(ai_matching_fields())
+    values.update(matching_risk_fields())
     return values
+
+
+def matching_risk_fields() -> dict[str, object]:
+    """Return Streamlit controls for matching risk policy."""
+    with st.expander("Matching Risk", expanded=False):
+        policy = st.selectbox("Risk policy", ["safe", "aggressive"], index=0)
+        action = st.selectbox(
+            "Flagged match action",
+            ["manual-review-only", "add-to-cart"],
+            index=0,
+        )
+    return {
+        "matching_risk_policy": str(policy),
+        "flagged_match_action": str(action),
+    }
 
 
 def ai_matching_fields() -> dict[str, object]:
