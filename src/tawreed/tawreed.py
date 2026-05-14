@@ -797,6 +797,8 @@ class TawreedBot:
 
     def _unmatched_decision_status(self) -> str:
         """Return a more precise status for a rejected but recognized candidate."""
+        if getattr(self.last_order_ai_outcome, "manual_review", False):
+            return "manual-review-required"
         decision = self.last_match_decision
         if not decision or decision.best_match:
             return ""

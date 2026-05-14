@@ -326,6 +326,12 @@ class TawreedBotTests(unittest.TestCase):
             "manual-review-required",
         )
 
+    def test_no_decisive_match_after_ai_review_has_manual_review_status(self) -> None:
+        bot = self._bot()
+        bot.last_order_ai_outcome = type("Outcome", (), {"manual_review": True})()
+
+        self.assertEqual(bot._skip_status("No decisive match found"), "manual-review-required")
+
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:
         config = AppConfig(
             base_url="https://seller.tawreed.io/#/login",

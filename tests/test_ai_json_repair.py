@@ -22,6 +22,17 @@ class AiJsonRepairTests(unittest.TestCase):
     def test_extract_json_keeps_unparseable_text_rejected(self) -> None:
         self.assertIsNone(_extract_json("same product but no JSON object"))
 
+    def test_extract_json_recovers_partial_search_decision_safely(self) -> None:
+        parsed = _extract_json(
+            '{"decision":"accept","best_index":1,'
+            '"reason":"brand and form match but response truncated'
+        )
+
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["decision"], "accept")
+        self.assertEqual(parsed["best_index"], 1)
+        self.assertEqual(parsed["confidence"], 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()

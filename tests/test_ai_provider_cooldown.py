@@ -43,6 +43,17 @@ class ProviderCooldownTests(unittest.TestCase):
         self.assertEqual(disabled, {"opencode"})
         self.assertIn(("opencode", "opn456", "m4"), verifier._failed_combos)
 
+    def test_retry_after_rate_limit_disables_provider_immediately(self) -> None:
+        verifier = self._verifier()
+
+        disabled = apply_provider_cooldown(
+            verifier,
+            self._result("groq", "rate_limited", reason="429 retry_after=120"),
+        )
+
+        self.assertEqual(disabled, {"groq"})
+        self.assertIn(("groq", "abc123", "m1"), verifier._failed_combos)
+
     @staticmethod
     def _verifier():
         return SimpleNamespace(
@@ -58,7 +69,7 @@ class ProviderCooldownTests(unittest.TestCase):
         )
 
     @staticmethod
-    def _result(provider: str, error_code: str) -> dict:
+    def _result(provider: str, error_code: str, reason: str = "") -> dict:
         return {
             "_api_attempts": [
                 {
@@ -66,6 +77,7 @@ class ProviderCooldownTests(unittest.TestCase):
                     "key_suffix": "abc123",
                     "model": "m1",
                     "error_code": error_code,
+                    "reason": reason,
                 }
             ]
         }

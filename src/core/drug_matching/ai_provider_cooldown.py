@@ -1,6 +1,7 @@
 """Per-run provider cooldown for noisy AI rotation attempts."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 COOLDOWN_ERRORS = frozenset({"rate_limited", "invalid_json", "null_content"})
@@ -16,9 +17,9 @@ def apply_provider_cooldown(
         return set()
     disabled: set[str] = set()
     counts = _PROVIDER_FAILURES.setdefault(id(verifier), {})
-    for provider in _failed_attempt_providers(result.get("_api_attempts", [])):
+    for provider, immediate in _failed_attempt_providers(result.get("_api_attempts", [])):
         counts[provider] = counts.get(provider, 0) + 1
-        if counts[provider] >= threshold:
+        if immediate or counts[provider] >= threshold:
             disabled.add(provider)
     for provider in disabled:
         _disable_provider(verifier, provider)
@@ -27,15 +28,22 @@ def apply_provider_cooldown(
     return disabled
 
 
-def _failed_attempt_providers(attempts) -> list[str]:
-    providers: list[str] = []
+def _failed_attempt_providers(attempts) -> list[tuple[str, bool]]:
+    providers: list[tuple[str, bool]] = []
     for attempt in attempts or []:
         provider = str(attempt.get("provider", ""))
         if not provider or provider == "default":
             continue
         if str(attempt.get("error_code", "")) in COOLDOWN_ERRORS:
-            providers.append(provider)
+            providers.append((provider, _immediate_cooldown(attempt)))
     return providers
+
+
+def _immediate_cooldown(attempt: dict[str, Any]) -> bool:
+    if str(attempt.get("error_code", "")) != "rate_limited":
+        return False
+    match = re.search(r"retry_after=(\d+)", str(attempt.get("reason", "")))
+    return bool(match and int(match.group(1)) >= 60)
 
 
 def _disable_provider(verifier: Any, provider: str) -> None:
