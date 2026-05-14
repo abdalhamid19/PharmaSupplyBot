@@ -30,7 +30,7 @@ def _base_commands() -> list[list[str]]:
     python = sys.executable
     return [
         [python, "-m", "compileall", "-q", "run.py", "streamlit_app.py", "src", "tests", "tools"],
-        [python, "-m", "unittest", "discover", "-s", "tests", "-q"],
+        [python, "tools/run_unit_tests.py"],
         [python, "tools/rule_audit.py"],
     ]
 

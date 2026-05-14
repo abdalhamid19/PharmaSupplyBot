@@ -132,6 +132,8 @@
 - Phase validation harness added:
   `.venv/bin/python tools/phase_validation.py` runs compileall, unittest, and
   rule audit as the repeated post-phase baseline.
+- Unit-test execution inside phase validation uses `tools/run_unit_tests.py` to
+  silence bare Streamlit logging noise before importing UI tests.
 - Phase 9 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 248 unit tests plus
   compileall and rule audit.
@@ -156,3 +158,6 @@
 - Phase 16 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 261 unit tests plus
   compileall and rule audit.
+- Phase 17 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 261 unit tests with
+  Streamlit warning noise suppressed, plus compileall and rule audit.
