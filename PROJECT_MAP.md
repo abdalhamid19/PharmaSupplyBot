@@ -18,6 +18,12 @@
 - Order AI is opt-in. Accepted AI decisions can correct/select the active match;
   low-confidence or review-rejected AI decisions are blocked and written to
   `manual_review`.
+- Order matching now has explicit `safe` and `aggressive` risk policies.
+  Aggressive matches remain flagged for manual review and can either be staged
+  or added to cart with manual-review metadata, depending on the selected action.
+- Manual-review rows can save `approved_match`, `needs_correction`, or
+  `not_matching` decisions. Saved `not_matching` choices block the same rejected
+  candidate in later matching and can drive cart removal.
 - Each order run writes `order_item_summary_<run_id>.csv/.txt`,
   `order_ai_trace_<run_id>.csv/.txt`, and `manual_review_<run_id>.csv/.txt`
   when review rows exist.
@@ -103,6 +109,12 @@
 - Order artifact writing and worker partition merging stay in
   `src/tawreed/tawreed_order_run_artifacts.py` and
   `src/tawreed/order_worker_artifact_merger.py`.
+- Manual-review removal source building stays in
+  `src/core/manual_review_removal.py`; CLI wiring stays in
+  `src/cli/cli_cart_removal_source.py`.
+- Aggressive matching bridge logic stays in
+  `src/tawreed/tawreed_aggressive_matching.py`; the core risk selection remains
+  in `src/core/matching_risk.py`.
 - Artifact CSV/XLSX schema normalization stays in `src/tawreed/tawreed_artifacts.py`;
   worker CSV union merging stays in `src/tawreed/order_result_merger.py`.
 - Run-scoped artifact paths stay in `src/core/artifact_run.py`.
@@ -114,6 +126,9 @@
 - Queue-backed matching logging is available through
   `src/core/matching_trace.py::async_matching_logging`, which guarantees the
   listener is stopped after use.
+- Candidate-level matching trace output is bounded by
+  `src/core/matching_trace.py::MAX_TRACE_CANDIDATE_ROWS` to keep large runs from
+  producing unbounded diagnostics.
 
 ## [ORPHANS & PENDING]
 
@@ -129,6 +144,8 @@
 - Historical `tools/list_all_violations.py` baseline debt remains outside this
   remediation scope; `tools/rule_audit.py` enforces that no new violations are
   introduced.
+- Latest run audit for `20260514_2107` is documented in
+  `docs/latest_run_audit_20260514_2107.md`.
 
 ## [EXTERNAL CONSTRAINTS]
 
@@ -287,3 +304,8 @@
   `.venv/bin/python run.py remove-cart --profile wardany --excel artifacts/order/wardany/20260514_2054_2/live_actionable_limit30_20260514_2054_2.xlsx --execution-mode auto`
   wrote `artifacts/remove-cart/wardany/20260514_2101/` and removed 17/17 rows.
 - Streamlit smoke succeeded on `http://localhost:8765` with HTTP 200.
+- Current remediation added detailed manual-review artifact fields, aggressive
+  flagged matching controls, saved not-matching filtering, CLI/GUI not-matching
+  cart removal, and bounded matching trace output. Latest validation:
+  `.venv/bin/python tools/phase_validation.py` ran compileall, 319 unit tests,
+  and rule audit successfully.
