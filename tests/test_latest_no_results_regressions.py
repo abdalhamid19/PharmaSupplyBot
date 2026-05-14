@@ -109,6 +109,63 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
         )
         self.assertIsNone(decision.best_match)
 
+    # -- Phase 2: component/brand matching regressions --
+
+    def test_phase2_form_words_not_absorbed_into_brand(self) -> None:
+        """SUSPENSION, EMULSION, ENEMA should be form boundaries, not brand."""
+        cases = [
+            ("DOLO D SUSPENSION 115 ML", "DOLO D ORAL SUSP. 115 ML"),
+            ("ENEMAX 120ML VIAL", "ENEMAX ENEMA 120 ML"),
+            ("SIMEDILL SYRUP 120ML", "SIMEDILL EMULSION 120 ML"),
+        ]
+        for item_name, candidate_name in cases:
+            with self.subTest(item_name=item_name):
+                decision = explain_best_product_match(
+                    Item(code="p2", name=item_name, qty=1),
+                    [(item_name, [_candidate(candidate_name, store_id="s-p2")])],
+                )
+                self.assertIsNotNone(decision.best_match)
+
+    def test_phase2_supplement_descriptor_not_in_brand(self) -> None:
+        """CALCIUM after brand name should be a descriptor, not part of brand."""
+        decision = explain_best_product_match(
+            Item(code="p2", name="TOTACAL CALCIUM 30 TAB", qty=1),
+            [("TOTACAL CALCIUM 30 TAB", [
+                _candidate("TOTACAL 30 TABS", store_id="s-p2"),
+            ])],
+        )
+        self.assertIsNotNone(decision.best_match)
+
+    def test_phase2_retard_sr_modifier_equivalence(self) -> None:
+        """RETARD and SR are equivalent release modifiers."""
+        decision = explain_best_product_match(
+            Item(code="p2", name="EPILAT RETARD 20 TAB", qty=1),
+            [("EPILAT RETARD 20 TAB", [
+                _candidate("EPILAT RETARD 20 MG SR. 20 F.C.TAB.", store_id="s-p2"),
+            ])],
+        )
+        self.assertIsNotNone(decision.best_match)
+
+    def test_phase2_milk_noise_word_not_in_brand(self) -> None:
+        """MILK should not be absorbed into the brand."""
+        decision = explain_best_product_match(
+            Item(code="p2", name="HERO BABY FEH 400 GM", qty=1),
+            [("HERO BABY FEH 400 GM", [
+                _candidate("HERO BABY FEH MILK 400 GM", store_id="s-p2"),
+            ])],
+        )
+        self.assertIsNotNone(decision.best_match)
+
+    def test_phase2_different_modifiers_still_rejected(self) -> None:
+        """PANADOL JOINT != PANADOL COLD FLU DAY (different modifiers)."""
+        decision = explain_best_product_match(
+            Item(code="p2", name="PANADOL JOINT 24 TABS", qty=1),
+            [("PANADOL JOINT 24 TABS", [
+                _candidate("PANADOL COLD FLU DAY 24 F.C. TABS.", store_id="s-p2"),
+            ])],
+        )
+        self.assertIsNone(decision.best_match)
+
 
 def _candidate(english_name: str, store_id: str = "store-1") -> dict[str, object]:
     """Return one Tawreed-style candidate for regression tests."""

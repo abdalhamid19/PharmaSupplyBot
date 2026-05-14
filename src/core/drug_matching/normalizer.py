@@ -29,11 +29,12 @@ FORM_PREFIXES = frozenset({
     "MASSAGE", "FEMININE", "CLEANSER", "WASH", "DOUCHE",
     "INHALER", "INH", "OPHTALMIC", "DROPS", "SPRAYS", "ORL",
     "SYRP", "SYP",
+    "SUSPENSION", "EMULSION", "ENEMA", "MOUTHWASH",
 })
 
 NOISE_WORDS = frozenset({
     "BLUE", "RED", "WHITE", "ORS", "FLAVOR", "FLAVOUR",
-    "LIQUID", "FACIAL",
+    "LIQUID", "FACIAL", "MILK",
 })
 SOFT_BRAND_DESCRIPTORS = frozenset({
     "ACTIVE", "ADULT", "ADULTS", "ANISE", "ANTISEPTIC", "COLD", "FLU", "FOLIC",
@@ -49,7 +50,7 @@ BRAND_QUALIFIERS = frozenset({
 })
 ACRONYM_BRANDS = frozenset({"AIG"})
 FLAVOR_WORDS = frozenset({
-    "APPLE", "BANANA", "BERRY", "CHERRY", "CHOCOLATE", "COLA",
+    "APPLE", "BANANA", "BERRY", "CHERRY", "CHOCOLATE", "CLOVE", "COLA",
     "GRAPE", "LEMON", "MANGO", "MINT", "ORANGE", "PINEAPPLE",
     "RASPBERRY", "STRAWBERRY", "VANILLA",
 })
@@ -391,7 +392,10 @@ def _is_brand_boundary(words: list[str], idx: int) -> bool:
     ):
         return True
     return idx > 0 and (
-        word in SOFT_BRAND_DESCRIPTORS or word in CONNECTOR_WORDS
+        word in SOFT_BRAND_DESCRIPTORS
+        or word in CONNECTOR_WORDS
+        or word in FLAVOR_WORDS
+        or word in SUPPLEMENT_WORDS
     )
 
 
@@ -480,6 +484,8 @@ def _modifier_is_optional(modifier: str, d_words: set[str], m_words: set[str]):
     ):
         return True
     if modifier == "R" and "PROLONGED" in (d_words | m_words):
+        return True
+    if modifier == "SR" and "RETARD" in (d_words | m_words):
         return True
     if modifier == "MOUTH" and (
         "MOUTHWASH" in d_words or "MOUTHWASH" in m_words
