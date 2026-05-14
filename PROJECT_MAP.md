@@ -54,6 +54,10 @@
 - Live-order AI safety checks stay in `src/core/order_ai_safety.py`; AI verify
   and AI search cannot activate a match without an orderable id or with a local
   component mismatch.
+- Per-run AI provider cooldown stays in
+  `src/core/drug_matching/ai_provider_cooldown.py`; repeated provider
+  rate-limit or invalid JSON attempts disable that provider's rotation attempts
+  for the active verifier.
 - Live-order matching now rejects otherwise-accepted candidates that lack an
   orderable Tawreed id, while preserving earlier lexical/component rejection
   reasons for diagnostics.
@@ -124,4 +128,7 @@
   compileall and rule audit.
 - Phase 11 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 252 unit tests plus
+  compileall and rule audit.
+- Phase 12 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 254 unit tests plus
   compileall and rule audit.

@@ -1,6 +1,7 @@
 """Review helpers for live-order AI matching."""
 from __future__ import annotations
 
+from .drug_matching.ai_provider_cooldown import apply_provider_cooldown
 from .matching_models import MatchDecision
 from .order_ai_records import candidate_ar, candidate_name
 
@@ -12,6 +13,7 @@ async def review_order_ai(settings, verifier, item, match, confidence, result):
     if not settings.api_config.review_model:
         return None
     review = await _review_match(verifier, item, match, confidence, result)
+    apply_provider_cooldown(verifier, review)
     review_conf = float(review.get("confidence", confidence) or 0.0)
     if review.get("is_correct") and review_conf >= settings.review_threshold:
         return None
