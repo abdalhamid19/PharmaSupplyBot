@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from .cli_parser_ai import add_order_ai_arguments
+from .cli_parser_matching import add_matching_risk_arguments
 from .cli_parser_shared import add_common_arguments, add_excel_argument
 
 
@@ -72,6 +73,7 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
         default=None,
         help="Parallel worker processes for items within one profile (overrides config)",
     )
+    add_matching_risk_arguments(argument_parser)
 
 
 

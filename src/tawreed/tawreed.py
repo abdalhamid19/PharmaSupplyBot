@@ -68,6 +68,8 @@ class TawreedBot:
         match_only: bool = False,
         order_ai_settings: OrderAiSettings | None = None,
         execution_mode: str = "browser",
+        matching_risk_policy: str = "safe",
+        flagged_match_action: str = "manual-review-only",
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
@@ -81,6 +83,8 @@ class TawreedBot:
         self.match_only = match_only
         self.order_ai_settings = order_ai_settings or OrderAiSettings()
         self.execution_mode = execution_mode
+        self.matching_risk_policy = matching_risk_policy
+        self.flagged_match_action = flagged_match_action
         self.order_ai_service = self._build_order_ai_service()
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem

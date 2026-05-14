@@ -32,7 +32,23 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         self.assertEqual(len(decisions), 1)
         self.assertTrue(decisions[0].approved)
+        self.assertEqual(decisions[0].manual_decision, "approved_match")
         self.assertEqual(decisions[0].correct_store_product_id, "store-1")
+
+    def test_builds_not_matching_decision(self) -> None:
+        decisions = manual_review_decisions_from_rows(
+            [
+                {
+                    "item_code": "123",
+                    "item_name": "Panadol",
+                    "not_matching": True,
+                    "correct_store_product_id": "store-1",
+                }
+            ],
+            "20260514_1252",
+        )
+
+        self.assertEqual(decisions[0].manual_decision, "not_matching")
 
     def test_skips_empty_unapproved_row(self) -> None:
         decisions = manual_review_decisions_from_rows(
@@ -81,6 +97,7 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["decision_source"], "saved_manual_review")
         self.assertTrue(rows[0]["approved_match"])
+        self.assertFalse(rows[0]["not_matching"])
         self.assertEqual(rows[0]["correct_store_product_id"], "store-2")
 
 

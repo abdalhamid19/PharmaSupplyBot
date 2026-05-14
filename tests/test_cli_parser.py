@@ -112,6 +112,24 @@ class CliParserTests(unittest.TestCase):
 
         self.assertEqual(args.execution_mode, "api")
 
+    def test_order_accepts_matching_risk_policy(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--matching-risk-policy",
+                "aggressive",
+                "--flagged-match-action",
+                "add-to-cart",
+            ]
+        )
+
+        self.assertEqual(args.matching_risk_policy, "aggressive")
+        self.assertEqual(args.flagged_match_action, "add-to-cart")
+
     def test_order_accepts_ai_matching_flags(self) -> None:
         args = build_parser().parse_args(
             [

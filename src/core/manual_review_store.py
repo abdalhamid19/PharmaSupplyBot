@@ -8,13 +8,13 @@ from pathlib import Path
 
 from .manual_review_hints import hint_key
 from .manual_review_store_sql import (
+    ALTER_DECISIONS_TABLE,
     CREATE_DECISIONS_TABLE,
     SELECT_DECISIONS,
     UPSERT_DECISION,
 )
 
 DEFAULT_MANUAL_REVIEW_DB = Path("data") / "manual_review" / "manual_review.sqlite3"
-
 
 @dataclass(frozen=True)
 class ManualReviewDecision:
@@ -27,7 +27,14 @@ class ManualReviewDecision:
     correct_product_name: str = ""
     correct_query: str = ""
     run_id: str = ""
+    manual_decision: str = ""
 
+    def __post_init__(self) -> None:
+        """Backfill the explicit decision for old approved-only call sites."""
+        if self.manual_decision:
+            return
+        decision = "approved_match" if self.approved else ""
+        object.__setattr__(self, "manual_decision", decision)
 
 class ManualReviewStore:
     """Small SQLite store for reusable manual-review decisions."""
@@ -67,15 +74,27 @@ class ManualReviewStore:
     def _init_schema(self) -> None:
         with sqlite3.connect(self.path) as connection:
             connection.execute(CREATE_DECISIONS_TABLE)
-
+            _ensure_manual_decision_column(connection)
 
 def _decision_values(code_key: str, name_key: str, decision: ManualReviewDecision):
     return (
         code_key, name_key, decision.item_code, decision.item_name,
-        int(decision.approved), decision.correct_store_product_id,
+        int(decision.approved), decision.manual_decision,
+        decision.correct_store_product_id,
         decision.correct_product_name, decision.correct_query, decision.run_id,
     )
 
-
 def _decision_from_row(row) -> ManualReviewDecision:
-    return ManualReviewDecision(row[0], row[1], bool(row[2]), row[3], row[4], row[5], row[6])
+    return ManualReviewDecision(
+        row[0], row[1], bool(row[2]), row[3], row[5], row[6], row[7], row[4]
+    )
+
+def _ensure_manual_decision_column(connection) -> None:
+    columns = _table_columns(connection)
+    if "manual_decision" not in columns:
+        connection.execute(ALTER_DECISIONS_TABLE)
+
+
+def _table_columns(connection) -> set[str]:
+    rows = connection.execute("pragma table_info(manual_review_decisions)")
+    return {row[1] for row in rows}

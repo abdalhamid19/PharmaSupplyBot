@@ -304,18 +304,28 @@ def _order_bot(
     args: argparse.Namespace,
 ) -> TawreedBot:
     """Build the bot used for one profile order run."""
-    stop_flag = getattr(args, "stop_flag", None)
     return build_bot(
         app_config,
         profile_key,
         profile,
-        debug_browser=bool(getattr(args, "debug_browser", False)),
-        stop_flag_path=Path(stop_flag) if stop_flag else None,
-        fast_search=bool(getattr(args, "fast_search", False)),
-        match_only=_match_only(args),
-        order_ai_settings=order_ai_settings(args),
-        execution_mode=str(getattr(args, "execution_mode", "auto")),
+        **_order_bot_options(args),
     )
+
+
+def _order_bot_options(args: argparse.Namespace) -> dict[str, object]:
+    stop_flag = getattr(args, "stop_flag", None)
+    return {
+        "debug_browser": bool(getattr(args, "debug_browser", False)),
+        "stop_flag_path": Path(stop_flag) if stop_flag else None,
+        "fast_search": bool(getattr(args, "fast_search", False)),
+        "match_only": _match_only(args),
+        "order_ai_settings": order_ai_settings(args),
+        "execution_mode": str(getattr(args, "execution_mode", "auto")),
+        "matching_risk_policy": str(getattr(args, "matching_risk_policy", "safe")),
+        "flagged_match_action": str(
+            getattr(args, "flagged_match_action", "manual-review-only")
+        ),
+    }
 
 
 def _run_profile_order(
@@ -398,6 +408,10 @@ def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": _match_only(args),
         "execution_mode": str(getattr(args, "execution_mode", "auto")),
+        "matching_risk_policy": str(getattr(args, "matching_risk_policy", "safe")),
+        "flagged_match_action": str(
+            getattr(args, "flagged_match_action", "manual-review-only")
+        ),
         "stop_flag": getattr(args, "stop_flag", None),
         "warehouse_mode": getattr(args, "warehouse_mode", None),
         "min_discount_percent": getattr(args, "min_discount_percent", None),

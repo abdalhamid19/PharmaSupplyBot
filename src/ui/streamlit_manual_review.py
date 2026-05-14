@@ -51,11 +51,13 @@ def manual_review_decisions_from_rows(
 
 def _decision_from_row(row: dict, run_id: str) -> ManualReviewDecision | None:
     approved = bool(row.get("approved_match"))
+    not_matching = bool(row.get("not_matching"))
     correct_id = _clean(row.get("correct_store_product_id"))
     correct_name = _clean(row.get("correct_product_name"))
     correct_query = _clean(row.get("correct_query"))
-    if not approved and not any((correct_id, correct_name, correct_query)):
+    if not approved and not not_matching and not any((correct_id, correct_name, correct_query)):
         return None
+    manual_decision = _manual_decision(approved, not_matching)
     return ManualReviewDecision(
         item_code=_clean(row.get("item_code")),
         item_name=_clean(row.get("item_name")),
@@ -64,7 +66,14 @@ def _decision_from_row(row: dict, run_id: str) -> ManualReviewDecision | None:
         correct_product_name=correct_name,
         correct_query=correct_query,
         run_id=run_id,
+        manual_decision=manual_decision,
     )
+
+
+def _manual_decision(approved: bool, not_matching: bool) -> str:
+    if not_matching:
+        return "not_matching"
+    return "approved_match" if approved else "needs_correction"
 
 
 def _clean(value: object) -> str:

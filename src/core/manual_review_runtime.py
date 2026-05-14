@@ -28,6 +28,26 @@ def manual_review_queries(item: Item, base_queries: list[str]) -> list[str]:
     return [preferred, *[query for query in base_queries if query != preferred]]
 
 
+def filter_manual_review_candidates(
+    item: Item, results: list[tuple[str, list[dict]]]
+) -> list[tuple[str, list[dict]]]:
+    """Remove candidates previously rejected as not matching by a human."""
+    decision = saved_manual_review_decision(item)
+    if not _blocks_candidate(decision):
+        return results
+    blocked_id = decision.correct_store_product_id
+    return [
+        (
+            query,
+            [
+                candidate for candidate in candidates
+                if candidate_store_product_id(candidate) != blocked_id
+            ],
+        )
+        for query, candidates in results
+    ]
+
+
 def manual_review_match(
     item: Item, results: list[tuple[str, list[dict]]]
 ) -> MatchDecision | None:
@@ -42,6 +62,14 @@ def manual_review_match(
                 match = SearchMatch(query, index, 999.0, candidate)
                 return MatchDecision(match, [], "Approved by saved manual review.")
     return None
+
+
+def _blocks_candidate(decision: ManualReviewDecision | None) -> bool:
+    return bool(
+        decision
+        and decision.manual_decision == "not_matching"
+        and decision.correct_store_product_id
+    )
 
 
 def _preferred_query(decision: ManualReviewDecision | None) -> str:

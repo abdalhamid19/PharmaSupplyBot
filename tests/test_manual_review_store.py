@@ -37,13 +37,30 @@ class ManualReviewStoreTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             store = ManualReviewStore(Path(temp_dir) / "manual.sqlite3")
             store.upsert(ManualReviewDecision("1", "A", True, "old"))
-            store.upsert(ManualReviewDecision("1", "A", False, "", "A New"))
+            store.upsert(
+                ManualReviewDecision(
+                    "1", "A", False, "", "A New", manual_decision="needs_correction"
+                )
+            )
 
             decisions = store.list_decisions()
 
         self.assertEqual(len(decisions), 1)
         self.assertFalse(decisions[0].approved)
         self.assertEqual(decisions[0].correct_product_name, "A New")
+
+    def test_stores_not_matching_decision(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            store = ManualReviewStore(Path(temp_dir) / "manual.sqlite3")
+            store.upsert(
+                ManualReviewDecision(
+                    "1", "A", False, "store-1", manual_decision="not_matching"
+                )
+            )
+
+            decision = store.lookup("1", "A")
+
+        self.assertEqual(decision.manual_decision, "not_matching")
 
     def test_decision_persists_across_store_instances(self) -> None:
         with TemporaryDirectory() as temp_dir:

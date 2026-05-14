@@ -20,6 +20,7 @@ def editable_manual_review_rows(
 def _editable_row(row: dict[str, str]) -> dict[str, object]:
     item = dict(row)
     item.setdefault("approved_match", False)
+    item.setdefault("not_matching", False)
     item.setdefault("correct_store_product_id", "")
     item.setdefault("correct_product_name", "")
     item.setdefault("correct_query", item.get("matched_query", ""))
@@ -33,6 +34,7 @@ def _apply_saved_decision(
     if not saved:
         return
     item["approved_match"] = saved.approved
+    item["not_matching"] = saved.manual_decision == "not_matching"
     item["correct_store_product_id"] = saved.correct_store_product_id
     item["correct_product_name"] = saved.correct_product_name
     item["correct_query"] = saved.correct_query

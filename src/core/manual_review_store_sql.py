@@ -1,17 +1,18 @@
 """SQL statements for the manual-review SQLite store."""
 
 SELECT_DECISIONS = (
-    "select item_code,item_name,approved,correct_store_product_id,"
+    "select item_code,item_name,approved,correct_store_product_id,manual_decision,"
     "correct_product_name,correct_query,run_id from manual_review_decisions"
 )
 
 UPSERT_DECISION = """
 insert into manual_review_decisions
-(item_code_key,item_name_key,item_code,item_name,approved,
+(item_code_key,item_name_key,item_code,item_name,approved,manual_decision,
  correct_store_product_id,correct_product_name,correct_query,run_id)
-values (?,?,?,?,?,?,?,?,?)
+values (?,?,?,?,?,?,?,?,?,?)
 on conflict(item_code_key,item_name_key) do update set
 approved=excluded.approved,
+manual_decision=excluded.manual_decision,
 correct_store_product_id=excluded.correct_store_product_id,
 correct_product_name=excluded.correct_product_name,
 correct_query=excluded.correct_query,
@@ -26,6 +27,7 @@ create table if not exists manual_review_decisions (
     item_code text not null,
     item_name text not null,
     approved integer not null,
+    manual_decision text not null default '',
     correct_store_product_id text not null default '',
     correct_product_name text not null default '',
     correct_query text not null default '',
@@ -35,3 +37,8 @@ create table if not exists manual_review_decisions (
     primary key (item_code_key, item_name_key)
 )
 """
+
+ALTER_DECISIONS_TABLE = (
+    "alter table manual_review_decisions "
+    "add column manual_decision text not null default ''"
+)
