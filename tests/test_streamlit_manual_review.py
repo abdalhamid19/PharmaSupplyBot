@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from src.ui.streamlit_manual_review import manual_review_decisions_from_rows
+from src.core.manual_review_store import ManualReviewDecision, ManualReviewStore
+from src.ui.streamlit_manual_review import (
+    editable_manual_review_rows,
+    manual_review_decisions_from_rows,
+    save_manual_review_rows,
+)
 
 
 class StreamlitManualReviewTests(unittest.TestCase):
@@ -34,6 +41,47 @@ class StreamlitManualReviewTests(unittest.TestCase):
         )
 
         self.assertEqual(decisions, [])
+
+    def test_save_decision_can_be_read_by_new_store_session(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "manual.sqlite3"
+            count = save_manual_review_rows(
+                [
+                    {
+                        "item_code": "123",
+                        "item_name": "Panadol",
+                        "approved_match": True,
+                        "correct_store_product_id": "store-1",
+                        "correct_query": "Panadol 24",
+                    }
+                ],
+                "20260514_1252",
+                db_path,
+            )
+
+            decision = ManualReviewStore(db_path).lookup("123", "Panadol")
+
+        self.assertEqual(count, 1)
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.correct_store_product_id, "store-1")
+        self.assertEqual(decision.correct_query, "Panadol 24")
+
+    def test_editable_rows_show_saved_decision_source(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            store = ManualReviewStore(Path(temp_dir) / "manual.sqlite3")
+            store.upsert(
+                ManualReviewDecision(
+                    "123", "Panadol", True, "store-2", "Panadol Extra", "Pana"
+                )
+            )
+
+            rows = editable_manual_review_rows(
+                [{"item_code": "123", "item_name": "Panadol"}], store
+            )
+
+        self.assertEqual(rows[0]["decision_source"], "saved_manual_review")
+        self.assertTrue(rows[0]["approved_match"])
+        self.assertEqual(rows[0]["correct_store_product_id"], "store-2")
 
 
 if __name__ == "__main__":

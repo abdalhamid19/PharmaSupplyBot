@@ -7,22 +7,30 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ..core.manual_review_store import ManualReviewDecision, ManualReviewStore
+from ..core.manual_review_store import (
+    DEFAULT_MANUAL_REVIEW_DB,
+    ManualReviewDecision,
+    ManualReviewStore,
+)
+from .streamlit_manual_review_rows import editable_manual_review_rows
 
 
 def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> None:
     """Render editable manual-review decisions and persist approved corrections."""
     st.subheader("Manual Review")
-    editable_rows = _editable_rows(rows)
+    store = ManualReviewStore()
+    editable_rows = editable_manual_review_rows(rows, store)
     edited = st.data_editor(pd.DataFrame(editable_rows), use_container_width=True)
     if st.button("Save Manual Review Decisions"):
         count = save_manual_review_rows(edited.to_dict("records"), run_dir.name)
         st.success(f"Saved {count} manual-review decision(s).")
 
 
-def save_manual_review_rows(rows: list[dict], run_id: str) -> int:
+def save_manual_review_rows(
+    rows: list[dict], run_id: str, store_path: Path = DEFAULT_MANUAL_REVIEW_DB
+) -> int:
     """Persist edited manual-review rows and return the saved count."""
-    store = ManualReviewStore()
+    store = ManualReviewStore(store_path)
     decisions = manual_review_decisions_from_rows(rows, run_id)
     for decision in decisions:
         store.upsert(decision)
@@ -57,18 +65,6 @@ def _decision_from_row(row: dict, run_id: str) -> ManualReviewDecision | None:
         correct_query=correct_query,
         run_id=run_id,
     )
-
-
-def _editable_rows(rows: list[dict[str, str]]) -> list[dict[str, object]]:
-    editable = []
-    for row in rows:
-        item = dict(row)
-        item.setdefault("approved_match", False)
-        item.setdefault("correct_store_product_id", "")
-        item.setdefault("correct_product_name", "")
-        item.setdefault("correct_query", item.get("matched_query", ""))
-        editable.append(item)
-    return editable
 
 
 def _clean(value: object) -> str:
