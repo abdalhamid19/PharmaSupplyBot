@@ -156,6 +156,7 @@ class NormalizerTests(unittest.TestCase):
             ("azrolid 200 syrup 30 ml", "AZROLID 1200 / 30 ML SUSP"),
             ("AZROLID 200MG/5ML 15 ML SUSP", "AZROLID 600 / 15 ML SUSP"),
             ("AZROLID 200MG/5ML PD. FOR ORAL SUSP. 22.5ML", "AZROLID 900 / 22.5 ML SUSP"),
+            ("CEFTRIAXONE 1 GM VIAL", "CEFTRIAXONE 1000 MG VIAL"),
             ("BECLOSONE FORTE 200 METERED", "BECLOSONE FORTE INHALER 0.1 MG / DOSE 200 DOSES"),
             ("BETMIGA 50 MG 30 TAB", "BETMIGA 50 MG 30 PROLONGED R.TABLETS"),
             ("BETOLVEX 2 pre-filled AMP", "BETOLVEX 1 MG / ML 2 PRE FILLED SYRINGE I.M."),
@@ -165,6 +166,15 @@ class NormalizerTests(unittest.TestCase):
                 is_ok, reason = components_match(parse_drug(left), parse_drug(right))
                 self.assertTrue(is_ok)
                 self.assertEqual(reason, "ok")
+
+    def test_components_match_rejects_conflicting_gm_mg_strengths(self) -> None:
+        is_ok, reason = components_match(
+            parse_drug("CEFTRIAXONE 2 GM VIAL"),
+            parse_drug("CEFTRIAXONE 1000 MG VIAL"),
+        )
+
+        self.assertFalse(is_ok)
+        self.assertEqual(reason, "different_dosage")
 
     def test_components_match_accepts_audited_false_negative_formats(self) -> None:
         cases = [

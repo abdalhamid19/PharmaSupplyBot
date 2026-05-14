@@ -293,6 +293,8 @@ def parse_drug(name: str) -> DrugComponents:
         dosage_nums, dosage_units = _infer_missing_dosage(
             norm, qty, volume, weight, form,
         )
+    if not dosage_nums and _weight_is_strength(weight, form, norm_words):
+        dosage_nums, dosage_units = (weight,), ("GM",)
     flavor = ""
     for fw in FLAVOR_WORDS:
         if fw in norm_words:
@@ -563,6 +565,9 @@ def _known_brand_variant_match(
 
 
 def _dosage_compatible(d: DrugComponents, m: DrugComponents) -> bool:
+    canonical = _matching_canonical_dosage(d, m)
+    if canonical is not None:
+        return canonical
     d_parts = _dosage_parts(d.dosage_nums)
     m_parts = _dosage_parts(m.dosage_nums)
     if _concor_plus_dosage_compatible(d_parts, m_parts, d, m):
@@ -573,14 +578,62 @@ def _dosage_compatible(d: DrugComponents, m: DrugComponents) -> bool:
         return True
     if _liquid_total_matches_per_5(d_parts, m_parts, d, m):
         return True
-    forms = {d.form, m.form}
-    if not forms & LIQUID_DOSE_FORMS:
+    return _liquid_primary_strength_matches(d_parts, m_parts, d, m)
+
+
+def _liquid_primary_strength_matches(
+    d_parts: list[str], m_parts: list[str], d: DrugComponents, m: DrugComponents
+) -> bool:
+    if not ({d.form, m.form} & LIQUID_DOSE_FORMS):
         return False
-    if len(d_parts) == 1 and len(m_parts) > 1 and d_parts[0] == m_parts[0]:
-        return True
-    if len(m_parts) == 1 and len(d_parts) > 1 and m_parts[0] == d_parts[0]:
-        return True
-    return False
+    return (
+        len(d_parts) == 1 and len(m_parts) > 1 and d_parts[0] == m_parts[0]
+    ) or (
+        len(m_parts) == 1 and len(d_parts) > 1 and m_parts[0] == d_parts[0]
+    )
+
+
+def _weight_is_strength(weight: str, form: str, words: set[str]) -> bool:
+    """Return whether a GM value is an injectable strength, not package weight."""
+    if not weight:
+        return False
+    return form in {"VIAL", "AMP"} or bool(words & INFUSION_CONTEXT_WORDS)
+
+
+def _matching_canonical_dosage(
+    d: DrugComponents, m: DrugComponents
+) -> bool | None:
+    left = _canonical_dosage_values_mg(d)
+    right = _canonical_dosage_values_mg(m)
+    if not left or not right:
+        return None
+    return tuple(sorted(left)) == tuple(sorted(right))
+
+
+def _canonical_dosage_values_mg(c: DrugComponents) -> tuple[float, ...]:
+    if len(c.dosage_nums) != len(c.dosage_units):
+        return ()
+    values: list[float] = []
+    for num, unit in zip(c.dosage_nums, c.dosage_units):
+        value = _canonical_dosage_value_mg(num, unit)
+        if value is None:
+            return ()
+        values.append(value)
+    return tuple(values)
+
+
+def _canonical_dosage_value_mg(num: str, unit: str) -> float | None:
+    if "/" in num:
+        return None
+    value = float(num)
+    normalized_unit = unit.replace(" ", "").upper()
+    if normalized_unit in {"GM", "G"}:
+        return value * 1000.0
+    if normalized_unit == "MG":
+        return value
+    if normalized_unit == "MCG":
+        return value / 1000.0
+    return None
 
 
 def _concor_plus_dosage_compatible(

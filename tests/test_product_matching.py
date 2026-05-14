@@ -266,6 +266,17 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["productNameEn"], candidate["productNameEn"])
 
+    def test_unit_dose_pack_markers_do_not_block_vial_match(self) -> None:
+        item = Item(code="AT50", name="ATROVENT 500 MCG VIAL", qty=1)
+        candidate = _candidate(
+            "ATROVENT 500 MCG / 2 ML 20 UNIT DOSE VIAL.", "اتروفنت"
+        )
+
+        decision = explain_best_product_match(item, [(item.name, [candidate])])
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["productNameEn"], candidate["productNameEn"])
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

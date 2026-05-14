@@ -747,6 +747,7 @@ def _unrequested_numeric_tokens(query: str, candidate_name: str) -> set[str]:
     candidate_tokens = _numeric_tokens(_normalize_text(candidate_name))
     extra_tokens = candidate_tokens - query_tokens
     extra_tokens = _ignore_liquid_per_5_marker(extra_tokens, query, candidate_name)
+    extra_tokens = _ignore_unit_dose_pack_markers(extra_tokens, query, candidate_name)
     if not query_tokens and len(extra_tokens) <= 1:
         return set()
     if len(extra_tokens) == 1 and _single_percentage_token(extra_tokens, candidate_name):
@@ -762,6 +763,35 @@ def _ignore_liquid_per_5_marker(
     if re.search(r"\b5\s*ML\b", str(candidate_name).upper()):
         return {token for token in tokens if token != "5"}
     return tokens
+
+
+def _ignore_unit_dose_pack_markers(
+    tokens: set[str], query: str, candidate_name: str
+) -> set[str]:
+    if not tokens or not _unit_dose_context(query, candidate_name):
+        return tokens
+    candidate_text = _normalize_text(candidate_name)
+    return {
+        token for token in tokens
+        if not _is_unit_dose_pack_token(token, candidate_text)
+    }
+
+
+def _unit_dose_context(query: str, candidate_name: str) -> bool:
+    candidate_words = set(_normalize_text(candidate_name).split())
+    if not {"UNIT", "DOSE"} <= candidate_words:
+        return False
+    requested = parse_drug(query)
+    offered = parse_drug(candidate_name)
+    if not ({requested.form, offered.form} & {"VIAL", "AMP", "SPRAY"}):
+        return False
+    compatible, reason = components_match(requested, offered)
+    return compatible or reason != "different_dosage"
+
+
+def _is_unit_dose_pack_token(token: str, candidate_text: str) -> bool:
+    escaped = re.escape(token)
+    return bool(re.search(rf"\b{escaped}\s*(ML|UNIT|DOSE)\b", candidate_text))
 
 
 def _single_percentage_token(tokens: set[str], candidate_name: str) -> bool:
