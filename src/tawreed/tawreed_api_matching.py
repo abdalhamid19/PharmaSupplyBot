@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+from ..core.manual_review_runtime import manual_review_match, manual_review_queries
 from ..core.product_matching import _search_queries_for_item, explain_best_product_match
 from ..core.utils.excel import Item
 from .tawreed_api import TawreedApiClient
@@ -16,9 +17,13 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
     started_at = time.perf_counter()
     queries: list[str] = []
     results = []
-    for query in _search_queries_for_item(item):
+    for query in manual_review_queries(item, _search_queries_for_item(item)):
         queries.append(query)
         results.append((query, api.search_products(query)))
+        manual_decision = manual_review_match(item, results)
+        if manual_decision:
+            bot.last_match_decision, bot.last_searched_queries = manual_decision, queries
+            return manual_decision.best_match
         decision = explain_best_product_match(item, results, bot.config.matching)
         if decisive_match(bot, item, decision, started_at, queries, require_available):
             return bot.last_match_decision.best_match
