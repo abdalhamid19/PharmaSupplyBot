@@ -18,6 +18,7 @@ class StreamlitRemoveCartTests(unittest.TestCase):
                 "profile_mode": "Single profile",
                 "profile_key": "wardany",
                 "debug_browser": True,
+                "execution_mode": "browser",
             },
             Path("data/input/remove_items/remove.xlsx"),
         )
@@ -33,6 +34,8 @@ class StreamlitRemoveCartTests(unittest.TestCase):
                 "--profile",
                 "wardany",
                 "--debug-browser",
+                "--execution-mode",
+                "browser",
             ],
         )
 

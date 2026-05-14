@@ -70,6 +70,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 "debug_browser": False,
                 "resume": False,
                 "match_only": True,
+                "execution_mode": "api",
                 "highest_discount": False,
                 "min_discount_percent": 0,
             },
@@ -77,6 +78,7 @@ class StreamlitOrderTests(unittest.TestCase):
         )
 
         self.assertIn("--match-only", command)
+        self.assertEqual(command[command.index("--execution-mode") + 1], "api")
 
     def test_order_command_adds_ai_flags(self) -> None:
         command = order_command(

@@ -54,6 +54,12 @@ def remove_cart_form_values(app_config) -> tuple[bool, dict[str, object]]:
             "Run target", ["Single profile", "All profiles"], horizontal=True
         )
         profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
+        execution_mode = st.selectbox(
+            "Execution mode",
+            ["auto", "api", "browser"],
+            index=0,
+            help="auto uses API when a safe contract exists, then falls back to browser.",
+        )
         debug_browser = st.checkbox("Debug browser", value=False)
         item_workers = remove_cart_item_workers_field(app_config)
         submitted = st.form_submit_button("Remove Cart Items")
@@ -63,6 +69,7 @@ def remove_cart_form_values(app_config) -> tuple[bool, dict[str, object]]:
         "upload": upload,
         "profile_mode": str(profile_mode),
         "profile_key": str(profile_key),
+        "execution_mode": str(execution_mode),
         "debug_browser": bool(debug_browser),
         "item_workers": int(item_workers),
     }
@@ -112,6 +119,7 @@ def remove_cart_command(
         command.append("--all-profiles")
     if form_values.get("debug_browser"):
         command.append("--debug-browser")
+    command.extend(["--execution-mode", str(form_values.get("execution_mode", "auto"))])
     item_workers = _form_int(form_values, "item_workers", 1)
     if item_workers > 1:
         command.extend(["--item-workers", str(item_workers)])

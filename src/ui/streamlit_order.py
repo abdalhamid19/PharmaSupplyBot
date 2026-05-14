@@ -261,6 +261,7 @@ def order_command(
         command.append("--resume")
     if form_values.get("match_only"):
         command.append("--match-only")
+    command.extend(["--execution-mode", str(form_values.get("execution_mode", "auto"))])
     item_workers = _int_form_value(form_values, "item_workers", 1)
     command.extend(["--item-workers", str(item_workers)])
     if form_values.get("highest_discount"):

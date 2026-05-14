@@ -20,7 +20,7 @@ from ..core.prevented_items import (
 )
 from .streamlit_uploads import available_excel_options
 
-OrderRunFields = tuple[str, str, int, bool, bool, bool, bool, float]
+OrderRunFields = tuple[str, str, int, bool, bool, bool, str, bool, float]
 
 
 def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
@@ -112,7 +112,7 @@ def _order_form_values(
 def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
     """Build values related to the selected order run target/options."""
     profile_mode, profile_key, limit, debug_browser, resume, match_only = run_fields[:6]
-    high_disc, min_disc = run_fields[6:]
+    execution_mode, high_disc, min_disc = _extended_order_run_values(run_fields)
     return {
         "profile_mode": profile_mode,
         "profile_key": profile_key,
@@ -120,9 +120,20 @@ def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
         "debug_browser": bool(debug_browser),
         "resume": bool(resume),
         "match_only": bool(match_only),
+        "execution_mode": str(execution_mode),
         "highest_discount": bool(high_disc),
         "min_discount_percent": float(min_disc),
     }
+
+
+def _extended_order_run_values(run_fields: OrderRunFields) -> tuple[str, bool, float]:
+    """Return execution mode and discount controls with old-test tuple compatibility."""
+    tail = run_fields[6:]
+    if len(tail) == 2:
+        high_disc, min_disc = tail
+        return "auto", bool(high_disc), float(min_disc)
+    execution_mode, high_disc, min_disc = tail
+    return str(execution_mode), bool(high_disc), float(min_disc)
 
 
 def render_prevented_items_manager(
@@ -281,6 +292,12 @@ def profile_run_fields(app_config) -> OrderRunFields:
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=50)
     resume = st.checkbox("Resume from previous summary", value=True)
     match_only = st.checkbox("Match only without adding to cart", value=False)
+    execution_mode = st.selectbox(
+        "Execution mode",
+        ["auto", "api", "browser"],
+        index=0,
+        help="auto uses API when a safe contract exists, then falls back to browser.",
+    )
     highest_discount = st.checkbox("Highest discount only", value=False)
     min_discount = st.number_input(
         "Minimum discount percent",
@@ -297,6 +314,7 @@ def profile_run_fields(app_config) -> OrderRunFields:
         bool(debug_browser),
         bool(resume),
         bool(match_only),
+        str(execution_mode),
         bool(highest_discount),
         float(min_discount),
     )
