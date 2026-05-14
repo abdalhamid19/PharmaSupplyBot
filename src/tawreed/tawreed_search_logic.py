@@ -7,11 +7,12 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-from ..core.manual_review_runtime import manual_review_match, manual_review_queries
+from ..core.manual_review_runtime import manual_review_queries
 from ..core.matching_models import SearchMatch
 from ..core.product_matching import _search_queries_for_item, explain_best_product_match
 from ..core.utils.excel import Item
 from .tawreed_match_logs import write_match_log
+from .tawreed_manual_review_flow import manual_review_result
 from .tawreed_product_search import search_products
 from .tawreed_search_decision import decisive_match
 
@@ -22,11 +23,13 @@ def require_product_match(
     """Search Tawreed query variants until a decisive match is found."""
     queries: list[str] = []
     results: list[tuple[str, list[dict[str, Any]]]] = []
+    query_cache: dict[str, list[dict[str, Any]]] = {}
     started_at = time.perf_counter()
 
     for query in manual_review_queries(item, _search_queries_for_item(item)):
         match = _search_one_query(
-            bot, page, item, query, started_at, queries, results, require_available
+            bot, page, item, query, started_at,
+            queries, results, query_cache, require_available,
         )
         if match:
             return match, query
@@ -35,14 +38,13 @@ def require_product_match(
 
 
 def _search_one_query(
-    bot, page, item, query, started_at, queries, results, require_available
+    bot, page, item, query, started_at, queries, results, query_cache, require_available
 ):
     """Search one query and return the final match when it is decisive."""
-    queries.append(query)
-    results.append((query, search_products(bot, page, query)))
-    manual_decision = manual_review_match(item, results)
-    if manual_decision:
-        return _accepted_manual_review_match(bot, item, manual_decision, started_at, queries)
+    _append_search_result(bot, page, query, queries, results, query_cache)
+    manual_match = manual_review_result(bot, item, started_at, queries, results)
+    if manual_match:
+        return manual_match
     decision = explain_best_product_match(item, results, bot.config.matching)
     match = decision.best_match
     if not match:
@@ -56,12 +58,11 @@ def _search_one_query(
     return bot.last_match_decision.best_match if bot.last_match_decision else match
 
 
-def _accepted_manual_review_match(bot, item, decision, started_at, queries):
-    """Record and return a saved human-approved match from current candidates."""
-    bot.last_match_decision, bot.last_searched_queries = decision, queries
-    bot.last_match_elapsed_seconds = time.perf_counter() - started_at
-    write_match_log(bot, item, decision)
-    return decision.best_match
+def _append_search_result(bot, page, query, queries, results, query_cache) -> None:
+    """Search once per query and append the cached result to this item's history."""
+    queries.append(query)
+    query_cache.setdefault(query, search_products(bot, page, query))
+    results.append((query, query_cache[query]))
 
 
 def _handle_no_match(
@@ -90,7 +91,6 @@ def _accepted_no_match_result(bot, item: Item, decision, require_available: bool
             f"Matched product is out of stock for '{item.name}'."
         )
     return match, match.query
-
 
 def _available_quantity(candidate: dict[str, Any]) -> int:
     """Return available quantity from a Tawreed candidate."""

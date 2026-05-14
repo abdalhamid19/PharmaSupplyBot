@@ -198,6 +198,16 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("storeProductId", decision.final_reason)
 
+    def test_duplicate_candidate_across_queries_is_scored_once(self) -> None:
+        item = Item(code="123", name="PANADOL 24 TAB", qty=1)
+        candidate = _candidate("PANADOL 24 TAB", "بنادول 24 قرص")
+        decision = explain_best_product_match(
+            item,
+            [("PANADOL 24 TAB", [candidate]), ("PANADOL", [dict(candidate)])],
+        )
+
+        self.assertEqual(len(decision.diagnostics), 1)
+
     def test_tie_break_prefers_available_discounted_lower_price_candidate(self) -> None:
         item = Item(code="21058", name="MIDODRINE 2.5 mg 20 TAB", qty=1)
         low_stock = _candidate("MIDODRINE 2.5 MG 20 TAB.", "ميدودرين")

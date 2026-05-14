@@ -849,7 +849,21 @@ def _matching_rule_helpers() -> tuple:
 def _iter_results(
     search_results_by_query: list[tuple[str, list[dict[str, Any]]]],
 ) -> Iterable[tuple[str, int, dict[str, Any]]]:
-    """Yield each search result with its originating query and row index."""
+    """Yield de-duplicated search results with their first query and row index."""
+    seen: set[tuple[str, str, str]] = set()
     for query, results in search_results_by_query:
         for row_index, result in enumerate(results):
+            key = _candidate_dedupe_key(result)
+            if key in seen:
+                continue
+            seen.add(key)
             yield query, row_index, result
+
+
+def _candidate_dedupe_key(candidate: dict[str, Any]) -> tuple[str, str, str]:
+    """Return a stable key for repeated candidates across query variants."""
+    return (
+        candidate_store_product_id(candidate),
+        _normalize_text(_candidate_english_name(candidate)),
+        _normalize_text(str(candidate.get("productName") or "")),
+    )

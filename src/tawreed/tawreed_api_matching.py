@@ -17,9 +17,11 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
     started_at = time.perf_counter()
     queries: list[str] = []
     results = []
+    query_cache: dict[str, list[dict]] = {}
     for query in manual_review_queries(item, _search_queries_for_item(item)):
         queries.append(query)
-        results.append((query, api.search_products(query)))
+        query_cache.setdefault(query, api.search_products(query))
+        results.append((query, query_cache[query]))
         manual_decision = manual_review_match(item, results)
         if manual_decision:
             bot.last_match_decision, bot.last_searched_queries = manual_decision, queries
