@@ -314,6 +314,25 @@ class ProductMatchingQueryTests(unittest.TestCase):
                 )
                 self.assertIsNotNone(decision.best_match)
 
+    def test_safe_omitted_pack_or_injection_volume_matches(self) -> None:
+        cases = [
+            (
+                "47273",
+                "DEVAROL-S-200.000 I.U 1 AMP",
+                "DEVAROL S 200000 I.U / 2 ML SOLUTION FOR I.M INJ. 1 AMP.",
+            ),
+            ("91823", "Awadist 1000 mg Tab", "AWADIST 1000 MG 20 F.C. TABS."),
+            ("1587", "E-MOX 500MG CAP", "E MOX 500 MG 16 CAPS."),
+        ]
+        for code, item_name, candidate_name in cases:
+            with self.subTest(item_name=item_name):
+                candidate = _candidate(candidate_name, "")
+                decision = explain_best_product_match(
+                    Item(code=code, name=item_name, qty=1),
+                    [(item_name, [candidate])],
+                )
+                self.assertIsNotNone(decision.best_match)
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

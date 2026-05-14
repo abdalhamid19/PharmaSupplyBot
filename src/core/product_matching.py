@@ -88,6 +88,7 @@ from .utils.excel import Item
 def _normalize_text(value: str) -> str:
     """Normalize product text so Arabic and English matching stay stable."""
     text = _OCR_ZERO_RE.sub("0", str(value or "")).upper()
+    text = re.sub(r"(\d)\.(\d{3})(?=\D|$)", r"\1\2", text)
     text = _TOKEN_BOUNDARY_RE.sub(" ", text)
     text = _NON_ALNUM_RE.sub(" ", text)
     return _WHITESPACE_RE.sub(" ", text).strip()
@@ -773,11 +774,13 @@ def _ignore_component_safe_numeric_tokens(
     compatible, _reason = components_match(requested, offered)
     if not compatible:
         return tokens
-    if _safe_omitted_combo_strength(requested, offered):
-        return set()
-    if _safe_omitted_topical_strength(requested, offered):
-        return set()
-    if _safe_omitted_effervescent_strength(requested, offered):
+    if (
+        _safe_omitted_combo_strength(requested, offered)
+        or _safe_omitted_topical_strength(requested, offered)
+        or _safe_omitted_solid_pack_size(tokens, requested, offered)
+        or _safe_omitted_injection_volume(tokens, requested, offered)
+        or _safe_omitted_effervescent_strength(requested, offered)
+    ):
         return set()
     return tokens
 
@@ -800,6 +803,22 @@ def _safe_omitted_topical_strength(requested, offered) -> bool:
         return True
     topical_forms = {"CREAM", "GEL", "LOTION", "SOLUTION", "SPRAY"}
     return bool({requested.form, offered.form} & topical_forms)
+
+
+def _safe_omitted_solid_pack_size(tokens: set[str], requested, offered) -> bool:
+    if not requested.dosage_nums or not offered.qty or requested.qty:
+        return False
+    if offered.qty not in tokens or offered.form not in {"TAB", "CAP"}:
+        return False
+    return {requested.form, offered.form} <= {"", "TAB", "CAP"}
+
+
+def _safe_omitted_injection_volume(tokens: set[str], requested, offered) -> bool:
+    if not offered.volume or offered.volume not in tokens:
+        return False
+    if requested.volume or requested.form not in {"AMP", "VIAL"}:
+        return False
+    return offered.form in {"AMP", "VIAL"}
 
 
 def _safe_omitted_effervescent_strength(requested, offered) -> bool:

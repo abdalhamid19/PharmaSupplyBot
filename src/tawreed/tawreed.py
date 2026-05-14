@@ -819,7 +819,10 @@ def _diagnostic_missing_orderable_identity(
     if candidate_has_store_product_id(diagnostic.candidate):
         return False
     reason = diagnostic.rejection_reason.lower()
-    return "candidate missing orderable storeproductid" in reason
+    if "candidate missing orderable storeproductid" in reason:
+        return True
+    hard_rejections = ("component mismatch", "identity token", "different_brand")
+    return diagnostic.score >= 12.0 and not any(text in reason for text in hard_rejections)
 
 
 def _item_error_details(page: Page, item: Item, error: Exception) -> str:

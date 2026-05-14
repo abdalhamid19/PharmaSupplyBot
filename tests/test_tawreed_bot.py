@@ -318,6 +318,31 @@ class TawreedBotTests(unittest.TestCase):
 
         self.assertEqual(bot._skip_status("No decisive match found"), "not-orderable")
 
+    def test_missing_store_id_with_safe_numeric_review_is_not_orderable(self) -> None:
+        bot = self._bot()
+        bot.last_match_decision = MatchDecision(
+            best_match=None,
+            diagnostics=[
+                CandidateMatchDiagnostic(
+                    query="BEBELAC BEBEJUNIOR 3 MILK 400 GM",
+                    row_index=0,
+                    score=16.0,
+                    sort_key=(16.0,),
+                    accepted=False,
+                    accepted_reason="",
+                    rejection_reason="Candidate has unrequested numeric token: 1",
+                    breakdown=MatchScoreBreakdown(1, 1, 0, 1, 1, 0, 0, 0, 16),
+                    candidate={
+                        "productNameEn": "BEBELAC 3 (BEBEJUNIOR 1 +) MILK 400 GM",
+                        "productName": "بيبيلاك",
+                    },
+                )
+            ],
+            final_reason="No decisive match found",
+        )
+
+        self.assertEqual(bot._skip_status("No decisive match found"), "not-orderable")
+
     def test_ai_manual_review_skip_has_explicit_status(self) -> None:
         bot = self._bot()
 
