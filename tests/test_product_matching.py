@@ -217,6 +217,18 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["storeProductId"], "high")
 
+    def test_equal_accepted_candidates_with_different_ids_require_review(self) -> None:
+        item = Item(code="78379", name="NESTOGEN 3 MILK 200GM", qty=1)
+        first = _candidate("NESTOGEN 3 MILK 200 GM", "نستوجين")
+        first["storeProductId"] = "2630924"
+        second = _candidate("NESTOGEN 3 MILK 200 GM", "نستوجين")
+        second["storeProductId"] = "2695428"
+
+        decision = explain_best_product_match(item, [(item.name, [first, second])])
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("Ambiguous accepted candidates", decision.final_reason)
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

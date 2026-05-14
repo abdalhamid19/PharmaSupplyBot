@@ -56,6 +56,8 @@
   reasons for diagnostics.
 - Accepted live-search candidates use a stable winner sort key that includes
   score, exactness, overlap, numeric agreement, stock, discount, price, and id.
+- Equal accepted candidates with different orderable ids now become an
+  explicit ambiguity instead of an arbitrary winner.
 - Order AI artifact row shaping stays in `src/core/order_ai_trace_rows.py` and
   `src/core/order_run_artifact_rows.py`.
 - Order winner artifact fields stay in `src/core/order_winner_fields.py` and

@@ -534,6 +534,9 @@ def _decision_from_diagnostics(
     best_accepted = _best_accepted_diagnostic(sorted_diagnostics)
     if best_accepted is None:
         return _rejected_match_decision(diagnostics, sorted_diagnostics[0])
+    ambiguity = _accepted_ambiguity_reason(sorted_diagnostics, best_accepted)
+    if ambiguity:
+        return MatchDecision(None, diagnostics, ambiguity)
     return _accepted_match_decision(diagnostics, best_accepted)
 
 
@@ -578,6 +581,28 @@ def _best_accepted_diagnostic(
         if diagnostic.accepted:
             return diagnostic
     return None
+
+
+def _accepted_ambiguity_reason(
+    diagnostics: list[CandidateMatchDiagnostic],
+    best_diagnostic: CandidateMatchDiagnostic,
+) -> str:
+    tied_ids = _tied_accepted_ids(diagnostics, best_diagnostic)
+    if len(tied_ids) <= 1:
+        return ""
+    return "Ambiguous accepted candidates: " + ", ".join(sorted(tied_ids))
+
+
+def _tied_accepted_ids(
+    diagnostics: list[CandidateMatchDiagnostic],
+    best_diagnostic: CandidateMatchDiagnostic,
+) -> set[str]:
+    best_key = best_diagnostic.sort_key[:-1]
+    return {
+        candidate_store_product_id(diagnostic.candidate)
+        for diagnostic in diagnostics
+        if diagnostic.accepted and diagnostic.sort_key[:-1] == best_key
+    }
 
 
 def _rejected_decision_reason(best_diagnostic: CandidateMatchDiagnostic) -> str:
