@@ -184,9 +184,10 @@ def ensure_logged_in(page: Page, selectors, timeout_ms: int, ready_selector: str
     if _ready_surface_visible(page, ready_selector): return
     if _is_login_form_visible(page, selectors):
         raise SessionInvalidError("Saved session is expired or on login page.")
+    if _ready_surface_visible(page, ready_selector, min(timeout_ms, 15000)): return
     if _has_logged_in_marker(page, selectors.logged_in_marker, min(timeout_ms, 2000)):
         return
-    if _ready_surface_visible(page, ready_selector): return
+    if _ready_surface_visible(page, ready_selector, min(timeout_ms, 15000)): return
     if _is_login_form_visible(page, selectors):
         raise SessionInvalidError("Saved session is expired or on login page.")
     raise SessionInvalidError("Saved session did not expose order surface.")
@@ -300,12 +301,14 @@ def _is_login_form_visible(page: Page, selectors) -> bool:
         return False
 
 
-def _ready_surface_visible(page: Page, ready_selector: str) -> bool:
+def _ready_surface_visible(
+    page: Page, ready_selector: str, timeout_ms: int = 1200
+) -> bool:
     """Return whether the requested page surface is already interactive."""
     if not ready_selector:
         return False
     try:
-        page.locator(ready_selector).first.wait_for(timeout=1200)
+        page.locator(ready_selector).first.wait_for(timeout=timeout_ms)
         return True
     except Exception:
         return False
