@@ -198,6 +198,25 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("storeProductId", decision.final_reason)
 
+    def test_tie_break_prefers_available_discounted_lower_price_candidate(self) -> None:
+        item = Item(code="21058", name="MIDODRINE 2.5 mg 20 TAB", qty=1)
+        low_stock = _candidate("MIDODRINE 2.5 MG 20 TAB.", "ميدودرين")
+        low_stock.update({"storeProductId": "low", "availableQuantity": 2})
+        high_stock = _candidate("MIDODRINE 2.5 MG 20 TAB.", "ميدودرين")
+        high_stock.update(
+            {
+                "storeProductId": "high",
+                "availableQuantity": 8,
+                "discountPercent": 10.0,
+                "salePrice": 20.0,
+            }
+        )
+
+        decision = explain_best_product_match(item, [(item.name, [low_stock, high_stock])])
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["storeProductId"], "high")
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

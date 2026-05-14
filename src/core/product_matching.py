@@ -71,7 +71,7 @@ _GENERIC_IDENTITY_TOKENS = {
 }
 
 from .config.config_models import MatchingConfig
-from .candidate_identity import candidate_has_store_product_id
+from .candidate_identity import candidate_has_store_product_id, candidate_store_product_id
 from .drug_matching.normalizer import components_match, parse_drug
 from .matching_models import (
     CandidateMatchDiagnostic,
@@ -138,7 +138,7 @@ def _match_sort_key(
     query: str,
     candidate: dict[str, Any],
     score: float,
-) -> tuple[float, int, float, int, int, int]:
+) -> tuple[float, int, float, int, int, int, float, float, str]:
     """Build a stable sort key for choosing the best search match."""
     normalized_query = _normalize_text(query)
     normalized_english_name = _normalize_text(_candidate_english_name(candidate))
@@ -147,8 +147,11 @@ def _match_sort_key(
         int(normalized_query == normalized_english_name),
         _token_overlap_score(query, _candidate_english_name(candidate)),
         _numeric_match_count(normalized_query, normalized_english_name),
-        int(candidate.get("productsCount") or 0),
         int(candidate.get("availableQuantity") or 0),
+        int(candidate.get("productsCount") or 0),
+        float(candidate.get("discountPercent") or 0.0),
+        -float(candidate.get("salePrice") or 0.0),
+        candidate_store_product_id(candidate),
     )
 
 
