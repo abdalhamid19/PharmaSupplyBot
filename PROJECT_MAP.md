@@ -61,7 +61,8 @@
   for the active verifier.
 - Manual-review correction import stays in `src/core/manual_review_hints.py`
   with `tools/import_manual_review_hints.py`, exporting approved
-  `correct_store_product_id` rows into reusable JSON hints.
+  `correct_store_product_id` rows into reusable JSON hints. The tool supports
+  direct script execution from the repository root.
 - Tawreed product search uses `src/tawreed/tawreed_product_search_select.py` to
   fall back from partial API rows to DOM candidates when API rows lack
   orderable store product ids.
@@ -123,7 +124,7 @@
 
 ## [VALIDATION]
 
-- `.venv/bin/python tools/run_unit_tests.py`: 261 passed.
+- `.venv/bin/python tools/run_unit_tests.py`: 262 passed.
 - `.venv/bin/python tools/rule_audit.py`: `rule_audit_ok`,
   `baseline_violations_remaining:160`.
 - CLI help checks succeeded for `run.py`, `order`, `remove-cart`,
@@ -178,3 +179,11 @@
 - Phase 19 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 261 unit tests plus
   compileall and rule audit after syncing `PROJECT_MAP.md`.
+- Phase 20 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py --smoke` ran 262 unit tests,
+  compileall, rule audit, CLI help checks, and `match-products --trace`.
+- Phase 20 live-safe checks succeeded:
+  `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search --ai --provider custom --api-key ''`
+  accepted the first item without changing the cart, and
+  `.venv/bin/python tools/import_manual_review_hints.py artifacts/order/wardany/20260513_2352/manual_review_20260513_2352.csv --output artifacts/order/wardany/20260513_2352/manual_review_hints_phase20.json`
+  completed with `manual_review_hints_exported:0`.

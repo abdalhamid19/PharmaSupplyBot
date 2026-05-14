@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import csv
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -45,6 +47,27 @@ class ManualReviewHintsTests(unittest.TestCase):
 
         self.assertEqual(count, 1)
         self.assertEqual(payload[0]["store_product_id"], "s1")
+
+    def test_cli_runs_as_script(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "manual_review.csv"
+            output = Path(temp) / "hints.json"
+            self._write_rows(source, [self._row("1", "Panadol", "s1", "")])
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "tools/import_manual_review_hints.py",
+                    str(source),
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertIn("manual_review_hints_exported:1", result.stdout)
 
     @staticmethod
     def _row(code: str, name: str, store_id: str, decision: str) -> dict[str, str]:
