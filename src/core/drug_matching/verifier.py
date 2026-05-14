@@ -27,6 +27,24 @@ _PERMANENT_PARSE_FAILURES = frozenset((
     "null_content",
     "json_generation_failed",
 ))
+# AI-reported conflicts that override is_correct=True → force reject.
+_HARD_CONFLICT_REJECT = frozenset((
+    "different_strength",
+    "different_dosage",
+    "different_active_ingredient",
+    "different_concentration",
+    "different_route",
+))
+# AI-reported conflicts that lower confidence but don't force reject.
+_HARD_CONFLICT_PENALTY = frozenset((
+    "different_form",
+    "different_quantity",
+    "different_volume",
+    "different_brand",
+    "different_flavor",
+    "different_age_group",
+    "different_pack_size",
+))
 
 
 def _coerce_best_index(value, max_index: int) -> tuple[int, bool]:
@@ -142,6 +160,49 @@ def _infer_is_correct(text: str) -> bool:
             return True
     # Default: reject (safer for drug matching)
     return False
+
+
+def _resolve_ai_conflicts(result: dict[str, Any]) -> dict[str, Any]:
+    """Detect and resolve contradictions in AI response fields.
+
+    1. If hard_conflicts contain a critical mismatch → force is_correct=False.
+    2. If decision='reject' but is_correct=True → trust decision, set is_correct=False.
+    3. If hard_conflicts contain non-critical items → cap confidence.
+    """
+    hard = result.get("hard_conflicts") or []
+    if isinstance(hard, str):
+        hard = [h.strip() for h in hard.split(",") if h.strip()]
+    hard_lower = {h.lower().replace(" ", "_") for h in hard}
+
+    # Critical conflicts override is_correct
+    critical = hard_lower & _HARD_CONFLICT_REJECT
+    if critical and result.get("is_correct"):
+        result["is_correct"] = False
+        conflict_text = ", ".join(sorted(critical))
+        reason = result.get("reason", "")
+        result["reason"] = (
+            f"hard_conflict_override({conflict_text}); {reason}"
+            if reason else f"hard_conflict_override({conflict_text})"
+        )
+        result["confidence"] = min(result.get("confidence", 0.0), 0.55)
+
+    # Non-critical conflicts cap confidence
+    penalty = hard_lower & _HARD_CONFLICT_PENALTY
+    if penalty and result.get("is_correct"):
+        result["confidence"] = min(result.get("confidence", 0.0), 0.72)
+
+    # decision vs is_correct contradiction
+    decision = str(result.get("decision", "")).lower().strip()
+    if decision == "reject" and result.get("is_correct"):
+        result["is_correct"] = False
+        reason = result.get("reason", "")
+        result["reason"] = (
+            f"decision_reject_override; {reason}" if reason
+            else "decision_reject_override"
+        )
+        result["confidence"] = min(result.get("confidence", 0.0), 0.6)
+
+    return result
 
 
 def _fallback_from_unparseable_response(text: str, model: str) -> dict[str, Any]:
@@ -596,7 +657,7 @@ class AIVerifier:
                                     is_correct = bool(result.get("is_correct", False))
                                     confidence = 0.7 if is_correct else 0.6
                                 self._record_rotation_used(item)
-                                return {
+                                parsed_result = {
                                     "is_correct": bool(result.get("is_correct", False)),
                                     "agree": bool(result.get("agree", True)),
                                     "reason": str(result.get("reason", "")),
@@ -610,6 +671,7 @@ class AIVerifier:
                                     "_raw": result,
                                     "_api_attempts": attempts,
                                 }
+                                return _resolve_ai_conflicts(parsed_result)
                         except Exception as e:
                             disabled = self._record_combo_failure(
                                 key, mdl, type(e).__name__,
@@ -791,17 +853,26 @@ class AIVerifier:
                 "_api_attempts": result.get("_api_attempts", []),
             }
         agree = bool(result.get("agree", True))
+        # Resolve decision vs agree contradiction
+        review_decision = str(result.get("decision", "")).lower().strip()
+        if review_decision == "disagree" and agree:
+            agree = False
+        elif review_decision == "agree" and not agree:
+            agree = True
         first_ai_said_correct = first_decision in {
             "ai_confirmed", "ai_corrected", "ai_found",
         }
-        return {
+        review_result = {
             "is_correct": agree if first_ai_said_correct else not agree,
             "reason": str(result.get("reason", "")),
             "confidence": float(result.get("confidence", first_confidence)),
             "model_used": result.get("model_used", ""),
             "provider_used": result.get("provider_used", ""),
+            "hard_conflicts": result.get("hard_conflicts", []),
             "_api_attempts": result.get("_api_attempts", []),
         }
+        # Apply hard_conflicts logic to review result as well
+        return _resolve_ai_conflicts(review_result)
 
     async def review_batch(
         self, items: list[tuple]
