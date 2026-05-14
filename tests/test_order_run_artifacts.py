@@ -36,6 +36,9 @@ class OrderRunArtifactsTests(unittest.TestCase):
             rows = self._csv_rows(run_dir / "order_item_summary_20260513_2030.csv")
             self.assertEqual(rows[0]["ai_status"], "ai_verified")
             self.assertEqual(rows[0]["ai_verified"], "True")
+            self.assertEqual(rows[0]["matched"], "True")
+            self.assertEqual(rows[0]["deterministic_match_found"], "True")
+            self.assertEqual(rows[0]["manual_review_blocked_match"], "False")
             self.assertEqual(rows[0]["winner_store_product_id"], "s1")
             self.assertEqual(rows[0]["tie_break_reason"], "accepted")
 
@@ -80,7 +83,32 @@ class OrderRunArtifactsTests(unittest.TestCase):
             rows = self._csv_rows(run_dir / "manual_review_20260513_2030.csv")
             self.assertEqual(rows[0]["status"], status)
             self.assertEqual(rows[0]["manual_review_reason_code"], status)
+            self.assertTrue(rows[0]["manual_review_category"])
+            self.assertEqual(rows[0]["matched"], "False")
+            self.assertEqual(rows[0]["deterministic_match_found"], "False")
             self.assertEqual(rows[0]["manual_decision"], "")
+
+    def test_ai_blocked_match_is_not_final_actionable(self) -> None:
+        """A deterministic match blocked by AI is visible but not actionable."""
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "artifacts"
+            outcome = OrderAiOutcome(
+                self._decision(), "ai_rejected", "local safety mismatch", 0.5, True,
+                verify_result={"reason": "local_safety: component mismatch", "confidence": 0},
+            )
+            with artifact_run("order", "wardany", "20260513_2030", root):
+                append_order_item_artifacts(
+                    "wardany", self._item(), self._summary(), self._decision(), outcome,
+                )
+            rows = self._csv_rows(
+                root / "order/wardany/20260513_2030/order_item_summary_20260513_2030.csv"
+            )
+
+        self.assertEqual(rows[0]["matched"], "False")
+        self.assertEqual(rows[0]["deterministic_match_found"], "True")
+        self.assertEqual(rows[0]["manual_review_blocked_match"], "True")
+        self.assertEqual(rows[0]["manual_review_category"], "ai_rejected")
+        self.assertEqual(rows[0]["candidate_safety_reason"], "component mismatch")
 
     @staticmethod
     def _item() -> Item:

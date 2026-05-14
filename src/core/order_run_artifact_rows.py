@@ -1,37 +1,39 @@
 """Structured rows for order item summary artifacts."""
 from __future__ import annotations
 
+from .manual_review_reason import manual_review_reason_fields
 from .order_winner_fields import candidate_summary_fields
+
+REVIEWABLE_STATUSES = {
+    "no-results", "matched-but-unavailable", "not-orderable", "manual-review-required",
+}
 
 
 def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object]:
     """Return one compact row describing the final item outcome."""
     match = decision.best_match if decision else None
     candidate = match.data if match else {}
-    return {
+    row = {
         "item_code": item.code,
         "item_name": item.name,
         "item_qty": item.qty,
         "status": summary.status,
         "reason": summary.reason,
-        "matched": bool(match),
         "matched_query": match.query if match else "",
         "deterministic_score": round(match.score, 6) if match else "",
+        **_match_state_fields(summary.status, outcome, match),
         **candidate_summary_fields(candidate, decision, match),
         **_summary_ai_fields(outcome, summary.status),
+        **manual_review_reason_fields(summary.status, summary.reason, outcome),
     }
+    return row
 
 
 def manual_review_required(summary_status: str, outcome) -> bool:
     """Return whether this final item state needs human review."""
     if outcome is not None and outcome.manual_review:
         return True
-    return summary_status in {
-        "no-results",
-        "matched-but-unavailable",
-        "not-orderable",
-        "manual-review-required",
-    }
+    return summary_status in REVIEWABLE_STATUSES
 
 
 def manual_review_row(item, summary, decision, outcome) -> dict[str, object]:
@@ -46,6 +48,15 @@ def manual_review_row(item, summary, decision, outcome) -> dict[str, object]:
         }
     )
     return row
+
+
+def _match_state_fields(summary_status: str, outcome, match) -> dict[str, object]:
+    return {
+        "matched": _final_actionable_match(summary_status, outcome, match),
+        "deterministic_match_found": bool(match),
+        "manual_review_blocked_match": bool(match)
+        and manual_review_required(summary_status, outcome),
+    }
 
 
 def text_block(title: str, row: dict[str, object]) -> str:
@@ -76,13 +87,12 @@ def _summary_ai_fields(outcome, summary_status: str) -> dict[str, object]:
 def _first_value(results, key: str) -> object:
     return next((result.get(key, "") for result in results if result.get(key)), "")
 
-
 def _manual_review_reason_code(summary_status: str, outcome) -> str:
     status = getattr(outcome, "status", "") if outcome is not None else ""
     return status or summary_status
 
-
 def _final_action(summary_status: str, outcome) -> str:
-    if manual_review_required(summary_status, outcome):
-        return "manual_review"
-    return summary_status
+    return "manual_review" if manual_review_required(summary_status, outcome) else summary_status
+
+def _final_actionable_match(summary_status: str, outcome, match) -> bool:
+    return bool(match) and not manual_review_required(summary_status, outcome)

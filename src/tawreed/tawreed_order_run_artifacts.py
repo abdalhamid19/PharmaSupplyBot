@@ -70,6 +70,10 @@ def _final_trace_row(row: dict[str, object]) -> dict[str, object]:
         "provider_used": row["ai_provider"],
         "reason": row["reason"],
         "manual_review_required": row["manual_review_required"],
+        "manual_review_category": row.get("manual_review_category", ""),
+        "manual_review_reason_detail": row.get("manual_review_reason_detail", ""),
+        "manual_review_blocking_phase": row.get("manual_review_blocking_phase", ""),
+        "candidate_safety_reason": row.get("candidate_safety_reason", ""),
     }
 
 
