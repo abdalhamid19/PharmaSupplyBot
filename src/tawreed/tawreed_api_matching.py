@@ -9,6 +9,7 @@ from ..core.product_matching import _search_queries_for_item, explain_best_produ
 from ..core.utils.excel import Item
 from .tawreed_api import TawreedApiClient
 from .tawreed_match_logs import write_match_log
+from .tawreed_query_cache import cached_query_result
 from .tawreed_search_decision import decisive_match
 
 
@@ -20,8 +21,8 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
     query_cache: dict[str, list[dict]] = {}
     for query in manual_review_queries(item, _search_queries_for_item(item)):
         queries.append(query)
-        query_cache.setdefault(query, api.search_products(query))
-        results.append((query, query_cache[query]))
+        found = cached_query_result(query_cache, query, lambda: api.search_products(query))
+        results.append((query, found))
         manual_decision = manual_review_match(item, results)
         if manual_decision:
             bot.last_match_decision, bot.last_searched_queries = manual_decision, queries

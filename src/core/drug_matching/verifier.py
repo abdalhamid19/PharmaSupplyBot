@@ -60,24 +60,18 @@ def _extract_json(text: str) -> dict | None:
     if not isinstance(text, str) or not text:
         return None
     # Try direct parse
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, ValueError):
-        pass
+    if parsed := _loads_json_object(text):
+        return parsed
     # Try extracting from ```json ... ``` block
     m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if m:
-        try:
-            return json.loads(m.group(1))
-        except (json.JSONDecodeError, ValueError):
-            pass
+        if parsed := _loads_json_object(m.group(1)):
+            return parsed
     # Try finding first { ... } in text
     m = re.search(r"\{[^{}]*\}", text, re.DOTALL)
     if m:
-        try:
-            return json.loads(m.group(0))
-        except (json.JSONDecodeError, ValueError):
-            pass
+        if parsed := _loads_json_object(m.group(0)):
+            return parsed
     # Handle truncated JSON: find opening { and try to close it
     start = text.find("{")
     if start >= 0:
@@ -98,6 +92,18 @@ def _extract_json(text: str) -> dict | None:
                 "reason": reason_m.group(1) if reason_m else "",
                 "confidence": float(confidence_m.group(1)) if confidence_m else 0.5,
             }
+    return None
+
+
+def _loads_json_object(text: str) -> dict | None:
+    """Parse a JSON object after repairing common model formatting noise."""
+    for candidate in (text, re.sub(r",\s*([}\]])", r"\1", text)):
+        try:
+            parsed = json.loads(candidate)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
     return None
 
 

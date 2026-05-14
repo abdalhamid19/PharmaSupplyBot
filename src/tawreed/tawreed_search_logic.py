@@ -14,6 +14,7 @@ from ..core.utils.excel import Item
 from .tawreed_match_logs import write_match_log
 from .tawreed_manual_review_flow import manual_review_result
 from .tawreed_product_search import search_products
+from .tawreed_query_cache import cached_query_result
 from .tawreed_search_decision import decisive_match
 
 
@@ -61,9 +62,8 @@ def _search_one_query(
 def _append_search_result(bot, page, query, queries, results, query_cache) -> None:
     """Search once per query and append the cached result to this item's history."""
     queries.append(query)
-    query_cache.setdefault(query, search_products(bot, page, query))
-    results.append((query, query_cache[query]))
-
+    found = cached_query_result(query_cache, query, lambda: search_products(bot, page, query))
+    results.append((query, found))
 
 def _handle_no_match(
     bot,
