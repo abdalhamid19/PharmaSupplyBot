@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..core.candidate_identity import candidate_store_product_id
+
 
 def body_with_query(body: dict[str, Any], query: str) -> dict[str, Any]:
     """Return a search body with common query fields populated."""
@@ -22,7 +24,7 @@ def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str
     data = payload.setdefault("data", {})
     candidate = getattr(match, "data", {}) or {}
     if isinstance(data, dict):
-        data["storeProductId"] = candidate.get("storeProductId")
+        data["storeProductId"] = candidate_store_product_id(candidate)
         data["productId"] = candidate.get("productId")
         data["quantity"] = int(quantity)
     return payload

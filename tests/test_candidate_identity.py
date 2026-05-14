@@ -17,10 +17,21 @@ class CandidateIdentityTests(unittest.TestCase):
 
         self.assertEqual(candidate_store_product_id(candidate), "2695415")
 
-    def test_plain_id_is_last_resort(self) -> None:
-        candidate = {"id": "2341067.0"}
+    def test_product_store_id_alias_is_supported(self) -> None:
+        candidate = {"productStoreId": "2341067.0"}
 
         self.assertEqual(candidate_store_product_id(candidate), "2341067")
+
+    def test_nested_metadata_store_id_is_supported(self) -> None:
+        candidate = {"metadata": {"storeProductId": "nested-1"}}
+
+        self.assertEqual(candidate_store_product_id(candidate), "nested-1")
+
+    def test_plain_id_is_not_orderable(self) -> None:
+        candidate = {"id": "2341067.0"}
+
+        self.assertEqual(candidate_store_product_id(candidate), "")
+        self.assertFalse(candidate_has_store_product_id(candidate))
 
     def test_empty_values_are_not_orderable(self) -> None:
         for value in ("", None, "None", "nan", "null"):
