@@ -103,11 +103,15 @@
 
 ## [ORPHANS & PENDING]
 
-- None for the audited `20260513_2352` order and matching flow. The matching
-  defects, artifact schema failures, AI safety gaps, trace omissions, and
-  validation noise from `docs/run_audit_20260513_2352.md` and
-  `docs/matching_trace_audit_20260513_2352.md` are covered by regression tests
-  and phase validation.
+- The active remediation target is `docs/full_run_program_audit_20260514_1252.md`.
+  The 20-phase execution plan covers artifact grouping, API execution fallback,
+  SQLite-backed manual-review learning, and remaining audited false
+  positive/false negative matching failures.
+- Mutation tests for Tawreed must stop at live cart add/remove. Final order
+  submission remains disabled unless `runtime.submit_order` is explicitly true.
+- API add/remove/order endpoints are not yet a trusted contract. The execution
+  mode will default to `auto`, using browser fallback until live discovery and
+  contract checks prove a safe API endpoint.
 - Historical `tools/list_all_violations.py` baseline debt remains outside this
   remediation scope; `tools/rule_audit.py` enforces that no new violations are
   introduced.
