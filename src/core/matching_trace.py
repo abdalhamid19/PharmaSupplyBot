@@ -12,6 +12,8 @@ from .matching_models import MatchDecision
 from .matching_trace_fields import candidate_trace_fields, reason_code
 from .utils.excel import Item
 
+MAX_TRACE_CANDIDATE_ROWS = 25
+
 
 def configure_async_logging(level: str = "INFO") -> tuple[logging.Logger, QueueListener]:
     """Configure a simple queue-backed logger for matching workflows."""
@@ -44,7 +46,7 @@ def decision_trace_rows(
     """Return candidate-level trace rows for one matching decision."""
     diagnostics = sorted(
         decision.diagnostics, key=lambda current: current.sort_key, reverse=True
-    )
+    )[:MAX_TRACE_CANDIDATE_ROWS]
     if not diagnostics:
         return [_base_trace_row(item, decision, phase)]
     return [

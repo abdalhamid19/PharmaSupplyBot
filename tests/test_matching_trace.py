@@ -9,7 +9,7 @@ from src.core.matching_models import (
     MatchScoreBreakdown,
     SearchMatch,
 )
-from src.core.matching_trace import decision_trace_rows
+from src.core.matching_trace import MAX_TRACE_CANDIDATE_ROWS, decision_trace_rows
 from src.core.utils.excel import Item
 
 
@@ -49,6 +49,21 @@ class MatchingTraceTests(unittest.TestCase):
         rows = decision_trace_rows(Item("1", "Panadol", 1), decision)
 
         self.assertEqual(rows[0]["final_reason_code"], "no_search_candidates_were_returned")
+
+    def test_candidate_trace_rows_are_bounded(self) -> None:
+        candidate = {"productNameEn": "Panadol", "storeProductId": "s1"}
+        diagnostics = [
+            CandidateMatchDiagnostic(
+                "Panadol", index, float(index), (float(index), 0, 0, 0, 0, index),
+                False, "", "rejected", MatchScoreBreakdown(0, 0, 0, 0, 0, 0, 0, 0, 0),
+                candidate,
+            )
+            for index in range(MAX_TRACE_CANDIDATE_ROWS + 5)
+        ]
+
+        rows = decision_trace_rows(Item("1", "Panadol", 1), MatchDecision(None, diagnostics, "x"))
+
+        self.assertEqual(len(rows), MAX_TRACE_CANDIDATE_ROWS)
 
 
 if __name__ == "__main__":
