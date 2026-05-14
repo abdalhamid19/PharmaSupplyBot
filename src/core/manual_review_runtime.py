@@ -7,6 +7,7 @@ from .manual_review_store import (
     ManualReviewDecision,
     ManualReviewStore,
 )
+from .candidate_identity import candidate_store_product_id
 from .matching_models import MatchDecision, SearchMatch
 from .utils.excel import Item
 
@@ -37,7 +38,7 @@ def manual_review_match(
     target_id = decision.correct_store_product_id
     for query, candidates in results:
         for index, candidate in enumerate(candidates):
-            if str(candidate.get("storeProductId") or "") == target_id:
+            if candidate_store_product_id(candidate) == target_id:
                 match = SearchMatch(query, index, 999.0, candidate)
                 return MatchDecision(match, [], "Approved by saved manual review.")
     return None

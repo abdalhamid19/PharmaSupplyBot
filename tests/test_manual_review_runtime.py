@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from src.core.manual_review_runtime import manual_review_match, manual_review_queries
 from src.core.manual_review_store import ManualReviewDecision, ManualReviewStore
+from src.core.product_matching import explain_best_product_match
 from src.core.utils.excel import Item
 
 
@@ -40,6 +41,40 @@ class ManualReviewRuntimeTests(unittest.TestCase):
 
         self.assertIsNotNone(decision)
         self.assertEqual(decision.best_match.data["storeProductId"], "store-1")
+
+    def test_saved_manual_decision_turns_previous_no_match_into_match(self) -> None:
+        item = Item("CYTO", "CYTOTEC 200 MG 14 TABS +++IMP", 1)
+        wrong_candidate = {"productNameEn": "SEBACLAR TONIC LOTION 200 ML"}
+        self.assertIsNone(
+            explain_best_product_match(item, [("CYTO", [wrong_candidate])]).best_match
+        )
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "manual.sqlite3"
+            ManualReviewStore(db_path).upsert(
+                ManualReviewDecision(
+                    "CYTO", item.name, True, "store-cytotec", correct_query="CYTOTEC"
+                )
+            )
+            with patch("src.core.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB", db_path):
+                queries = manual_review_queries(item, ["CYTO"])
+                decision = manual_review_match(
+                    item,
+                    [
+                        (
+                            queries[0],
+                            [
+                                {
+                                    "storeProductId": "store-cytotec",
+                                    "productNameEn": "CYTOTEC 200 MG 14 TABS",
+                                }
+                            ],
+                        )
+                    ],
+                )
+
+        self.assertEqual(queries, ["CYTOTEC", "CYTO"])
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.best_match.data["storeProductId"], "store-cytotec")
 
 
 if __name__ == "__main__":
