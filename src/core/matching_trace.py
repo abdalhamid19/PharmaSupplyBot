@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import queue
+from contextlib import contextmanager
 from logging.handlers import QueueHandler, QueueListener
 from typing import Any
 
@@ -24,6 +25,16 @@ def configure_async_logging(level: str = "INFO") -> tuple[logging.Logger, QueueL
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     logger.propagate = False
     return logger, listener
+
+
+@contextmanager
+def async_matching_logging(level: str = "INFO"):
+    """Run matching logging with a queue listener that is always stopped."""
+    logger, listener = configure_async_logging(level)
+    try:
+        yield logger
+    finally:
+        listener.stop()
 
 def decision_trace_rows(
     item: Item,

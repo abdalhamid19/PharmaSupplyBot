@@ -95,6 +95,9 @@
 - Matching trace field expansion stays in `src/core/matching_trace_fields.py`;
   trace rows include reason codes, orderable-id flags, and score breakdown
   columns for easier audit grouping.
+- Queue-backed matching logging is available through
+  `src/core/matching_trace.py::async_matching_logging`, which guarantees the
+  listener is stopped after use.
 
 ## [ORPHANS & PENDING]
 
@@ -149,4 +152,7 @@
   compileall and rule audit.
 - Phase 15 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 260 unit tests plus
+  compileall and rule audit.
+- Phase 16 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 261 unit tests plus
   compileall and rule audit.
