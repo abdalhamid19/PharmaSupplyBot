@@ -814,6 +814,8 @@ def _safe_omitted_solid_pack_size(tokens: set[str], requested, offered) -> bool:
 
 
 def _safe_omitted_injection_volume(tokens: set[str], requested, offered) -> bool:
+    if not requested.dosage_nums or not offered.dosage_nums:
+        return False
     if not offered.volume or offered.volume not in tokens:
         return False
     if requested.volume or requested.form not in {"AMP", "VIAL"}:

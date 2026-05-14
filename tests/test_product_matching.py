@@ -333,6 +333,16 @@ class ProductMatchingQueryTests(unittest.TestCase):
                 )
                 self.assertIsNotNone(decision.best_match)
 
+    def test_injection_strength_omission_still_requires_review(self) -> None:
+        candidate = _candidate("ADWIFLAM 75 MG / 3 ML 6 AMP.", "ادو فلام")
+        decision = explain_best_product_match(
+            Item(code="adw", name="ADWIFLAM 6 AMP", qty=1),
+            [("ADWIFLAM 6 AMP", [candidate])],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("unrequested numeric token", decision.final_reason)
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""
