@@ -42,6 +42,9 @@
 - CLI parsing and command dispatch stay in `src/cli`.
 - Streamlit presentation and subprocess orchestration stay in `src/ui`.
 - Tawreed browser automation stays in `src/tawreed`.
+- Optional Tawreed API execution stays in `src/tawreed/tawreed_api*.py`. The
+  `auto` backend tries a locally discovered API contract from `state/` and
+  falls back to browser automation when the contract is incomplete.
 - Shared live-search scoring stays in `src/core/product_matching.py`.
 - Shared candidate id normalization stays in `src/core/candidate_identity.py` so
   matching, AI, and artifacts agree on orderable Tawreed ids.
@@ -59,10 +62,10 @@
   `src/core/drug_matching/ai_provider_cooldown.py`; repeated provider
   rate-limit or invalid JSON attempts disable that provider's rotation attempts
   for the active verifier.
-- Manual-review correction import stays in `src/core/manual_review_hints.py`
-  with `tools/import_manual_review_hints.py`, exporting approved
-  `correct_store_product_id` rows into reusable JSON hints. The tool supports
-  direct script execution from the repository root.
+- Manual-review correction import stays in `src/core/manual_review_hints.py`.
+  Runtime learning uses `src/core/manual_review_store.py` with a local SQLite
+  file ignored by git, and `src/core/manual_review_runtime.py` applies saved
+  queries or approved `storeProductId` choices before normal matching.
 - Tawreed product search uses `src/tawreed/tawreed_product_search_select.py` to
   fall back from partial API rows to DOM candidates when API rows lack
   orderable store product ids.
@@ -103,15 +106,14 @@
 
 ## [ORPHANS & PENDING]
 
-- The active remediation target is `docs/full_run_program_audit_20260514_1252.md`.
-  The 20-phase execution plan covers artifact grouping, API execution fallback,
-  SQLite-backed manual-review learning, and remaining audited false
-  positive/false negative matching failures.
-- Mutation tests for Tawreed must stop at live cart add/remove. Final order
-  submission remains disabled unless `runtime.submit_order` is explicitly true.
-- API add/remove/order endpoints are not yet a trusted contract. The execution
-  mode will default to `auto`, using browser fallback until live discovery and
-  contract checks prove a safe API endpoint.
+- Active remediation for `docs/full_run_program_audit_20260514_1252.md` is in
+  progress. Completed: diagnostic artifact grouping, bounded match traces,
+  Tawreed API contract discovery/client, `auto/api/browser` CLI+GUI backend
+  selection, SQLite manual-review learning, runtime manual-review application,
+  query caching, and candidate de-duplication.
+- Remaining: full validation, GUI smoke, and live-safe Tawreed checks up to cart
+  add/remove only. Final order submission remains disabled unless
+  `runtime.submit_order` is explicitly true.
 - Historical `tools/list_all_violations.py` baseline debt remains outside this
   remediation scope; `tools/rule_audit.py` enforces that no new violations are
   introduced.
