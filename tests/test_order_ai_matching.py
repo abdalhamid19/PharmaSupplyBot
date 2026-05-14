@@ -87,6 +87,51 @@ class OrderAiMatchingTests(unittest.TestCase):
         self.assertEqual(outcome.decision.best_match.score, 91.0)
         self.assertEqual(outcome.search_result["reason"], "better")
 
+    def test_ai_search_rejects_missing_store_id(self) -> None:
+        """AI search cannot select a candidate that is not orderable."""
+        record = self._record()
+        record["store_product_id"] = ""
+        record["_raw"] = {"productNameEn": "Panadol Advance", "availableQuantity": 5}
+        FakeVerifier.search_result = {
+            "record": record,
+            "score": 91.0,
+            "reason": "better",
+            "confidence": 0.96,
+        }
+        outcome = self._service(self._api()).resolve(self._item(), self._decision(False))
+        self.assertEqual(outcome.status, "ai_rejected")
+        self.assertTrue(outcome.manual_review)
+        self.assertIn("missing storeProductId", outcome.reason)
+
+    def test_ai_search_rejects_component_mismatch(self) -> None:
+        """AI search cannot override local component safety."""
+        record = self._record()
+        record["product_name_en"] = "ASPIRIN 100 MG 30 TAB"
+        record["_raw"] = {
+            "productNameEn": "ASPIRIN 100 MG 30 TAB",
+            "storeProductId": "s2",
+            "availableQuantity": 5,
+        }
+        FakeVerifier.search_result = {
+            "record": record,
+            "score": 91.0,
+            "reason": "better",
+            "confidence": 0.96,
+        }
+        outcome = self._service(self._api()).resolve(self._item(), self._decision(False))
+        self.assertEqual(outcome.status, "ai_rejected")
+        self.assertTrue(outcome.manual_review)
+        self.assertIn("component mismatch", outcome.reason)
+
+    def test_verify_does_not_override_local_safety(self) -> None:
+        """AI verification cannot keep a deterministic match missing orderable id."""
+        decision = self._decision(True)
+        decision.best_match.data.pop("storeProductId")
+        outcome = self._service(self._api()).resolve(self._item(), decision)
+        self.assertEqual(outcome.status, "ai_rejected")
+        self.assertTrue(outcome.manual_review)
+        self.assertEqual(outcome.verify_result["reason"], "local_safety: missing storeProductId")
+
     def test_review_rejection_blocks_ai_selection(self) -> None:
         """A review model disagreement forces manual review."""
         FakeVerifier.search_result = {

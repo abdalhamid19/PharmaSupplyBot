@@ -45,9 +45,19 @@ def record_from_diagnostic(diag) -> dict[str, Any]:
 
 def match_from_record(record: dict[str, Any], score: float) -> SearchMatch:
     """Return a SearchMatch from an AI-selected record."""
+    data = dict(record.get("_raw") or {})
+    if not data:
+        data = {
+            "productNameEn": record.get("product_name_en", ""),
+            "productName": record.get("product_name_ar", ""),
+            "storeProductId": record.get("store_product_id", ""),
+            "price": record.get("price", ""),
+        }
+    if not candidate_store_product_id(data) and record.get("store_product_id"):
+        data["storeProductId"] = record.get("store_product_id")
     return SearchMatch(
         query=str(record.get("_query", "")),
         row_index=int(record.get("_row_index", 0) or 0),
         score=float(score or 0.0),
-        data=dict(record.get("_raw") or {}),
+        data=data,
     )

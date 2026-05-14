@@ -1,7 +1,7 @@
 """Async live-order AI decision flow."""
 from __future__ import annotations
 
-from .matching_models import MatchDecision
+from .order_ai_outcomes import accepted_search, low_confidence, rejected_search
 from .order_ai_records import (
     ai_candidates,
     candidate_ar,
@@ -10,6 +10,7 @@ from .order_ai_records import (
     match_from_record,
 )
 from .order_ai_review import review_order_ai, with_ai_results
+from .order_ai_safety import local_match_rejection, local_rejection_result
 async def resolve_order_ai(settings, verifier, item, decision):
     """Return an OrderAiOutcome after verify/search/review."""
     from .order_ai_matching import OrderAiOutcome
@@ -28,6 +29,9 @@ async def _verify_current(settings, verifier, item, decision):
     match = decision.best_match
     if not match:
         return None, {}
+    local_rejection = local_match_rejection(item, match)
+    if local_rejection:
+        return None, local_rejection_result(local_rejection)
     result = await _verify_match(verifier, item, match, decision)
     confidence = float(result.get("confidence", 0.0) or 0.0)
     if not result.get("is_correct") or confidence < settings.accept_confidence:
@@ -58,30 +62,16 @@ async def _search(settings, verifier, item, decision, verify_result):
         return None
     confidence = float(result.get("confidence", 0.0) or 0.0)
     if confidence < settings.accept_confidence:
-        return _low_confidence(decision, result, confidence, verify_result)
+        return low_confidence(decision, result, confidence, verify_result)
     match = match_from_record(result["record"], result.get("score", 0.0))
+    local_rejection = local_match_rejection(item, match)
+    if local_rejection:
+        return rejected_search(
+            decision, result, confidence, verify_result, local_rejection
+        )
     reviewed = await review_order_ai(settings, verifier, item, match, confidence, result)
     if reviewed:
         return with_ai_results(
             reviewed, verify_result=verify_result, search_result=result
         )
-    return _accepted_search(decision, match, result, confidence, verify_result)
-
-
-def _low_confidence(decision, result, confidence, verify_result):
-    from .order_ai_matching import OrderAiOutcome
-
-    return OrderAiOutcome(
-        decision, "ai_low_confidence", str(result.get("reason", "")),
-        confidence, True, verify_result=verify_result, search_result=result,
-    )
-
-
-def _accepted_search(decision, match, result, confidence, verify_result):
-    from .order_ai_matching import OrderAiOutcome
-
-    active = MatchDecision(match, decision.diagnostics, "ai_search_accepted")
-    return OrderAiOutcome(
-        active, "ai_search_accepted", str(result.get("reason", "")), confidence,
-        verify_result=verify_result, search_result=result,
-    )
+    return accepted_search(decision, match, result, confidence, verify_result)
