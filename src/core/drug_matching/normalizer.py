@@ -209,6 +209,7 @@ def normalize(name: str) -> str:
     name = re.sub(r'\.(?!\d)', ' ', name)
     name = re.sub(r'(?<!\d)\.', ' ', name)
     name = re.sub(r"\b([DESCMX])\s+R\b", r"\1R", name)
+    name = re.sub(r"\bUNITS?\b", "IU", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name
 

@@ -890,7 +890,10 @@ def _dosage_or_shared_strength(requested, offered) -> bool:
     if not offered.dosage_nums:
         return False
     query_nums = _numeric_tokens(requested.normalized)
-    return bool(query_nums & set(offered.dosage_nums))
+    if query_nums & set(offered.dosage_nums):
+        return True
+    req_text = requested.normalized
+    return any(d in req_text for d in offered.dosage_nums)
 
 
 def _safe_omitted_pen_insulin_details(tokens: set[str], requested, offered) -> bool:
@@ -988,9 +991,34 @@ def _missing_english_identity_reasons(
     """Return reasons for candidates missing requested English identity tokens."""
     candidate_tokens = set(_normalized_tokens(_candidate_english_name(candidate)))
     identity_tokens = _identity_tokens(query_tokens)
-    if identity_tokens and not identity_tokens & candidate_tokens:
+    if identity_tokens and not _any_identity_match(identity_tokens, candidate_tokens):
         return ["English name missing requested identity token"]
     return []
+
+
+def _any_identity_match(
+    identity_tokens: set[str], candidate_tokens: set[str]
+) -> bool:
+    """True when at least one identity token matches a candidate token.
+
+    Exact match first, then fuzzy (ratio >= 0.85, both >= 4 chars)
+    to tolerate 1-2 char typos in Excel drug name entries.
+    """
+    if identity_tokens & candidate_tokens:
+        return True
+    return any(
+        _fuzzy_token_match(qt, ct)
+        for qt in identity_tokens if len(qt) >= 4
+        for ct in candidate_tokens if len(ct) >= 4
+    )
+
+
+def _fuzzy_token_match(a: str, b: str) -> bool:
+    """True when two tokens are a close spelling variant."""
+    return (
+        a.startswith(b) or b.startswith(a)
+        or SequenceMatcher(None, a, b).ratio() >= 0.85
+    )
 
 
 def _identity_tokens(tokens: set[str]) -> set[str]:

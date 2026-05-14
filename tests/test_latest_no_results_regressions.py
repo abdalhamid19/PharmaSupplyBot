@@ -166,6 +166,32 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
         )
         self.assertIsNone(decision.best_match)
 
+    # -- Phase 3: identity token & spelling tolerance regressions --
+
+    def test_phase3_fuzzy_identity_tokens_tolerate_typos(self) -> None:
+        """1-2 char typos in brand names should not block identity check."""
+        cases = [
+            ("AMEBAZOLE 1 GM 2 TAB", "AMEBAZOL 1 GM 2 F.C. TABS."),
+            ("PROCORLAN 7.5MG TAB", "PROCORALAN 7.5 MG 28 F.C. TABS."),
+            ("ZADOGLOBN 20 CAPS", "ZADOGLOBIN 20 CAPS"),
+            ("MONONDEXIN 0.1 EYE DROPS", "MONODEXIN 0.1 % EYE DROPS 10 ML"),
+        ]
+        for item_name, candidate_name in cases:
+            with self.subTest(item_name=item_name):
+                decision = explain_best_product_match(
+                    Item(code="p3", name=item_name, qty=1),
+                    [(item_name, [_candidate(candidate_name, store_id="s-p3")])],
+                )
+                self.assertIsNotNone(decision.best_match)
+
+    def test_phase3_units_normalized_to_iu(self) -> None:
+        """'UNITS' should be normalized to 'IU' for dosage parsing."""
+        from src.core.drug_matching.normalizer import parse_drug, components_match
+        r = parse_drug("LANTUS 100 UNITS 5 CARTRIDGES")
+        o = parse_drug("LANTUS 100 I.U. / ML 5 CARTRIDGES")
+        compat, _ = components_match(r, o)
+        self.assertTrue(compat)
+
 
 def _candidate(english_name: str, store_id: str = "store-1") -> dict[str, object]:
     """Return one Tawreed-style candidate for regression tests."""
