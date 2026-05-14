@@ -60,6 +60,8 @@
   explicit ambiguity instead of an arbitrary winner.
 - Fuzzy/non-exact live-search matches reject unrequested numeric additions except
   a single percentage strength marker, reducing unsafe variant acceptance.
+- Numeric matching now extracts digit groups from attached unit tokens such as
+  `5MG` or `30TAB`, reducing false numeric mismatches.
 - Order AI artifact row shaping stays in `src/core/order_ai_trace_rows.py` and
   `src/core/order_run_artifact_rows.py`.
 - Order winner artifact fields stay in `src/core/order_winner_fields.py` and

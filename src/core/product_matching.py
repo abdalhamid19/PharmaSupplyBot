@@ -12,6 +12,7 @@ _NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
 _WHITESPACE_RE = re.compile(r"\s+")
 _ARABIC_NON_WORD_RE = re.compile(r"[^\w\u0600-\u06FF]+")
 _ARABIC_WHITESPACE_RE = re.compile(r"\s+")
+_NUMERIC_PART_RE = re.compile(r"\d+")
 MAX_SEARCH_QUERY_VARIANTS = 24
 _ARABIC_REQUIRED_TOKEN_ALIASES = {
     "APPLE": ("تفاح", "ابل"),
@@ -355,9 +356,9 @@ def _numeric_overlap_score(
 def _numeric_tokens(text: str) -> set[str]:
     """Return tokens that contain at least one digit."""
     return {
-        token
+        numeric_part
         for token in text.split()
-        if any(character.isdigit() for character in token)
+        for numeric_part in _NUMERIC_PART_RE.findall(token)
     }
 
 

@@ -238,6 +238,15 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("unrequested numeric token", decision.final_reason)
 
+    def test_attached_unit_numbers_match_spaced_candidate_numbers(self) -> None:
+        item = Item(code="61862", name="AMLODIPINE 5MG 30 TAB", qty=1)
+        candidate = _candidate("AMLODIPINE 5 MG 30 TAB.", "املوديبين")
+
+        decision = explain_best_product_match(item, [(item.name, [candidate])])
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["productNameEn"], candidate["productNameEn"])
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""
