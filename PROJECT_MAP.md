@@ -92,6 +92,9 @@
 - Run-scoped artifact paths stay in `src/core/artifact_run.py`.
 - Shared candidate-level trace rows and async logging setup stay in
   `src/core/matching_trace.py`.
+- Matching trace field expansion stays in `src/core/matching_trace_fields.py`;
+  trace rows include reason codes, orderable-id flags, and score breakdown
+  columns for easier audit grouping.
 
 ## [ORPHANS & PENDING]
 
@@ -143,4 +146,7 @@
   compileall and rule audit.
 - Phase 14 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 258 unit tests plus
+  compileall and rule audit.
+- Phase 15 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 260 unit tests plus
   compileall and rule audit.

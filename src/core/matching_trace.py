@@ -7,8 +7,8 @@ import queue
 from logging.handlers import QueueHandler, QueueListener
 from typing import Any
 
-from .candidate_identity import candidate_store_product_id
-from .matching_models import CandidateMatchDiagnostic, MatchDecision
+from .matching_models import MatchDecision
+from .matching_trace_fields import candidate_trace_fields, reason_code
 from .utils.excel import Item
 
 
@@ -43,22 +43,16 @@ def decision_trace_rows(
 
 def _base_trace_row(item: Item, decision: MatchDecision, phase: str) -> dict[str, Any]:
     return {
-        "phase": phase,
-        "item_code": item.code,
-        "item_name": item.name,
+        "phase": phase, "item_code": item.code, "item_name": item.name,
         "item_qty": item.qty,
         "final_status": "matched" if decision.best_match else "no_match",
         "final_reason": decision.final_reason,
-        "candidate_rank": "",
-        "candidate_name_en": "",
-        "candidate_name_ar": "",
-        "candidate_id": "",
-        "candidate_score": "",
-        "accepted": "",
-        "accepted_reason": "",
-        "rejection_reason": "",
-        "query": "",
-        "row_index": "",
+        "final_reason_code": reason_code(decision.final_reason),
+        "candidate_rank": "", "candidate_name_en": "",
+        "candidate_name_ar": "", "candidate_id": "",
+        "candidate_has_orderable_id": "", "candidate_score": "",
+        "accepted": "", "accepted_reason": "", "rejection_reason": "",
+        "reason_code": "", "query": "", "row_index": "",
         "selection_reason": decision.final_reason,
     }
 
@@ -70,29 +64,5 @@ def _candidate_trace_row(
     rank: int,
 ) -> dict[str, Any]:
     row = _base_trace_row(item, decision, phase)
-    row.update(_candidate_trace_fields(diagnostic, rank))
+    row.update(candidate_trace_fields(diagnostic, rank))
     return row
-
-def _candidate_trace_fields(
-    diagnostic: CandidateMatchDiagnostic, rank: int
-) -> dict[str, Any]:
-    return {
-        "candidate_rank": rank,
-        "candidate_name_en": _candidate_name(diagnostic, "productNameEn"),
-        "candidate_name_ar": _candidate_name(diagnostic, "productName"),
-        "candidate_id": candidate_store_product_id(diagnostic.candidate),
-        "candidate_score": round(diagnostic.score, 6),
-        "accepted": diagnostic.accepted,
-        "accepted_reason": diagnostic.accepted_reason,
-        "rejection_reason": diagnostic.rejection_reason,
-        "query": diagnostic.query,
-        "row_index": diagnostic.row_index,
-        "selection_reason": _candidate_selection_reason(diagnostic),
-    }
-
-def _candidate_name(diagnostic: CandidateMatchDiagnostic, key: str) -> str:
-    return str(diagnostic.candidate.get(key) or "")
-
-
-def _candidate_selection_reason(diagnostic: CandidateMatchDiagnostic) -> str:
-    return diagnostic.accepted_reason if diagnostic.accepted else diagnostic.rejection_reason
