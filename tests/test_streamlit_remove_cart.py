@@ -54,6 +54,22 @@ class StreamlitRemoveCartTests(unittest.TestCase):
         self.assertIn("--item-workers", command)
         self.assertEqual(command[command.index("--item-workers") + 1], "2")
 
+    def test_remove_cart_command_can_use_saved_not_matching(self) -> None:
+        command = remove_cart_command(
+            Path("config.yaml"),
+            {
+                "input_mode": "Saved not matching manual review",
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+            },
+            None,
+        )
+
+        self.assertIn("--manual-review-scope", command)
+        self.assertEqual(command[command.index("--manual-review-scope") + 1], "saved-decisions")
+        self.assertNotIn("--excel", command)
+
     def test_start_remove_cart_process_adds_stop_flag(self) -> None:
         with TemporaryDirectory() as temp_dir:
             stop_flag = Path(temp_dir) / "remove_cart_stop.flag"

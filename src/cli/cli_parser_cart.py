@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 
-from .cli_parser_shared import add_common_arguments, add_excel_argument
+from .cli_parser_manual_review import add_manual_review_removal_arguments
+from .cli_parser_shared import add_common_arguments
 
 
 def build_remove_cart_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -14,7 +15,11 @@ def build_remove_cart_parser(subparsers: argparse._SubParsersAction) -> None:
         help="Remove matching products from Tawreed carts",
     )
     add_common_arguments(remove_parser)
-    add_excel_argument(remove_parser, "cart-removal", "data/input/remove_items/")
+    remove_parser.add_argument(
+        "--excel",
+        default=None,
+        help="Path to cart-removal Excel file, usually under data/input/remove_items/",
+    )
     _add_remove_cart_runtime_arguments(remove_parser)
 
 
@@ -35,6 +40,7 @@ def _add_remove_cart_runtime_arguments(
         default=None,
         help="Parallel worker processes for items within one profile",
     )
+    add_manual_review_removal_arguments(argument_parser)
 
 
 def _add_debug_browser_argument(argument_parser: argparse.ArgumentParser) -> None:

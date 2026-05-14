@@ -187,6 +187,20 @@ class CliParserTests(unittest.TestCase):
         self.assertEqual(args.excel, "data/input/remove_items/remove.xlsx")
         self.assertTrue(args.debug_browser)
 
+    def test_remove_cart_accepts_manual_review_source(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "remove-cart",
+                "--from-manual-review",
+                "artifacts/order/wardany/run/manual_review.csv",
+                "--profile",
+                "wardany",
+            ]
+        )
+
+        self.assertEqual(args.from_manual_review, "artifacts/order/wardany/run/manual_review.csv")
+        self.assertEqual(args.manual_decision, "not_matching")
+
     def test_remove_cart_accepts_all_profiles(self) -> None:
         args = build_parser().parse_args(
             [

@@ -30,7 +30,7 @@ def render_remove_cart_tab(
     excel_path = resolve_excel_path(
         form_values["excel_path_str"], form_values["upload"]
     )
-    if excel_path is None:
+    if excel_path is None and not _uses_saved_manual_review(form_values):
         st.error("Please choose or upload an Excel file.")
         return
     run_remove_cart_submission(app_config, config_path, form_values, excel_path)
@@ -41,7 +41,7 @@ def remove_cart_form_values(app_config) -> tuple[bool, dict[str, object]]:
     with st.form("remove_cart_form"):
         input_mode = st.radio(
             "Removal Excel source",
-            ["Existing file", "Upload file"],
+            ["Existing file", "Upload file", "Saved not matching manual review"],
             horizontal=True,
         )
         excel_path_str = existing_remove_excel_path(input_mode, remove_excel_options())
@@ -95,7 +95,7 @@ def run_remove_cart_submission(
     app_config,
     config_path: Path,
     form_values: dict[str, object],
-    excel_path: Path,
+    excel_path: Path | None,
 ) -> None:
     """Start one remove-cart CLI process."""
     if not prepare_remove_cart_state_files(app_config, form_values):
@@ -109,10 +109,10 @@ def run_remove_cart_submission(
 def remove_cart_command(
     config_path: Path,
     form_values: dict[str, object],
-    excel_path: Path,
+    excel_path: Path | None,
 ) -> list[str]:
     """Return CLI command arguments for one remove-cart run."""
-    command = ["remove-cart", "--config", str(config_path), "--excel", str(excel_path)]
+    command = _remove_cart_base_command(config_path, form_values, excel_path)
     if form_values["profile_mode"] == "Single profile":
         command.extend(["--profile", str(form_values["profile_key"])])
     else:
@@ -124,6 +124,22 @@ def remove_cart_command(
     if item_workers > 1:
         command.extend(["--item-workers", str(item_workers)])
     return command
+
+
+def _remove_cart_base_command(
+    config_path: Path, form_values: dict[str, object], excel_path: Path | None
+) -> list[str]:
+    if _uses_saved_manual_review(form_values):
+        return [
+            "remove-cart", "--config", str(config_path),
+            "--manual-review-scope", "saved-decisions",
+            "--manual-decision", "not_matching",
+        ]
+    return ["remove-cart", "--config", str(config_path), "--excel", str(excel_path)]
+
+
+def _uses_saved_manual_review(form_values: dict[str, object]) -> bool:
+    return form_values.get("input_mode") == "Saved not matching manual review"
 
 
 def _form_int(values: dict[str, object], key: str, default: int) -> int:
