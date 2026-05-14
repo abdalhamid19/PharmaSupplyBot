@@ -11,8 +11,8 @@ from .tawreed_dom_fields import (
     _badge_int,
     _dom_candidate,
     _inner_text,
-    _normalize_ocr_zero,
 )
+from .tawreed_dom_fallback import normalize_fallback_query
 from .tawreed_ui import is_no_results_row, visible_product_rows
 
 _NUMERIC_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?")
@@ -54,7 +54,7 @@ def _row_name_lines(row) -> list[str]:
 
 def _row_is_plausible(arabic_name: str, query: str) -> bool:
     """Return whether a DOM row is numerically plausible for the query."""
-    q_nums = _NUMERIC_TOKEN_RE.findall(_normalize_ocr_zero(query))
+    q_nums = _NUMERIC_TOKEN_RE.findall(normalize_fallback_query(query))
     if not q_nums:
         return True
     r_nums = _NUMERIC_TOKEN_RE.findall(arabic_name)

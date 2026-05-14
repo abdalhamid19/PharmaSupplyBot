@@ -5,10 +5,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .tawreed_dom_fallback import fallback_english_name
+
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
-_NUMERIC_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?")
-_OCR_ZERO_RE = re.compile(r"(?<=\d)[Oo](?=\b|[^A-Za-z0-9])")
-_WHITESPACE_RE = re.compile(r"\s+")
 FAST_OPTIONAL_TEXT_TIMEOUT_MS = 300
 
 
@@ -17,7 +16,7 @@ def _dom_candidate(
 ) -> dict[str, Any]:
     return {
         "productNameEn": "",
-        "productNameEnFallback": _fallback_english_name(query, lines[0]),
+        "productNameEnFallback": fallback_english_name(query, lines[0]),
         "productNameEnSynthetic": True,
         "productName": lines[0],
         "productsCount": s_count,
@@ -72,18 +71,6 @@ def _first_number(text: str) -> str:
 
 def _normalized_dom_id(text: str) -> str:
     return "".join(c if c.isalnum() else "-" for c in text)[:48]
-
-
-def _fallback_english_name(query: str, arabic_name: str) -> str:
-    normalized_query = _normalize_ocr_zero(query.strip())
-    q_tokens = [t for t in _WHITESPACE_RE.split(normalized_query) if t]
-    non_num = [t for t in q_tokens if not any(ch.isdigit() for ch in t)]
-    ar_num = _NUMERIC_TOKEN_RE.findall(arabic_name)
-    return " ".join(non_num + ar_num) or normalized_query
-
-
-def _normalize_ocr_zero(text: str) -> str:
-    return _OCR_ZERO_RE.sub("0", text)
 
 
 def _row_unavailable_message(row) -> str:
