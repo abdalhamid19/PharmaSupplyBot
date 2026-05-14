@@ -58,6 +58,9 @@
   `src/core/drug_matching/ai_provider_cooldown.py`; repeated provider
   rate-limit or invalid JSON attempts disable that provider's rotation attempts
   for the active verifier.
+- Manual-review correction import stays in `src/core/manual_review_hints.py`
+  with `tools/import_manual_review_hints.py`, exporting approved
+  `correct_store_product_id` rows into reusable JSON hints.
 - Live-order matching now rejects otherwise-accepted candidates that lack an
   orderable Tawreed id, while preserving earlier lexical/component rejection
   reasons for diagnostics.
@@ -131,4 +134,7 @@
   compileall and rule audit.
 - Phase 12 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 254 unit tests plus
+  compileall and rule audit.
+- Phase 13 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 256 unit tests plus
   compileall and rule audit.
