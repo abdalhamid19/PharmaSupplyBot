@@ -15,6 +15,7 @@ from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
 from .selectors import _selectors
 from .tawreed_artifacts import append_csv_artifact, dump_artifacts
+from .tawreed_api import TawreedApiUnavailable
 from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
 from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
@@ -65,6 +66,7 @@ class TawreedBot:
         summary_label_suffix: str | None = None,
         match_only: bool = False,
         order_ai_settings: OrderAiSettings | None = None,
+        execution_mode: str = "browser",
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state."""
         self.config = config
@@ -77,6 +79,7 @@ class TawreedBot:
         self.summary_label_suffix = summary_label_suffix
         self.match_only = match_only
         self.order_ai_settings = order_ai_settings or OrderAiSettings()
+        self.execution_mode = execution_mode
         self.order_ai_service = self._build_order_ai_service()
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
@@ -102,6 +105,50 @@ class TawreedBot:
         if not self.order_ai_settings.enabled:
             return None
         return OrderAiDecisionService(self.order_ai_settings)
+
+    def _try_api_order(self, items: Iterable[Item]) -> bool:
+        """Run API order flow or return False when browser fallback should handle it."""
+        if not self._api_enabled():
+            return False
+        from .tawreed_api_flow import place_order_with_api
+
+        return self._run_api_or_fallback("order", lambda: place_order_with_api(self, items))
+
+    def _try_api_match_only(self, items: Iterable[Item]) -> bool:
+        """Run API match-only flow or return False when browser fallback should handle it."""
+        if not self._api_enabled():
+            return False
+        from .tawreed_api_flow import match_items_only_with_api
+
+        return self._run_api_or_fallback(
+            "match-only", lambda: match_items_only_with_api(self, items)
+        )
+
+    def _try_api_cart_removal(self, items: Iterable[CartRemovalItem]) -> bool:
+        """Run API cart removal or return False when browser fallback should handle it."""
+        if not self._api_enabled():
+            return False
+        from .tawreed_api_flow import remove_cart_items_with_api
+
+        return self._run_api_or_fallback(
+            "cart-removal", lambda: remove_cart_items_with_api(self, items)
+        )
+
+    def _api_enabled(self) -> bool:
+        """Return whether this bot should try the API backend before the browser."""
+        return self.execution_mode in {"api", "auto"}
+
+    def _run_api_or_fallback(self, label: str, operation) -> bool:
+        """Run one API operation and decide whether browser fallback may continue."""
+        try:
+            operation()
+            self.log(f"{label} completed with Tawreed API backend.")
+            return True
+        except TawreedApiUnavailable as error:
+            if self.execution_mode == "api":
+                raise
+            self.log(f"{label} API unavailable; falling back to browser: {error}")
+            return False
 
     def resolve_order_ai_decision(
         self, item: Item, decision: MatchDecision
@@ -173,6 +220,8 @@ class TawreedBot:
 
     def place_order_from_items(self, items: Iterable[Item]) -> None:
         """Place an order by processing each item from the provided iterable."""
+        if self._try_api_order(items):
+            return
         with sync_playwright() as p:
             browser, context, page = open_order_page(
                 p,
@@ -213,6 +262,8 @@ class TawreedBot:
 
     def match_items_only(self, items: Iterable[Item]) -> None:
         """Match Tawreed products for each item without adding anything to the cart."""
+        if self._try_api_match_only(items):
+            return
         with sync_playwright() as p:
             browser, context, page = open_order_page(
                 p,
@@ -240,6 +291,8 @@ class TawreedBot:
 
     def remove_cart_items(self, items: Iterable[CartRemovalItem]) -> None:
         """Remove the requested items from Tawreed carts."""
+        if self._try_api_cart_removal(items):
+            return
         with sync_playwright() as p:
             browser, context, page = open_order_page(
                 p,

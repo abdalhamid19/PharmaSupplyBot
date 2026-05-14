@@ -97,6 +97,21 @@ class CliParserTests(unittest.TestCase):
 
         self.assertTrue(args.match_only)
 
+    def test_order_accepts_execution_mode(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--excel",
+                "data/input/order_items/ddd.xlsx",
+                "--profile",
+                "wardany",
+                "--execution-mode",
+                "api",
+            ]
+        )
+
+        self.assertEqual(args.execution_mode, "api")
+
     def test_order_accepts_ai_matching_flags(self) -> None:
         args = build_parser().parse_args(
             [
@@ -209,6 +224,21 @@ class CliParserTests(unittest.TestCase):
             ]
         )
         self.assertEqual(args.item_workers, 2)
+
+    def test_remove_cart_accepts_execution_mode(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "remove-cart",
+                "--excel",
+                "data/input/remove_items/remove.xlsx",
+                "--profile",
+                "wardany",
+                "--execution-mode",
+                "browser",
+            ]
+        )
+
+        self.assertEqual(args.execution_mode, "browser")
 
     def test_export_products_accepts_output_options(self) -> None:
         args = build_parser().parse_args(

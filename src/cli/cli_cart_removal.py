@@ -65,6 +65,7 @@ def _remove_cart_bot(
         profile,
         debug_browser=bool(getattr(args, "debug_browser", False)),
         stop_flag_path=Path(stop_flag) if stop_flag else None,
+        execution_mode=str(getattr(args, "execution_mode", "auto")),
     )
 
 

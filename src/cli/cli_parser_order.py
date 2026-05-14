@@ -61,6 +61,12 @@ def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> No
         help="Only run product matching and never add matched items to the cart",
     )
     argument_parser.add_argument(
+        "--execution-mode",
+        choices=["auto", "api", "browser"],
+        default="auto",
+        help="Use Tawreed API when available, strict API only, or browser automation",
+    )
+    argument_parser.add_argument(
         "--item-workers",
         type=int,
         default=None,

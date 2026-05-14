@@ -14,6 +14,7 @@ from src.core.config.config_models import (
 from src.core.matching_models import MatchDecision, SearchMatch
 from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
+from src.tawreed.tawreed_api import TawreedApiUnavailable
 from src.tawreed.tawreed_session import SessionInvalidError
 
 
@@ -194,6 +195,41 @@ class TawreedBotTests(unittest.TestCase):
             bot._match_item_only(page, item)
 
         require_match.assert_called_once_with(bot, page, item, require_available=False)
+
+    def test_auto_execution_mode_falls_back_when_api_is_unavailable(self) -> None:
+        bot = self._bot()
+        bot.execution_mode = "auto"
+
+        with (
+            patch(
+                "src.tawreed.tawreed_api_flow.match_items_only_with_api",
+                side_effect=TawreedApiUnavailable("missing contract"),
+            ),
+            patch("src.tawreed.tawreed.sync_playwright") as playwright,
+            patch("src.tawreed.tawreed.open_order_page") as open_page,
+            patch.object(bot, "_run_match_only_session") as run_browser,
+        ):
+            open_page.return_value = (object(), object(), object())
+            bot.match_items_only([Item(code="1", name="Panadol", qty=1)])
+
+        playwright.assert_called_once()
+        run_browser.assert_called_once()
+
+    def test_api_execution_mode_does_not_fallback_to_browser(self) -> None:
+        bot = self._bot()
+        bot.execution_mode = "api"
+
+        with (
+            patch(
+                "src.tawreed.tawreed_api_flow.match_items_only_with_api",
+                side_effect=TawreedApiUnavailable("missing contract"),
+            ),
+            patch("src.tawreed.tawreed.sync_playwright") as playwright,
+        ):
+            with self.assertRaises(TawreedApiUnavailable):
+                bot.match_items_only([Item(code="1", name="Panadol", qty=1)])
+
+        playwright.assert_not_called()
 
     def test_build_item_summary_populates_matched_names_by_language(self) -> None:
         bot = self._bot()

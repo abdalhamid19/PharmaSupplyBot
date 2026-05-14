@@ -52,6 +52,7 @@ def _cart_options(args: object) -> dict[str, Any]:
         "artifact_run_id": run.run_id if run else "",
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "stop_flag": getattr(args, "stop_flag", None),
+        "execution_mode": str(getattr(args, "execution_mode", "auto")),
     }
 
 

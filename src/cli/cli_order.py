@@ -314,6 +314,7 @@ def _order_bot(
         fast_search=bool(getattr(args, "fast_search", False)),
         match_only=_match_only(args),
         order_ai_settings=order_ai_settings(args),
+        execution_mode=str(getattr(args, "execution_mode", "auto")),
     )
 
 
@@ -396,6 +397,7 @@ def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": _match_only(args),
+        "execution_mode": str(getattr(args, "execution_mode", "auto")),
         "stop_flag": getattr(args, "stop_flag", None),
         "warehouse_mode": getattr(args, "warehouse_mode", None),
         "min_discount_percent": getattr(args, "min_discount_percent", None),
