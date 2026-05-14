@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import unittest
 
-from src.tawreed.tawreed_product_search import _api_candidates, _search_response_pattern
+from src.tawreed.tawreed_product_search import (
+    _api_candidates,
+    _search_response_pattern,
+)
+from src.tawreed.tawreed_product_search_select import select_search_candidates
 
 
 class TawreedProductSearchTests(unittest.TestCase):
@@ -50,6 +54,24 @@ class TawreedProductSearchTests(unittest.TestCase):
         self.assertIsNotNone(
             pattern.search("https://seller.tawreed.io/stores/products/search/similar5")
         )
+
+    def test_dom_candidates_replace_api_rows_without_orderable_ids(self) -> None:
+        """API rows without store ids are partial data and should use DOM fallback."""
+        api_rows = [{"productNameEn": "PANADOL"}]
+        dom_rows = [{"productNameEn": "PANADOL", "storeProductId": "dom-row-panadol"}]
+
+        selected = select_search_candidates(api_rows, dom_rows)
+
+        self.assertEqual(selected, dom_rows)
+
+    def test_orderable_api_candidates_remain_preferred(self) -> None:
+        """API rows with store ids remain the preferred source."""
+        api_rows = [{"productNameEn": "PANADOL", "storeProductId": "s1"}]
+        dom_rows = [{"productNameEn": "PANADOL", "storeProductId": "dom-row-panadol"}]
+
+        selected = select_search_candidates(api_rows, dom_rows)
+
+        self.assertEqual(selected, api_rows)
 
 
 if __name__ == "__main__":

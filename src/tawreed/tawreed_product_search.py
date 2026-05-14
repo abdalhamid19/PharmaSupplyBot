@@ -8,6 +8,7 @@ from typing import Any
 from playwright.sync_api import Page
 
 from .tawreed_constants import PRODUCT_SEARCH_ENDPOINT
+from .tawreed_product_search_select import has_orderable_candidate, select_search_candidates
 
 PRODUCT_SEARCH_INPUT_SELECTOR = (
     "#tawreedTableGlobalSearch, "
@@ -30,17 +31,15 @@ def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     close_visible_dialogs(page)
     api_candidates = _submit_product_search_with_api(page, query)
     wait_for_table_overlay_to_clear(page)
-    if api_candidates is not None:
+    if api_candidates is not None and has_orderable_candidate(api_candidates):
         return api_candidates
     rows = _ready_product_rows(page)
     if rows is None or is_no_results_row(rows.first):
-        return []
-    return dom_search_results(page, query)
+        return select_search_candidates(api_candidates, [])
+    return select_search_candidates(api_candidates, dom_search_results(page, query))
 
 
-def _submit_product_search_with_api(
-    page: Page, query: str
-) -> list[dict[str, Any]] | None:
+def _submit_product_search_with_api(page: Page, query: str) -> list[dict[str, Any]] | None:
     try:
         with page.expect_response(_search_response_pattern(), timeout=3000) as resp:
             _submit_product_search(page, query)
@@ -48,9 +47,7 @@ def _submit_product_search_with_api(
     except Exception:
         return None
 
-
 def _search_response_pattern(): return re.compile(f".*{PRODUCT_SEARCH_ENDPOINT}.*")
-
 
 def _api_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]: return _product_dicts(payload)
 

@@ -61,6 +61,9 @@
 - Manual-review correction import stays in `src/core/manual_review_hints.py`
   with `tools/import_manual_review_hints.py`, exporting approved
   `correct_store_product_id` rows into reusable JSON hints.
+- Tawreed product search uses `src/tawreed/tawreed_product_search_select.py` to
+  fall back from partial API rows to DOM candidates when API rows lack
+  orderable store product ids.
 - Live-order matching now rejects otherwise-accepted candidates that lack an
   orderable Tawreed id, while preserving earlier lexical/component rejection
   reasons for diagnostics.
@@ -137,4 +140,7 @@
   compileall and rule audit.
 - Phase 13 validation succeeded:
   `.venv/bin/python tools/phase_validation.py` ran 256 unit tests plus
+  compileall and rule audit.
+- Phase 14 validation succeeded:
+  `.venv/bin/python tools/phase_validation.py` ran 258 unit tests plus
   compileall and rule audit.
