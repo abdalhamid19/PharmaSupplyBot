@@ -43,6 +43,8 @@
 - Streamlit presentation and subprocess orchestration stay in `src/ui`.
 - Tawreed browser automation stays in `src/tawreed`.
 - Shared live-search scoring stays in `src/core/product_matching.py`.
+- Shared candidate id normalization stays in `src/core/candidate_identity.py` so
+  matching, AI, and artifacts agree on orderable Tawreed ids.
 - Shared item code/name normalization stays in `src/core/item_text.py` and is
   reused by prevented-items and cart-removal input handling.
 - Component parsing, indexed CSV matching, AI verification/search/review, model
