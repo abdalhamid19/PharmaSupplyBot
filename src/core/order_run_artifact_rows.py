@@ -1,7 +1,7 @@
 """Structured rows for order item summary artifacts."""
 from __future__ import annotations
 
-from .candidate_identity import candidate_store_product_id
+from .order_winner_fields import candidate_summary_fields
 
 
 def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object]:
@@ -15,11 +15,9 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
         "status": summary.status,
         "reason": summary.reason,
         "matched": bool(match),
-        "matched_product_name_en": candidate.get("productNameEn", ""),
-        "matched_product_name_ar": candidate.get("productName", ""),
-        "matched_store_product_id": candidate_store_product_id(candidate),
         "matched_query": match.query if match else "",
         "deterministic_score": round(match.score, 6) if match else "",
+        **candidate_summary_fields(candidate, decision, match),
         **_summary_ai_fields(outcome, summary.status),
     }
 
@@ -34,7 +32,14 @@ def manual_review_required(summary_status: str, outcome) -> bool:
 def manual_review_row(item, summary, decision, outcome) -> dict[str, object]:
     """Return a manual-review row with empty human decision columns."""
     row = order_item_summary_row(item, summary, decision, outcome)
-    row.update({"manual_decision": "", "manual_reason": "", "correct_store_product_id": ""})
+    row.update(
+        {
+            "manual_review_reason_code": _manual_review_reason_code(summary.status, outcome),
+            "manual_decision": "",
+            "manual_reason": "",
+            "correct_store_product_id": "",
+        }
+    )
     return row
 
 
@@ -65,6 +70,11 @@ def _summary_ai_fields(outcome, summary_status: str) -> dict[str, object]:
 
 def _first_value(results, key: str) -> object:
     return next((result.get(key, "") for result in results if result.get(key)), "")
+
+
+def _manual_review_reason_code(summary_status: str, outcome) -> str:
+    status = getattr(outcome, "status", "") if outcome is not None else ""
+    return status or summary_status
 
 
 def _final_action(summary_status: str, outcome) -> str:

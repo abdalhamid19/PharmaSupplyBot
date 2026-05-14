@@ -7,6 +7,7 @@ import queue
 from logging.handlers import QueueHandler, QueueListener
 from typing import Any
 
+from .candidate_identity import candidate_store_product_id
 from .matching_models import CandidateMatchDiagnostic, MatchDecision
 from .utils.excel import Item
 
@@ -79,7 +80,7 @@ def _candidate_trace_fields(
         "candidate_rank": rank,
         "candidate_name_en": _candidate_name(diagnostic, "productNameEn"),
         "candidate_name_ar": _candidate_name(diagnostic, "productName"),
-        "candidate_id": diagnostic.candidate.get("storeProductId", ""),
+        "candidate_id": candidate_store_product_id(diagnostic.candidate),
         "candidate_score": round(diagnostic.score, 6),
         "accepted": diagnostic.accepted,
         "accepted_reason": diagnostic.accepted_reason,

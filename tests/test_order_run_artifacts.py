@@ -36,6 +36,8 @@ class OrderRunArtifactsTests(unittest.TestCase):
             rows = self._csv_rows(run_dir / "order_item_summary_20260513_2030.csv")
             self.assertEqual(rows[0]["ai_status"], "ai_verified")
             self.assertEqual(rows[0]["ai_verified"], "True")
+            self.assertEqual(rows[0]["winner_store_product_id"], "s1")
+            self.assertEqual(rows[0]["tie_break_reason"], "accepted")
 
     def test_ai_trace_writes_api_attempt_columns(self) -> None:
         """AI trace artifacts include provider attempt metadata."""
@@ -70,6 +72,7 @@ class OrderRunArtifactsTests(unittest.TestCase):
             run_dir = root / "order/wardany/20260513_2030"
             rows = self._csv_rows(run_dir / "manual_review_20260513_2030.csv")
             self.assertEqual(rows[0]["status"], "no-results")
+            self.assertEqual(rows[0]["manual_review_reason_code"], "no-results")
             self.assertEqual(rows[0]["manual_decision"], "")
 
     @staticmethod

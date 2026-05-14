@@ -56,6 +56,8 @@
   reasons for diagnostics.
 - Order AI artifact row shaping stays in `src/core/order_ai_trace_rows.py` and
   `src/core/order_run_artifact_rows.py`.
+- Order winner artifact fields stay in `src/core/order_winner_fields.py` and
+  include the selected orderable id, stock, price, store, and tie-break reason.
 - Order artifact writing and worker partition merging stay in
   `src/tawreed/tawreed_order_run_artifacts.py` and
   `src/tawreed/order_worker_artifact_merger.py`.
