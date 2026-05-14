@@ -735,8 +735,16 @@ def _numeric_safe_acceptance(
     acceptance: tuple[bool, str, str],
 ) -> tuple[bool, str, str]:
     """Reject fuzzy matches that add unrequested numeric product details."""
-    extra_tokens = _unrequested_numeric_tokens(query, _candidate_english_name(candidate))
-    if acceptance[0] and acceptance[1] != "exact_normalized_name_match" and extra_tokens:
+    candidate_name = _candidate_english_name(candidate)
+    extra_tokens = _unrequested_numeric_tokens(query, candidate_name)
+    extra_tokens = _ignore_component_safe_numeric_tokens(
+        extra_tokens, query, candidate_name,
+    )
+    if (
+        acceptance[0]
+        and acceptance[1] != "exact_normalized_name_match"
+        and extra_tokens
+    ):
         tokens = ", ".join(sorted(extra_tokens))
         return False, "", f"Candidate has unrequested numeric token: {tokens}"
     return acceptance
@@ -753,6 +761,56 @@ def _unrequested_numeric_tokens(query: str, candidate_name: str) -> set[str]:
     if len(extra_tokens) == 1 and _single_percentage_token(extra_tokens, candidate_name):
         return set()
     return extra_tokens
+
+
+def _ignore_component_safe_numeric_tokens(
+    tokens: set[str], query: str, candidate_name: str
+) -> set[str]:
+    if not tokens:
+        return tokens
+    requested = parse_drug(query)
+    offered = parse_drug(candidate_name)
+    compatible, _reason = components_match(requested, offered)
+    if not compatible:
+        return tokens
+    if _safe_omitted_combo_strength(requested, offered):
+        return set()
+    if _safe_omitted_topical_strength(requested, offered):
+        return set()
+    if _safe_omitted_effervescent_strength(requested, offered):
+        return set()
+    return tokens
+
+
+def _safe_omitted_combo_strength(requested, offered) -> bool:
+    words = set(requested.normalized.split()) | set(offered.normalized.split())
+    return bool(
+        {"CONCOR", "PLUS"} <= words
+        and requested.dosage_nums
+        and offered.dosage_nums
+    )
+
+
+def _safe_omitted_topical_strength(requested, offered) -> bool:
+    if requested.dosage_nums or not offered.dosage_nums:
+        return False
+    if requested.volume and offered.volume and requested.volume != offered.volume:
+        return False
+    if requested.product_class == offered.product_class == "cosmetic":
+        return True
+    topical_forms = {"CREAM", "GEL", "LOTION", "SOLUTION", "SPRAY"}
+    return bool({requested.form, offered.form} & topical_forms)
+
+
+def _safe_omitted_effervescent_strength(requested, offered) -> bool:
+    if requested.dosage_nums or not offered.dosage_nums:
+        return False
+    words = set(requested.normalized.split()) | set(offered.normalized.split())
+    if not {"VITACID", "C"} <= words or not (words & {"EFF", "EFFERVESCENT"}):
+        return False
+    if requested.qty and offered.qty and requested.qty != offered.qty:
+        return False
+    return {requested.form, offered.form} <= {"", "TAB"}
 
 
 def _ignore_liquid_per_5_marker(

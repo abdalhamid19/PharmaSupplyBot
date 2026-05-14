@@ -277,6 +277,43 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["productNameEn"], candidate["productNameEn"])
 
+    def test_safe_omitted_topical_strength_does_not_block_match(self) -> None:
+        cases = [
+            ("26979", "IVERZINE LOTION 6O ML", "IVERZINE 1 % LOTION 60 ML"),
+            ("83061", "CLOSOL 50 ML SPRAY", "CLOSOL 10 MG / ML TOPICAL SPRAY 50 ML"),
+            (
+                "89588",
+                "REXODIN 10% ANTISEPTIC SOLUTION 60 ML",
+                "REXODIN ANTISEPTIC SOLUTION 60 ML",
+            ),
+        ]
+        for code, item_name, candidate_name in cases:
+            with self.subTest(item_name=item_name):
+                candidate = _candidate(candidate_name, "")
+                decision = explain_best_product_match(
+                    Item(code=code, name=item_name, qty=1),
+                    [(item_name, [candidate])],
+                )
+                self.assertIsNotNone(decision.best_match)
+
+    def test_safe_omitted_combo_and_effervescent_strengths_match(self) -> None:
+        cases = [
+            (
+                "73173",
+                "CONCOR 5 PLUS 30TAB",
+                "CONCOR PLUS 5 / 12.5 MG 30 F.C. TABLETS",
+            ),
+            ("73267", "VITACID C EFF 12 TAB", "VITACID C 1 GM 12 EFF TAB"),
+        ]
+        for code, item_name, candidate_name in cases:
+            with self.subTest(item_name=item_name):
+                candidate = _candidate(candidate_name, "")
+                decision = explain_best_product_match(
+                    Item(code=code, name=item_name, qty=1),
+                    [(item_name, [candidate])],
+                )
+                self.assertIsNotNone(decision.best_match)
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""

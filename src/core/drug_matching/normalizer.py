@@ -12,6 +12,7 @@ FORM_WORDS = frozenset({
     "SACHET", "SACHETS", "SACH", "AMP", "AMPS", "AMPOULE", "AMPOULES", "VIAL", "VIALS",
     "SUPP", "SUPPS", "PIECE", "PIECES", "DROPS", "DROP", "PEN", "PENS",
     "CARTRIDGE", "CARTRIDGES", "GUMMIES", "PACKETS", "DOSES", "BOTTLES",
+    "EFF", "EFFERVESCENT",
     "F.C.TAB", "F.C.TABS", "F.C. TAB", "F.C. TABS", "F.C.TAB.", "F.C.TABS.",
     "E.C.TAB", "E.C.TABS", "E.C. TAB", "E.C. TABS",
     "EXT.REL.TAB", "EXT. REL. TABS", "E.R.F.C.TABS",
@@ -35,7 +36,7 @@ NOISE_WORDS = frozenset({
     "LIQUID", "FACIAL",
 })
 SOFT_BRAND_DESCRIPTORS = frozenset({
-    "ACTIVE", "ADULT", "ADULTS", "ANISE", "COLD", "FLU", "FOLIC",
+    "ACTIVE", "ADULT", "ADULTS", "ANISE", "ANTISEPTIC", "COLD", "FLU", "FOLIC",
     "JOINT", "NIGHT", "ORIGINAL", "SINUS", "TOP", "TRIPLE", "VAG",
     "VAGINAL",
 })
@@ -142,7 +143,7 @@ _COMBO_MG_PER_ML_RE = re.compile(
 _WEIGHT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(GM|G)\b", re.IGNORECASE)
 _QTY_RE = re.compile(
     r"(\d+)\s*"
-    r"(?:(?:F\s*C|FC|SCORED|CHEWABLE|VAGINAL|VAG|PRE\s*FILLED|"
+    r"(?:(?:F\s*C|FC|SCORED|CHEWABLE|EFF|EFFERVESCENT|VAGINAL|VAG|PRE\s*FILLED|"
     r"PREFILLED|METERED)\s*)?"
     r"(TABLETS|TABLET|TABS|TAB|CAPSULES|CAPSULE|CAPS|CAP|SACHETS|SACHET|"
     r"SACH|AMPOULES|AMPOULE|AMPS|AMP|VIAL|SUPPS|SUPP|PIECE|DROPS|"
@@ -594,9 +595,11 @@ def _liquid_primary_strength_matches(
 
 
 def _weight_is_strength(weight: str, form: str, words: set[str]) -> bool:
-    """Return whether a GM value is an injectable strength, not package weight."""
+    """Return whether a GM value is product strength, not package weight."""
     if not weight:
         return False
+    if form == "TAB" and words & {"EFF", "EFFERVESCENT"}:
+        return True
     return form in {"VIAL", "AMP"} or bool(words & INFUSION_CONTEXT_WORDS)
 
 

@@ -187,6 +187,11 @@ class NormalizerTests(unittest.TestCase):
                 "BEBELAC 3 (BEBEJUNIOR 1 +) MILK 400 GM",
             ),
             ("PRISOLINE DROPS", "PRISOLINE EYE / NASAL DROPS 15 ML"),
+            (
+                "REXODIN 10% ANTISEPTIC SOLUTION 60 ML",
+                "REXODIN ANTISEPTIC SOLUTION 60 ML",
+            ),
+            ("VITACID C EFF 12 TAB", "VITACID C 1 GM 12 EFF TAB"),
         ]
         for left, right in cases:
             with self.subTest(left=left, right=right):
