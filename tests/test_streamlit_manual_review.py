@@ -12,6 +12,10 @@ from src.ui.streamlit_manual_review import (
     manual_review_decisions_from_rows,
     save_manual_review_rows,
 )
+from src.ui.streamlit_manual_review_remove import (
+    manual_review_remove_command,
+    write_not_matching_review_csv,
+)
 
 
 class StreamlitManualReviewTests(unittest.TestCase):
@@ -99,6 +103,34 @@ class StreamlitManualReviewTests(unittest.TestCase):
         self.assertTrue(rows[0]["approved_match"])
         self.assertFalse(rows[0]["not_matching"])
         self.assertEqual(rows[0]["correct_store_product_id"], "store-2")
+
+    def test_writes_not_matching_csv_for_current_run_removal(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir) / "artifacts/order/wardany/20260514_2107"
+            run_dir.mkdir(parents=True)
+
+            path = write_not_matching_review_csv(
+                [
+                    {"item_code": "1", "item_name": "Panadol", "not_matching": True},
+                    {"item_code": "2", "item_name": "Cetal", "not_matching": False},
+                ],
+                run_dir,
+            )
+            content = path.read_text(encoding="utf-8")
+
+        self.assertTrue(path.name.startswith("manual_review_not_matching_"))
+        self.assertIn("Panadol", content)
+        self.assertNotIn("Cetal", content)
+
+    def test_manual_review_remove_command_uses_run_profile(self) -> None:
+        command = manual_review_remove_command(
+            Path("config.yaml"),
+            Path("artifacts/order/wardany/20260514_2107"),
+            Path("manual.csv"),
+        )
+
+        self.assertEqual(command[command.index("--profile") + 1], "wardany")
+        self.assertIn("--from-manual-review", command)
 
 
 if __name__ == "__main__":

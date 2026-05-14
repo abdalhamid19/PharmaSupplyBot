@@ -12,6 +12,7 @@ from ..core.manual_review_store import (
     ManualReviewDecision,
     ManualReviewStore,
 )
+from .streamlit_manual_review_remove import start_not_matching_removal
 from .streamlit_manual_review_rows import editable_manual_review_rows
 
 
@@ -24,6 +25,9 @@ def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> No
     if st.button("Save Manual Review Decisions"):
         count = save_manual_review_rows(edited.to_dict("records"), run_dir.name)
         st.success(f"Saved {count} manual-review decision(s).")
+    if st.button("Remove Not Matching From Cart"):
+        start_not_matching_removal(edited.to_dict("records"), run_dir, st)
+        st.success("Not-matching cart-removal flow started.")
 
 
 def save_manual_review_rows(
@@ -52,21 +56,27 @@ def manual_review_decisions_from_rows(
 def _decision_from_row(row: dict, run_id: str) -> ManualReviewDecision | None:
     approved = bool(row.get("approved_match"))
     not_matching = bool(row.get("not_matching"))
-    correct_id = _clean(row.get("correct_store_product_id"))
-    correct_name = _clean(row.get("correct_product_name"))
-    correct_query = _clean(row.get("correct_query"))
-    if not approved and not not_matching and not any((correct_id, correct_name, correct_query)):
+    correction = _correction_fields(row)
+    if not approved and not not_matching and not any(correction):
         return None
     manual_decision = _manual_decision(approved, not_matching)
     return ManualReviewDecision(
         item_code=_clean(row.get("item_code")),
         item_name=_clean(row.get("item_name")),
         approved=approved,
-        correct_store_product_id=correct_id,
-        correct_product_name=correct_name,
-        correct_query=correct_query,
+        correct_store_product_id=correction[0],
+        correct_product_name=correction[1],
+        correct_query=correction[2],
         run_id=run_id,
         manual_decision=manual_decision,
+    )
+
+
+def _correction_fields(row: dict) -> tuple[str, str, str]:
+    return (
+        _clean(row.get("correct_store_product_id")),
+        _clean(row.get("correct_product_name")),
+        _clean(row.get("correct_query")),
     )
 
 
