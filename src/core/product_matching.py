@@ -71,6 +71,7 @@ _GENERIC_IDENTITY_TOKENS = {
 }
 
 from .config.config_models import MatchingConfig
+from .candidate_identity import candidate_has_store_product_id
 from .drug_matching.normalizer import components_match, parse_drug
 from .matching_models import (
     CandidateMatchDiagnostic,
@@ -654,7 +655,16 @@ def _diagnostic_acceptance(
     component_rejection = _candidate_component_rejection(score_query, result)
     if component_rejection:
         return False, "", component_rejection
-    return lexical_acceptance
+    return _orderable_acceptance(result, lexical_acceptance)
+
+
+def _orderable_acceptance(
+    candidate: dict[str, Any], acceptance: tuple[bool, str, str]
+) -> tuple[bool, str, str]:
+    """Reject otherwise-accepted candidates that cannot be used for ordering."""
+    if acceptance[0] and not candidate_has_store_product_id(candidate):
+        return False, "", "Candidate missing orderable storeProductId"
+    return acceptance
 
 
 def _candidate_component_rejection(query: str, candidate: dict[str, Any]) -> str:

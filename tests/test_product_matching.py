@@ -188,6 +188,16 @@ class ProductMatchingQueryTests(unittest.TestCase):
             "English name missing requested identity token", decision.final_reason
         )
 
+    def test_missing_store_product_id_is_not_orderable(self) -> None:
+        item = Item(code="73241", name="MINALAX 10 TAB", qty=1)
+        candidate = _candidate("MINALAX 10 TAB.", "مينالاكس 10 اقراص")
+        candidate.pop("storeProductId")
+
+        decision = explain_best_product_match(item, [(item.name, [candidate])])
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("storeProductId", decision.final_reason)
+
 
 def _bebelac_results() -> list[dict[str, object]]:
     """Return Bebelac candidates with one false high-scoring row and one real row."""
@@ -204,6 +214,7 @@ def _candidate(english_name: str, arabic_name: str, qty: int = 3) -> dict[str, o
         "productName": arabic_name,
         "availableQuantity": qty,
         "productsCount": qty,
+        "storeProductId": f"store-{english_name}",
     }
 
 

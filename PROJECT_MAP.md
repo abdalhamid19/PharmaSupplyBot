@@ -51,6 +51,9 @@
   rotation, and detailed trace logging stay in `src/core/drug_matching`.
 - Live-order AI decision policy stays in `src/core/order_ai_matching.py` and
   `src/core/order_ai_flow.py`; Tawreed only invokes it and writes trace rows.
+- Live-order matching now rejects otherwise-accepted candidates that lack an
+  orderable Tawreed id, while preserving earlier lexical/component rejection
+  reasons for diagnostics.
 - Order AI artifact row shaping stays in `src/core/order_ai_trace_rows.py` and
   `src/core/order_run_artifact_rows.py`.
 - Order artifact writing and worker partition merging stay in

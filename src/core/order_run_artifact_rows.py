@@ -1,6 +1,8 @@
 """Structured rows for order item summary artifacts."""
 from __future__ import annotations
 
+from .candidate_identity import candidate_store_product_id
+
 
 def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object]:
     """Return one compact row describing the final item outcome."""
@@ -15,7 +17,7 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
         "matched": bool(match),
         "matched_product_name_en": candidate.get("productNameEn", ""),
         "matched_product_name_ar": candidate.get("productName", ""),
-        "matched_store_product_id": candidate.get("storeProductId", ""),
+        "matched_store_product_id": candidate_store_product_id(candidate),
         "matched_query": match.query if match else "",
         "deterministic_score": round(match.score, 6) if match else "",
         **_summary_ai_fields(outcome, summary.status),

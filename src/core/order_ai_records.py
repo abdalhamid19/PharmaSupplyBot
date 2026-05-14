@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import Any
 
+from .candidate_identity import candidate_store_product_id
 from .matching_models import MatchDecision, SearchMatch
 
 
@@ -34,7 +35,7 @@ def record_from_diagnostic(diag) -> dict[str, Any]:
     return {
         "product_name_en": candidate_name(candidate),
         "product_name_ar": candidate_ar(candidate),
-        "store_product_id": candidate.get("storeProductId") or candidate.get("id"),
+        "store_product_id": candidate_store_product_id(candidate),
         "price": candidate_price(candidate),
         "_raw": candidate,
         "_query": diag.query,
