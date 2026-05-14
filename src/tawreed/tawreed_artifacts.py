@@ -95,9 +95,24 @@ def _artifact_path(
     """Return the fully-qualified artifact path for one label."""
     active = current_artifact_run()
     if active:
-        return active.directory / artifact_filename(label, extension, label_suffix)
+        parent = active.directory / _active_artifact_subdir(label, extension)
+        parent.mkdir(parents=True, exist_ok=True)
+        return parent / artifact_filename(label, extension, label_suffix)
     effective_label = f"{label}.{label_suffix}" if label_suffix else label
     return _artifacts_dir(profile_key) / f"{effective_label}{extension}"
+
+
+def _active_artifact_subdir(label: str, extension: str) -> Path:
+    """Return the run-local grouping directory for noisy diagnostic artifacts."""
+    if label.startswith("match_log"):
+        return Path("logs") / "match"
+    if extension == ".html":
+        return Path("diagnostics") / "html"
+    if extension == ".png":
+        return Path("diagnostics") / "images"
+    if label.endswith("_error") or "error" in label:
+        return Path("diagnostics") / "errors"
+    return Path()
 
 
 def _ensure_csv_schema(artifact_path: Path, fieldnames: list[str]) -> None:

@@ -6,7 +6,13 @@ from tempfile import TemporaryDirectory
 
 from openpyxl import Workbook, load_workbook
 
-from src.tawreed.tawreed_artifacts import append_csv_artifact, append_xlsx_artifact
+from src.core.artifact_run import artifact_run
+from src.tawreed.tawreed_artifacts import (
+    append_csv_artifact,
+    append_text_artifact,
+    append_xlsx_artifact,
+    write_text_artifact,
+)
 
 
 class TawreedArtifactsTests(unittest.TestCase):
@@ -94,6 +100,26 @@ class TawreedArtifactsTests(unittest.TestCase):
         )
         self.assertEqual(values[1], ("123", "Panadol", None, None, 2))
         self.assertEqual(values[2], ("456", "Panadol Advance", "35%", "Abu Amira", 3))
+
+    def test_active_run_groups_noisy_diagnostics(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                root = Path("artifacts")
+                with artifact_run("order", "wardany", "20260514_1252", root):
+                    match_path = write_text_artifact("wardany", "match_log_11737", "x")
+                    all_path = append_text_artifact("wardany", "match_log_all", "x")
+                    error_path = write_text_artifact(
+                        "wardany", "order_flow_error", "x"
+                    )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(match_path.parent.name, "match")
+        self.assertEqual(match_path.parent.parent.name, "logs")
+        self.assertEqual(all_path.parent, match_path.parent)
+        self.assertEqual(error_path.parent.name, "errors")
 
 
 if __name__ == "__main__":
