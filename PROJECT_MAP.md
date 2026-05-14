@@ -90,3 +90,6 @@
   `.venv/bin/python run.py export-products --profile wardany --limit 5`.
 - Post-cleanup regression check succeeded:
   `.venv/bin/python -m unittest tests.test_cart_removal_items tests.test_prevented_items -q`.
+- Phase validation harness added:
+  `.venv/bin/python tools/phase_validation.py` runs compileall, unittest, and
+  rule audit as the repeated post-phase baseline.
