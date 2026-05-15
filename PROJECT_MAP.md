@@ -359,3 +359,8 @@
   `.venv/bin/python tools/phase_validation.py --smoke` ran compileall, 352 unit
   tests, rule audit (`baseline_violations_remaining:160`), CLI help checks, and
   a `match-products --trace` smoke.
+- Follow-up CLI parser cleanup split order runtime arguments and match-products
+  argument/API-config helpers without changing command options. Validation:
+  `.venv/bin/python tools/run_unit_tests.py` ran 352 tests, and
+  `.venv/bin/python tools/rule_audit.py` reports
+  `baseline_violations_remaining:157`.
