@@ -15,7 +15,7 @@ async def review_order_ai(settings, verifier, item, match, confidence, result):
     review = await _review_match(verifier, item, match, confidence, result)
     apply_provider_cooldown(verifier, review)
     review_conf = float(review.get("confidence", confidence) or 0.0)
-    if review.get("is_correct") and review_conf >= settings.review_threshold:
+    if review.get("is_correct"):
         return None
     reason = str(review.get("reason", "review_rejected"))
     return OrderAiOutcome(

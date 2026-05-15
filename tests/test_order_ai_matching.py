@@ -152,6 +152,40 @@ class OrderAiMatchingTests(unittest.TestCase):
         self.assertTrue(outcome.manual_review)
         self.assertEqual(outcome.review_result["reason"], "review reject")
 
+    def test_low_confidence_agreeing_review_keeps_verified_match(self) -> None:
+        """An agreeing review confirms a verified match even below review threshold."""
+        FakeVerifier.review_result = {
+            "is_correct": True,
+            "reason": "same product",
+            "confidence": 0.90,
+        }
+        outcome = self._service(self._api(review_model="review")).resolve(
+            self._item(), self._decision(True)
+        )
+        self.assertEqual(outcome.status, "ai_verified")
+        self.assertFalse(outcome.manual_review)
+        self.assertIsNotNone(outcome.decision.best_match)
+
+    def test_low_confidence_agreeing_review_keeps_search_replacement(self) -> None:
+        """An agreeing review confirms an AI search replacement below review threshold."""
+        FakeVerifier.search_result = {
+            "record": self._record(),
+            "score": 91.0,
+            "reason": "better",
+            "confidence": 0.96,
+        }
+        FakeVerifier.review_result = {
+            "is_correct": True,
+            "reason": "same product",
+            "confidence": 0.90,
+        }
+        outcome = self._service(self._api(review_model="review")).resolve(
+            self._item(), self._decision(False)
+        )
+        self.assertEqual(outcome.status, "ai_search_accepted")
+        self.assertFalse(outcome.manual_review)
+        self.assertIsNotNone(outcome.decision.best_match)
+
     def _service(self, api_config):
         settings = OrderAiSettings(enabled=True, api_config=api_config)
         return OrderAiDecisionService(settings, FakeVerifier)
