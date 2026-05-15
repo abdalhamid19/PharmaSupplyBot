@@ -14,17 +14,34 @@ def build_match_products_parser(subparsers: argparse._SubParsersAction) -> None:
         help="Match an inventory Excel/CSV file against exported Tawreed products",
     )
     add_common_arguments(parser)
+    _add_match_input_arguments(parser)
+    _add_match_range_arguments(parser)
+    _add_match_ai_arguments(parser)
+
+
+def _add_match_input_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--excel", required=True, help="Inventory Excel or CSV file")
     parser.add_argument("--tawreed-csv", default=None, help="Tawreed products CSV")
     parser.add_argument("--output", default=None, help="Output CSV path")
+
+
+def _add_match_range_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--start", type=int, default=None)
     parser.add_argument("--end", type=int, default=None)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--trace", action="store_true")
+
+
+def _add_match_ai_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--no-ai", action="store_true")
     parser.add_argument("--threshold", type=int, default=80)
     parser.add_argument("--ai-threshold", type=float, default=90.0)
+    _add_match_ai_policy_arguments(parser)
+    _add_match_ai_provider_arguments(parser)
+
+
+def _add_match_ai_policy_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--ai-verify-policy",
         choices=["score", "fuzzy", "all-non-exact", "all"],
@@ -35,6 +52,9 @@ def build_match_products_parser(subparsers: argparse._SubParsersAction) -> None:
         choices=["safe", "review-candidates", "expanded", "aggressive"],
         default="review-candidates",
     )
+
+
+def _add_match_ai_provider_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--provider", default=None)
     parser.add_argument("--model", default=None)
     parser.add_argument("--api-key", default=None)
