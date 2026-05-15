@@ -16,14 +16,20 @@
   evaluates candidates through `src/core/product_matching.py`, then can optionally
   run active AI verify/search/review with strict thresholds via `--ai`.
 - Order AI is opt-in. Accepted AI decisions can correct/select the active match;
-  low-confidence or review-rejected AI decisions are blocked and written to
-  `manual_review`.
+  review only vetoes explicit incorrect/disagreement/conflict decisions rather
+  than blocking an otherwise correct match solely for low review confidence.
+- AI candidates that semantically match but lack `storeProductId` are surfaced as
+  `matched-but-unavailable` with `candidate_not_orderable` manual-review
+  metadata instead of disappearing as generic no-match rows.
 - Order matching now has explicit `safe` and `aggressive` risk policies.
   Aggressive matches remain flagged for manual review and can either be staged
   or added to cart with manual-review metadata, depending on the selected action.
 - Manual-review rows can save `approved_match`, `needs_correction`, or
   `not_matching` decisions. Saved `not_matching` choices block the same rejected
   candidate in later matching and can drive cart removal.
+- Corrected manual-review rows can be re-searched with
+  `order --from-manual-review-corrections <manual_review.csv>` or from the
+  Streamlit Manual Review action; this runs order matching in match-only mode.
 - Each order run writes `order_item_summary_<run_id>.csv/.txt`,
   `order_ai_trace_<run_id>.csv/.txt`, and `manual_review_<run_id>.csv/.txt`
   when review rows exist.
@@ -57,6 +63,12 @@
 - Optional Tawreed API execution stays in `src/tawreed/tawreed_api*.py`. The
   `auto` backend tries a locally discovered API contract from `state/` and
   falls back to browser automation when the contract is incomplete.
+- Tawreed API defaults/discovery/contract merging live in
+  `src/tawreed/tawreed_api_defaults.py`,
+  `src/tawreed/tawreed_api_discovery.py`, and
+  `src/tawreed/tawreed_api_contract_merge.py`; product search has a safe default
+  for Tawreed's `stores/products/search/similar5` endpoint, while mutation
+  endpoints still require trusted captured contracts.
 - Shared live-search scoring stays in `src/core/product_matching.py`.
 - Shared candidate id normalization stays in `src/core/candidate_identity.py` so
   matching, AI, and artifacts agree on orderable Tawreed ids.
@@ -86,6 +98,10 @@
   Runtime learning uses `src/core/manual_review_store.py` with a local SQLite
   file ignored by git, and `src/core/manual_review_runtime.py` applies saved
   queries or approved `storeProductId` choices before normal matching.
+- Manual-review corrected-item search is implemented in
+  `src/core/manual_review_corrections.py`, CLI wiring in
+  `src/cli/cli_parser_manual_review_search.py`, and Streamlit launch helpers in
+  `src/ui/streamlit_manual_review_search.py`.
 - Tawreed product search uses `src/tawreed/tawreed_product_search_select.py` to
   fall back from partial API rows to DOM candidates when API rows lack
   orderable store product ids.
@@ -147,7 +163,9 @@
   selection, SQLite manual-review learning, runtime manual-review application,
   guarded API final submission, actionable candidate identity, improved
   pharmaceutical numeric/dosage rules, query caching, AI JSON repair, provider
-  cooldown, and candidate de-duplication.
+  cooldown, candidate de-duplication, order AI review-veto correction,
+  non-orderable AI candidate artifact mapping, Tawreed product-search API
+  defaults/discovery, and corrected manual-review item re-search.
 - Final order submission remains disabled unless `runtime.submit_order` is
   explicitly true.
 - Historical `tools/list_all_violations.py` baseline debt remains outside this
@@ -163,9 +181,10 @@
   after each phase; `git push origin main` cannot complete in this environment
   without saved credentials or a token.
 - Live cart mutation checks depend on a valid Tawreed authenticated session and
-  an incomplete local Tawreed API contract currently makes strict
-  `--execution-mode api` fail fast; `auto` falls back to browser automation.
-  Final order submission remains disabled unless `runtime.submit_order=true`.
+  trusted captured Tawreed mutation endpoints. Product search has a safe API
+  default, but add/remove/submit still require captured contracts; `auto` falls
+  back to browser automation when mutation contracts are incomplete. Final order
+  submission remains disabled unless `runtime.submit_order=true`.
 
 ## [VALIDATION]
 
@@ -324,3 +343,19 @@
   `.venv/bin/python tools/phase_validation.py --smoke` ran compileall, 323 unit
   tests, rule audit, CLI help checks, and a match-products smoke. Streamlit
   started on `http://127.0.0.1:8765` and returned HTTP 200.
+- Order AI/API/manual-review remediation validation succeeded:
+  `.venv/bin/python -m pytest tests/test_order_ai_matching.py
+  tests/test_order_blocked_candidate_artifacts.py
+  tests/test_tawreed_api_execution_mode.py
+  tests/test_manual_review_corrections.py tests/test_cli_parser.py -q` covered
+  AI review veto behavior, non-orderable artifact mapping, Tawreed API
+  execution-mode discovery/defaults, manual-review corrected search, and parser
+  wiring.
+- Final rule-audit cleanup split long helpers in
+  `src/core/drug_matching/verifier.py` and
+  `src/core/drug_matching/pipeline.py` with focused conflict tests passing:
+  `.venv/bin/python -m pytest tests/test_ai_decision_conflicts.py -q`.
+- Latest final validation succeeded:
+  `.venv/bin/python tools/phase_validation.py --smoke` ran compileall, 352 unit
+  tests, rule audit (`baseline_violations_remaining:160`), CLI help checks, and
+  a `match-products --trace` smoke.
