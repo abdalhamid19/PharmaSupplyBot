@@ -97,16 +97,24 @@ def _matching_config(args: argparse.Namespace) -> MatchingConfig:
 
 def _api_config(args: argparse.Namespace) -> APIConfig:
     if args.provider == "rotation":
-        attempts = configured_attempts("auto")
-        first = attempts[0] if attempts else None
-        return APIConfig(
-            api_key=first.api_key if first else "",
-            api_keys=(first.api_key,) if first else (),
-            base_url=first.base_url if first else "",
-            model=first.model if first else "",
-            review_model=args.review_model or "",
-            attempt_plan=attempts,
-        )
+        return _rotation_api_config(args)
+    return _resolved_api_config(args)
+
+
+def _rotation_api_config(args: argparse.Namespace) -> APIConfig:
+    attempts = configured_attempts("auto")
+    first = attempts[0] if attempts else None
+    return APIConfig(
+        api_key=first.api_key if first else "",
+        api_keys=(first.api_key,) if first else (),
+        base_url=first.base_url if first else "",
+        model=first.model if first else "",
+        review_model=args.review_model or "",
+        attempt_plan=attempts,
+    )
+
+
+def _resolved_api_config(args: argparse.Namespace) -> APIConfig:
     resolved = resolve_api_config(args.provider or "", args.model or "", args.api_key or "")
     return APIConfig(
         api_key=resolved["api_key"],
