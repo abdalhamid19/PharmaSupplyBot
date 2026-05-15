@@ -14,6 +14,7 @@ from ..core.manual_review_store import (
 )
 from .streamlit_manual_review_remove import start_not_matching_removal
 from .streamlit_manual_review_rows import editable_manual_review_rows
+from .streamlit_manual_review_search import start_corrected_item_search
 
 
 def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> None:
@@ -28,6 +29,9 @@ def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> No
     if st.button("Remove Not Matching From Cart"):
         start_not_matching_removal(edited.to_dict("records"), run_dir, st)
         st.success("Not-matching cart-removal flow started.")
+    if st.button("Search Corrected Items"):
+        start_corrected_item_search(edited.to_dict("records"), run_dir, st)
+        st.success("Corrected-item match-only search started.")
 
 
 def save_manual_review_rows(

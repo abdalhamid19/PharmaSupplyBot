@@ -13,6 +13,7 @@ from typing import Any, Iterable
 from ..core.artifact_run import artifact_run, current_artifact_run
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.drug_matching.config import load_env
+from ..core.manual_review_corrections import corrected_items_from_manual_review_csv
 from ..core.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     filter_prevented_order_items,
@@ -165,6 +166,17 @@ def _load_order_items(
     app_config: AppConfig, args: argparse.Namespace
 ) -> Iterable[Item]:
     """Load and filter order items iteratively."""
+    correction_items = _manual_review_correction_items(args)
+    if correction_items is not None:
+        return correction_items
+    _require_order_excel(args)
+    return _load_regular_order_items(app_config, args)
+
+
+def _load_regular_order_items(
+    app_config: AppConfig, args: argparse.Namespace
+) -> Iterable[Item]:
+    """Load regular order items from the configured Excel source."""
     excel_path = Path(args.excel)
     prevented_path = _prevented_items_path(args)
     _reject_prevented_excel_as_order_source(excel_path, prevented_path)
@@ -179,6 +191,19 @@ def _load_order_items(
         prevented_items = load_prevented_items(prevented_path)
         items = filter_prevented_order_items(items, prevented_items)
     return items
+
+
+def _manual_review_correction_items(args: argparse.Namespace) -> Iterable[Item] | None:
+    corrections = getattr(args, "from_manual_review_corrections", None)
+    if not corrections:
+        return None
+    args.match_only = True
+    return corrected_items_from_manual_review_csv(Path(corrections))
+
+
+def _require_order_excel(args: argparse.Namespace) -> None:
+    if not getattr(args, "excel", None):
+        raise SystemExit("Provide --excel or --from-manual-review-corrections.")
 
 
 def _load_items_for_order_mode(

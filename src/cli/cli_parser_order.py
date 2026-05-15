@@ -6,6 +6,7 @@ import argparse
 
 from .cli_parser_ai import add_order_ai_arguments
 from .cli_parser_matching import add_matching_risk_arguments
+from .cli_parser_manual_review_search import add_manual_review_search_argument
 from .cli_parser_shared import add_common_arguments, add_excel_argument
 
 
@@ -20,6 +21,7 @@ def build_order_parser(subparsers: argparse._SubParsersAction) -> None:
     _add_order_runtime_arguments(order_parser)
     add_order_ai_arguments(order_parser)
     _add_order_filter_arguments(order_parser)
+    add_manual_review_search_argument(order_parser)
 
 
 def _add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> None:

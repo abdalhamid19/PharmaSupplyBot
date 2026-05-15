@@ -171,6 +171,19 @@ class CliParserTests(unittest.TestCase):
             "data/input/prevented_items/custom_prevented.xlsx",
         )
 
+    def test_order_accepts_manual_review_corrections_source(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "order",
+                "--profile",
+                "wardany",
+                "--from-manual-review-corrections",
+                "manual_review.csv",
+            ]
+        )
+
+        self.assertEqual(args.from_manual_review_corrections, "manual_review.csv")
+
     def test_remove_cart_accepts_excel_and_debug_browser(self) -> None:
         args = build_parser().parse_args(
             [
