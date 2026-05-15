@@ -432,26 +432,33 @@ def _manual_review_path(output_path: str) -> str:
 
 def _manual_review_reason_column(row: pd.Series) -> str:
     """Build a human-readable reason explaining why this row needs review."""
-    parts: list[str] = []
+    parts = _manual_review_base_reasons(row)
+    _append_component_review_reason(parts, row)
+    return "; ".join(parts) if parts else "needs_review"
+
+
+def _manual_review_base_reasons(row: pd.Series) -> list[str]:
     verified = str(row.get("verified", "") or "")
     has_match = bool(row.get("matched_product_name_en"))
-
     if not has_match:
-        parts.append("no_match_found")
-    elif verified == "ai_rejected":
-        parts.append("ai_rejected_match")
-    elif verified == "ai_review_rejected":
-        parts.append("ai_review_rejected_match")
-    elif verified in ("ai_confirmed", "ai_corrected", "ai_found"):
-        parts.append("low_confidence_ai_match")
-    else:
-        score = pd.to_numeric(row.get("match_score", 0), errors="coerce")
-        if pd.notna(score) and score < 90:
-            parts.append(f"uncertain_score({score:.0f})")
+        return ["no_match_found"]
+    if verified == "ai_rejected":
+        return ["ai_rejected_match"]
+    if verified == "ai_review_rejected":
+        return ["ai_review_rejected_match"]
+    if verified in ("ai_confirmed", "ai_corrected", "ai_found"):
+        return ["low_confidence_ai_match"]
+    return _score_review_reasons(row)
 
-    # Expose internal AI component reason if present
+
+def _score_review_reasons(row: pd.Series) -> list[str]:
+    score = pd.to_numeric(row.get("match_score", 0), errors="coerce")
+    if pd.notna(score) and score < 90:
+        return [f"uncertain_score({score:.0f})"]
+    return []
+
+
+def _append_component_review_reason(parts: list[str], row: pd.Series) -> None:
     component = str(row.get("_ai_component_reason", "") or "")
     if component and component.lower() not in {"", "nan", "ok"}:
         parts.append(f"component:{component}")
-
-    return "; ".join(parts) if parts else "needs_review"

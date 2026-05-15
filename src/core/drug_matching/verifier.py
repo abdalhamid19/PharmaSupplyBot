@@ -169,12 +169,21 @@ def _resolve_ai_conflicts(result: dict[str, Any]) -> dict[str, Any]:
     2. If decision='reject' but is_correct=True → trust decision, set is_correct=False.
     3. If hard_conflicts contain non-critical items → cap confidence.
     """
+    hard_lower = _hard_conflict_names(result)
+    _apply_critical_conflicts(result, hard_lower)
+    _apply_conflict_penalty(result, hard_lower)
+    _apply_reject_decision_override(result)
+    return result
+
+
+def _hard_conflict_names(result: dict[str, Any]) -> set[str]:
     hard = result.get("hard_conflicts") or []
     if isinstance(hard, str):
         hard = [h.strip() for h in hard.split(",") if h.strip()]
-    hard_lower = {h.lower().replace(" ", "_") for h in hard}
+    return {h.lower().replace(" ", "_") for h in hard}
 
-    # Critical conflicts override is_correct
+
+def _apply_critical_conflicts(result: dict[str, Any], hard_lower: set[str]) -> None:
     critical = hard_lower & _HARD_CONFLICT_REJECT
     if critical and result.get("is_correct"):
         result["is_correct"] = False
@@ -186,12 +195,14 @@ def _resolve_ai_conflicts(result: dict[str, Any]) -> dict[str, Any]:
         )
         result["confidence"] = min(result.get("confidence", 0.0), 0.55)
 
-    # Non-critical conflicts cap confidence
+
+def _apply_conflict_penalty(result: dict[str, Any], hard_lower: set[str]) -> None:
     penalty = hard_lower & _HARD_CONFLICT_PENALTY
     if penalty and result.get("is_correct"):
         result["confidence"] = min(result.get("confidence", 0.0), 0.72)
 
-    # decision vs is_correct contradiction
+
+def _apply_reject_decision_override(result: dict[str, Any]) -> None:
     decision = str(result.get("decision", "")).lower().strip()
     if decision == "reject" and result.get("is_correct"):
         result["is_correct"] = False
@@ -201,8 +212,6 @@ def _resolve_ai_conflicts(result: dict[str, Any]) -> dict[str, Any]:
             else "decision_reject_override"
         )
         result["confidence"] = min(result.get("confidence", 0.0), 0.6)
-
-    return result
 
 
 def _fallback_from_unparseable_response(text: str, model: str) -> dict[str, Any]:
