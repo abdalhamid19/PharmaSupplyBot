@@ -12,6 +12,7 @@ from ..core.cart_removal_items import CartRemovalItem
 from ..core.candidate_identity import candidate_has_store_product_id
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
+from ..core.order_blocked_candidate import missing_store_product_id_outcome
 from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
 from .selectors import _selectors
@@ -801,6 +802,8 @@ class TawreedBot:
 
     def _unmatched_decision_status(self) -> str:
         """Return a more precise status for a rejected but recognized candidate."""
+        if missing_store_product_id_outcome(self.last_order_ai_outcome):
+            return "matched-but-unavailable"
         if getattr(self.last_order_ai_outcome, "manual_review", False):
             return "manual-review-required"
         decision = self.last_match_decision

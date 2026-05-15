@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .order_blocked_candidate import candidate_safety_reason
+
 
 def manual_review_reason_fields(
     summary_status: str, summary_reason: str, outcome
@@ -13,12 +15,14 @@ def manual_review_reason_fields(
         "manual_review_category": category,
         "manual_review_reason_detail": detail,
         "manual_review_blocking_phase": _blocking_phase(outcome, summary_status),
-        "candidate_safety_reason": _candidate_safety_reason(outcome),
+        "candidate_safety_reason": candidate_safety_reason(outcome),
     }
 
 
 def _manual_review_category(summary_status: str, outcome) -> str:
     status = str(getattr(outcome, "status", "") or summary_status)
+    if candidate_safety_reason(outcome) == "missing storeProductId":
+        return "candidate_not_orderable"
     if summary_status == "matched-but-unavailable":
         return "matched_but_not_available"
     if summary_status == "not-orderable":
@@ -82,17 +86,3 @@ def _blocking_phase(outcome, summary_status: str) -> str:
     if summary_status in {"matched-but-unavailable", "not-orderable"}:
         return "deterministic_match"
     return "summary_status"
-
-
-def _candidate_safety_reason(outcome) -> str:
-    for result in (
-        getattr(outcome, "review_result", {}) or {},
-        getattr(outcome, "search_result", {}) or {},
-        getattr(outcome, "verify_result", {}) or {},
-    ):
-        reason = str(result.get("reason", "") or "")
-        if reason.startswith("local_safety:"):
-            return reason.removeprefix("local_safety:").strip()
-        if "local safety" in reason.lower():
-            return reason
-    return ""

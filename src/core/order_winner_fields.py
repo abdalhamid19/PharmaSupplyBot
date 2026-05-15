@@ -11,7 +11,9 @@ def candidate_summary_fields(candidate: dict, decision, match) -> dict[str, obje
     return {
         "matched_product_name_en": candidate.get("productNameEn", ""),
         "matched_product_name_ar": candidate.get("productName", ""),
+        "matched_product_id": candidate.get("productId", ""),
         "matched_store_product_id": candidate_id,
+        "winner_product_id": candidate.get("productId", ""),
         "winner_store_product_id": candidate_id,
         "winner_available_quantity": candidate.get("availableQuantity", ""),
         "winner_sale_price": candidate.get("salePrice", ""),
