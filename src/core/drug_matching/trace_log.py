@@ -33,13 +33,31 @@ _SUMMARY_COLS = [
 ]
 
 
+TRACE_MINIMAL = 1   # Only final outcomes + AI decisions
+TRACE_NORMAL = 2    # + candidate scoring and component checks
+TRACE_VERBOSE = 3   # + every candidate generated, full normalization
+
+
+class _DefaultRow(dict):
+    """Dict wrapper that returns '' for missing keys (used by TXT writer)."""
+
+    _MISSING = ""
+
+    def __missing__(self, key):
+        return self._MISSING
+
+
 class MatchTraceLog:
     """Records every algorithmic + AI step for debugging."""
 
-    __slots__ = ("_rows", "_dir", "_enabled", "_run_id")
+    __slots__ = ("_rows", "_dir", "_enabled", "_run_id", "_level")
 
-    def __init__(self, log_dir: str | None = None, enabled: bool = True):
+    def __init__(
+        self, log_dir: str | None = None, enabled: bool = True,
+        level: int = TRACE_NORMAL,
+    ):
         self._enabled = enabled
+        self._level = level
         self._rows: list[dict] = []
         self._dir = Path(log_dir) if log_dir else Path("artifacts/matching/trace")
         self._run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -50,33 +68,26 @@ class MatchTraceLog:
     def enabled(self) -> bool:
         return self._enabled
 
+    @property
+    def level(self) -> int:
+        return self._level
+
+    @property
+    def verbose(self) -> bool:
+        return self._level >= TRACE_VERBOSE
+
     def _base(self, code, name, norm, brand, **extra):
         row_index = extra.pop("row_index", "")
-        return {
+        row = {
             "run_id": self._run_id, "row_index": row_index,
-            "phase": "", "decision": "", "decision_source": "",
-            "error_stage": "", "error_code": "", "reject_rule": "",
-            "inventory_components": "", "candidate_components": "",
-            "base_score": "", "price_bonus": "",
-            "final_candidate_score": "", "candidate_rank": "",
-            "candidate_source": "", "threshold_name": "",
-            "threshold_value": "", "api_attempt": "",
-            "api_status": "", "model_used": "", "fallback_used": "",
-            "parse_failed": "", "provider_used": "",
             "drug_code": code, "drug_name": name,
             "norm": norm, "brand": brand,
-            "step": "", "candidate_name": "",
-            "candidate_id": "", "candidate_brand": "",
-            "candidate_norm": "", "score": "",
-            "scorer": "", "threshold": "",
-            "component_ok": "", "component_reason": "",
-            "ai_phase": "", "ai_result": "", "ai_confidence": "",
-            "ai_model": "", "ai_review_model": "", "api_failures": "",
-            "selection_reason": "",
-            "final_match": "", "final_score": "",
-            "final_method": "",
-            **extra,
         }
+        # Only add non-empty extra fields to save memory
+        for key, value in extra.items():
+            if value not in (None, ""):
+                row[key] = value
+        return row
 
     def _append(self, code, name, norm, brand, **extra):
         if not self._enabled:
@@ -101,7 +112,7 @@ class MatchTraceLog:
         self, code, name, norm, brand, dosage, form,
         row_index="", components="",
     ):
-        if not self._enabled:
+        if not self._enabled or self._level < TRACE_VERBOSE:
             return
         row = self._base(
             code, name, norm, brand,
@@ -117,7 +128,7 @@ class MatchTraceLog:
         self, code, name, norm, brand, candidate, index,
         source, rank="", score="", row_index="",
     ):
-        if not self._enabled or candidate is None:
+        if not self._enabled or self._level < TRACE_VERBOSE or candidate is None:
             return
         idx = candidate[0] if isinstance(candidate, tuple) else candidate
         rec = index.get_record(idx)
@@ -259,7 +270,7 @@ class MatchTraceLog:
         cidx, ok, reason, index,
         row_index="",
     ):
-        if not self._enabled:
+        if not self._enabled or self._level < TRACE_NORMAL:
             return
         rec = index.get_record(cidx)
         parsed = index.get_parsed(cidx)
@@ -735,7 +746,10 @@ class MatchTraceLog:
 
     def _save_csv(self, path: Path):
         with open(path, "w", encoding="utf-8-sig", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=_TRACE_CSV_COLS)
+            writer = csv.DictWriter(
+                f, fieldnames=_TRACE_CSV_COLS,
+                restval="", extrasaction="ignore",
+            )
             writer.writeheader()
             writer.writerows(self._rows)
 
@@ -864,7 +878,8 @@ class MatchTraceLog:
             f.write(f"Total steps: {len(self._rows)}\n")
             f.write("=" * 80 + "\n\n")
             current_drug = None
-            for row in self._rows:
+            for raw_row in self._rows:
+                row = _DefaultRow(raw_row)
                 key = (row["drug_code"], row["drug_name"])
                 if key != current_drug:
                     current_drug = key
