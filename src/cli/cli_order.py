@@ -29,9 +29,15 @@ from ..core.utils.excel import (
 from ..tawreed.order_result_merger import merge_worker_summaries
 from ..tawreed.order_worker_artifact_merger import merge_order_worker_artifacts
 from ..tawreed.tawreed import TawreedBot
+from ..tawreed.tawreed_api import TawreedApiUnavailable
 from ..tawreed.tawreed_match_only_summary import MATCH_ONLY_SUMMARY_LABEL
 from ..tawreed.tawreed_session import SessionInvalidError
-from .cli_shared import build_bot, invalid_session_exit, require_state_file
+from .cli_shared import (
+    api_unavailable_exit,
+    build_bot,
+    invalid_session_exit,
+    require_state_file,
+)
 from .cli_order_ai import order_ai_settings
 from .item_worker_pool import report_worker_results, resolve_item_workers
 
@@ -359,6 +365,8 @@ def _run_profile_order(
     """Run one profile order flow and handle session-expiry failures uniformly."""
     try:
         bot.place_order_from_items(items)
+    except TawreedApiUnavailable as error:
+        raise api_unavailable_exit(profile_key, error) from error
     except SessionInvalidError as error:
         raise invalid_session_exit(base_url, profile_key, error) from error
 
@@ -369,6 +377,8 @@ def _run_profile_match_only(
     """Run product matching only and handle session-expiry failures uniformly."""
     try:
         bot.match_items_only(items)
+    except TawreedApiUnavailable as error:
+        raise api_unavailable_exit(profile_key, error) from error
     except SessionInvalidError as error:
         raise invalid_session_exit(base_url, profile_key, error) from error
 

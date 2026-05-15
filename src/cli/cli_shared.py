@@ -55,3 +55,12 @@ def invalid_session_exit(
         f"Session for profile '{profile_key}' is not valid. "
         f"Run: py run.py auth --profile {profile_key}"
     )
+
+
+def api_unavailable_exit(profile_key: str, error: Exception) -> SystemExit:
+    """Return a clean CLI exit for strict API execution failures."""
+    return SystemExit(
+        f"Tawreed API unavailable for profile '{profile_key}': {error}. "
+        "Use --execution-mode auto or browser, or refresh auth with: "
+        f"py run.py auth --profile {profile_key}"
+    )

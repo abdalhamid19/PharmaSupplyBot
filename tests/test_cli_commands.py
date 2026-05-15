@@ -18,10 +18,17 @@ from src.cli.cli_order import (
     _run_parallel_order as run_parallel_order,
 )
 from src.cli.cli_order import (
+    _run_profile_match_only as run_profile_match_only,
+)
+from src.cli.cli_order import (
+    _run_profile_order as run_profile_order,
+)
+from src.cli.cli_order import (
     _run_single_profile as run_single_profile,
 )
 from src.cli.cli_shared import invalid_session_exit
 from src.core.utils.excel import Item
+from src.tawreed.tawreed_api import TawreedApiUnavailable
 
 
 class CliCommandsTests(unittest.TestCase):
@@ -157,6 +164,28 @@ class CliCommandsTests(unittest.TestCase):
         build_bot.assert_called_once()
         run_order.assert_not_called()
         run_match_only.assert_called_once()
+
+    def test_strict_api_match_only_failure_exits_without_traceback(self) -> None:
+        bot: Any = SimpleNamespace(
+            match_items_only=lambda _items: (_ for _ in ()).throw(
+                TawreedApiUnavailable("Tawreed API returned HTTP 401.")
+            )
+        )
+
+        with self.assertRaisesRegex(SystemExit, "Use --execution-mode auto or browser"):
+            run_profile_match_only(
+                "https://seller.tawreed.io/#/login", "wardany", bot, []
+            )
+
+    def test_strict_api_order_failure_exits_without_traceback(self) -> None:
+        bot: Any = SimpleNamespace(
+            place_order_from_items=lambda _items: (_ for _ in ()).throw(
+                TawreedApiUnavailable("Tawreed API returned HTTP 401.")
+            )
+        )
+
+        with self.assertRaisesRegex(SystemExit, "Tawreed API unavailable"):
+            run_profile_order("https://seller.tawreed.io/#/login", "wardany", bot, [])
 
     def test_run_single_profile_limits_after_resume_skips_previous_rows(self) -> None:
         items = [
