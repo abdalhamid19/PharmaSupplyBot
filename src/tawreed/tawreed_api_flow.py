@@ -83,6 +83,6 @@ def _require_contract(api: TawreedApiClient, *fields: str) -> None:
     """Raise before item iteration when the discovered contract is incomplete."""
     from .tawreed_api import TawreedApiUnavailable
 
-    missing = [field for field in fields if not getattr(api.contract, field)]
+    missing = [field for field in fields if not api.contract_field_available(field)]
     if missing:
         raise TawreedApiUnavailable(f"Missing Tawreed API contract fields: {missing}")

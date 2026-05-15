@@ -8,6 +8,7 @@ from typing import Any
 from playwright.sync_api import sync_playwright
 
 from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, load_api_contract
+from .tawreed_api_defaults import product_search_body, product_search_url
 from .tawreed_api_payloads import body_with_item, body_with_match, body_with_query
 from .tawreed_product_search import _api_candidates
 
@@ -32,13 +33,17 @@ class TawreedApiClient:
 
     def search_products(self, query: str) -> list[dict[str, Any]]:
         """Return product candidates from a discovered API search endpoint."""
-        if not self.contract.product_search_url:
-            raise TawreedApiUnavailable("No trusted Tawreed product-search API contract.")
         payload = self._post_json(
-            self.contract.product_search_url,
-            body_with_query(self.contract.product_search_body or {}, query),
+            product_search_url(self.contract),
+            body_with_query(product_search_body(self.contract), query),
         )
         return _api_candidates(payload)
+
+    def contract_field_available(self, field: str) -> bool:
+        """Return whether a required API field is available or safely defaulted."""
+        if field == "product_search_url":
+            return bool(product_search_url(self.contract))
+        return bool(getattr(self.contract, field, ""))
 
     def add_to_cart(self, match: Any, quantity: int) -> None:
         """Add a matched product to the cart through a discovered API endpoint."""

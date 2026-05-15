@@ -18,6 +18,7 @@ from ..core.utils.excel import Item
 from .selectors import _selectors
 from .tawreed_artifacts import append_csv_artifact, dump_artifacts
 from .tawreed_api import TawreedApiUnavailable
+from .tawreed_api_discovery import begin_api_contract_capture, save_api_contract_capture
 from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
 from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
@@ -235,6 +236,7 @@ class TawreedBot:
                 self.state_path,
                 debug_browser=self.debug_browser,
             )
+            api_capture = begin_api_contract_capture(page)
             try:
                 self._run_order_session(page, items)
             except Exception as error:
@@ -246,6 +248,7 @@ class TawreedBot:
                 )
                 raise
             finally:
+                _save_api_contract_capture(api_capture)
                 close_context(context)
                 close_browser(browser)
 
@@ -277,14 +280,21 @@ class TawreedBot:
                 self.state_path,
                 debug_browser=self.debug_browser,
             )
+            api_capture = begin_api_contract_capture(page)
             try:
-                self._run_match_only_session(page, items)
-            except Exception as error:
-                self._handle_match_only_error(page, error)
-                raise
+                self._run_match_only_with_artifacts(page, items)
             finally:
+                _save_api_contract_capture(api_capture)
                 close_context(context)
                 close_browser(browser)
+
+    def _run_match_only_with_artifacts(self, page: Page, items: Iterable[Item]) -> None:
+        """Run match-only browser flow and capture diagnostics on failure."""
+        try:
+            self._run_match_only_session(page, items)
+        except Exception as error:
+            self._handle_match_only_error(page, error)
+            raise
 
     def _handle_match_only_error(self, page: Page, error: Exception) -> None:
         """Capture diagnostics for match-only failures."""
@@ -306,6 +316,7 @@ class TawreedBot:
                 self.state_path,
                 debug_browser=self.debug_browser,
             )
+            api_capture = begin_api_contract_capture(page)
             try:
                 self._prepare_order_page(page)
                 targets = resolve_cart_removal_targets(self, page, items)
@@ -315,6 +326,7 @@ class TawreedBot:
                 self._handle_removal_error(page, error)
                 raise
             finally:
+                _save_api_contract_capture(api_capture)
                 close_context(context)
                 close_browser(browser)
 
@@ -850,6 +862,13 @@ def _artifact_details(label: str, error: Exception, **extra: object) -> str:
     for key, value in extra.items():
         lines.append(f"{key}={value}")
     return "\n".join(lines) + "\n"
+
+
+def _save_api_contract_capture(captured: list[dict]) -> None:
+    try:
+        save_api_contract_capture(captured)
+    except Exception:
+        pass
 
 
 def _console_safe(text: str) -> str:
