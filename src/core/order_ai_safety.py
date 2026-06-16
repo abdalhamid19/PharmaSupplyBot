@@ -12,6 +12,7 @@ def local_match_rejection(item, match) -> str:
         return "missing storeProductId"
     requested = parse_drug(item.name)
     offered = parse_drug(candidate_name(match.data))
+    offered.is_synthetic = bool(match.data.get("productNameEnSynthetic"))
     if requested.brand and offered.brand:
         is_match, reason = components_match(requested, offered)
         if not is_match:

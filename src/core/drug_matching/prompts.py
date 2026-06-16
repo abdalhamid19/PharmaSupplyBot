@@ -1,4 +1,5 @@
 """Prompt loading and rendering helpers for AI matching steps."""
+
 from pathlib import Path
 from string import Template
 
@@ -12,12 +13,18 @@ _VERIFY_FALLBACK = """Verify this drug match:
 DRUG A (from inventory): $drug_a
 DRUG B (from tawreed): $drug_b$drug_b_ar_line
 
+Rules:
+1. Concentration policy: If one side omits the concentration only (e.g. 10%), while name, volume, and form match perfectly and there is no conflicting concentration, treat them as the same product and accept. Only reject if there are explicitly different/conflicting concentrations (e.g. 10% vs 5%).
+
 Return JSON:
 {"decision": "accept|reject", "is_correct": true/false, "reason": "brief reason", "confidence": 0.0-1.0, "hard_conflicts": [], "matched_fields": [], "mismatched_fields": []}"""
 
 _SEARCH_FALLBACK = """Given this drug from inventory: "$drug_name"
 
 Choose the correct candidate or 0 if none are correct.
+
+Rules:
+1. Concentration policy: If one side omits the concentration only (e.g. 10%), while name, volume, and form match perfectly and there is no conflicting concentration, treat them as the same product and accept. Only reject if there are explicitly different/conflicting concentrations (e.g. 10% vs 5%).
 
 Candidates:
 $candidates_text
@@ -42,6 +49,9 @@ Verify this match from scratch.
 
 DRUG A (from inventory): $drug_a
 DRUG B (from tawreed): $drug_b$drug_b_ar_line
+
+Rules:
+1. Concentration policy: If one side omits the concentration only (e.g. 10%), while name, volume, and form match perfectly and there is no conflicting concentration, treat them as the same product and accept. Only reject if there are explicitly different/conflicting concentrations (e.g. 10% vs 5%).
 
 Return JSON:
 {"decision": "accept|reject", "is_correct": true/false, "reason": "brief reason", "confidence": 0.0-1.0, "hard_conflicts": [], "matched_fields": [], "mismatched_fields": []}"""

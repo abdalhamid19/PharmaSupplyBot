@@ -240,17 +240,17 @@ def _fallback_search_queries(
     """Return extra bounded fallback queries when priority variants do not match."""
     fallback = [_normalized_item_code(code)]
     fallback.extend(_token_window_queries(normalized_tokens or tokens, window_size=2))
-    fallback.extend(normalized_tokens or tokens)
     return fallback
 
 
 def _token_window_queries(tokens: list[str], window_size: int) -> list[str]:
     """Return contiguous token-window query variants."""
-    if len(tokens) <= window_size:
+    if len(tokens) <= window_size or not tokens:
         return []
+    brand = tokens[0]
     return [
-        " ".join(tokens[index : index + window_size])
-        for index in range(1, len(tokens) - window_size + 1)
+        f"{brand} {' '.join(tokens[i : i + window_size])}"
+        for i in range(1, len(tokens) - window_size + 1)
     ]
 
 
@@ -756,6 +756,7 @@ def _candidate_component_rejection(query: str, candidate: dict[str, Any]) -> str
         return ""
     requested = parse_drug(query)
     offered = parse_drug(candidate_name)
+    offered.is_synthetic = bool(candidate.get("productNameEnSynthetic"))
     if not requested.brand or not offered.brand:
         return ""
     is_match, reason = components_match(requested, offered)

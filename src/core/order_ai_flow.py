@@ -1,4 +1,5 @@
 """Async live-order AI decision flow."""
+
 from __future__ import annotations
 
 from .drug_matching.ai_provider_cooldown import apply_provider_cooldown
@@ -20,7 +21,11 @@ async def resolve_order_ai(settings, verifier, item, decision):
         return verified
     searched = await _search(settings, verifier, item, decision, verify_result)
     return searched or OrderAiOutcome(
-        decision, "ai_rejected", "No accepted AI match", 0.0, True,
+        decision,
+        "ai_rejected",
+        "No accepted AI match",
+        0.0,
+        True,
         verify_result=verify_result,
     )
 
@@ -31,7 +36,21 @@ async def _search(settings, verifier, item, decision, verify_result):
     if not result or not result.get("record"):
         return None
     confidence = float(result.get("confidence", 0.0) or 0.0)
-    if confidence < settings.accept_confidence:
+    is_correct = bool(result.get("is_correct"))
+    is_accept = result.get("decision") == "accept"
+    no_conflicts = not result.get("hard_conflicts")
+
+    is_borderline = (
+        is_correct
+        and is_accept
+        and no_conflicts
+        and settings.verify_soft_accept_confidence
+        <= confidence
+        < settings.accept_confidence
+        and bool(settings.api_config.review_model)
+    )
+
+    if confidence < settings.accept_confidence and not is_borderline:
         return low_confidence(decision, result, confidence, verify_result)
     match = match_from_record(result["record"], result.get("score", 0.0))
     local_rejection = local_match_rejection(item, match)
@@ -39,7 +58,9 @@ async def _search(settings, verifier, item, decision, verify_result):
         return rejected_search(
             decision, result, confidence, verify_result, local_rejection
         )
-    reviewed = await review_order_ai(settings, verifier, item, match, confidence, result)
+    reviewed = await review_order_ai(
+        settings, verifier, item, match, confidence, result
+    )
     if reviewed:
         return with_ai_results(
             reviewed, verify_result=verify_result, search_result=result

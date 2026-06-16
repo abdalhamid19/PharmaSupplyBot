@@ -19,6 +19,7 @@ def match_confidence(decision: MatchDecision, item: Item, query: str) -> float:
         match.data.get("productNameEn") or match.data.get("productNameEnFallback") or ""
     )
     off = parse_drug(cand_name)
+    off.is_synthetic = bool(match.data.get("productNameEnSynthetic"))
 
     f1 = min(1.0, max(0.0, match.score / 20.0))
     f2 = 1.0 if _is_exact_brand(req, off) else 0.5

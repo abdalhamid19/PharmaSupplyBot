@@ -17,6 +17,9 @@ def order_ai_settings(args: argparse.Namespace) -> OrderAiSettings:
         api_config=order_api_config(args),
         concurrency=concurrency,
         accept_confidence=float(getattr(args, "ai_accept_confidence", 0.9)),
+        verify_soft_accept_confidence=float(
+            getattr(args, "ai_verify_soft_accept_confidence", 0.8)
+        ),
         review_threshold=float(getattr(args, "ai_review_threshold", 0.95)),
         verify_policy=str(getattr(args, "ai_verify_policy", "score")),
         search_policy=str(getattr(args, "ai_search_policy", "review-candidates")),

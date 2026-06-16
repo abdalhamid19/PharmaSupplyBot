@@ -55,6 +55,7 @@ class MatchingConfig:
     candidate_top_k: int = 5
     fuzzy_prefix_len: int = 3
     query_cache_size: int = 256
+    require_identity_token_for_flag: bool = True
 
 
 @dataclass(frozen=True)

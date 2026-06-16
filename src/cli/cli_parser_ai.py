@@ -17,6 +17,9 @@ def add_order_ai_arguments(argument_parser: argparse.ArgumentParser) -> None:
     argument_parser.add_argument("--concurrency", type=int, default=None)
     _add_ai_policy_arguments(argument_parser)
     argument_parser.add_argument("--ai-accept-confidence", type=float, default=0.9)
+    argument_parser.add_argument(
+        "--ai-verify-soft-accept-confidence", type=float, default=0.8
+    )
     argument_parser.add_argument("--ai-review-threshold", type=float, default=0.95)
     argument_parser.add_argument("--no-ai-preflight", action="store_true")
     argument_parser.add_argument("--rotation-preflight-policy", default="smart")

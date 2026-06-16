@@ -67,9 +67,13 @@ def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
         "candidate_top_k",
         "fuzzy_prefix_len",
         "query_cache_size",
+        "require_identity_token_for_flag",
     ):
         val = _matching_value(matching_values, default_config, k)
-        kwargs[k] = bool(val) if k == "exact_match_accept" else int(val)
+        if k in {"exact_match_accept", "require_identity_token_for_flag"}:
+            kwargs[k] = bool(val)
+        else:
+            kwargs[k] = int(val)
     return MatchingConfig(**kwargs)
 
 

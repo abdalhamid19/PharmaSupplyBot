@@ -1,5 +1,7 @@
 """AI-assisted live order matching decisions."""
+
 from __future__ import annotations
+
 import asyncio
 import concurrent.futures
 from dataclasses import dataclass, field
@@ -20,6 +22,7 @@ class OrderAiSettings:
     api_config: APIConfig = field(default_factory=APIConfig)
     concurrency: int = 5
     accept_confidence: float = 0.9
+    verify_soft_accept_confidence: float = 0.8
     review_threshold: float = 0.95
     verify_policy: str = "score"
     search_policy: str = "review-candidates"
@@ -58,7 +61,9 @@ class OrderAiDecisionService:
             return self._no_key_outcome(decision)
         return _run_async(self._resolve_async(item, decision))
 
-    async def _resolve_async(self, item: Item, decision: MatchDecision) -> OrderAiOutcome:
+    async def _resolve_async(
+        self, item: Item, decision: MatchDecision
+    ) -> OrderAiOutcome:
         verifier = self._verifier_factory(
             self._settings.api_config, max_concurrent=self._settings.concurrency
         )

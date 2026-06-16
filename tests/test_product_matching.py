@@ -17,8 +17,8 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIn("QUINSTIBOWL 5 MG 20 F C TABS", queries)
         self.assertIn("QUINSTIBOWL 5 MG 20", queries)
         self.assertIn("92037", queries)
-        self.assertIn("5 MG", queries)
-        self.assertIn("F", queries)
+        self.assertNotIn("5 MG", queries)
+        self.assertNotIn("F", queries)
         self.assertLessEqual(len(queries), 24)
 
     def test_short_names_include_code_fallback_after_unique_variants(self) -> None:
@@ -26,9 +26,9 @@ class ProductMatchingQueryTests(unittest.TestCase):
 
         queries = _search_queries_for_item(item)
 
-        self.assertGreaterEqual(len(queries), 4)
+        self.assertGreaterEqual(len(queries), 3)
         self.assertIn("73368", queries)
-        self.assertIn("CREAM", queries)
+        self.assertNotIn("CREAM", queries)
 
     def test_search_queries_fix_common_zero_ocr_in_pack_size(self) -> None:
         item = Item(code="47273", name="IVERZINE LOTION 6O ML", qty=1)

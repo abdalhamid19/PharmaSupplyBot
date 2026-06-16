@@ -199,6 +199,38 @@ class NormalizerTests(unittest.TestCase):
                 self.assertTrue(is_ok)
                 self.assertEqual(reason, "ok")
 
+    def test_parse_drug_translates_arabic_numerals_and_terms(self) -> None:
+        comp = parse_drug("سوبراكس ١٠٠ مجم شراب ٣٠ مل")
+        self.assertEqual(comp.dosage_nums, ("100",))
+        self.assertEqual(comp.dosage_units, ("MG",))
+        self.assertEqual(comp.volume, "30")
+        self.assertEqual(comp.form, "SYRUP")
+
+    def test_components_match_rejects_conflicting_critical_chemicals(self) -> None:
+        # POTASSIUM vs CALCIUM
+        is_ok, reason = components_match(
+            parse_drug("POTASSIUM CHLORIDE 10%"),
+            parse_drug("CALCIUM CHLORIDE 10%"),
+        )
+        self.assertFalse(is_ok)
+        self.assertEqual(reason, "different_brand")
+
+        # CETAL vs DOLIPRANE
+        is_ok, reason = components_match(
+            parse_drug("CETAL 250MG/5ML SUSP"),
+            parse_drug("DOLIPRANE 250MG/5ML SUSP"),
+        )
+        self.assertFalse(is_ok)
+        self.assertEqual(reason, "different_brand")
+
+    def test_components_match_ignores_synthetic_dosage_mismatch(self) -> None:
+        d = parse_drug("CHEMICETRIZINE 5 MG")
+        m = parse_drug("CHEMICETRIZINE")  # no dosage
+        m.is_synthetic = True
+        is_ok, reason = components_match(d, m)
+        self.assertTrue(is_ok)
+        self.assertEqual(reason, "ok")
+
 
 if __name__ == "__main__":
     unittest.main()

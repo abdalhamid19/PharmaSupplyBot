@@ -12,7 +12,7 @@ def aggressive_review_result(bot, item: Item, decision, require_available: bool)
     """Return or stage a flagged aggressive match when the run opted into it."""
     if getattr(bot, "matching_risk_policy", "safe") != "aggressive":
         return None
-    flagged_decision = aggressive_review_decision(decision)
+    flagged_decision = aggressive_review_decision(decision, bot.config.matching)
     if not flagged_decision or not flagged_decision.best_match:
         return None
     _record_flagged_decision(bot, flagged_decision)

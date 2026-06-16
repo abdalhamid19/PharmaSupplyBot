@@ -1,5 +1,7 @@
 """Candidate conversion helpers for live-order AI matching."""
+
 from __future__ import annotations
+
 from typing import Any
 
 from .candidate_identity import candidate_store_product_id
@@ -8,7 +10,12 @@ from .matching_models import MatchDecision, SearchMatch
 
 def candidate_name(candidate: dict[str, Any]) -> str:
     """Return the English display name used in AI prompts."""
-    return str(candidate.get("productNameEn") or candidate.get("productName") or "")
+    return str(
+        candidate.get("productNameEn")
+        or candidate.get("productNameEnFallback")
+        or candidate.get("productName")
+        or ""
+    )
 
 
 def candidate_ar(candidate: dict[str, Any]) -> str:

@@ -1,114 +1,430 @@
 """Name normalization and drug component parsing."""
+
 import re
 from dataclasses import dataclass
 
 from rapidfuzz import fuzz
 
-CONNECTOR_WORDS = frozenset({
-    "AND", "WITH", "OF", "THE",
-})
-FORM_WORDS = frozenset({
-    "TABLET", "TABLETS", "TAB", "TABS", "CAP", "CAPS", "CAPSULE", "CAPSULES",
-    "SACHET", "SACHETS", "SACH", "AMP", "AMPS", "AMPOULE", "AMPOULES", "VIAL", "VIALS",
-    "SUPP", "SUPPS", "PIECE", "PIECES", "DROPS", "DROP", "PEN", "PENS",
-    "CARTRIDGE", "CARTRIDGES", "GUMMIES", "PACKETS", "DOSES", "BOTTLES",
-    "EFF", "EFFERVESCENT",
-    "F.C.TAB", "F.C.TABS", "F.C. TAB", "F.C. TABS", "F.C.TAB.", "F.C.TABS.",
-    "E.C.TAB", "E.C.TABS", "E.C. TAB", "E.C. TABS",
-    "EXT.REL.TAB", "EXT. REL. TABS", "E.R.F.C.TABS",
-    "CHEW.TAB", "CHEWABLE TAB", "SUGAR COATED TAB",
-    "S.G.CAPS", "S.G. CAPS", "H.G.CAPS", "H.G. CAPS",
-    "ORODISSOLVABLE", "FILM", "FILMS", "LOZENGES",
-})
+CONNECTOR_WORDS = frozenset(
+    {
+        "AND",
+        "WITH",
+        "OF",
+        "THE",
+    }
+)
+FORM_WORDS = frozenset(
+    {
+        "TABLET",
+        "TABLETS",
+        "TAB",
+        "TABS",
+        "CAP",
+        "CAPS",
+        "CAPSULE",
+        "CAPSULES",
+        "SACHET",
+        "SACHETS",
+        "SACH",
+        "AMP",
+        "AMPS",
+        "AMPOULE",
+        "AMPOULES",
+        "VIAL",
+        "VIALS",
+        "SUPP",
+        "SUPPS",
+        "PIECE",
+        "PIECES",
+        "DROPS",
+        "DROP",
+        "PEN",
+        "PENS",
+        "CARTRIDGE",
+        "CARTRIDGES",
+        "GUMMIES",
+        "PACKETS",
+        "DOSES",
+        "BOTTLES",
+        "EFF",
+        "EFFERVESCENT",
+        "F.C.TAB",
+        "F.C.TABS",
+        "F.C. TAB",
+        "F.C. TABS",
+        "F.C.TAB.",
+        "F.C.TABS.",
+        "E.C.TAB",
+        "E.C.TABS",
+        "E.C. TAB",
+        "E.C. TABS",
+        "EXT.REL.TAB",
+        "EXT. REL. TABS",
+        "E.R.F.C.TABS",
+        "CHEW.TAB",
+        "CHEWABLE TAB",
+        "SUGAR COATED TAB",
+        "S.G.CAPS",
+        "S.G. CAPS",
+        "H.G.CAPS",
+        "H.G. CAPS",
+        "ORODISSOLVABLE",
+        "FILM",
+        "FILMS",
+        "LOZENGES",
+    }
+)
 
-FORM_PREFIXES = frozenset({
-    "CREAM", "GEL", "OINTMENT", "OINT", "SYRUP", "SUSP", "SPRAY",
-    "POWDER", "LOTION", "SOAP", "SHAMPOO", "OIL", "SERUM",
-    "EMULGEL", "INJECTION", "INFUSION", "SOLUTION", "SOLN",
-    "TOPICAL", "ORAL", "EYE", "NASAL", "EAR", "INTIMATE",
-    "MASSAGE", "FEMININE", "CLEANSER", "WASH", "DOUCHE",
-    "INHALER", "INH", "OPHTALMIC", "DROPS", "SPRAYS", "ORL",
-    "SYRP", "SYP",
-    "SUSPENSION", "EMULSION", "ENEMA", "MOUTHWASH",
-})
+FORM_PREFIXES = frozenset(
+    {
+        "CREAM",
+        "GEL",
+        "OINTMENT",
+        "OINT",
+        "SYRUP",
+        "SUSP",
+        "SPRAY",
+        "POWDER",
+        "LOTION",
+        "SOAP",
+        "SHAMPOO",
+        "OIL",
+        "SERUM",
+        "EMULGEL",
+        "INJECTION",
+        "INFUSION",
+        "SOLUTION",
+        "SOLN",
+        "TOPICAL",
+        "ORAL",
+        "EYE",
+        "NASAL",
+        "EAR",
+        "INTIMATE",
+        "MASSAGE",
+        "FEMININE",
+        "CLEANSER",
+        "WASH",
+        "DOUCHE",
+        "INHALER",
+        "INH",
+        "OPHTALMIC",
+        "DROPS",
+        "SPRAYS",
+        "ORL",
+        "SYRP",
+        "SYP",
+        "SUSPENSION",
+        "EMULSION",
+        "ENEMA",
+        "MOUTHWASH",
+    }
+)
 
-NOISE_WORDS = frozenset({
-    "BLUE", "RED", "WHITE", "ORS", "FLAVOR", "FLAVOUR",
-    "LIQUID", "FACIAL", "MILK",
-})
-SOFT_BRAND_DESCRIPTORS = frozenset({
-    "ACTIVE", "ADULT", "ADULTS", "ANISE", "ANTISEPTIC", "COLD", "FLU", "FOLIC",
-    "JOINT", "NIGHT", "ORIGINAL", "SINUS", "TOP", "TRIPLE", "VAG",
-    "VAGINAL",
-})
-BRAND_QUALIFIERS = frozenset({
-    "INFINITY", "SURACTIVE", "ALKALINE", "ESOMEPRAZOLE",
-    "OPHTALMIC", "HAIR", "GROWTH", "CAFFEINE", "RICH",
-    "DS", "DA", "ANTI", "EXTRA", "FORTE", "FORET", "EFFOX", "LONG",
-    "EMOLLIENT", "OPHTIOLE", "ORL", "AMOUN", "PAEDIATRIC",
-    "PEDIATRIC", "INFANT", "INFANTS", "INFANTILE", "KID", "KIDS",
-})
+NOISE_WORDS = frozenset(
+    {
+        "BLUE",
+        "RED",
+        "WHITE",
+        "ORS",
+        "FLAVOR",
+        "FLAVOUR",
+        "LIQUID",
+        "FACIAL",
+        "MILK",
+    }
+)
+CRITICAL_CHEMICALS = frozenset(
+    {
+        "POTASSIUM",
+        "CALCIUM",
+        "SODIUM",
+        "MAGNESIUM",
+        "IRON",
+        "ZINC",
+        "CETAL",
+        "DOLIPRANE",
+        "PANADOL",
+        "ADOL",
+        "PARAMOL",
+    }
+)
+SOFT_BRAND_DESCRIPTORS = frozenset(
+    {
+        "ACTIVE",
+        "ADULT",
+        "ADULTS",
+        "ANISE",
+        "ANTISEPTIC",
+        "COLD",
+        "FLU",
+        "FOLIC",
+        "JOINT",
+        "NIGHT",
+        "ORIGINAL",
+        "SINUS",
+        "TOP",
+        "TRIPLE",
+        "VAG",
+        "VAGINAL",
+    }
+)
+BRAND_QUALIFIERS = frozenset(
+    {
+        "INFINITY",
+        "SURACTIVE",
+        "ALKALINE",
+        "ESOMEPRAZOLE",
+        "OPHTALMIC",
+        "HAIR",
+        "GROWTH",
+        "CAFFEINE",
+        "RICH",
+        "DS",
+        "DA",
+        "ANTI",
+        "EXTRA",
+        "FORTE",
+        "FORET",
+        "EFFOX",
+        "LONG",
+        "EMOLLIENT",
+        "OPHTIOLE",
+        "ORL",
+        "AMOUN",
+        "PAEDIATRIC",
+        "PEDIATRIC",
+        "INFANT",
+        "INFANTS",
+        "INFANTILE",
+        "KID",
+        "KIDS",
+    }
+)
 ACRONYM_BRANDS = frozenset({"AIG"})
-FLAVOR_WORDS = frozenset({
-    "APPLE", "BANANA", "BERRY", "CHERRY", "CHOCOLATE", "CLOVE", "COLA",
-    "GRAPE", "LEMON", "MANGO", "MINT", "ORANGE", "PINEAPPLE",
-    "RASPBERRY", "STRAWBERRY", "VANILLA",
-})
-COLOR_WORDS = frozenset({
-    "BLACK", "BLUE", "BROWN", "GOLD", "GREEN", "GREY", "PINK",
-    "PURPLE", "RED", "SILVER", "WHITE", "YELLOW",
-})
-VITAMIN_MODIFIERS = frozenset({
-    "B1", "B2", "B6", "B12", "D3",
-})
-CRITICAL_MODIFIERS = frozenset({
-    "PLUS", "EXTRA", "ADVANCE", "FORTE", "NIGHT", "COLD",
-    "SINUS", "D", "R", "MEN", "WOMEN", "MALE", "FEMALE",
-    "XR", "XL", "SR", "CR", "MR", "ER", "DR", "PRONTO", "VAGINAL", "NASAL",
-    "MOUTH",
-})
-COSMETIC_WORDS = frozenset({
-    "BODY", "CONCEALER", "COSMETIC", "CREAM", "DEODORANT", "DOUCHE",
-    "EMULGEL", "GEL", "HAIR", "LOTION", "MASK", "MOUTH", "MOUTHWASH",
-    "OIL", "SERUM", "SHAMPOO", "SOAP", "SPRAY", "SUN", "TONER",
-    "WASH",
-})
-DEVICE_WORDS = frozenset({
-    "BANDAGE", "CANULA", "CONDOM", "CONDOMS", "LANCET", "LANCETS",
-    "NEBULIZER", "NEEDLE", "NEEDLES", "PATCH", "PATCHES", "STRIP",
-    "STRIPS", "SYRINGE", "SYRINGES",
-})
-BABY_FOOD_WORDS = frozenset({
-    "APTAMIL", "BEBELAC", "BEBEJUNIOR", "CERELAC", "FEH", "HERO",
-    "MILK", "NAN", "NIDO", "S26",
-})
-SUPPLEMENT_WORDS = frozenset({
-    "ASHWAGANDHA", "BIOTIN", "CALCIUM", "CENTRUM", "COLLAGEN", "D3",
-    "FEROGLOBIN", "GLUCOSAMINE", "OMEGA", "PERFECTIL", "PREGNACARE",
-    "VITAMIN", "VITAMINS", "ZINC",
-})
+FLAVOR_WORDS = frozenset(
+    {
+        "APPLE",
+        "BANANA",
+        "BERRY",
+        "CHERRY",
+        "CHOCOLATE",
+        "CLOVE",
+        "COLA",
+        "GRAPE",
+        "LEMON",
+        "MANGO",
+        "MINT",
+        "ORANGE",
+        "PINEAPPLE",
+        "RASPBERRY",
+        "STRAWBERRY",
+        "VANILLA",
+    }
+)
+COLOR_WORDS = frozenset(
+    {
+        "BLACK",
+        "BLUE",
+        "BROWN",
+        "GOLD",
+        "GREEN",
+        "GREY",
+        "PINK",
+        "PURPLE",
+        "RED",
+        "SILVER",
+        "WHITE",
+        "YELLOW",
+    }
+)
+VITAMIN_MODIFIERS = frozenset(
+    {
+        "B1",
+        "B2",
+        "B6",
+        "B12",
+        "D3",
+    }
+)
+CRITICAL_MODIFIERS = frozenset(
+    {
+        "PLUS",
+        "EXTRA",
+        "ADVANCE",
+        "FORTE",
+        "NIGHT",
+        "COLD",
+        "SINUS",
+        "D",
+        "R",
+        "MEN",
+        "WOMEN",
+        "MALE",
+        "FEMALE",
+        "XR",
+        "XL",
+        "SR",
+        "CR",
+        "MR",
+        "ER",
+        "DR",
+        "PRONTO",
+        "VAGINAL",
+        "NASAL",
+        "MOUTH",
+    }
+)
+COSMETIC_WORDS = frozenset(
+    {
+        "BODY",
+        "CONCEALER",
+        "COSMETIC",
+        "CREAM",
+        "DEODORANT",
+        "DOUCHE",
+        "EMULGEL",
+        "GEL",
+        "HAIR",
+        "LOTION",
+        "MASK",
+        "MOUTH",
+        "MOUTHWASH",
+        "OIL",
+        "SERUM",
+        "SHAMPOO",
+        "SOAP",
+        "SPRAY",
+        "SUN",
+        "TONER",
+        "WASH",
+    }
+)
+DEVICE_WORDS = frozenset(
+    {
+        "BANDAGE",
+        "CANULA",
+        "CONDOM",
+        "CONDOMS",
+        "LANCET",
+        "LANCETS",
+        "NEBULIZER",
+        "NEEDLE",
+        "NEEDLES",
+        "PATCH",
+        "PATCHES",
+        "STRIP",
+        "STRIPS",
+        "SYRINGE",
+        "SYRINGES",
+    }
+)
+BABY_FOOD_WORDS = frozenset(
+    {
+        "APTAMIL",
+        "BEBELAC",
+        "BEBEJUNIOR",
+        "CERELAC",
+        "FEH",
+        "HERO",
+        "MILK",
+        "NAN",
+        "NIDO",
+        "S26",
+    }
+)
+SUPPLEMENT_WORDS = frozenset(
+    {
+        "ASHWAGANDHA",
+        "BIOTIN",
+        "CALCIUM",
+        "CENTRUM",
+        "COLLAGEN",
+        "D3",
+        "FEROGLOBIN",
+        "GLUCOSAMINE",
+        "OMEGA",
+        "PERFECTIL",
+        "PREGNACARE",
+        "VITAMIN",
+        "VITAMINS",
+        "ZINC",
+    }
+)
 OCULAR_FORMS = frozenset({"OPHTALMIC", "EYE", "DROPS", "SOLUTION"})
 LIQUID_FORMS = frozenset({"SYRUP", "SUSP", "SOLUTION", "ORL"})
 LIQUID_DOSE_FORMS = frozenset({"SYRUP", "SUSP", "SOLUTION", "ORL", "AMP", "VIAL"})
 SOLID_FORMS = frozenset({"TAB", "CAP"})
-PEDIATRIC_WORDS = frozenset({
-    "PAEDIATRIC", "PEDIATRIC", "INFANT", "INFANTS", "INFANTILE", "KID", "KIDS",
-})
+PEDIATRIC_WORDS = frozenset(
+    {
+        "PAEDIATRIC",
+        "PEDIATRIC",
+        "INFANT",
+        "INFANTS",
+        "INFANTILE",
+        "KID",
+        "KIDS",
+    }
+)
 ADULT_WORDS = frozenset({"ADULT", "ADULTS"})
-INFUSION_CONTEXT_WORDS = frozenset({
-    "I", "V", "IV", "I/V", "INJ", "INJECTION", "INFUSION", "VIAL", "AMP", "AMPS",
-})
+INFUSION_CONTEXT_WORDS = frozenset(
+    {
+        "I",
+        "V",
+        "IV",
+        "I/V",
+        "INJ",
+        "INJECTION",
+        "INFUSION",
+        "VIAL",
+        "AMP",
+        "AMPS",
+    }
+)
 ROUTE_WORDS = frozenset({"IM", "IV", "SC"})
 FORM_SCAN_ORDER = (
-    "VIAL", "VIALS", "AMPOULES", "AMPOULE", "AMP", "AMPS",
-    "PENS", "PEN", "CARTRIDGES", "CARTIRIDGES", "CARTRIDGE",
-    "SPRAY", "SPRAYS", "METERED", "SYRUP", "SYRP", "SYP", "SUSP",
-    "DROPS", "DROP", "EYE", "OPHTALMIC", "GEL", "CREAM",
-    "POWDER", "SHAMPOO", "CLEANSER", "WASH", "SOLUTION",
-    "SUPPS", "SUPP",
-    "TABLETS", "TABLET", "TABS", "TAB", "CAPSULES",
-    "CAPSULE", "CAPS", "CAP", "DOSES",
+    "VIAL",
+    "VIALS",
+    "AMPOULES",
+    "AMPOULE",
+    "AMP",
+    "AMPS",
+    "PENS",
+    "PEN",
+    "CARTRIDGES",
+    "CARTIRIDGES",
+    "CARTRIDGE",
+    "SPRAY",
+    "SPRAYS",
+    "METERED",
+    "SYRUP",
+    "SYRP",
+    "SYP",
+    "SUSP",
+    "DROPS",
+    "DROP",
+    "EYE",
+    "OPHTALMIC",
+    "GEL",
+    "CREAM",
+    "POWDER",
+    "SHAMPOO",
+    "CLEANSER",
+    "WASH",
+    "SOLUTION",
+    "SUPPS",
+    "SUPP",
+    "TABLETS",
+    "TABLET",
+    "TABS",
+    "TAB",
+    "CAPSULES",
+    "CAPSULE",
+    "CAPS",
+    "CAP",
+    "DOSES",
 )
+
 
 @dataclass(slots=True)
 class DrugComponents:
@@ -126,6 +442,8 @@ class DrugComponents:
     normalized: str
     brand_variants: tuple[str, ...] = ()
     product_class: str = "medicine"
+    is_synthetic: bool = False
+
 
 _DOSAGE_RE = re.compile(
     r"(\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?(?:\s\d{3})?)"
@@ -173,6 +491,7 @@ def normalize_arabic(name: str) -> str:
     text = re.sub(r"[^\w\s\u0600-\u06FF]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
+
 def normalize(name: str) -> str:
     """Normalize an English drug/product name before parsing or fuzzy matching."""
 
@@ -203,23 +522,55 @@ def normalize(name: str) -> str:
     name = re.sub(r"\b([BD])\s+(3|6|12)\b", r"\1\2", name)
     name = re.sub(r"\s*[\\/]\s*", " / ", name)
     # Handle European decimal notation BEFORE removing dots: "1.000" IU means 1000
-    name = re.sub(r'(\d)\.(\d{3})\s*(I\.?U\.?|IU|MCG|MG)', r'\1\2 \3', name)
-    name = re.sub(r'(?<!\d)\.(\d+)', r'0.\1', name)
+    name = re.sub(r"(\d)\.(\d{3})\s*(I\.?U\.?|IU|MCG|MG)", r"\1\2 \3", name)
+    name = re.sub(r"(?<!\d)\.(\d+)", r"0.\1", name)
     # Remove dots but NOT between digits that form a decimal (e.g. 0.5, 2.5)
-    name = re.sub(r'\.(?!\d)', ' ', name)
-    name = re.sub(r'(?<!\d)\.', ' ', name)
+    name = re.sub(r"\.(?!\d)", " ", name)
+    name = re.sub(r"(?<!\d)\.", " ", name)
     name = re.sub(r"\b([DESCMX])\s+R\b", r"\1R", name)
     name = re.sub(r"\bUNITS?\b", "IU", name)
     name = re.sub(r"\s+", " ", name).strip()
     return name
 
+
+def _convert_arabic_to_english_terms(name: str) -> str:
+    """Convert Arabic numerals and unit/form keywords to English equivalents."""
+    arabic_digits = "٠١٢٣٤٥٦٧٨٩"
+    english_digits = "0123456789"
+    digit_map = str.maketrans(arabic_digits, english_digits)
+    text = name.translate(digit_map)
+
+    replacements = {
+        r"\b(?:مجم|ملجم|مليجرام|مليجرم)\b": " MG ",
+        r"\b(?:مل|ملل|مللي|ميللي|مللتر)\b": " ML ",
+        r"\b(?:جم|جرام|جرم)\b": " GM ",
+        r"\b(?:قرص|اقراص|قراص)\b": " TAB ",
+        r"\b(?:كبسول|كبسولات|كبسوله)\b": " CAP ",
+        r"\b(?:امبول|امبولات)\b": " AMP ",
+        r"\b(?:فيال|فيلات|فيالات)\b": " VIAL ",
+        r"\b(?:نقط|قطره|قطرات)\b": " DROPS ",
+        r"\b(?:بخاخ|بخاخة|سبراي)\b": " SPRAY ",
+        r"\b(?:لبن|حليب)\b": " MILK ",
+        r"\b(?:شراب|شرب)\b": " SYRUP ",
+        r"\b(?:كريم|دهان)\b": " CREAM ",
+        r"\b(?:جل|جيل)\b": " GEL ",
+        r"\b(?:مرهم)\b": " OINTMENT ",
+        r"\b(?:ايه\s+ار|اي\s+ار|ارتجاع)\b": " AR ",
+    }
+    for pattern, repl in replacements.items():
+        text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
+    return text
+
+
 def parse_drug(name: str) -> DrugComponents:
     """Parse a raw drug/product name into matching components."""
 
     if not name or not isinstance(name, str):
-        return DrugComponents("", (), (), "", "", "", "", "", False, "")
+        return DrugComponents("", (), (), "", "", "", "", "", False, "", is_synthetic=False)
 
     imported = bool(_IMPORT_MARKER_RE.search(name))
+    if any(0x0600 <= ord(character) <= 0x06FF for character in name):
+        name = _convert_arabic_to_english_terms(name)
     norm = normalize(name)
 
     # Dosage (MG, MCG, IU, %) - NOT GM/G (those are weight/packaging)
@@ -265,7 +616,8 @@ def parse_drug(name: str) -> DrugComponents:
         brand = "".join(brand_words)
     if not brand and words and words[0] in BRAND_QUALIFIERS:
         brand = "".join(
-            w for idx, w in enumerate(words[1:], start=1)
+            w
+            for idx, w in enumerate(words[1:], start=1)
             if (
                 not re.search(r"\d", w)
                 and not _is_brand_boundary(words, idx)
@@ -287,14 +639,21 @@ def parse_drug(name: str) -> DrugComponents:
     if form == "SUSP" and ({"EYE", "DROPS"} & norm_words):
         form = "EYE"
     if (
-        not dosage_nums and qty and qty.isdigit()
+        not dosage_nums
+        and qty
+        and qty.isdigit()
         and int(qty) >= 100
-        and "VAGINAL" in norm_words and form in {"CAP", "SUPP"}
+        and "VAGINAL" in norm_words
+        and form in {"CAP", "SUPP"}
     ):
         qty = ""
     if not dosage_nums:
         dosage_nums, dosage_units = _infer_missing_dosage(
-            norm, qty, volume, weight, form,
+            norm,
+            qty,
+            volume,
+            weight,
+            form,
         )
     if not dosage_nums and _weight_is_strength(weight, form, norm_words):
         dosage_nums, dosage_units = (weight,), ("GM",)
@@ -363,7 +722,8 @@ def _infer_missing_dosage(
         normalized = _canonical_number(num)
         consumed_idx = next(
             (
-                idx for idx, value in enumerate(consumed)
+                idx
+                for idx, value in enumerate(consumed)
                 if _canonical_number(value) == normalized
             ),
             None,
@@ -386,8 +746,10 @@ def _infer_missing_dosage(
 def _is_brand_boundary(words: list[str], idx: int) -> bool:
     word = words[idx]
     if (
-        word in FORM_PREFIXES or word in FORM_WORDS
-        or word in NOISE_WORDS or word in BRAND_QUALIFIERS
+        word in FORM_PREFIXES
+        or word in FORM_WORDS
+        or word in NOISE_WORDS
+        or word in BRAND_QUALIFIERS
         or _is_pediatric_inf(words, idx)
         or _is_descriptive_brand_word(word)
     ):
@@ -466,32 +828,32 @@ def _modifier_is_optional(modifier: str, d_words: set[str], m_words: set[str]):
         return True
     if modifier == "EXTRA" and ("EMOLLIENT" in d_words or "EMOLLIENT" in m_words):
         return True
-    if modifier == "NASAL" and (
-        {"SPRAY", "SPRAYS", "DOSES"} & d_words
-    ) and (
-        {"SPRAY", "SPRAYS", "DOSES"} & m_words
+    if (
+        modifier == "NASAL"
+        and ({"SPRAY", "SPRAYS", "DOSES"} & d_words)
+        and ({"SPRAY", "SPRAYS", "DOSES"} & m_words)
     ):
         return True
-    if modifier == "NASAL" and (
-        {"DROPS", "DROP", "EYE"} & d_words
-    ) and (
-        {"DROPS", "DROP", "EYE"} & m_words
+    if (
+        modifier == "NASAL"
+        and ({"DROPS", "DROP", "EYE"} & d_words)
+        and ({"DROPS", "DROP", "EYE"} & m_words)
     ):
         return True
-    if modifier == "VAGINAL" and (
-        {"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"} & d_words
-    ) and (
-        {"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"} & m_words
+    if (
+        modifier == "VAGINAL"
+        and ({"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"} & d_words)
+        and ({"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"} & m_words)
     ):
         return True
     if modifier == "R" and "PROLONGED" in (d_words | m_words):
         return True
     if modifier == "SR" and "RETARD" in (d_words | m_words):
         return True
-    if modifier == "MOUTH" and (
-        "MOUTHWASH" in d_words or "MOUTHWASH" in m_words
-    ) and (
-        "WASH" in d_words or "WASH" in m_words
+    if (
+        modifier == "MOUTH"
+        and ("MOUTHWASH" in d_words or "MOUTHWASH" in m_words)
+        and ("WASH" in d_words or "WASH" in m_words)
     ):
         return True
     return False
@@ -594,9 +956,7 @@ def _liquid_primary_strength_matches(
 ) -> bool:
     if not ({d.form, m.form} & LIQUID_DOSE_FORMS):
         return False
-    return (
-        len(d_parts) == 1 and len(m_parts) > 1 and d_parts[0] == m_parts[0]
-    ) or (
+    return (len(d_parts) == 1 and len(m_parts) > 1 and d_parts[0] == m_parts[0]) or (
         len(m_parts) == 1 and len(d_parts) > 1 and m_parts[0] == d_parts[0]
     )
 
@@ -610,9 +970,7 @@ def _weight_is_strength(weight: str, form: str, words: set[str]) -> bool:
     return form in {"VIAL", "AMP"} or bool(words & INFUSION_CONTEXT_WORDS)
 
 
-def _matching_canonical_dosage(
-    d: DrugComponents, m: DrugComponents
-) -> bool | None:
+def _matching_canonical_dosage(d: DrugComponents, m: DrugComponents) -> bool | None:
     left = _canonical_dosage_values_mg(d)
     right = _canonical_dosage_values_mg(m)
     if not left or not right:
@@ -682,7 +1040,9 @@ def _single_per_5_matches_total(
     total_volume: str,
     parsed_volume: str,
 ) -> bool:
-    if parsed_volume and _canonical_number(parsed_volume) != _canonical_number(total_volume):
+    if parsed_volume and _canonical_number(parsed_volume) != _canonical_number(
+        total_volume
+    ):
         return False
     return abs((float(total) / float(total_volume)) - (float(single) / 5.0)) <= 0.01
 
@@ -711,7 +1071,8 @@ def _unmatched_numeric_signals(c: DrugComponents) -> tuple[str, ...]:
         normalized = str(float(num)).rstrip("0").rstrip(".") if "." in num else num
         consumed_idx = next(
             (
-                idx for idx, value in enumerate(consumed)
+                idx
+                for idx, value in enumerate(consumed)
                 if value == num or value == normalized
             ),
             None,
@@ -766,6 +1127,14 @@ def _qty_is_misclassified_dosage(a: DrugComponents, b: DrugComponents) -> bool:
     return a.qty in _dosage_flat_set(b.dosage_nums)
 
 
+def _has_reliable_english_name(c: DrugComponents) -> bool:
+    """Return True if the components came from a reliable English name."""
+    if c.is_synthetic:
+        return False
+    text = c.normalized or ""
+    return any(char.isalpha() and char.isascii() for char in text)
+
+
 def components_match(
     d: DrugComponents,
     m: DrugComponents,
@@ -776,44 +1145,57 @@ def components_match(
     d_clean = re.sub(r"[^A-Z0-9]", "", d.brand)
     m_clean = re.sub(r"[^A-Z0-9]", "", m.brand)
 
-    if d.imported != m.imported:
-        return False, "different_import_status"
+    # Critical chemicals and substances identity check
+    d_words_upper = set(w.upper() for w in d.normalized.split()) | set(w.upper() for w in d.brand.split())
+    m_words_upper = set(w.upper() for w in m.normalized.split()) | set(w.upper() for w in m.brand.split())
+    d_chems = d_words_upper & CRITICAL_CHEMICALS
+    m_chems = m_words_upper & CRITICAL_CHEMICALS
+    if d_chems and m_chems and d_chems != m_chems:
+        return False, "different_brand"
+
+    if _has_reliable_english_name(d) and _has_reliable_english_name(m):
+        if d.imported != m.imported:
+            return False, "different_import_status"
 
     d_words = set(d.normalized.split())
     m_words = set(m.normalized.split())
-    for modifier in CRITICAL_MODIFIERS | VITAMIN_MODIFIERS:
-        if (modifier in d_words) != (modifier in m_words):
-            if _modifier_is_optional(modifier, d_words, m_words):
-                continue
+
+    if _has_reliable_english_name(d) and _has_reliable_english_name(m):
+        for modifier in CRITICAL_MODIFIERS | VITAMIN_MODIFIERS:
+            if (modifier in d_words) != (modifier in m_words):
+                if _modifier_is_optional(modifier, d_words, m_words):
+                    continue
+                return False, "different_modifier"
+        d_insulin = _insulin_variant_signature(d)
+        m_insulin = _insulin_variant_signature(m)
+        if (d_insulin or m_insulin) and d_insulin != m_insulin:
             return False, "different_modifier"
-    d_insulin = _insulin_variant_signature(d)
-    m_insulin = _insulin_variant_signature(m)
-    if (d_insulin or m_insulin) and d_insulin != m_insulin:
-        return False, "different_modifier"
-    d_variants = _variant_tokens(d)
-    m_variants = _variant_tokens(m)
-    if d_variants and m_variants and d_variants.isdisjoint(m_variants):
-        return False, "different_flavor"
-    d_pediatric = _has_pediatric_signal(d_words)
-    m_pediatric = _has_pediatric_signal(m_words)
-    if d_pediatric != m_pediatric:
-        return False, "different_age_group"
-    if (_has_adult_signal(d_words) and m_pediatric) or (
-        _has_adult_signal(m_words) and d_pediatric
-    ):
-        return False, "different_age_group"
+        d_variants = _variant_tokens(d)
+        m_variants = _variant_tokens(m)
+        if d_variants and m_variants and d_variants.isdisjoint(m_variants):
+            return False, "different_flavor"
+        d_pediatric = _has_pediatric_signal(d_words)
+        m_pediatric = _has_pediatric_signal(m_words)
+        if d_pediatric != m_pediatric:
+            return False, "different_age_group"
+        if (_has_adult_signal(d_words) and m_pediatric) or (
+            _has_adult_signal(m_words) and d_pediatric
+        ):
+            return False, "different_age_group"
 
     if d_clean and m_clean:
         brand_exception = _known_brand_variant_match(d, m, d_clean, m_clean)
         shorter = min(len(d_clean), len(m_clean))
         prefix_len = min(
-            len(d_clean), len(m_clean),
+            len(d_clean),
+            len(m_clean),
             max(brand_prefix_min, int(shorter * 0.75)),
         )
         prefix_len = min(prefix_len, len(d_clean), len(m_clean))
         if prefix_len > 0 and d_clean[:prefix_len] != m_clean[:prefix_len]:
             if (
-                d_clean not in m_clean and m_clean not in d_clean
+                d_clean not in m_clean
+                and m_clean not in d_clean
                 and fuzz.ratio(d_clean, m_clean) < 86
                 and not brand_exception
             ):
@@ -846,36 +1228,38 @@ def components_match(
             return False, "different_dosage"
         dosage_checked_compatible = True
     if not dosage_checked_compatible:
-        d_numeric = _component_numeric_signals(d)
-        m_numeric = _component_numeric_signals(m)
-        d_matched_dosage = False
-        m_matched_dosage = False
-        if d_numeric and m.dosage_nums:
-            if _numeric_signals_match_dosage(d_numeric, m.dosage_nums):
-                d_matched_dosage = True
-            else:
+        if _has_reliable_english_name(d) and _has_reliable_english_name(m):
+            d_numeric = _component_numeric_signals(d)
+            m_numeric = _component_numeric_signals(m)
+            d_matched_dosage = False
+            m_matched_dosage = False
+            if d_numeric and m.dosage_nums:
+                if _numeric_signals_match_dosage(d_numeric, m.dosage_nums):
+                    d_matched_dosage = True
+                else:
+                    return False, "different_dosage"
+            if m_numeric and d.dosage_nums:
+                if _numeric_signals_match_dosage(m_numeric, d.dosage_nums):
+                    m_matched_dosage = True
+                else:
+                    return False, "different_dosage"
+            if (
+                d_numeric
+                and m_numeric
+                and d_numeric != m_numeric
+                and not d_matched_dosage
+                and not m_matched_dosage
+            ):
                 return False, "different_dosage"
-        if m_numeric and d.dosage_nums:
-            if _numeric_signals_match_dosage(m_numeric, d.dosage_nums):
-                m_matched_dosage = True
-            else:
-                return False, "different_dosage"
-        if (
-            d_numeric
-            and m_numeric
-            and d_numeric != m_numeric
-            and not d_matched_dosage
-            and not m_matched_dosage
-        ):
-            return False, "different_dosage"
 
     if d.form and m.form and not _forms_compatible(d.form, m.form):
         return False, "different_form"
 
-    d_routes = _route_signals(d_words)
-    m_routes = _route_signals(m_words)
-    if d_routes and m_routes and d_routes.isdisjoint(m_routes):
-        return False, "different_route"
+    if _has_reliable_english_name(d) and _has_reliable_english_name(m):
+        d_routes = _route_signals(d_words)
+        m_routes = _route_signals(m_words)
+        if d_routes and m_routes and d_routes.isdisjoint(m_routes):
+            return False, "different_route"
 
     # Quantity check
     if d.qty and m.qty and d.qty != m.qty:
