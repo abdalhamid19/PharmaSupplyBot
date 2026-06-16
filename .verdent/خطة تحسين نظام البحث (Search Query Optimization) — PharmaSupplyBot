@@ -1,0 +1,201 @@
+# خطة شاملة لتطبيق تحسينات نظام البحث (Query Optimization)
+
+## الخلفية والسياق
+
+استند هذا التحليل إلى المستند `search_query_optimization_explained.html` وإلى فحص الكود الفعلي. النتيجة المهمّة: بعض التحسينات المقترحة في المستند **موجودة جزئياً بالفعل**، لذا تبني الخطة على الموجود وتركّز الجهد على الفجوات الحقيقية المثبتة بالكود، بدل إعادة بناء ما يعمل.
+
+### نظام البحث ينقسم إلى مسارين
+
+```mermaid
+flowchart TD
+    Item["صنف Excel (Item)"] --> Gen["_search_queries_for_item()<br/>product_matching.py:201"]
+
+    subgraph LIVE["المسار الحي على Tawreed"]
+        Gen --> DOMLoop["require_product_match()<br/>tawreed_search_logic.py:26"]
+        Gen --> APILoop["require_api_match()<br/>tawreed_api_matching.py:16"]
+        DOMLoop --> Cache["cached_query_result()<br/>tawreed_query_cache.py (per-item, FIFO, 16)"]
+        APILoop --> Cache
+        Cache --> Search["search_products / api.search_products"]
+        Search --> Explain["explain_best_product_match()<br/>product_matching.py:274"]
+        Explain --> Decide["decisive_match()<br/>tawreed_search_decision.py:15"]
+        Decide -->|نهائي| Done["إرجاع المطابقة"]
+        Decide -->|غير نهائي| DOMLoop
+    end
+
+    subgraph OFFLINE["المسار دون اتصال (CSV bulk)"]
+        OffItem["MatchPipeline.run_matching()<br/>pipeline.py:83"] --> Best["DrugIndex.best_match()<br/>indexer.py:261"]
+        Best --> CompIdx["component_index (O(1))"]
+        Best --> BrandIdx["brand_index (O(1))"]
+        Best --> Fuzzy["_fuzzy_lookup / _try_fuzzy_match<br/>indexer.py:191/417 — O(n) كامل ❌"]
+    end
+```
+
+### الفجوات الحقيقية المثبتة بالكود
+
+| # | الفجوة | الدليل في الكود | حالة المستند |
+|---|--------|------------------|--------------|
+| أ | توليد الـ queries ثابت ولا يستخدم `parse_drug`/الشكل الصيدلاني (تقطيع كلمات فقط) | `product_matching.py:201-247` | مشكلة #1 + تحسين #1/#6 |
+| ب | الـ fuzzy fallback يمسح كل الأسماء `process.extract(query, self._norms)` بلا ترشيح مسبق | `indexer.py:191-199`, `417-436`, `343-378` | مشكلة #3 + تحسين #3 |
+| ج | الـ cache لكل صنف على حدة (يُنشأ `query_cache={}` داخل كل دالة) → لا إعادة استخدام عبر الأصناف | `tawreed_search_logic.py:32`, `tawreed_api_matching.py:21`, `tawreed_query_cache.py:8` | مشكلة #5 + تحسين #4 |
+| د | الفحص المكلّف `components_match`/`parse_drug` يُطبَّق على **كل** مرشح بلا حدّ top-K | `product_matching.py:414-431`, `700-712` | مشكلة #4 + تحسين #5 |
+| هـ | التوقف المبكر خشن: تطابق اسم كامل أو ٣ queries، بلا درجة ثقة مرنة | `tawreed_search_decision.py:34-40` | تحسين #7 |
+
+### ما هو موجود بالفعل (لا يُعاد بناؤه)
+- **تجميع المرشحين عبر الـ queries**: كلا المسارين يمرّران كامل `results` المتراكمة إلى `explain_best_product_match` في كل دورة (`tawreed_search_logic.py:95-98`, `tawreed_api_matching.py:30`) — أي أن «البحث التدريجي» (تحسين #2) قائم جزئياً.
+- **ترتيب المرشحين بمفتاح فرز**: `_match_sort_key` (`product_matching.py:139-157`) يرتّب حسب الدرجة والتطابق العددي والتوفر والسعر.
+- **توقف مبكر أساسي + وضع `fast_search`** (`tawreed_search_decision.py:34-40`).
+
+### قيود المشروع الملزمة (`docs/project_guidelines.md` + `tools/rule_audit.py`)
+- سطر ≤ ١٠٠ حرف؛ ملف ≤ ١٠٠ سطر؛ دالة ≤ ٢٠ سطراً (يفرضها الـ audit).
+- caches محدودة إجبارياً؛ ممنوع caches غير محدودة أو حالة عامة قابلة للتعديل.
+- السلوك المكلّف يُضبط عبر `MatchingConfig` المكتوب لا عبر ثوابت مبعثرة.
+- «قِس قبل التحسين»؛ دوال نقية للمطابقة/التهديف؛ تحديث الاختبارات + تشغيل الـ audit بعد التغيير.
+- `product_matching.py` مشترك بين مساري DOM وAPI → أي تغيير فيه يجب أن يبقى متوافقاً مع كليهما.
+
+---
+
+## الأهداف
+
+1. تسريع البحث وتقليل عدد المحاولات/طلبات الـ API دون خفض الدقة.
+2. توليد queries أذكى حسب نوع المنتج (شراب/حقن/أقراص).
+3. ترشيح مسبق للـ fuzzy fallback في الفهرس دون اتصال.
+4. cache مشترك محدود وآمن للتوازي عبر الأصناف.
+5. توقف مبكر قائم على درجة ثقة، وحدّ top-K للفحص المكلّف.
+6. الالتزام الكامل بأعراف المشروع (حجم الملفات/الدوال، الإعدادات المكتوبة، الاختبارات، الـ audit).
+
+---
+
+## المرحلة ٠ — قياس خط الأساس (Baseline) قبل أي تعديل
+
+> التزاماً بقاعدة «قِس قبل التحسين». لا تغييرات سلوكية في هذه المرحلة.
+
+### المهمة ٠.١: التقاط مقاييس خط الأساس
+- تشغيل `python3 tools/phase_validation.py` على عينة ثابتة (≈٥٠ صنفاً) وحفظ النتيجة كـ baseline.
+- المقاييس المستهدفة: متوسط زمن/صنف، عدد queries/صنف، نسبة المطابقات المقبولة، عدد طلبات البحث.
+- إضافة عدّاد بسيط (إن لزم) لقياس نسبة إصابة الـ cache الحالية لتأكيد رقم «٣٪» تجريبياً.
+
+### المهمة ٠.٢: تثبيت لقطة المرجعية
+- حفظ مخرجات baseline في `artifacts/` (لا تُخلط مع نتائج الإنتاج) لاستخدامها في المقارنة قبل/بعد في كل مرحلة لاحقة.
+
+**التحقق**: تشغيل ناجح لـ `phase_validation.py` ووجود ملف baseline قابل للمقارنة.
+
+---
+
+## المرحلة ١ — تحسينات أعلى أثر/أقل مخاطرة
+
+### المهمة ١.١: توقف مبكر قائم على درجة ثقة (Early Stopping)
+**الملفات**: `src/tawreed/tawreed_search_decision.py` + وحدة نقية جديدة `src/core/matching_confidence.py`.
+
+- إضافة دالة نقية `match_confidence(decision, item, query) -> float` في `matching_confidence.py` تحسب الثقة من عوامل موجودة بالفعل: درجة المطابقة (مُطبَّعة)، تطابق العلامة، تطابق الجرعة عبر `components_match`، التوفر (`availableQuantity`). تجميع بأوزان (مطابق لمنطق المستند `calculate_confidence`).
+- تعديل `_is_final_match` (`tawreed_search_decision.py:34`) ليُنهي مبكراً عندما `confidence >= matching.early_stop_confidence` حتى قبل بلوغ `MIN_SEARCH_QUERIES_PER_ITEM`، مع الإبقاء على شرط تطابق الاسم الكامل وعتبة الـ ٣ queries كـ fallback، واحترام `fast_search`.
+- إضافة الحقل `early_stop_confidence: float = 0.95` إلى `MatchingConfig` (`config.py` و`config/config_models.py` — يجب مطابقة كلا التعريفين، انظر ملاحظة الإعدادات أدناه).
+
+**التحقق**: اختبارات في `tests/test_tawreed_search_*` (أو ملف جديد `test_matching_confidence.py`): مطابقة عالية الثقة في query #1 تتوقف فوراً؛ مطابقة ضعيفة تكمل حتى عتبة الـ queries؛ عدم تغيّر سلوك `fast_search`.
+
+### المهمة ١.٢: حدّ top-K + ترتيب أرخص للفحص المكلّف (Candidate Prioritization)
+**الملف**: `src/core/product_matching.py` (`_build_candidate_diagnostics:414`, `_decision_from_diagnostics:527`, `_candidate_diagnostic:633`).
+
+- إدخال «درجة أولية رخيصة» (overlap/sequence فقط) لترتيب المرشحين أولاً، ثم تطبيق الفحص المكلّف (`parse_drug` + `components_match` + قواعد القبول) على أعلى `matching.candidate_top_k` فقط، بدل كل المرشحين.
+- ضمان عدم فقدان الصحة: إن لم يُقبَل أي من الـ top-K، يُسمح بالرجوع لفحص بقية المرشحين (حماية ضد التراجع في الدقة) — أي top-K كتحسين أداء وليس كقصّ صارم للنتائج.
+- إضافة الحقل `candidate_top_k: int = 5` إلى `MatchingConfig`.
+- (اختياري ضمن نفس المهمة) دمج مكافآت/عقوبات المستند الصريحة في `_match_sort_key`/التهديف إن أظهرت مقارنة baseline حاجة لها (مكافأة تطابق الشكل/السعر، عقوبة مُعدِّل إضافي/فئة عمرية مختلفة) — مع أن أغلبها مُغطّى ضمن `components_match` و`penalty_breakdown`.
+
+**التحقق**: تحديث `tests/test_product_matching.py` للتأكد أن النتيجة النهائية مطابقة لنتيجة الفحص الكامل على حالات الاختبار الحالية (عدم تراجع)، مع تقليل عدد استدعاءات الفحص المكلّف (تأكيد عبر spy/عدّاد).
+
+### المهمة ١.٣: ترشيح مسبق ببادئة العلامة قبل الـ fuzzy (Fuzzy Pre-filtering)
+**الملف**: `src/core/drug_matching/indexer.py`.
+
+- بناء فهرس بادئة أحرف عند الإنشاء (`__init__`) يربط بادئة طول N (مثلاً ٣–٤ أحرف من الاسم المُطبَّع/العلامة) بقائمة الفهارس، مُعاد استخدامه من `_brand_index` الموجود قدر الإمكان لتفادي ذاكرة إضافية.
+- تعديل `_fuzzy_lookup:191` و`_try_fuzzy_match:417` والخطوة الضبابية في `best_match_detailed:343` بحيث يُمرَّر إلى `process.extract`/`extractOne` قائمة مرشحين مُرشّحة مسبقاً (subset) بدل `self._norms` كاملة، مع fallback إلى المسح الكامل فقط حين تكون البادئة فارغة أو لا تُنتج مرشحين.
+- إضافة الحقل `fuzzy_prefix_len: int = 3` إلى `MatchingConfig`؛ والإبقاء على `fuzzy_threshold` كما هو.
+
+**التحقق**: تحديث `tests/test_drug_matching_indexer.py`: نفس المطابقات الحالية (`AUGMENTIN`, `PANADOL COLD AND FLU`, إلخ) تبقى صحيحة؛ إضافة حالة تثبت أن الترشيح المسبق لا يُسقط مطابقة صحيحة كانت تُلتقط عبر المسح الكامل.
+
+---
+
+## المرحلة ٢ — تخزين مؤقت ذكي وقوالب queries
+
+### المهمة ٢.١: cache مشترك محدود عبر الأصناف (Smart Caching)
+**الملف**: `src/tawreed/tawreed_query_cache.py` + نقاط الحقن في `tawreed_search_logic.py` و`tawreed_api_matching.py`.
+
+- استبدال القاموس FIFO لكل صنف بـ بنية cache محدودة (LRU أو LFU بسيط) قابلة لإعادة الاستخدام عبر الأصناف ضمن نفس التشغيل، مُحقَنة من المستوى الأعلى (لكل bot/worker) بدل إنشائها داخل دالة البحث لكل صنف.
+- الالتزام بقيد الأعراف: محدودة الحجم (`matching.query_cache_size`, افتراضي مثلاً ٢٥٦)، وآمنة للتوازي بجعلها **لكل worker** (لا حالة عامة مشتركة بين العمليات) — متوافق مع نموذج `item_worker_pool`/`fast_search`.
+- الحفاظ على نفس توقيع `cached_query_result` العام قدر الإمكان لتقليل أثر التغيير، أو تقديم غلاف `QueryResultCache` صغير (دالة `get`/`put` محدودة) مع إبقاء الدالة الحالية تعمل فوقه.
+
+**التحقق**: تحديث `tests/test_tawreed_query_cache.py`: إصابة عبر صنفين مختلفين لنفس الـ query؛ احترام الحدّ الأقصى والإخلاء الصحيح؛ عزل الـ cache بين العمال (لا تسرّب حالة).
+
+### المهمة ٢.٢: قوالب queries حسب التصنيف + ترتيب ديناميكي (Query Templates / Dynamic Ordering)
+**الملفات**: `src/core/product_matching.py` (`_search_queries_for_item:201`, `_priority_search_queries:212`) + وحدة قوالب نقية جديدة `src/core/search_query_templates.py`.
+
+- استخدام `parse_drug(item.name)` (المتاح في `normalizer.py`، يوفّر `form`, `volume`, `dosage_nums`, `qty`, `product_class`, `brand`) لاكتشاف الفئة وبناء ترتيب queries مناسب:
+  - سوائل (`form ∈ {SYRUP, SUSP, SOLUTION}` أو وجود `volume`): `brand+volume` أولاً ثم `brand+concentration` ثم الاسم الكامل.
+  - حقن (`form ∈ {AMP, VIAL}`): `brand+dosage+form` ثم `brand+dosage` ثم الاسم الكامل.
+  - أقراص/كبسولات وغيرها (افتراضي): السلوك الحالي (الاسم الكامل ثم brand+dosage ثم المُطبَّع).
+- تعريف القوالب في `search_query_templates.py` كدوال نقية صغيرة مفاتيحها التصنيف/الشكل، تُرجع قائمة قوالب نصية تُملأ من حقول `DrugComponents`.
+- الإبقاء على الـ fallback الحالي (token windows + code) في الذيل، والاحترام الصارم لـ `MAX_SEARCH_QUERY_VARIANTS=24` و`_unique_non_empty`.
+- ضمان عدم كسر المسار العربي: القوالب تعتمد الاسم المُطبَّع كما في الحالي؛ الأصناف بلا علامة مُكتشفة ترجع للسلوك الحالي تلقائياً.
+
+**التحقق**: تحديث/إضافة اختبارات في `tests/test_product_matching.py`: شراب يُولّد `brand+volume` ضمن أوائل الـ queries؛ حقن يُولّد `brand+dosage+form`؛ صنف بلا تصنيف يُطابق الترتيب الحالي حرفياً (عدم تراجع).
+
+---
+
+## المرحلة ٣ — تحسينات متقدمة (اختيارية، حسب نتائج القياس)
+
+### المهمة ٣.١: إعادة ترتيب تدريجية واعية بالمُعدِّلات (Progressive Re-prioritization)
+- البناء فوق التجميع القائم: عند انتقال query → التالي، رفع أولوية المرشحين الحاملين للمُعدِّل المكتشف سابقاً (مثل `ADVANCE`) عبر تلميح صغير في الترتيب داخل `_decision_from_diagnostics`. تغيير صغير منخفض الأولوية لأن التجميع نفسه قائم.
+
+### خارج النطاق صراحةً
+- **ML Ranking** و**Distributed/Multi-level L1/L2 caching**: مؤجّلة/خارج النطاق (المستند نفسه صنّفها منخفضة الأولوية وللأنظمة الكبيرة جداً). تُذكر للتوثيق فقط.
+
+---
+
+## ملاحظة الإعدادات (مهمة جداً للتوافق)
+
+يوجد تعريفان لـ `MatchingConfig`:
+- `src/core/drug_matching/config.py:16` (يستخدمه `DrugIndex`/`MatchPipeline`).
+- `src/core/config/config_models.py` (يستخدمه `bot.config.matching` في المسارات الحية — يجب التأكد عبر فحص الملف قبل التعديل).
+
+أي حقل جديد (`early_stop_confidence`, `candidate_top_k`, `fuzzy_prefix_len`, `query_cache_size`) يجب أن يُضاف بشكل متّسق في التعريف الصحيح المستخدم بكل مسار، مع قيم افتراضية آمنة تحافظ على السلوك الحالي عند تركها على الافتراضي. تُمرَّر القيم من `config.yaml` حيثما كانت قابلة للضبط.
+
+---
+
+## استراتيجية التحقق الشاملة
+
+1. **اختبارات الوحدة** لكل مهمة (مذكورة أعلاه): `test_product_matching`, `test_drug_matching_indexer`, `test_tawreed_query_cache`, `test_tawreed_search_*`, و`test_matching_confidence` الجديد.
+2. **تشغيل الحزمة كاملة**: `python3 tools/run_unit_tests.py` (أو `python3 -m pytest tests/`).
+3. **audit الأعراف**: `python3 tools/rule_audit.py` بعد كل مرحلة (حجم ملف/دالة، طول السطر، docstrings).
+4. **مقارنة قبل/بعد**: إعادة تشغيل `tools/phase_validation.py` على نفس عينة الـ baseline (المرحلة ٠) والتأكد من: عدم تراجع الدقة، وانخفاض زمن/صنف وعدد الـ queries/طلبات البحث.
+5. **بوابة عدم التراجع**: أي تحسين أداء يُسقط مطابقة صحيحة كانت تنجح في baseline يُرفض ويُعاد ضبطه (top-K والترشيح المسبق مصمَّمان مع fallback لهذا الغرض).
+
+---
+
+## ترتيب التنفيذ المقترح
+
+```mermaid
+flowchart LR
+    P0["م٠: قياس Baseline"] --> P1A["م١.١: توقف مبكر بالثقة"]
+    P0 --> P1B["م١.٢: top-K + ترتيب"]
+    P0 --> P1C["م١.٣: ترشيح fuzzy مسبق"]
+    P1A --> V1["تحقق + مقارنة"]
+    P1B --> V1
+    P1C --> V1
+    V1 --> P2A["م٢.١: cache مشترك محدود"]
+    V1 --> P2B["م٢.٢: قوالب queries حسب التصنيف"]
+    P2A --> V2["تحقق + مقارنة"]
+    P2B --> V2
+    V2 --> P3["م٣: إعادة ترتيب تدريجية (اختياري)"]
+```
+
+## ملخص الملفات المتأثرة
+
+| الملف | التغيير |
+|------|---------|
+| `src/core/matching_confidence.py` *(جديد)* | حساب درجة الثقة (دوال نقية) |
+| `src/tawreed/tawreed_search_decision.py` | توقف مبكر قائم على الثقة |
+| `src/core/product_matching.py` | top-K للفحص المكلّف + استدعاء قوالب الـ queries |
+| `src/core/search_query_templates.py` *(جديد)* | قوالب queries حسب التصنيف/الشكل |
+| `src/core/drug_matching/indexer.py` | فهرس بادئة + ترشيح مسبق قبل الـ fuzzy |
+| `src/tawreed/tawreed_query_cache.py` | cache مشترك محدود (LRU/LFU) |
+| `src/tawreed/tawreed_search_logic.py`, `tawreed_api_matching.py` | حقن الـ cache المشترك لكل worker |
+| `src/core/drug_matching/config.py` + `src/core/config/config_models.py` | حقول إعدادات جديدة |
+| `tests/test_*` ذات الصلة | تحديث/إضافة اختبارات لكل مهمة |

@@ -1,16 +1,26 @@
 """Inverted index for fast brand-based lookup + fuzzy matching."""
+
 import re
 from collections import defaultdict
 
 import pandas as pd
 from rapidfuzz import fuzz, process
 
-from .pricing import parse_price
-from .normalizer import (
-    normalize, parse_drug, DrugComponents, components_match,
-    OCULAR_FORMS,
-)
 from .config import MatchingConfig
+from .normalizer import (
+    OCULAR_FORMS,
+    DrugComponents,
+    components_match,
+    normalize,
+    parse_drug,
+)
+from .pricing import parse_price
+
+_FUZZY_SCORERS = (
+    fuzz.token_set_ratio,
+    fuzz.token_sort_ratio,
+    fuzz.partial_token_sort_ratio,
+)
 
 
 class DrugIndex:
@@ -18,33 +28,45 @@ class DrugIndex:
     lookup + cached fuzzy search. Uses list-based storage."""
 
     __slots__ = (
-        "_names_en", "_names_ar", "_ids",
-        "_norms", "_parsed", "_prices",
-        "_brand_index", "_component_index", "_cfg",
+        "_names_en",
+        "_names_ar",
+        "_ids",
+        "_norms",
+        "_parsed",
+        "_prices",
+        "_brand_index",
+        "_component_index",
+        "_prefix_index",
+        "_cfg",
     )
 
     def __init__(self, tawreed_df: pd.DataFrame, cfg: MatchingConfig | None = None):
         self._cfg = cfg or MatchingConfig()
         original_cols = list(tawreed_df.columns)
-        df = tawreed_df.rename(columns={
-            original_cols[0]: "product_name_ar",
-            original_cols[1]: "product_name_en",
-            original_cols[2]: "store_product_id",
-        })
+        df = tawreed_df.rename(
+            columns={
+                original_cols[0]: "product_name_ar",
+                original_cols[1]: "product_name_en",
+                original_cols[2]: "store_product_id",
+            }
+        )
         price_col = self._find_price_col(df, original_cols)
         self._names_en = df["product_name_en"].tolist()
         self._names_ar = df["product_name_ar"].tolist()
         self._ids = df["store_product_id"].astype(str).tolist()
         self._prices = (
             [self._parse_price(v) for v in df[price_col].tolist()]
-            if price_col else [None] * len(df)
+            if price_col
+            else [None] * len(df)
         )
         self._norms = [normalize(n) for n in self._names_en]
         self._parsed = [parse_drug(n) for n in self._names_en]
         self._brand_index: dict[str, list[int]] = defaultdict(list)
         self._component_index: dict[tuple, list[int]] = defaultdict(list)
+        self._prefix_index: dict[str, list[int]] = defaultdict(list)
         self._build_brand_index()
         self._build_component_index()
+        self._build_prefix_index()
 
     def _build_brand_index(self):
         for i, parsed in enumerate(self._parsed):
@@ -56,6 +78,11 @@ class DrugIndex:
         for i, parsed in enumerate(self._parsed):
             for key in self._component_keys(parsed):
                 self._component_index[key].append(i)
+
+    def _build_prefix_index(self):
+        prefix_len = self._cfg.fuzzy_prefix_len
+        for i, norm in enumerate(self._norms):
+            self._prefix_index[norm[:prefix_len]].append(i)
 
     # --- public read interface ---
 
@@ -78,7 +105,10 @@ class DrugIndex:
         return scorer(query_norm, self._norms[idx])
 
     def get_candidates(
-        self, parsed: DrugComponents, limit: int = 10, price=None,
+        self,
+        parsed: DrugComponents,
+        limit: int = 10,
+        price=None,
     ) -> list[tuple[int, float]]:
         """Return (idx, score) pairs for brand + fuzzy candidates."""
         query_price = self._parse_price(price)
@@ -90,7 +120,9 @@ class DrugIndex:
     # --- internal lookups ---
 
     def _brand_lookup(
-        self, parsed: DrugComponents, query_price=None,
+        self,
+        parsed: DrugComponents,
+        query_price=None,
     ) -> list[tuple[int, float]]:
         brands = self._brand_keys(parsed)
         if not brands:
@@ -105,12 +137,14 @@ class DrugIndex:
                         continue
                     seen.add(idx)
                     is_ok, _ = components_match(
-                        parsed, self._parsed[idx],
+                        parsed,
+                        self._parsed[idx],
                         self._cfg.brand_prefix_min,
                     )
                     if is_ok:
                         score = fuzz.token_sort_ratio(
-                            parsed.normalized, self._norms[idx],
+                            parsed.normalized,
+                            self._norms[idx],
                         )
                         score += self._price_bonus(query_price, idx)
                         hits.append((idx, score))
@@ -143,7 +177,9 @@ class DrugIndex:
         return keys
 
     def _component_lookup(
-        self, parsed: DrugComponents, query_price=None,
+        self,
+        parsed: DrugComponents,
+        query_price=None,
     ) -> list[tuple[int, float]]:
         query_price = self._parse_price(query_price)
         hits = []
@@ -154,20 +190,30 @@ class DrugIndex:
                     continue
                 seen.add(idx)
                 is_ok, _ = components_match(
-                    parsed, self._parsed[idx],
+                    parsed,
+                    self._parsed[idx],
                     self._cfg.brand_prefix_min,
                 )
                 if is_ok:
-                    hits.append((
-                        idx,
-                        self._component_score(
-                            parsed, self._parsed[idx], idx, query_price,
-                        ),
-                    ))
+                    hits.append(
+                        (
+                            idx,
+                            self._component_score(
+                                parsed,
+                                self._parsed[idx],
+                                idx,
+                                query_price,
+                            ),
+                        )
+                    )
         return hits
 
     def _component_score(
-        self, parsed, candidate, idx: int, query_price=None,
+        self,
+        parsed,
+        candidate,
+        idx: int,
+        query_price=None,
     ) -> float:
         score = fuzz.token_set_ratio(parsed.normalized, self._norms[idx])
         if parsed.volume and parsed.volume == candidate.volume:
@@ -188,13 +234,29 @@ class DrugIndex:
             return True
         return bool(left in OCULAR_FORMS and right in OCULAR_FORMS)
 
+    def _fuzzy_choices(self, query: str) -> dict[int, str] | None:
+        subset = self._prefix_index.get(query[: self._cfg.fuzzy_prefix_len], [])
+        if not subset:
+            return None
+        return {i: self._norms[i] for i in subset}
+
     def _fuzzy_lookup(self, query: str, limit: int) -> list[tuple[int, float]]:
+        choices = self._fuzzy_choices(query)
+        hits = self._fuzzy_extract(query, limit, choices or self._norms)
+        if not hits and choices is not None:
+            hits = self._fuzzy_extract(query, limit, self._norms)
+        return hits
+
+    def _fuzzy_extract(self, query, limit, choices) -> list[tuple[int, float]]:
         results = process.extract(
-            query, self._norms,
-            scorer=fuzz.token_set_ratio, limit=limit,
+            query,
+            choices,
+            scorer=fuzz.token_set_ratio,
+            limit=limit,
         )
         return [
-            (idx, score) for _, score, idx in results
+            (idx, score)
+            for _, score, idx in results
             if score >= self._cfg.fuzzy_threshold
         ]
 
@@ -211,7 +273,11 @@ class DrugIndex:
     def _find_price_col(df: pd.DataFrame, original_cols: list[str]):
         for col in df.columns:
             if str(col).strip().lower() in {
-                "price", "product_price", "selling_price", "sale_price", "سعر",
+                "price",
+                "product_price",
+                "selling_price",
+                "sale_price",
+                "سعر",
             }:
                 return col
         if len(original_cols) >= 5:
@@ -228,7 +294,8 @@ class DrugIndex:
         if query_price is None or candidate_price is None:
             return 0.0
         diff_ratio = abs(query_price - candidate_price) / max(
-            query_price, candidate_price,
+            query_price,
+            candidate_price,
         )
         if diff_ratio == 0:
             return 6.0
@@ -259,7 +326,9 @@ class DrugIndex:
         return out
 
     def best_match(
-        self, drug_name: str, price=None,
+        self,
+        drug_name: str,
+        price=None,
     ) -> tuple[dict | None, float, str]:
         """Find best verified match. Returns (record, score, method)."""
         parsed = parse_drug(drug_name)
@@ -281,16 +350,21 @@ class DrugIndex:
         return None, 0.0, "no_match"
 
     def best_match_detailed(
-        self, drug_name: str, price=None,
+        self,
+        drug_name: str,
+        price=None,
     ) -> tuple[dict | None, float, str, dict]:
         """Like best_match but also returns trace dict for logging."""
         parsed = parse_drug(drug_name)
         norm = parsed.normalized
         query_price = self._parse_price(price)
         trace = {
-            "norm": norm, "brand": parsed.brand,
-            "brand_hits": [], "fuzzy_steps": [],
-            "component_checks": [], "candidates": [],
+            "norm": norm,
+            "brand": parsed.brand,
+            "brand_hits": [],
+            "fuzzy_steps": [],
+            "component_checks": [],
+            "candidates": [],
             "score_breakdowns": [],
         }
         if not norm or len(norm) < 3:
@@ -308,7 +382,8 @@ class DrugIndex:
             best_idx, best_score = max(component_hits, key=lambda x: x[1])
             if best_score >= self._cfg.fuzzy_threshold:
                 ok, reason = components_match(
-                    parsed, self._parsed[best_idx],
+                    parsed,
+                    self._parsed[best_idx],
                     self._cfg.brand_prefix_min,
                 )
                 trace["component_checks"].append((best_idx, ok, reason))
@@ -316,7 +391,8 @@ class DrugIndex:
                     return (
                         self.get_record(best_idx),
                         self._display_score(best_score),
-                        "component_index", trace,
+                        "component_index",
+                        trace,
                     )
         hits = self._brand_lookup(parsed, query_price)
         trace["brand_hits"] = hits
@@ -328,7 +404,8 @@ class DrugIndex:
             best_idx, best_score = max(hits, key=lambda x: x[1])
             if best_score >= self._cfg.fuzzy_threshold:
                 ok, reason = components_match(
-                    parsed, self._parsed[best_idx],
+                    parsed,
+                    self._parsed[best_idx],
                     self._cfg.brand_prefix_min,
                 )
                 trace["component_checks"].append(
@@ -338,32 +415,56 @@ class DrugIndex:
                     return (
                         self.get_record(best_idx),
                         self._display_score(best_score),
-                        "brand_index", trace,
+                        "brand_index",
+                        trace,
                     )
-        for scorer in [fuzz.token_set_ratio, fuzz.token_sort_ratio, fuzz.partial_token_sort_ratio]:
+        choices = self._fuzzy_choices(norm)
+        for scorer in [
+            fuzz.token_set_ratio,
+            fuzz.token_sort_ratio,
+            fuzz.partial_token_sort_ratio,
+        ]:
             result = process.extractOne(
-                norm, self._norms, scorer=scorer,
+                norm,
+                choices or self._norms,
+                scorer=scorer,
                 score_cutoff=self._cfg.fuzzy_threshold,
             )
+            if not result and choices is not None:
+                result = process.extractOne(
+                    norm,
+                    self._norms,
+                    scorer=scorer,
+                    score_cutoff=self._cfg.fuzzy_threshold,
+                )
             trace["fuzzy_steps"].append(
                 (scorer.__name__, result),
             )
             if result:
                 _, score, idx = result
                 price_bonus = self._price_bonus(query_price, idx)
-                trace["candidates"].append({
-                    "idx": idx, "source": scorer.__name__,
-                    "rank": 1, "score": score,
-                })
-                trace["score_breakdowns"].append({
-                    "idx": idx, "source": scorer.__name__,
-                    "rank": 1, "base_score": score,
-                    "price_bonus": price_bonus,
-                    "final_score": score + price_bonus,
-                    "threshold": self._cfg.fuzzy_threshold,
-                })
+                trace["candidates"].append(
+                    {
+                        "idx": idx,
+                        "source": scorer.__name__,
+                        "rank": 1,
+                        "score": score,
+                    }
+                )
+                trace["score_breakdowns"].append(
+                    {
+                        "idx": idx,
+                        "source": scorer.__name__,
+                        "rank": 1,
+                        "base_score": score,
+                        "price_bonus": price_bonus,
+                        "final_score": score + price_bonus,
+                        "threshold": self._cfg.fuzzy_threshold,
+                    }
+                )
                 ok, reason = components_match(
-                    parsed, self._parsed[idx],
+                    parsed,
+                    self._parsed[idx],
                     self._cfg.brand_prefix_min,
                 )
                 trace["component_checks"].append(
@@ -372,8 +473,10 @@ class DrugIndex:
                 if ok:
                     score += price_bonus
                     return (
-                        self.get_record(idx), self._display_score(score),
-                        scorer.__name__, trace,
+                        self.get_record(idx),
+                        self._display_score(score),
+                        scorer.__name__,
+                        trace,
                     )
         return None, 0.0, "no_match", trace
 
@@ -387,13 +490,17 @@ class DrugIndex:
         events = []
         for rank, (idx, score) in enumerate(hits[:5], start=1):
             price_bonus = self._price_bonus(query_price, idx)
-            events.append({
-                "idx": idx, "source": source, "rank": rank,
-                "base_score": score - price_bonus,
-                "price_bonus": price_bonus,
-                "final_score": score,
-                "threshold": self._cfg.fuzzy_threshold,
-            })
+            events.append(
+                {
+                    "idx": idx,
+                    "source": source,
+                    "rank": rank,
+                    "base_score": score - price_bonus,
+                    "price_bonus": price_bonus,
+                    "final_score": score,
+                    "threshold": self._cfg.fuzzy_threshold,
+                }
+            )
         return events
 
     def _try_brand_match(self, parsed, norm, query_price=None):
@@ -416,24 +523,33 @@ class DrugIndex:
 
     def _try_fuzzy_match(self, parsed, norm, query_price=None):
         query_price = self._parse_price(query_price)
-        best = None
-        for scorer in [fuzz.token_set_ratio, fuzz.token_sort_ratio, fuzz.partial_token_sort_ratio]:
-            result = process.extractOne(
-                norm, self._norms, scorer=scorer,
-                score_cutoff=self._cfg.fuzzy_threshold,
-            )
-            if result:
-                _, score, idx = result
-                is_ok, _ = components_match(
-                    parsed, self._parsed[idx],
-                    self._cfg.brand_prefix_min,
-                )
-                score += self._price_bonus(query_price, idx)
-                if is_ok and (best is None or score > best[1]):
-                    best = (self.get_record(idx), score, scorer.__name__)
+        choices = self._fuzzy_choices(norm)
+        best = self._best_fuzzy_over(parsed, norm, query_price, choices or self._norms)
+        if best is None and choices is not None:
+            best = self._best_fuzzy_over(parsed, norm, query_price, self._norms)
         if best:
             return best[0], self._display_score(best[1]), best[2]
         return None, 0.0, ""
+
+    def _best_fuzzy_over(self, parsed, norm, query_price, choices):
+        best = None
+        for scorer in _FUZZY_SCORERS:
+            result = process.extractOne(
+                norm,
+                choices,
+                scorer=scorer,
+                score_cutoff=self._cfg.fuzzy_threshold,
+            )
+            if not result:
+                continue
+            _, score, idx = result
+            is_ok, _ = components_match(
+                parsed, self._parsed[idx], self._cfg.brand_prefix_min
+            )
+            score += self._price_bonus(query_price, idx)
+            if is_ok and (best is None or score > best[1]):
+                best = (self.get_record(idx), score, scorer.__name__)
+        return best
 
     @property
     def size(self) -> int:

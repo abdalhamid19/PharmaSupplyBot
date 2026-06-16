@@ -62,9 +62,14 @@ def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
     matching_values = dict(raw_values.get("matching", {}))
     default_config = MatchingConfig()
     kwargs = _matching_float_values(matching_values, default_config)
-    kwargs["exact_match_accept"] = bool(
-        _matching_value(matching_values, default_config, "exact_match_accept")
-    )
+    for k in (
+        "exact_match_accept",
+        "candidate_top_k",
+        "fuzzy_prefix_len",
+        "query_cache_size",
+    ):
+        val = _matching_value(matching_values, default_config, k)
+        kwargs[k] = bool(val) if k == "exact_match_accept" else int(val)
     return MatchingConfig(**kwargs)
 
 
@@ -82,17 +87,11 @@ def _matching_float_values(
         "critical_token_penalty",
         "distinguishing_token_penalty",
         "semantic_mismatch_penalty",
+        "early_stop_confidence",
     )
     return {
-        name: _matching_float(matching_values, default_config, name) for name in names
+        n: float(_matching_value(matching_values, default_config, n)) for n in names
     }
-
-
-def _matching_float(
-    matching_values, default_config: MatchingConfig, name: str
-) -> float:
-    """Return one matching configuration value coerced to float."""
-    return float(_matching_value(matching_values, default_config, name))
 
 
 def _matching_value(matching_values, default_config: MatchingConfig, name: str) -> Any:

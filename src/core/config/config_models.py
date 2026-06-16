@@ -51,6 +51,10 @@ class MatchingConfig:
     critical_token_penalty: float = 2.0
     distinguishing_token_penalty: float = 3.0
     semantic_mismatch_penalty: float = 10.0
+    early_stop_confidence: float = 0.95
+    candidate_top_k: int = 5
+    fuzzy_prefix_len: int = 3
+    query_cache_size: int = 256
 
 
 @dataclass(frozen=True)

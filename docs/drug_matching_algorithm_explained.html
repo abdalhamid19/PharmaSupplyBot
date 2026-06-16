@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شرح خوارزمية مطابقة الأدوية - PharmaSupplyBot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.8;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        h2 {
+            color: #2a5298;
+            font-size: 2em;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        h3 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin: 25px 0 15px 0;
+        }
+        
+        h4 {
+            color: #764ba2;
+            font-size: 1.2em;
+            margin: 20px 0 10px 0;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .section {
+            margin: 40px 0;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border-right: 5px solid #667eea;
+        }
+        
+        .diagram {
+            background: white;
+            padding: 30px;
+            margin: 25px 0;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .flow-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .flow-arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .code-box {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            margin: 20px 0;
+            overflow-x: auto;
+            direction: ltr;
+            text-align: left;
+        }
+        
+        .example {
+            background: #fff3cd;
+            border-right: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        
+        .example h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        
+        .highlight {
+            background: #d1ecf1;
+            border-right: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: right;
+            font-weight: bold;
+        }
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-top: 4px solid #667eea;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .grid-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .grid-item h4 {
+            color: white;
+            margin-bottom: 10px;
+        }
+        
+        ul, ol {
+            margin: 15px 0 15px 30px;
+        }
+        
+        li {
+            margin: 10px 0;
+            font-size: 1.05em;
+        }
+        
+        .alert {
+            background: #f8d7da;
+            border-right: 4px solid #dc3545;
+            color: #721c24;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        
+        .success {
+            background: #d4edda;
+            border-right: 4px solid #28a745;
+            color: #155724;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔬 شرح تفصيلي لخوارزمية مطابقة الأدوية</h1>
+            <p>PharmaSupplyBot - Pharmaceutical Product Matching Algorithm</p>
+        </header>
+        
+        <div class="content">
+            <!-- المقدمة -->
+            <section class="section">
+                <h2>📋 نظرة عامة</h2>
+                <p>
+                    يستخدم <strong>PharmaSupplyBot</strong> خوارزمية متقدمة لمطابقة الأدوية الموجودة في ملف Excel الخاص بالصيدلية 
+                    مع قاعدة بيانات الأصناف المتوفرة على منصة <strong>Tawreed</strong>. الخوارزمية تعمل على ثلاث مراحل رئيسية:
+                </p>
+                
+                <div class="grid">
+                    <div class="grid-item">
+                        <h4>المرحلة الأولى</h4>
+                        <p>المطابقة الخوارزمية التقليدية</p>
+                    </div>
+                    <div class="grid-item">
+                        <h4>المرحلة الثانية</h4>
+                        <p>التحقق بالذكاء الاصطناعي</p>
+                    </div>
+                    <div class="grid-item">
+                        <h4>المرحلة الثالثة</h4>
+                        <p>المراجعة النهائية بالـ AI</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- الهدف من الخوارزمية -->
+            <section class="section">
+                <h2>🎯 الهدف من الخوارزمية</h2>
+                <p>
+                    الهدف الأساسي هو التأكد من أن الصنف المطلوب من ملف Excel يطابق <strong>بالضبط</strong> 
+                    الصنف الموجود في قاعدة بيانات Tawreed من حيث:
+                </p>
+                <ul>
+                    <li><strong>اسم العلامة التجارية (Brand)</strong>: مثل باندول، بروفين، فيفادول</li>
+                    <li><strong>الجرعة (Dosage)</strong>: مثل 500 MG، 400 MG، 10 MG/ML</li>
+                    <li><strong>الشكل الصيدلاني (Form)</strong>: مثل أقراص، كبسولات، شراب، حقن</li>
+                    <li><strong>العدد (Quantity)</strong>: مثل 20 قرص، 30 كبسولة</li>
+                    <li><strong>الحجم (Volume)</strong>: للأشربة والسوائل مثل 100 ML، 120 ML</li>
+                    <li><strong>المعدلات (Modifiers)</strong>: مثل EXTRA، PLUS، FORTE، SR، XR</li>
+                </ul>
+                
+                <div class="alert">
+                    <strong>⚠️ تحذير:</strong> عدم التطابق الدقيق قد يؤدي لطلب صنف مختلف (جرعة مختلفة أو شكل مختلف)، 
+                    وهذا قد يسبب مشاكل طبية أو صيدلانية.
+                </div>
+            </section>
+
+            <!-- المرحلة الأولى -->
+            <section class="section">
+                <h2>🔍 المرحلة الأولى: المطابقة الخوارزمية (Algorithmic Matching)</h2>
+                
+                <h3>1.1 التطبيع والتحليل (Normalization & Parsing)</h3>
+                <p>
+                    أول خطوة هي تطبيع اسم الدواء وتحليله إلى مكوناته الأساسية. التطبيع يشمل:
+                </p>
+                
+                <div class="diagram">
+                    <h4>خطوات التطبيع:</h4>
+                    <div class="flow-box">النص الأصلي من Excel</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box">تحويل لحروف كبيرة (UPPERCASE)</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box">إزالة الرموز الخاصة والشرطات</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box">توحيد المسافات</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box">تصحيح الأخطاء الشائعة (FORET → FORTE)</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box">فصل الأرقام عن الحروف (20MG → 20 MG)</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box">النص النهائي المطبّع</div>
+                </div>
+                
+                <div class="example">
+                    <h4>مثال عملي:</h4>
+                    <div class="code-box">
+النص الأصلي:    **IMP. panadol-advance_500mg 24tab
+↓
+بعد التطبيع:    PANADOL ADVANCE 500 MG 24 TAB
+                    </div>
+                </div>
+            </section>
+
+            <!-- استخراج المكونات -->
+            <section class="section">
+                <h3>1.2 استخراج المكونات (Component Extraction)</h3>
+                <p>
+                    بعد التطبيع، يتم تحليل النص لاستخراج مكونات الدواء باستخدام تعبيرات نمطية (Regex) متقدمة:
+                </p>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>المكون</th>
+                                <th>النمط (Pattern)</th>
+                                <th>أمثلة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>العلامة التجارية (Brand)</strong></td>
+                                <td>أول الكلمات الحرفية قبل أي رقم</td>
+                                <td>PANADOL، BRUFEN، AMOXIL</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الجرعة (Dosage)</strong></td>
+                                <td>رقم + وحدة (MG, MCG, IU, %)</td>
+                                <td>500 MG، 25 MCG، 1000 IU</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الجرعة المركبة</strong></td>
+                                <td>رقم / رقم + وحدة</td>
+                                <td>500/125 MG، 70/30 IU</td>
+                            </tr>
+                            <tr>
+                                <td><strong>العدد (Quantity)</strong></td>
+                                <td>رقم + وحدة عد (TAB, CAP, AMP)</td>
+                                <td>20 TAB، 30 CAP، 5 AMP</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الحجم (Volume)</strong></td>
+                                <td>رقم + ML</td>
+                                <td>100 ML، 120 ML، 5 ML</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الوزن (Weight)</strong></td>
+                                <td>رقم + GM أو G</td>
+                                <td>50 GM، 100 G</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الشكل (Form)</strong></td>
+                                <td>كلمات محددة مسبقاً</td>
+                                <td>TAB، CAP، SYRUP، AMP، VIAL</td>
+                            </tr>
+                            <tr>
+                                <td><strong>النكهة (Flavor)</strong></td>
+                                <td>كلمات نكهات معروفة</td>
+                                <td>ORANGE، STRAWBERRY، MINT</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="example">
+                    <h4>مثال تحليل كامل:</h4>
+                    <div class="code-box">
+الاسم المطبّع: PANADOL ADVANCE 500 MG 24 TAB
+↓
+المكونات المستخرجة:
+  Brand:        PANADOLADVANCE
+  Dosage:       (500) MG
+  Quantity:     24 TAB
+  Form:         TAB
+  Volume:       -
+  Weight:       -
+  Flavor:       -
+  Imported:     False
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h4>📌 ملاحظات مهمة:</h4>
+                    <ul>
+                        <li>العلامة التجارية تُستخرج بدمج الكلمات الأولى قبل أي رقم (بدون مسافات)</li>
+                        <li>الخوارزمية تميز بين الوزن (GM) والجرعة (MG) حسب السياق</li>
+                        <li>إذا كانت الجرعة مفقودة، يحاول النظام استنتاجها من الأرقام المتبقية</li>
+                        <li>يتم التعامل مع حالات خاصة مثل "MG/ML" للأدوية السائلة</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- البحث والمطابقة -->
+            <section class="section">
+                <h3>1.3 البحث عن المرشحين (Candidate Search)</h3>
+                <p>
+                    بعد استخراج المكونات، يبحث النظام عن المنتجات المرشحة في قاعدة بيانات Tawreed بطريقتين:
+                </p>
+                
+                <div class="diagram">
+                    <div class="grid">
+                        <div class="card">
+                            <h4>🔎 الطريقة الأولى: البحث بالفهرس (Brand Index)</h4>
+                            <p>يستخدم فهرس مبني مسبقاً يربط كل علامة تجارية بمنتجاتها</p>
+                            <div class="success">
+                                ✅ <strong>سريع جداً</strong> - يعطي نتائج فورية
+                            </div>
+                            <div class="code-box">
+مثال:
+Brand: PANADOL
+↓
+الفهرس يحتوي على:
+  - PANADOL 500 MG 24 TAB
+  - PANADOL ADVANCE 500 MG 24 TAB
+  - PANADOL EXTRA 500 MG 24 TAB
+  - PANADOL COLD AND FLU 24 TAB
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <h4>🔎 الطريقة الثانية: البحث الضبابي (Fuzzy Search)</h4>
+                            <p>يستخدم خوارزميات التشابه النصي للعثور على أقرب تطابق</p>
+                            <div class="highlight">
+                                💡 يُستخدم عندما لا يجد البحث بالفهرس نتائج
+                            </div>
+                            <div class="code-box">
+خوارزميات التشابه المستخدمة:
+1. Token Sort Ratio   - ترتيب الكلمات
+2. Partial Ratio      - التطابق الجزئي
+3. Token Set Ratio    - مجموعة الكلمات الفريدة
+4. Ratio              - التطابق الكامل
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- نظام التقييم -->
+            <section class="section">
+                <h3>1.4 نظام التقييم (Scoring System)</h3>
+                <p>
+                    لكل منتج مرشح، يتم حساب <strong>درجة التطابق (Match Score)</strong> من 0 إلى 100 باستخدام خوارزميات RapidFuzz:
+                </p>
+                
+                <div class="card">
+                    <h4>🎯 خوارزميات التشابه الأربعة:</h4>
+                    <ol>
+                        <li>
+                            <strong>Token Sort Ratio</strong>: يرتب الكلمات أبجدياً قبل المقارنة
+                            <div class="code-box">
+مثال:
+Query:     "PANADOL ADVANCE 500 MG"
+Candidate: "ADVANCE PANADOL 500 MG"
+↓ بعد الترتيب يصبحان متطابقين
+Score: 100
+                            </div>
+                        </li>
+                        <li>
+                            <strong>Partial Ratio</strong>: يبحث عن أفضل تطابق جزئي
+                            <div class="code-box">
+مثال:
+Query:     "PANADOL 500"
+Candidate: "PANADOL ADVANCE 500 MG 24 TAB"
+↓ يجد "PANADOL 500" داخل النص الأطول
+Score: 95+
+                            </div>
+                        </li>
+                        <li>
+                            <strong>Token Set Ratio</strong>: يقارن مجموعة الكلمات الفريدة
+                            <div class="code-box">
+مثال:
+Query:     "PANADOL 500 MG TAB"
+Candidate: "TAB PANADOL 500 MG"
+↓ نفس مجموعة الكلمات الفريدة
+Score: 100
+                            </div>
+                        </li>
+                        <li>
+                            <strong>Ratio</strong>: المقارنة المباشرة الكاملة
+                            <div class="code-box">
+مثال:
+Query:     "PANADOL 500 MG"
+Candidate: "PANADOL 500 MG"
+↓ تطابق حرفي 100%
+Score: 100
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+                
+                <div class="highlight">
+                    <strong>📊 الدرجة النهائية:</strong> 
+                    يتم اختيار <strong>أعلى درجة</strong> من بين الخوارزميات الأربعة. 
+                    الحد الأدنى للقبول هو <strong>80 من 100</strong> (يمكن تعديله من config.yaml).
+                </div>
+            </section>
+
+            <!-- قواعد القبول -->
+            <section class="section">
+                <h3>1.5 قواعد القبول والرفض (Acceptance Rules)</h3>
+                <p>
+                    حتى لو كانت درجة التشابه عالية، يجب أن يمر المنتج المرشح بفحوصات صارمة للتأكد من التطابق التام:
+                </p>
+                
+                <div class="card">
+                    <h4>✅ قواعد القبول (يكفي تحقق واحدة):</h4>
+                    <ol>
+                        <li>
+                            <strong>تطابق الاسم الدقيق (Exact Name Match)</strong>
+                            <div class="code-box">
+الشرط: الاسم المطبّع متطابق 100% بعد إزالة المسافات
+مثال:
+  Query:     "PANADOL500MG"
+  Candidate: "PANADOL 500 MG"
+  ↓ بعد التطبيع: "PANADOL500MG" = "PANADOL500MG"
+  النتيجة: ✅ مقبول
+                            </div>
+                        </li>
+                        <li>
+                            <strong>تداخل عالي للكلمات (High Token Overlap)</strong>
+                            <div class="code-box">
+الشرط: نسبة الكلمات المشتركة ≥ 0.85 (85%)
+مثال:
+  Query:     "PANADOL ADVANCE 500 MG 24 TAB"  (6 كلمات)
+  Candidate: "PANADOL ADVANCE 500 MG 20 TAB"  (6 كلمات)
+  الكلمات المشتركة: 5 من 6 = 83.3%
+  النتيجة: ✅ مقبول (قريب جداً)
+                            </div>
+                        </li>
+                        <li>
+                            <strong>درجة متوسطة + تداخل جيد</strong>
+                            <div class="code-box">
+الشرط: Score ≥ 85 AND Overlap ≥ 0.70
+مثال:
+  Score: 90
+  Overlap: 0.75 (75%)
+  النتيجة: ✅ مقبول
+                            </div>
+                        </li>
+                        <li>
+                            <strong>درجة جيدة + تطابق رقمي</strong>
+                            <div class="code-box">
+الشرط: Score ≥ 80 AND يوجد رقم مشترك AND Overlap ≥ 0.60
+مثال:
+  Query:     "PANADOL 500 TABLET"
+  Candidate: "PANADOL 500 MG TAB"
+  Score: 85
+  رقم مشترك: "500"
+  Overlap: 0.67
+  النتيجة: ✅ مقبول
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+                
+                <div class="card">
+                    <h4>❌ أسباب الرفض (Component Mismatch):</h4>
+                    <p>حتى لو كان Score عالياً، يُرفض المنتج إذا كان هناك اختلاف في:</p>
+                    
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>السبب</th>
+                                    <th>المثال</th>
+                                    <th>لماذا مرفوض؟</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>different_brand</strong></td>
+                                    <td>PANADOL ≠ BRUFEN</td>
+                                    <td>دواء مختلف تماماً</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_dosage</strong></td>
+                                    <td>500 MG ≠ 1000 MG</td>
+                                    <td>جرعة مختلفة = خطر طبي</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_form</strong></td>
+                                    <td>TAB ≠ SYRUP</td>
+                                    <td>شكل صيدلاني مختلف</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_quantity</strong></td>
+                                    <td>24 TAB ≠ 20 TAB</td>
+                                    <td>عدد مختلف في العبوة</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_volume</strong></td>
+                                    <td>100 ML ≠ 120 ML</td>
+                                    <td>حجم مختلف للشراب</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_modifier</strong></td>
+                                    <td>PANADOL ≠ PANADOL EXTRA</td>
+                                    <td>تركيبة مختلفة</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_flavor</strong></td>
+                                    <td>ORANGE ≠ STRAWBERRY</td>
+                                    <td>نكهة مختلفة (مهم للأطفال)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_age_group</strong></td>
+                                    <td>ADULT ≠ PEDIATRIC</td>
+                                    <td>فئة عمرية مختلفة</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>different_import_status</strong></td>
+                                    <td>Local ≠ Imported</td>
+                                    <td>حالة الاستيراد مختلفة</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="example">
+                    <h4>مثال عملي على الرفض:</h4>
+                    <div class="code-box">
+Query:     "PANADOL 500 MG 24 TAB"
+Candidate: "PANADOL EXTRA 500 MG 24 TAB"
+
+✅ Score: 95 (عالي جداً)
+✅ Brand: PANADOL = PANADOL
+✅ Dosage: 500 MG = 500 MG
+✅ Form: TAB = TAB
+✅ Quantity: 24 = 24
+❌ Modifier: بدون EXTRA ≠ يحتوي EXTRA
+
+النتيجة النهائية: ❌ مرفوض
+السبب: different_modifier
+التفسير: PANADOL EXTRA يحتوي على كافيين إضافي
+          والمريض قد لا يريد الكافيين
+                    </div>
+                </div>
+            </section>
+
+            <!-- المرحلة الثانية: AI -->
+            <section class="section">
+                <h2>🤖 المرحلة الثانية: التحقق بالذكاء الاصطناعي (AI Verification)</h2>
+                <p>
+                    عندما تكون درجة التطابق الخوارزمي <strong>أقل من 90</strong> (الحد القابل للتعديل)، 
+                    يتدخل الذكاء الاصطناعي للمراجعة والتحقق.
+                </p>
+                
+                <div class="diagram">
+                    <h4>متى يتدخل الـ AI؟</h4>
+                    <div class="flow-box" style="background: #28a745;">Score ≥ 90: ✅ مقبول مباشرة</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box" style="background: #ffc107;">70 ≤ Score < 90: 🤖 AI Verification</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box" style="background: #dc3545;">Score < 70: ❌ مرفوض أو AI Search</div>
+                </div>
+                
+                <h3>2.1 آلية عمل AI Verification</h3>
+                <p>
+                    يتم إرسال معلومات الدواء المطلوب والمنتج المرشح إلى نموذج ذكاء اصطناعي متخصص (GPT-4، Gemini، Claude) 
+                    مع تعليمات دقيقة لفحص التطابق:
+                </p>
+                
+                <div class="code-box">
+النموذج المُرسل للـ AI:
+{
+  "drug_requested": "PANADOL ADVANCE 500 MG 24 TAB",
+  "candidate": {
+    "name_en": "PANADOL ADVANCE 500MG 24TAB",
+    "name_ar": "بانادول ادفانس 500 مجم 24 قرص",
+    "store_product_id": "12345",
+    "price": "25.00"
+  },
+  "components": {
+    "brand": "PANADOLADVANCE",
+    "dosage": ["500"],
+    "dosage_unit": ["MG"],
+    "form": "TAB",
+    "quantity": "24"
+  }
+}
+
+السؤال المرسل للـ AI:
+"هل هذا المنتج المرشح يطابق الدواء المطلوب تماماً؟
+ تحقق من: العلامة التجارية، الجرعة، الشكل، العدد، أي معدلات.
+ إذا كان مطابقاً، أجب بـ yes وثقتك من 0-1.
+ إذا كان مختلفاً، أجب بـ no واذكر السبب."
+                </div>
+                
+                <div class="card">
+                    <h4>🎯 إجابات الـ AI المحتملة:</h4>
+                    <ol>
+                        <li>
+                            <strong>ai_confirmed</strong>: الـ AI يؤكد أن المنتج مطابق (Confidence ≥ 0.85)
+                            <div class="success">✅ يتم قبول المنتج</div>
+                        </li>
+                        <li>
+                            <strong>ai_corrected</strong>: الـ AI يجد منتجاً أفضل من المرشحين
+                            <div class="success">✅ يتم استبدال المنتج بالمنتج الأفضل</div>
+                        </li>
+                        <li>
+                            <strong>ai_rejected</strong>: الـ AI يرفض التطابق
+                            <div class="alert">❌ يتم رفض المنتج ويذهب للمراجعة اليدوية</div>
+                        </li>
+                        <li>
+                            <strong>ai_uncertain</strong>: الـ AI غير متأكد (Confidence < 0.85)
+                            <div class="highlight">⚠️ يذهب لمرحلة AI Review</div>
+                        </li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- المرحلة الثالثة: AI Search -->
+            <section class="section">
+                <h2>🔎 المرحلة 2.5: البحث بالذكاء الاصطناعي (AI Search)</h2>
+                <p>
+                    عندما <strong>لا يجد</strong> النظام الخوارزمي أي تطابق مقبول، يحاول الـ AI البحث في قاعدة البيانات:
+                </p>
+                
+                <div class="diagram">
+                    <div class="flow-box" style="background: #dc3545;">No Match Found</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box" style="background: #17a2b8;">AI Search في أفضل 5-8 مرشحين</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box" style="background: #28a745;">AI يختار الأفضل (إن وُجد)</div>
+                </div>
+                
+                <div class="example">
+                    <h4>مثال على AI Search:</h4>
+                    <div class="code-box">
+الحالة: النظام الخوارزمي لم يجد تطابق مقبول لـ:
+  "PANADOL RAPID 500MG"
+
+AI Search يفحص:
+  1. PANADOL 500 MG 24 TAB         (Score: 75)
+  2. PANADOL ADVANCE 500 MG        (Score: 73)
+  3. PANADOL EXTRA 500 MG          (Score: 70)
+  4. PANADOL COLD FLU 500 MG       (Score: 68)
+
+AI يحلل:
+  - RAPID قد يكون خطأ إملائي أو اسم قديم
+  - الأقرب هو PANADOL 500 MG العادي
+  
+النتيجة: ✅ ai_found
+المنتج: PANADOL 500 MG 24 TAB
+الثقة: 0.88
+                    </div>
+                </div>
+            </section>
+
+            <!-- المرحلة الثالثة: AI Review -->
+            <section class="section">
+                <h2>🔬 المرحلة الثالثة: المراجعة النهائية بالـ AI (AI Review)</h2>
+                <p>
+                    هذه المرحلة هي <strong>طبقة أمان إضافية</strong>. عندما يكون قرار الـ AI الأول غير واضح 
+                    (ثقة منخفضة أو رفض)، يتم إرسال الحالة إلى نموذج AI ثانٍ للمراجعة المستقلة.
+                </p>
+                
+                <div class="diagram">
+                    <h4>آلية AI Review:</h4>
+                    <div class="flow-box" style="background: #ffc107;">AI Verification نتج عنه ثقة منخفضة</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box" style="background: #17a2b8;">إرسال لنموذج AI مختلف (مثل Claude أو Gemini)</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box" style="background: #6f42c1;">AI Review يعطي قرار مستقل</div>
+                    <div class="flow-arrow">⬇</div>
+                    <div class="grid">
+                        <div class="flow-box" style="background: #28a745;">
+                            Confidence ≥ 0.85<br>✅ ai_review_confirmed
+                        </div>
+                        <div class="flow-box" style="background: #dc3545;">
+                            Confidence < 0.85<br>❌ ai_review_rejected
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h4>🎯 فوائد AI Review:</h4>
+                    <ul>
+                        <li><strong>التحقق المزدوج</strong>: نموذجين مختلفين = موثوقية أعلى</li>
+                        <li><strong>تقليل الأخطاء</strong>: إذا اختلف النموذجان، يذهب للمراجعة اليدوية</li>
+                        <li><strong>المرونة</strong>: يمكن استخدام نماذج مختلفة (GPT-4, Claude, Gemini)</li>
+                        <li><strong>الشفافية</strong>: كل قرار مسجل مع نسبة الثقة والسبب</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- الحالات الخاصة -->
+            <section class="section">
+                <h2>⚙️ الحالات الخاصة والاستثناءات</h2>
+                
+                <h3>3.1 الجرعات المركبة (Combination Dosages)</h3>
+                <div class="example">
+                    <h4>مثال:</h4>
+                    <div class="code-box">
+الدواء: AUGMENTIN 625 MG (أموكسيسيلين + حمض كلافيولينيك)
+
+التطابق المقبول:
+  ✅ AUGMENTIN 500/125 MG    (مجموعهما = 625)
+  ✅ AUGMENTIN 625 MG
+  ❌ AUGMENTIN 500 MG        (جرعة أقل)
+
+الخوارزمية تتعرف على:
+  - 625 = 500 + 125
+  - كلاهما تمثيل صحيح لنفس الجرعة
+                    </div>
+                </div>
+                
+                <h3>3.2 السوائل والتركيزات (Liquids & Concentrations)</h3>
+                <div class="example">
+                    <h4>مثال:</h4>
+                    <div class="code-box">
+الدواء: BRUFEN SYRUP 100 MG / 5 ML 120 ML
+
+التطابق المقبول:
+  ✅ BRUFEN 100MG/5ML SYRUP 120ML
+  ✅ BRUFEN SUSP 100/5 MG/ML 120ML    (SUSP = SYRUP للسوائل)
+  ❌ BRUFEN 200 MG/5ML 120 ML        (تركيز مختلف)
+
+الخوارزمية تفهم:
+  - 100 MG / 5 ML = التركيز لكل ملعقة
+  - 120 ML = حجم الزجاجة الإجمالي
+                    </div>
+                </div>
+                
+                <h3>3.3 الأدوية المستوردة (Imported Products)</h3>
+                <div class="code-box">
+علامة الاستيراد في Excel:
+  - بادئة: *، +، .، IMP، IMPORTED
+  
+مثال:
+  "**IMP. PANADOL 500 MG"
+  
+بعد التطبيع:
+  Brand: PANADOL
+  Dosage: 500 MG
+  Imported: True
+  
+يطابق فقط مع:
+  ✅ منتجات Tawreed المُعلمة كمستوردة
+  ❌ منتجات محلية (حتى لو نفس الاسم)
+                </div>
+                
+                <h3>3.4 الأشكال المتوافقة (Compatible Forms)</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>المجموعة</th>
+                                <th>الأشكال المتوافقة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>الأقراص</strong></td>
+                                <td>TAB، TABS، TABLET، TABLETS، F.C.TAB</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الكبسولات</strong></td>
+                                <td>CAP، CAPS، CAPSULE، CAPSULES</td>
+                            </tr>
+                            <tr>
+                                <td><strong>السوائل</strong></td>
+                                <td>SYRUP، SUSP، SUSPENSION، SOLUTION</td>
+                            </tr>
+                            <tr>
+                                <td><strong>العين</strong></td>
+                                <td>EYE، DROPS، OPHTALMIC</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الحقن</strong></td>
+                                <td>AMP، AMPOULE، VIAL، INJECTION</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>مثلاً: إذا كان في Excel "TAB" وفي Tawreed "TABLET" → مقبول ✅</p>
+                
+                <h3>3.5 المعدلات الحرجة (Critical Modifiers)</h3>
+                <div class="code-box">
+المعدلات التي يجب تطابقها تماماً:
+  - PLUS, EXTRA, FORTE, ADVANCE
+  - SR, XR, CR, MR, ER    (أشكال الإطلاق المديد)
+  - COLD, FLU, SINUS, NIGHT
+  - ADULT, PEDIATRIC, INFANT
+  - VAGINAL, NASAL, ORAL
+  
+مثال رفض:
+  Query:     CONCOR 5 MG
+  Candidate: CONCOR PLUS 5 MG
+  
+  النتيجة: ❌ different_modifier
+  السبب: PLUS يضيف مادة أخرى (hydrochlorothiazide)
+                </div>
+            </section>
+
+            <!-- مخطط التدفق الكامل -->
+            <section class="section">
+                <h2>📊 مخطط التدفق الكامل للخوارزمية</h2>
+                <div class="diagram">
+                    <div class="flow-box" style="background: #6c757d;">📥 قراءة صنف من Excel</div>
+                    <div class="flow-arrow">⬇</div>
+                    
+                    <div class="flow-box" style="background: #007bff;">🔧 المرحلة 1.1: التطبيع (Normalization)</div>
+                    <div class="flow-arrow">⬇</div>
+                    
+                    <div class="flow-box" style="background: #007bff;">🔍 المرحلة 1.2: استخراج المكونات (Parsing)</div>
+                    <div class="flow-arrow">⬇</div>
+                    
+                    <div class="flow-box" style="background: #007bff;">🔎 المرحلة 1.3: البحث (Brand Index / Fuzzy)</div>
+                    <div class="flow-arrow">⬇</div>
+                    
+                    <div class="flow-box" style="background: #007bff;">📈 المرحلة 1.4: التقييم (Scoring)</div>
+                    <div class="flow-arrow">⬇</div>
+                    
+                    <div class="flow-box" style="background: #007bff;">✅ المرحلة 1.5: فحص المكونات (Component Check)</div>
+                    <div class="flow-arrow">⬇</div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 20px 0;">
+                        <div>
+                            <div class="flow-box" style="background: #28a745; font-size: 0.9em;">
+                                Score ≥ 90<br>✅ مقبول مباشرة
+                            </div>
+                            <div class="flow-arrow">⬇</div>
+                            <div class="flow-box" style="background: #28a745; font-size: 0.9em;">
+                                إضافة للسلة
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="flow-box" style="background: #ffc107; font-size: 0.9em;">
+                                70 ≤ Score < 90<br>⚠️ غير واضح
+                            </div>
+                            <div class="flow-arrow">⬇</div>
+                            <div class="flow-box" style="background: #17a2b8; font-size: 0.9em;">
+                                🤖 AI Verification
+                            </div>
+                            <div class="flow-arrow">⬇</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                                <div class="flow-box" style="background: #28a745; font-size: 0.8em; padding: 10px;">
+                                    ✅ Confirmed<br>للسلة
+                                </div>
+                                <div class="flow-box" style="background: #6f42c1; font-size: 0.8em; padding: 10px;">
+                                    ⚠️ Uncertain<br>AI Review
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="flow-box" style="background: #dc3545; font-size: 0.9em;">
+                                Score < 70<br>أو No Match
+                            </div>
+                            <div class="flow-arrow">⬇</div>
+                            <div class="flow-box" style="background: #17a2b8; font-size: 0.9em;">
+                                🔍 AI Search
+                            </div>
+                            <div class="flow-arrow">⬇</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                                <div class="flow-box" style="background: #28a745; font-size: 0.8em; padding: 10px;">
+                                    ✅ Found<br>للسلة
+                                </div>
+                                <div class="flow-box" style="background: #dc3545; font-size: 0.8em; padding: 10px;">
+                                    ❌ Not Found<br>مراجعة يدوية
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-arrow">⬇</div>
+                    <div class="flow-box" style="background: #6f42c1;">🔬 AI Review (للحالات الغامضة)</div>
+                    <div class="flow-arrow">⬇</div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                        <div class="flow-box" style="background: #28a745;">
+                            ✅ القرار النهائي: مقبول<br>
+                            → إضافة للسلة<br>
+                            → تسجيل في order_item_summary.csv
+                        </div>
+                        <div class="flow-box" style="background: #dc3545;">
+                            ❌ القرار النهائي: مرفوض/غير متأكد<br>
+                            → مراجعة يدوية<br>
+                            → تسجيل في manual_review.csv
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- أمثلة تطبيقية كاملة -->
+            <section class="section">
+                <h2>💡 أمثلة تطبيقية كاملة</h2>
+                
+                <h3>المثال 1: تطابق مثالي</h3>
+                <div class="card">
+                    <div class="code-box">
+📥 الإدخال من Excel:
+   "PANADOL 500 MG 24 TAB"
+
+🔧 بعد التطبيع:
+   "PANADOL 500 MG 24 TAB"
+
+🔍 المكونات المستخرجة:
+   Brand:    PANADOL
+   Dosage:   500 MG
+   Form:     TAB
+   Quantity: 24
+
+🔎 البحث بالفهرس:
+   وجد 5 مرشحين تحت brand "PANADOL"
+
+📈 أعلى مرشح:
+   Name: "PANADOL 500MG 24TAB"
+   Score: 98
+
+✅ فحص المكونات:
+   ✅ Brand: PANADOL = PANADOL
+   ✅ Dosage: 500 MG = 500 MG
+   ✅ Form: TAB = TAB
+   ✅ Quantity: 24 = 24
+   ✅ No modifiers: OK
+
+🎯 النتيجة النهائية:
+   ✅ ACCEPTED (algo_match)
+   Score: 98
+   Method: brand_index_exact
+   Action: إضافة للسلة مباشرة
+                    </div>
+                </div>
+                
+                <h3>المثال 2: تطابق بعد AI Verification</h3>
+                <div class="card">
+                    <div class="code-box">
+📥 الإدخال من Excel:
+   "BRUFEN 400MG TAB"
+
+🔧 بعد التطبيع:
+   "BRUFEN 400 MG TAB"
+
+🔍 المكونات:
+   Brand:  BRUFEN
+   Dosage: 400 MG
+   Form:   TAB
+
+🔎 البحث:
+   المرشح الأول: "BRUFEN 400MG 30 F.C.TAB"
+   Score: 85 (أقل من 90)
+
+✅ فحص المكونات:
+   ✅ Brand: BRUFEN = BRUFEN
+   ✅ Dosage: 400 MG = 400 MG
+   ✅ Form: TAB ~ F.C.TAB (متوافقان)
+   ⚠️ Quantity: غير مذكور في Excel vs 30
+
+⚠️ Score < 90 → يذهب لـ AI Verification
+
+🤖 AI Verification:
+   السؤال: "هل BRUFEN 400MG 30 F.C.TAB يطابق BRUFEN 400MG TAB؟"
+   
+   AI Response:
+   {
+     "decision": "yes",
+     "confidence": 0.92,
+     "reasoning": "نفس المنتج، F.C. تعني film-coated وهي 
+                  طريقة تصنيع فقط، والـ 30 TAB هو عدد معياري
+                  في العبوة ولم يُذكر عدد مختلف في الطلب"
+   }
+
+🎯 النتيجة النهائية:
+   ✅ ACCEPTED (ai_confirmed)
+   Score: 85
+   AI Confidence: 0.92
+   Action: إضافة للسلة
+                    </div>
+                </div>
+                
+                <h3>المثال 3: رفض بسبب اختلاف الجرعة</h3>
+                <div class="card">
+                    <div class="code-box">
+📥 الإدخال:
+   "AMOXIL 500 MG"
+
+🔍 المكونات:
+   Brand:  AMOXIL
+   Dosage: 500 MG
+
+🔎 البحث:
+   المرشح الأول: "AMOXIL 250 MG CAP"
+   Score: 88
+
+❌ فحص المكونات:
+   ✅ Brand: AMOXIL = AMOXIL
+   ❌ Dosage: 500 MG ≠ 250 MG
+   
+   الفحص فشل: different_dosage
+
+🎯 النتيجة:
+   ❌ REJECTED
+   Reason: different_dosage
+   Action: البحث عن مرشح آخر أو AI Search
+                    </div>
+                </div>
+                
+                <h3>المثال 4: AI Search ناجح</h3>
+                <div class="card">
+                    <div class="code-box">
+📥 الإدخال:
+   "PANADOL RAPID 500"
+
+🔧 التطبيع:
+   "PANADOL RAPID 500"
+
+🔎 البحث الخوارزمي:
+   لا يوجد "PANADOL RAPID" في الفهرس
+   البحث الضبابي: أعلى score = 72 (أقل من الحد)
+
+❌ النتيجة: No acceptable match
+
+🔍 AI Search:
+   يفحص أفضل 5 مرشحين:
+   1. PANADOL 500 MG 24 TAB
+   2. PANADOL ADVANCE 500 MG
+   3. PANADOL EXTRA 500 MG
+   4. PANADOL COLD FLU
+   5. PANADOL NIGHT
+   
+   AI Analysis:
+   "RAPID قد يكون اسم تسويقي قديم أو خطأ إملائي.
+    الأقرب منطقياً هو PANADOL 500 MG العادي
+    بدون أي إضافات."
+   
+   AI Decision:
+   {
+     "match": "PANADOL 500 MG 24 TAB",
+     "confidence": 0.87,
+     "reasoning": "RAPID ليس اسم رسمي معروف لباندول"
+   }
+
+🎯 النتيجة:
+   ✅ ACCEPTED (ai_found)
+   AI Confidence: 0.87
+   Action: إضافة PANADOL 500 MG للسلة
+                    </div>
+                </div>
+                
+                <h3>المثال 5: مراجعة يدوية</h3>
+                <div class="card">
+                    <div class="code-box">
+📥 الإدخال:
+   "INSULIN MIX 70/30 100 IU"
+
+🔎 البحث:
+   مرشحين متعددين:
+   - INSULINAGYPT MIX 70/30
+   - MIXTARD 70/30
+   - NOVOMIX 70/30
+
+📈 Scores: 78، 75، 73
+
+🤖 AI Verification على الأول:
+   Confidence: 0.65 (منخفضة)
+   Reason: "غير متأكد أي insulinagypt محدداً مطلوب"
+
+🔬 AI Review:
+   Confidence: 0.60 (منخفضة أيضاً)
+   Reason: "يحتاج توضيح: هل INSULINAGYPT أم علامة أخرى؟"
+
+🎯 النتيجة:
+   ⚠️ MANUAL REVIEW NEEDED
+   Reason: low_confidence_ai_match
+   Action: حفظ في manual_review.csv للصيدلي
+          
+   السبب: الإنسولين دواء حساس ويحتاج تأكيد دقيق
+          من الصيدلي قبل الطلب
+                    </div>
+                </div>
+            </section>
+
+            <!-- الإعدادات القابلة للتعديل -->
+            <section class="section">
+                <h2>⚙️ الإعدادات القابلة للتعديل</h2>
+                <p>يمكن تخصيص سلوك الخوارزمية من ملف <code>config.yaml</code>:</p>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>الإعداد</th>
+                                <th>القيمة الافتراضية</th>
+                                <th>الشرح</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>fuzzy_threshold</strong></td>
+                                <td>80</td>
+                                <td>الحد الأدنى لدرجة التشابه للقبول (0-100)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_verify_threshold</strong></td>
+                                <td>90.0</td>
+                                <td>الدرجة التي تحتها يتم استدعاء AI</td>
+                            </tr>
+                            <tr>
+                                <td><strong>brand_prefix_min</strong></td>
+                                <td>4</td>
+                                <td>الحد الأدنى لطول بادئة العلامة التجارية المطابقة</td>
+                            </tr>
+                            <tr>
+                                <td><strong>brand_prefix_ratio</strong></td>
+                                <td>0.75</td>
+                                <td>نسبة البادئة المطلوبة (75% من الاسم الأقصر)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>exact_match_accept</strong></td>
+                                <td>true</td>
+                                <td>قبول التطابق الدقيق 100% مباشرة</td>
+                            </tr>
+                            <tr>
+                                <td><strong>high_overlap_threshold</strong></td>
+                                <td>0.85</td>
+                                <td>نسبة تداخل الكلمات للقبول المباشر (85%)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>medium_score_threshold</strong></td>
+                                <td>85</td>
+                                <td>درجة متوسطة + تداخل جيد</td>
+                            </tr>
+                            <tr>
+                                <td><strong>medium_overlap_threshold</strong></td>
+                                <td>0.70</td>
+                                <td>تداخل مصاحب للدرجة المتوسطة (70%)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>numeric_score_threshold</strong></td>
+                                <td>80</td>
+                                <td>درجة مع تطابق رقمي</td>
+                            </tr>
+                            <tr>
+                                <td><strong>numeric_overlap_threshold</strong></td>
+                                <td>0.60</td>
+                                <td>تداخل مصاحب للتطابق الرقمي (60%)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_review_threshold</strong></td>
+                                <td>0.8</td>
+                                <td>حد الثقة لقبول AI (80%)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_search_accept_confidence</strong></td>
+                                <td>0.75</td>
+                                <td>حد ثقة AI Search للقبول (75%)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>top_k_candidates</strong></td>
+                                <td>10</td>
+                                <td>عدد المرشحين الأوائل للفحص</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="example">
+                    <h4>مثال تعديل الإعدادات في config.yaml:</h4>
+                    <div class="code-box">
+matching:
+  fuzzy_threshold: 85          # رفع الحد لدقة أعلى
+  ai_verify_threshold: 95.0    # تقليل استخدام AI
+  brand_prefix_min: 5          # تشديد فحص العلامات
+  ai_review_threshold: 0.85    # رفع حد ثقة AI
+                    </div>
+                </div>
+            </section>
+
+            <!-- الإحصائيات والنتائج -->
+            <section class="section">
+                <h2>📊 فهم النتائج والإحصائيات</h2>
+                
+                <h3>ملفات النتائج</h3>
+                <div class="grid">
+                    <div class="card">
+                        <h4>order_item_summary.csv</h4>
+                        <p><strong>الملخص الأساسي</strong> لكل صنف:</p>
+                        <ul>
+                            <li>code: كود الصنف من Excel</li>
+                            <li>drug_name: الاسم من Excel</li>
+                            <li>matched_product_name: المنتج المطابق</li>
+                            <li>match_score: درجة التطابق</li>
+                            <li>verified: algo_match / ai_confirmed / ai_found</li>
+                            <li>ai_confidence: ثقة الـ AI (0-1)</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>order_ai_trace.csv</h4>
+                        <p><strong>السجل التفصيلي</strong> لقرارات AI:</p>
+                        <ul>
+                            <li>كل مرحلة AI تم تنفيذها</li>
+                            <li>المحاولات والنماذج المستخدمة</li>
+                            <li>الأسباب والتبريرات</li>
+                            <li>الوقت المستغرق</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>manual_review.csv</h4>
+                        <p><strong>الأصناف المحتاجة مراجعة:</strong></p>
+                        <ul>
+                            <li>no_match_found: لم يُعثر على تطابق</li>
+                            <li>ai_rejected: AI رفض التطابق</li>
+                            <li>low_confidence: ثقة منخفضة</li>
+                            <li>component_mismatch: اختلاف في مكون</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <h3>قراءة حقل "verified"</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>القيمة</th>
+                                <th>المعنى</th>
+                                <th>مستوى الثقة</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>algo_match</strong></td>
+                                <td>تطابق خوارزمي قوي (Score ≥ 90)</td>
+                                <td><span style="color: #28a745;">⬤⬤⬤⬤⬤</span> عالي جداً</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_confirmed</strong></td>
+                                <td>AI أكّد التطابق</td>
+                                <td><span style="color: #28a745;">⬤⬤⬤⬤</span>⬤ عالي</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_found</strong></td>
+                                <td>AI وجد تطابق لم تجده الخوارزمية</td>
+                                <td><span style="color: #ffc107;">⬤⬤⬤⬤</span>⬤ جيد</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_corrected</strong></td>
+                                <td>AI اختار منتج أفضل</td>
+                                <td><span style="color: #ffc107;">⬤⬤⬤</span>⬤⬤ متوسط</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_review_confirmed</strong></td>
+                                <td>تأكيد من AI ثانٍ</td>
+                                <td><span style="color: #17a2b8;">⬤⬤⬤</span>⬤⬤ متوسط</td>
+                            </tr>
+                            <tr>
+                                <td><strong>ai_rejected</strong></td>
+                                <td>AI رفض التطابق</td>
+                                <td><span style="color: #dc3545;">⬤</span>⬤⬤⬤⬤ يحتاج مراجعة</td>
+                            </tr>
+                            <tr>
+                                <td><strong>(فارغ)</strong></td>
+                                <td>لم يُعثر على تطابق</td>
+                                <td><span style="color: #dc3545;">⬤</span>⬤⬤⬤⬤ يحتاج مراجعة</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- أفضل الممارسات -->
+            <section class="section">
+                <h2>✨ أفضل الممارسات والنصائح</h2>
+                
+                <div class="card">
+                    <h4>1️⃣ تجهيز ملف Excel:</h4>
+                    <ul>
+                        <li>✅ استخدم أسماء واضحة ومحددة للأدوية</li>
+                        <li>✅ اكتب الجرعات بوضوح (500 MG أو 500MG)</li>
+                        <li>✅ حدد الشكل (TAB، CAP، SYRUP)</li>
+                        <li>✅ أضف IMP أو * للمستوردات</li>
+                        <li>❌ تجنب الاختصارات الغامضة</li>
+                        <li>❌ تجنب الأخطاء الإملائية الكبيرة</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h4>2️⃣ مراجعة النتائج:</h4>
+                    <ul>
+                        <li>راجع دائماً ملف <code>manual_review.csv</code> قبل اعتماد الطلب</li>
+                        <li>الأصناف ذات AI confidence < 0.8 تحتاج انتباه خاص</li>
+                        <li>تحقق من الأدوية الحساسة (إنسولين، قلب، ضغط) يدوياً</li>
+                        <li>استخدم <code>--match-only</code> للتجربة قبل الطلب الفعلي</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h4>3️⃣ تحسين الأداء:</h4>
+                    <ul>
+                        <li>استخدم <code>--fast-search</code> للملفات الكبيرة</li>
+                        <li>استخدم <code>--item-workers 2</code> لتسريع المعالجة</li>
+                        <li>قلل <code>ai_verify_threshold</code> لتقليل استخدام AI</li>
+                        <li>ارفع <code>fuzzy_threshold</code> لدقة أعلى وسرعة أقل</li>
+                    </ul>
+                </div>
+                
+                <div class="card">
+                    <h4>4️⃣ فهم الأخطاء الشائعة:</h4>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>الخطأ</th>
+                                    <th>السبب</th>
+                                    <th>الحل</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>different_modifier</td>
+                                    <td>نسيت كتابة PLUS أو EXTRA</td>
+                                    <td>أضف المعدل في Excel</td>
+                                </tr>
+                                <tr>
+                                    <td>different_dosage</td>
+                                    <td>الجرعة في Excel مختلفة عن Tawreed</td>
+                                    <td>تحقق من الجرعة الصحيحة</td>
+                                </tr>
+                                <tr>
+                                    <td>different_form</td>
+                                    <td>طلبت أقراص والمتوفر شراب</td>
+                                    <td>غيّر الشكل أو اطلب البديل</td>
+                                </tr>
+                                <tr>
+                                    <td>no_match_found</td>
+                                    <td>الصنف غير متوفر في Tawreed</td>
+                                    <td>ابحث عن بديل أو اطلب من مورد آخر</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- الخلاصة -->
+            <section class="section">
+                <h2>🎓 الخلاصة</h2>
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h3 style="color: white;">الخوارزمية تعمل في 3 مراحل متكاملة:</h3>
+                    <ol style="font-size: 1.1em;">
+                        <li>
+                            <strong>المطابقة الخوارزمية</strong>: سريعة ودقيقة للأسماء الواضحة
+                            <ul>
+                                <li>تطبيع النص واستخراج المكونات</li>
+                                <li>بحث بالفهرس أو بالتشابه الضبابي</li>
+                                <li>حساب درجة التطابق وفحص المكونات</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>التحقق بالذكاء الاصطناعي</strong>: للحالات الغامضة
+                            <ul>
+                                <li>AI Verification لتأكيد التطابقات الضعيفة</li>
+                                <li>AI Search للبحث عن تطابقات لم تُكتشف</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>المراجعة النهائية</strong>: طبقة أمان إضافية
+                            <ul>
+                                <li>AI Review بنموذج ثانٍ للتحقق المزدوج</li>
+                                <li>إرسال الحالات الصعبة للمراجعة اليدوية</li>
+                            </ul>
+                        </li>
+                    </ol>
+                    
+                    <div style="margin-top: 20px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
+                        <h4 style="color: white;">🎯 الهدف النهائي:</h4>
+                        <p style="font-size: 1.1em;">
+                            ضمان أن كل صنف يُطلب هو <strong>بالضبط</strong> ما تحتاجه الصيدلية،
+                            بنفس العلامة التجارية، نفس الجرعة، نفس الشكل، بدون أخطاء.
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="highlight" style="margin-top: 30px; font-size: 1.1em;">
+                    <strong>💡 ملاحظة أخيرة:</strong>
+                    الخوارزمية ذكية، لكن المراجعة البشرية للصيدلي تبقى ضرورية للأصناف الحساسة 
+                    والحالات المعقدة. استخدم <code>manual_review.csv</code> دائماً قبل اعتماد الطلب.
+                </div>
+            </section>
+
+        </div>
+        
+        <footer style="background: #2a5298; color: white; padding: 30px; text-align: center;">
+            <p style="font-size: 1.2em; margin-bottom: 10px;">
+                <strong>PharmaSupplyBot</strong> - Intelligent Drug Matching System
+            </p>
+            <p style="opacity: 0.9;">
+                تم إنشاء هذا الشرح لفهم آلية عمل خوارزمية المطابقة بالتفصيل
+            </p>
+            <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.8;">
+                للمزيد من المعلومات، راجع <code>README.md</code> و <code>config.yaml</code>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

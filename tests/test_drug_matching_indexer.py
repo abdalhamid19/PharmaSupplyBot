@@ -436,5 +436,31 @@ class DrugIndexTests(unittest.TestCase):
         self.assertEqual(method, "no_match")
 
 
+    def test_fuzzy_prefilter_falls_back_to_full_scan_for_cross_prefix(self) -> None:
+        tawreed = pd.DataFrame(
+            [
+                {
+                    "product_name_ar": "زومبي",
+                    "product_name_en": "XOMBIE GEL 50 ML",
+                    "store_product_id": "decoy",
+                },
+                {
+                    "product_name_ar": "اوميبرازول",
+                    "product_name_en": "OMEPRAZOLE 20 MG 30 CAP",
+                    "store_product_id": "right",
+                },
+            ],
+        )
+        index = DrugIndex(tawreed, MatchingConfig(fuzzy_threshold=65))
+
+        record, score, method = index.best_match("XOMEPRAZOLE 20 MG 30 CAP")
+
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertEqual(record["store_product_id"], "right")
+        self.assertGreaterEqual(score, 65)
+        self.assertNotEqual(method, "no_match")
+
+
 if __name__ == "__main__":
     unittest.main()

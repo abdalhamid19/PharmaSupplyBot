@@ -19,6 +19,10 @@ class MatchingConfig:
     fuzzy_threshold: int = 80
     brand_prefix_min: int = 4
     brand_prefix_ratio: float = 0.75
+    fuzzy_prefix_len: int = 3
+    early_stop_confidence: float = 0.95
+    candidate_top_k: int = 5
+    query_cache_size: int = 256
     ai_verify_threshold: float = 90.0
     ai_batch_size: int = 20
     ai_max_concurrent: int = 5
@@ -207,14 +211,17 @@ def _configured_env_key_values() -> tuple[str, ...]:
 
 def _fallback_models() -> tuple[str, ...]:
     return tuple(
-        model.strip() for model in os.getenv("FALLBACK_MODELS", "").split(",")
+        model.strip()
+        for model in os.getenv("FALLBACK_MODELS", "").split(",")
         if model.strip()
     )
 
 
 def _dedupe(values) -> tuple[str, ...]:
     seen = set()
-    return tuple(value for value in values if value and value not in seen and not seen.add(value))
+    return tuple(
+        value for value in values if value and value not in seen and not seen.add(value)
+    )
 
 
 def _default_output_csv() -> Path:

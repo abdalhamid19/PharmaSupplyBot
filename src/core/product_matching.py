@@ -71,8 +71,11 @@ _GENERIC_IDENTITY_TOKENS = {
     "VIAL",
 }
 
+from .candidate_identity import (
+    candidate_has_store_product_id,
+    candidate_store_product_id,
+)
 from .config.config_models import MatchingConfig
-from .candidate_identity import candidate_has_store_product_id, candidate_store_product_id
 from .drug_matching.normalizer import components_match, parse_drug
 from .matching_models import (
     CandidateMatchDiagnostic,
@@ -82,6 +85,7 @@ from .matching_models import (
 )
 from .matching_penalties import compatibility_rejection_reason, penalty_breakdown
 from .matching_rules import acceptance_details, default_matching_config
+from .search_query_templates import category_queries
 from .utils.excel import Item
 
 
@@ -204,7 +208,10 @@ def _search_queries_for_item(item: Item) -> list[str]:
     normalized_name = _normalize_search_query(name)
     tokens = name.split()
     normalized_tokens = normalized_name.split()
-    queries = _priority_search_queries(name, normalized_name, tokens, normalized_tokens)
+    queries = category_queries(name)
+    queries.extend(
+        _priority_search_queries(name, normalized_name, tokens, normalized_tokens)
+    )
     queries.extend(_fallback_search_queries(item.code, tokens, normalized_tokens))
     return _unique_non_empty(queries)[:MAX_SEARCH_QUERY_VARIANTS]
 
@@ -426,9 +433,50 @@ def _build_candidate_diagnostics(
                 row_index,
                 result,
                 matching_config,
+                skip_components=True,
             )
         )
-    return diagnostics
+    sorted_diags = sorted(diagnostics, key=lambda d: d.sort_key, reverse=True)
+    return _apply_top_k_checks(item, sorted_diags, matching_config.candidate_top_k)
+
+
+def _apply_top_k_checks(item: Item, sorted_diags: list, top_k: int) -> list:
+    """Apply expensive component checks on sorted candidates using top-k logic."""
+    accepted_count, final = 0, []
+    for d in sorted_diags:
+        if not d.accepted:
+            final.append(d)
+        elif accepted_count < top_k or not any(x.accepted for x in final):
+            rejection = _candidate_component_rejection(
+                item.name or d.query, d.candidate
+            )
+            if rejection:
+                final.append(_rejected_diagnostic(d, rejection))
+            else:
+                final.append(d)
+                accepted_count += 1
+        else:
+            final.append(
+                _rejected_diagnostic(d, "Skipped by candidate top-k optimization")
+            )
+    return final
+
+
+def _rejected_diagnostic(
+    d: CandidateMatchDiagnostic, reason: str
+) -> CandidateMatchDiagnostic:
+    """Return a copy of the diagnostic marked as rejected with a reason."""
+    return CandidateMatchDiagnostic(
+        query=d.query,
+        row_index=d.row_index,
+        score=d.score,
+        sort_key=d.sort_key,
+        accepted=False,
+        accepted_reason="",
+        rejection_reason=reason,
+        breakdown=d.breakdown,
+        candidate=d.candidate,
+    )
 
 
 def _empty_breakdown() -> MatchScoreBreakdown:
@@ -636,10 +684,13 @@ def _candidate_diagnostic(
     row_index: int,
     result: dict[str, Any],
     matching_config: MatchingConfig,
+    skip_components: bool = False,
 ) -> CandidateMatchDiagnostic:
     """Return one diagnostic record for a candidate result row."""
     breakdown = _match_score_breakdown_for_config(score_query, result, matching_config)
-    acceptance = _diagnostic_acceptance(score_query, result, breakdown, matching_config)
+    acceptance = _diagnostic_acceptance(
+        score_query, result, breakdown, matching_config, skip_components
+    )
     return _diagnostic_record(
         query, row_index, result, score_query, breakdown, acceptance
     )
@@ -672,20 +723,21 @@ def _diagnostic_acceptance(
     result: dict[str, Any],
     breakdown: MatchScoreBreakdown,
     matching_config: MatchingConfig,
+    skip_components: bool = False,
 ) -> tuple[bool, str, str]:
     """Return the acceptance outcome for one candidate diagnostic."""
     variant_rejection = _candidate_variant_rejection(score_query, result)
     if variant_rejection:
         return False, "", variant_rejection
-    lexical_acceptance = _lexical_or_threshold_acceptance(
+    lexical = _lexical_or_threshold_acceptance(
         score_query, result, breakdown, matching_config
     )
-    if lexical_acceptance[2]:
-        return lexical_acceptance
-    component_rejection = _candidate_component_rejection(score_query, result)
-    if component_rejection:
-        return False, "", component_rejection
-    return _orderable_acceptance(result, lexical_acceptance)
+    if lexical[2] or skip_components:
+        return lexical if lexical[2] else _orderable_acceptance(result, lexical)
+    rejection = _candidate_component_rejection(score_query, result)
+    if rejection:
+        return False, "", rejection
+    return _orderable_acceptance(result, lexical)
 
 
 def _orderable_acceptance(
@@ -736,17 +788,11 @@ def _numeric_safe_acceptance(
     acceptance: tuple[bool, str, str],
 ) -> tuple[bool, str, str]:
     """Reject fuzzy matches that add unrequested numeric product details."""
-    candidate_name = _candidate_english_name(candidate)
-    extra_tokens = _unrequested_numeric_tokens(query, candidate_name)
-    extra_tokens = _ignore_component_safe_numeric_tokens(
-        extra_tokens, query, candidate_name,
-    )
-    if (
-        acceptance[0]
-        and acceptance[1] != "exact_normalized_name_match"
-        and extra_tokens
-    ):
-        tokens = ", ".join(sorted(extra_tokens))
+    cand_name = _candidate_english_name(candidate)
+    extra = _unrequested_numeric_tokens(query, cand_name)
+    extra = _ignore_component_safe_numeric_tokens(extra, query, cand_name)
+    if acceptance[0] and acceptance[1] != "exact_normalized_name_match" and extra:
+        tokens = ", ".join(sorted(extra))
         return False, "", f"Candidate has unrequested numeric token: {tokens}"
     return acceptance
 
@@ -759,7 +805,9 @@ def _unrequested_numeric_tokens(query: str, candidate_name: str) -> set[str]:
     extra_tokens = _ignore_unit_dose_pack_markers(extra_tokens, query, candidate_name)
     if not query_tokens and len(extra_tokens) <= 1:
         return set()
-    if len(extra_tokens) == 1 and _single_percentage_token(extra_tokens, candidate_name):
+    if len(extra_tokens) == 1 and _single_percentage_token(
+        extra_tokens, candidate_name
+    ):
         return set()
     return extra_tokens
 
@@ -796,9 +844,7 @@ def _any_safe_omission(tokens: set[str], requested, offered) -> bool:
 def _safe_omitted_combo_strength(requested, offered) -> bool:
     words = set(requested.normalized.split()) | set(offered.normalized.split())
     return bool(
-        {"CONCOR", "PLUS"} <= words
-        and requested.dosage_nums
-        and offered.dosage_nums
+        {"CONCOR", "PLUS"} <= words and requested.dosage_nums and offered.dosage_nums
     )
 
 
@@ -927,8 +973,7 @@ def _ignore_unit_dose_pack_markers(
         return tokens
     candidate_text = _normalize_text(candidate_name)
     return {
-        token for token in tokens
-        if not _is_unit_dose_pack_token(token, candidate_text)
+        token for token in tokens if not _is_unit_dose_pack_token(token, candidate_text)
     }
 
 
@@ -996,9 +1041,7 @@ def _missing_english_identity_reasons(
     return []
 
 
-def _any_identity_match(
-    identity_tokens: set[str], candidate_tokens: set[str]
-) -> bool:
+def _any_identity_match(identity_tokens: set[str], candidate_tokens: set[str]) -> bool:
     """True when at least one identity token matches a candidate token.
 
     Exact match first, then fuzzy (ratio >= 0.85, both >= 4 chars)
@@ -1008,15 +1051,18 @@ def _any_identity_match(
         return True
     return any(
         _fuzzy_token_match(qt, ct)
-        for qt in identity_tokens if len(qt) >= 4
-        for ct in candidate_tokens if len(ct) >= 4
+        for qt in identity_tokens
+        if len(qt) >= 4
+        for ct in candidate_tokens
+        if len(ct) >= 4
     )
 
 
 def _fuzzy_token_match(a: str, b: str) -> bool:
     """True when two tokens are a close spelling variant."""
     return (
-        a.startswith(b) or b.startswith(a)
+        a.startswith(b)
+        or b.startswith(a)
         or SequenceMatcher(None, a, b).ratio() >= 0.85
     )
 

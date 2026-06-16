@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+from ..core.matching_confidence import match_confidence
 from ..core.matching_models import MatchDecision
 from ..core.product_matching import is_decisive_product_match
 from ..core.utils.excel import Item
@@ -25,19 +26,27 @@ def decisive_match(
     if not decision.best_match:
         _write_pending_match_log(bot, item, decision, queries)
         return False
-    if not _is_final_match(bot, decision, queries):
+    if not _is_final_match(bot, item, decision, queries):
         return False
     _record_final_match(bot, item, decision, started_at, require_available)
     return True
 
 
-def _is_final_match(bot, decision: MatchDecision, queries: list[str]) -> bool:
+def _is_final_match(
+    bot, item: Item, decision: MatchDecision, queries: list[str]
+) -> bool:
     """Return whether the current best match can finish the query loop."""
     match = decision.best_match
     if not match or getattr(bot, "fast_search", False):
         return bool(match)
     is_decisive = is_decisive_product_match(queries[-1], match.data)
-    return is_decisive or len(queries) >= MIN_SEARCH_QUERIES_PER_ITEM
+    if is_decisive:
+        return True
+    matching = bot.config.matching
+    confidence = match_confidence(decision, item, queries[-1])
+    if confidence >= matching.early_stop_confidence:
+        return True
+    return len(queries) >= MIN_SEARCH_QUERIES_PER_ITEM
 
 
 def _write_pending_match_log(
