@@ -282,19 +282,22 @@ class StreamlitOrderTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "src.ui.streamlit_order_form.profile_run_fields",
+                "src.ui.streamlit_order_form.profile_run_fields_with_workers",
                 return_value=(
-                    "Single profile",
-                    "wardany",
-                    5,
-                    False,
-                    True,
-                    True,
-                    False,
-                    0,
+                    (
+                        "Single profile",
+                        "wardany",
+                        5,
+                        False,
+                        True,
+                        True,
+                        "auto",
+                        False,
+                        0.0,
+                    ),
+                    2,
                 ),
             ),
-            patch("src.ui.streamlit_order_form.item_workers_field", return_value=2),
         ):
             values = order_form_fields(object())
 

@@ -36,13 +36,13 @@ def order_form_fields(
 ) -> dict[str, object]:
     """Return the order form field values."""
     input_mode, excel_path_str, upload = excel_source_fields()
-    run_fields = profile_run_fields(app_config)
+    run_fields, item_workers = profile_run_fields_with_workers(app_config)
     values = _order_form_values(
         input_mode,
         excel_path_str,
         upload,
         run_fields,
-        item_workers_field(app_config),
+        item_workers,
         prevented_items_path,
     )
     values.update(ai_matching_fields())
@@ -52,8 +52,8 @@ def order_form_fields(
 
 def matching_risk_fields() -> dict[str, object]:
     """Return Streamlit controls for matching risk policy."""
-    with st.expander("Matching Risk", expanded=False):
-        policy = st.selectbox("Risk policy", ["safe", "aggressive"], index=0)
+    with st.expander("⚙️ Matching Risk (Advanced)", expanded=False):
+        policy = st.selectbox("Risk policy", ["aggressive", "safe"], index=0)
         action = st.selectbox(
             "Flagged match action",
             ["manual-review-only", "add-to-cart"],
@@ -67,7 +67,7 @@ def matching_risk_fields() -> dict[str, object]:
 
 def ai_matching_fields() -> dict[str, object]:
     """Return Streamlit controls for live-order AI matching."""
-    with st.expander("AI Matching", expanded=False):
+    with st.expander("🤖 AI Matching (Advanced)", expanded=False):
         enabled = st.checkbox("Enable AI matching", value=False)
         values = _ai_provider_fields()
         values.update(_ai_policy_fields())
@@ -301,29 +301,39 @@ def order_excel_options(
 
 def profile_run_fields(app_config) -> OrderRunFields:
     """Return the order form fields related to profile execution."""
+    fields, _ = profile_run_fields_with_workers(app_config)
+    return fields
+
+
+def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
+    """Return the order form fields and item workers count."""
     profile_mode = st.radio(
         "Run target", ["Single profile", "All profiles"], horizontal=True
     )
     profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
-    limit = st.number_input("Item limit", min_value=0, max_value=100000, value=50)
-    resume = st.checkbox("Resume from previous summary", value=True)
-    match_only = st.checkbox("Match only without adding to cart", value=False)
-    execution_mode = st.selectbox(
-        "Execution mode",
-        ["auto", "api", "browser"],
-        index=0,
-        help="auto uses API when a safe contract exists, then falls back to browser.",
-    )
-    highest_discount = st.checkbox("Highest discount only", value=False)
-    min_discount = st.number_input(
-        "Minimum discount percent",
-        min_value=0.0,
-        max_value=100.0,
-        value=0.0,
-        step=1.0,
-    )
-    debug_browser = st.checkbox("Debug browser", value=False)
-    return (
+    limit = st.number_input("Item limit", min_value=0, max_value=100000, value=1500)
+    
+    with st.expander("⚙️ Advanced Options", expanded=False):
+        debug_browser = st.checkbox("Debug browser", value=True)
+        resume = st.checkbox("Resume from previous summary", value=False)
+        match_only = st.checkbox("Match only without adding to cart", value=False)
+        execution_mode = st.selectbox(
+            "Execution mode",
+            ["auto", "api", "browser"],
+            index=0,
+            help="auto uses API when a safe contract exists, then falls back to browser.",
+        )
+        item_workers = item_workers_field(app_config)
+        highest_discount = st.checkbox("Highest discount only", value=False)
+        min_discount = st.number_input(
+            "Minimum discount percent",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=1.0,
+        )
+    
+    fields = (
         str(profile_mode),
         str(profile_key),
         int(limit),
@@ -334,6 +344,7 @@ def profile_run_fields(app_config) -> OrderRunFields:
         bool(highest_discount),
         float(min_discount),
     )
+    return fields, int(item_workers)
 
 
 def item_workers_field(app_config) -> int:

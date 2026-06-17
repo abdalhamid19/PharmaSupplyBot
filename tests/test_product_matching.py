@@ -16,18 +16,18 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIn("QUINSTIBOWL 5MG 20F.C TABS", queries)
         self.assertIn("QUINSTIBOWL 5 MG 20 F C TABS", queries)
         self.assertIn("QUINSTIBOWL 5 MG 20", queries)
-        self.assertIn("92037", queries)
+        self.assertNotIn("92037", queries)  # Code queries removed
         self.assertNotIn("5 MG", queries)
         self.assertNotIn("F", queries)
         self.assertLessEqual(len(queries), 24)
 
-    def test_short_names_include_code_fallback_after_unique_variants(self) -> None:
+    def test_short_names_include_token_window_fallback(self) -> None:
         item = Item(code="73368", name="KENACOMB CREAM", qty=1)
 
         queries = _search_queries_for_item(item)
 
-        self.assertGreaterEqual(len(queries), 3)
-        self.assertIn("73368", queries)
+        self.assertGreaterEqual(len(queries), 2)
+        self.assertNotIn("73368", queries)  # Code queries removed
         self.assertNotIn("CREAM", queries)
 
     def test_search_queries_fix_common_zero_ocr_in_pack_size(self) -> None:

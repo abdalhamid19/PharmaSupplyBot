@@ -238,9 +238,7 @@ def _fallback_search_queries(
     code: object, tokens: list[str], normalized_tokens: list[str]
 ) -> list[str]:
     """Return extra bounded fallback queries when priority variants do not match."""
-    fallback = [_normalized_item_code(code)]
-    fallback.extend(_token_window_queries(normalized_tokens or tokens, window_size=2))
-    return fallback
+    return _token_window_queries(normalized_tokens or tokens, window_size=2)
 
 
 def _token_window_queries(tokens: list[str], window_size: int) -> list[str]:
@@ -253,13 +251,6 @@ def _token_window_queries(tokens: list[str], window_size: int) -> list[str]:
         for i in range(1, len(tokens) - window_size + 1)
     ]
 
-
-def _normalized_item_code(code: object) -> str:
-    """Return a code search query when the Excel item code looks usable."""
-    text = str(code or "").strip()
-    if text.lower() in {"", "nan", "none"}:
-        return ""
-    return text[:-2] if text.endswith(".0") else text
 
 
 def _normalize_search_query(value: str) -> str:
