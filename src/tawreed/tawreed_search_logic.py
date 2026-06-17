@@ -9,6 +9,7 @@ from playwright.sync_api import Page
 
 from ..core.manual_review_runtime import (
     filter_manual_review_candidates,
+    manual_review_match,
     manual_review_queries,
 )
 from ..core.matching_models import SearchMatch
@@ -82,5 +83,8 @@ def _handle_no_match(bot, item, queries, results, require_available):
 
 def _match_decision(bot, item: Item, results: list[tuple[str, list]]):
     """Return the best decision after applying saved manual-review filters."""
+    forced_match = manual_review_match(item, results)
+    if forced_match:
+        return forced_match
     filtered = filter_manual_review_candidates(item, results)
     return explain_best_product_match(item, filtered, bot.config.matching)

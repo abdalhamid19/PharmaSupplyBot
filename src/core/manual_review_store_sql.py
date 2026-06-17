@@ -2,19 +2,20 @@
 
 SELECT_DECISIONS = (
     "select item_code,item_name,approved,correct_store_product_id,manual_decision,"
-    "correct_product_name,correct_query,run_id from manual_review_decisions"
+    "correct_product_name,correct_product_name_ar,correct_query,run_id from manual_review_decisions"
 )
 
 UPSERT_DECISION = """
 insert into manual_review_decisions
 (item_code_key,item_name_key,item_code,item_name,approved,manual_decision,
- correct_store_product_id,correct_product_name,correct_query,run_id)
-values (?,?,?,?,?,?,?,?,?,?)
+ correct_store_product_id,correct_product_name,correct_product_name_ar,correct_query,run_id)
+values (?,?,?,?,?,?,?,?,?,?,?)
 on conflict(item_code_key,item_name_key) do update set
 approved=excluded.approved,
 manual_decision=excluded.manual_decision,
 correct_store_product_id=excluded.correct_store_product_id,
 correct_product_name=excluded.correct_product_name,
+correct_product_name_ar=excluded.correct_product_name_ar,
 correct_query=excluded.correct_query,
 run_id=excluded.run_id,
 updated_at=current_timestamp
@@ -30,6 +31,7 @@ create table if not exists manual_review_decisions (
     manual_decision text not null default '',
     correct_store_product_id text not null default '',
     correct_product_name text not null default '',
+    correct_product_name_ar text not null default '',
     correct_query text not null default '',
     run_id text not null default '',
     created_at text not null default current_timestamp,
@@ -41,4 +43,9 @@ create table if not exists manual_review_decisions (
 ALTER_DECISIONS_TABLE = (
     "alter table manual_review_decisions "
     "add column manual_decision text not null default ''"
+)
+
+ALTER_DECISIONS_TABLE_AR = (
+    "alter table manual_review_decisions "
+    "add column correct_product_name_ar text not null default ''"
 )

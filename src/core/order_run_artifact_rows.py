@@ -21,7 +21,7 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
     match = decision.best_match if decision else None
     blocked_candidate = blocked_ai_candidate(outcome) if not match else {}
     status = effective_order_status(summary.status, outcome)
-    manual_review = manual_review_required(status, outcome)
+    manual_review = manual_review_required(item, status, outcome)
     return {
         "item_code": item.code,
         "item_name": item.name,
@@ -30,7 +30,7 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
         "reason": summary.reason,
         "matched_query": match.query if match else blocked_candidate_query(outcome),
         "deterministic_score": round(match.score, 6) if match else "",
-        **_match_state_fields(status, outcome, match),
+        **_match_state_fields(item, status, outcome, match),
         **candidate_summary_fields(match.data if match else blocked_candidate, decision, match),
         **blocked_candidate_fields(blocked_candidate),
         **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
@@ -38,8 +38,13 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
     }
 
 
-def manual_review_required(summary_status: str, outcome) -> bool:
+def manual_review_required(item, summary_status: str, outcome) -> bool:
     """Return whether this final item state needs human review."""
+    from .manual_review_runtime import saved_manual_review_decision
+    decision = saved_manual_review_decision(item)
+    if decision and decision.manual_decision in {"approved_match", "not_matching", "auto_matched"}:
+        return False
+
     if outcome is not None and outcome.manual_review:
         return True
     return summary_status in REVIEWABLE_STATUSES
@@ -59,12 +64,12 @@ def manual_review_row(item, summary, decision, outcome) -> dict[str, object]:
     return row
 
 
-def _match_state_fields(summary_status: str, outcome, match) -> dict[str, object]:
+def _match_state_fields(item, summary_status: str, outcome, match) -> dict[str, object]:
     return {
-        "matched": _final_actionable_match(summary_status, outcome, match),
+        "matched": _final_actionable_match(item, summary_status, outcome, match),
         "deterministic_match_found": bool(match),
         "manual_review_blocked_match": bool(match)
-        and manual_review_required(summary_status, outcome),
+        and manual_review_required(item, summary_status, outcome),
     }
 
 
@@ -83,5 +88,5 @@ def _final_action(summary_status: str, manual_review: bool) -> str:
     return "manual_review" if manual_review else summary_status
 
 
-def _final_actionable_match(summary_status: str, outcome, match) -> bool:
-    return bool(match) and not manual_review_required(summary_status, outcome)
+def _final_actionable_match(item, summary_status: str, outcome, match) -> bool:
+    return bool(match) and not manual_review_required(item, summary_status, outcome)

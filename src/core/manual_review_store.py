@@ -9,6 +9,7 @@ from pathlib import Path
 from .manual_review_hints import hint_key
 from .manual_review_store_sql import (
     ALTER_DECISIONS_TABLE,
+    ALTER_DECISIONS_TABLE_AR,
     CREATE_DECISIONS_TABLE,
     SELECT_DECISIONS,
     UPSERT_DECISION,
@@ -25,6 +26,7 @@ class ManualReviewDecision:
     approved: bool
     correct_store_product_id: str = ""
     correct_product_name: str = ""
+    correct_product_name_ar: str = ""
     correct_query: str = ""
     run_id: str = ""
     manual_decision: str = ""
@@ -75,24 +77,32 @@ class ManualReviewStore:
         with sqlite3.connect(self.path) as connection:
             connection.execute(CREATE_DECISIONS_TABLE)
             _ensure_manual_decision_column(connection)
+            _ensure_correct_product_name_ar_column(connection)
 
 def _decision_values(code_key: str, name_key: str, decision: ManualReviewDecision):
     return (
         code_key, name_key, decision.item_code, decision.item_name,
         int(decision.approved), decision.manual_decision,
         decision.correct_store_product_id,
-        decision.correct_product_name, decision.correct_query, decision.run_id,
+        decision.correct_product_name, decision.correct_product_name_ar,
+        decision.correct_query, decision.run_id,
     )
 
 def _decision_from_row(row) -> ManualReviewDecision:
     return ManualReviewDecision(
-        row[0], row[1], bool(row[2]), row[3], row[5], row[6], row[7], row[4]
+        row[0], row[1], bool(row[2]), row[3], row[5], row[6], row[7], row[8], row[4]
     )
 
 def _ensure_manual_decision_column(connection) -> None:
     columns = _table_columns(connection)
     if "manual_decision" not in columns:
         connection.execute(ALTER_DECISIONS_TABLE)
+
+
+def _ensure_correct_product_name_ar_column(connection) -> None:
+    columns = _table_columns(connection)
+    if "correct_product_name_ar" not in columns:
+        connection.execute(ALTER_DECISIONS_TABLE_AR)
 
 
 def _table_columns(connection) -> set[str]:

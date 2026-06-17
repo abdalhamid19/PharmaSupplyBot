@@ -44,7 +44,7 @@ def export_manual_review_hints(input_csv: str | Path, output_json: str | Path) -
 
 def hint_key(item_code: str, item_name: str) -> tuple[str, str]:
     """Return the stable lookup key for an order item."""
-    return (_clean_code(item_code), _clean(item_name).upper())
+    return (_clean_code(item_code).upper(), _clean(item_name).upper())
 
 
 def _hint_from_row(row: dict) -> ManualReviewHint | None:
