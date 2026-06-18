@@ -38,9 +38,11 @@ def append_order_item_artifacts(
     row = order_item_summary_row(item, summary, decision, outcome)
     _append_item_summary_row(profile_key, row, label_suffix)
     _append_final_trace_row(profile_key, row, label_suffix)
-    if manual_review_required(item, summary.status, outcome):
+    requires_review = manual_review_required(item, summary.status, outcome, bot.config.matching)
+
+    if requires_review:
         append_manual_review_artifacts(profile_key, item, summary, decision, outcome, label_suffix)
-    else:
+    elif bot.config.matching.enable_auto_save_verified_match:
         _auto_save_verified_match(item, decision)
 
 

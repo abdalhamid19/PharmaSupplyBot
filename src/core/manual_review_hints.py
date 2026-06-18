@@ -44,7 +44,7 @@ def export_manual_review_hints(input_csv: str | Path, output_json: str | Path) -
 
 def hint_key(item_code: str, item_name: str) -> tuple[str, str]:
     """Return the stable lookup key for an order item."""
-    return (_clean_code(item_code).upper(), _clean(item_name).upper())
+    return (_clean_code(item_code).upper(), _clean_name(item_name).upper())
 
 
 def _hint_from_row(row: dict) -> ManualReviewHint | None:
@@ -67,8 +67,16 @@ def _hint_from_row(row: dict) -> ManualReviewHint | None:
 
 
 def _clean(value: object) -> str:
-    text = " ".join(str(value or "").strip().split())
-    return "" if text.lower() in {"nan", "none", "null"} else text
+    text = str(value or "")
+    return "" if text.lower() in {"nan", "none", "null"} else " ".join(text.split())
+
+def _clean_name(value: object) -> str:
+    import re
+    text = str(value or "").lower()
+    # Keep only english alphanumeric and arabic letters, replace others with space
+    text = re.sub(r'[^a-z0-9\u0600-\u06ff]', ' ', text)
+    text = " ".join(text.split())
+    return "" if text in {"nan", "none", "null"} else text
 
 
 def _clean_code(value: object) -> str:

@@ -50,7 +50,8 @@ class ManualReviewStore:
     def upsert(self, decision: ManualReviewDecision) -> None:
         """Insert or replace one manual-review decision by normalized item key."""
         code_key, name_key = hint_key(decision.item_code, decision.item_name)
-        with sqlite3.connect(self.path) as connection:
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA journal_mode=WAL;")
             connection.execute(
                 UPSERT_DECISION, _decision_values(code_key, name_key, decision)
             )
@@ -58,23 +59,36 @@ class ManualReviewStore:
     def lookup(self, item_code: str, item_name: str) -> ManualReviewDecision | None:
         """Return a previously saved decision for an item when one exists."""
         code_key, name_key = hint_key(item_code, item_name)
-        with sqlite3.connect(self.path) as connection:
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA journal_mode=WAL;")
             row = connection.execute(
                 SELECT_DECISIONS + " where item_code_key=? and item_name_key=?",
                 (code_key, name_key),
             ).fetchone()
         return _decision_from_row(row) if row else None
 
+    def delete(self, item_code: str, item_name: str) -> None:
+        """Remove a previously saved decision for an item."""
+        code_key, name_key = hint_key(item_code, item_name)
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA journal_mode=WAL;")
+            connection.execute(
+                "delete from manual_review_decisions where item_code_key=? and item_name_key=?",
+                (code_key, name_key),
+            )
+
     def list_decisions(self) -> list[ManualReviewDecision]:
         """Return all saved manual-review decisions in newest-updated order."""
-        with sqlite3.connect(self.path) as connection:
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA journal_mode=WAL;")
             rows = connection.execute(
                 SELECT_DECISIONS + " order by updated_at desc"
             ).fetchall()
         return [_decision_from_row(row) for row in rows]
 
     def _init_schema(self) -> None:
-        with sqlite3.connect(self.path) as connection:
+        with sqlite3.connect(self.path, timeout=10.0) as connection:
+            connection.execute("PRAGMA journal_mode=WAL;")
             connection.execute(CREATE_DECISIONS_TABLE)
             _ensure_manual_decision_column(connection)
             _ensure_correct_product_name_ar_column(connection)

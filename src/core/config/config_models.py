@@ -56,6 +56,9 @@ class MatchingConfig:
     fuzzy_prefix_len: int = 3
     query_cache_size: int = 256
     require_identity_token_for_flag: bool = True
+    enable_auto_save_verified_match: bool = True
+    enable_auto_match_re_review_on_fail: bool = True
+    enable_approved_match_re_review_on_fail: bool = True
 
 
 @dataclass(frozen=True)

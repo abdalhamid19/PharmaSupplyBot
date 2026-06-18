@@ -17,8 +17,23 @@ from src.tawreed.tawreed_order_run_artifacts import (
 )
 
 
+from unittest.mock import patch
+
 class OrderRunArtifactsTests(unittest.TestCase):
     """Validate order-level trace and review artifact writers."""
+
+    def setUp(self) -> None:
+        self.temp_db = TemporaryDirectory()
+        db_path = Path(self.temp_db.name) / "test_manual.sqlite3"
+        self.patcher1 = patch("src.core.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB", db_path)
+        self.patcher2 = patch("src.core.manual_review_store.DEFAULT_MANUAL_REVIEW_DB", db_path)
+        self.patcher1.start()
+        self.patcher2.start()
+        
+    def tearDown(self) -> None:
+        self.patcher1.stop()
+        self.patcher2.stop()
+        self.temp_db.cleanup()
 
     def test_writes_summary_trace_and_txt_files(self) -> None:
         """Write one item row plus detailed AI trace rows."""

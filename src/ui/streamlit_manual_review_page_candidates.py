@@ -18,16 +18,13 @@ def render_run_candidates(run_dir: Path) -> None:
     candidates_dict = load_review_candidates(run_dir)
     
     if not candidates_dict:
-        st.warning("Could not parse candidates from this run.")
+        st.success("🎉 All items in this run were processed automatically! No manual review is required.")
         return
 
     store = ManualReviewStore()
     hide_completed = st.checkbox("Hide completed items", value=True)
     
     for item_key, options in candidates_dict.items():
-        if not options:
-            continue
-            
         parts = item_key.split("::", 1)
         item_code = parts[0].upper()
         item_name = parts[1].upper() if len(parts) > 1 else "Unknown"

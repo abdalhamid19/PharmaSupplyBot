@@ -37,6 +37,7 @@ def _available_runs_with_candidates() -> list[Path]:
     for c_dir in filter(lambda p: p.is_dir(), ARTIFACTS_DIR.iterdir()):
         for p_dir in filter(lambda p: p.is_dir(), c_dir.iterdir()):
             for r_dir in filter(lambda p: p.is_dir(), p_dir.iterdir()):
-                if list(r_dir.glob("manual_review_candidates_*.jsonl")):
+                # List any run that has been fully processed (has order_item_summary)
+                if list(r_dir.glob("order_item_summary_*.csv")):
                     runs.append(r_dir)
     return sorted(runs, reverse=True)

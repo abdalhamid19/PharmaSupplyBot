@@ -13,9 +13,6 @@ def append_review_candidates(
     run_dir: Path, item_code: str, item_name: str, options: list[ReviewCandidateOption]
 ) -> None:
     """Append the item's top N candidates to the run's JSONL file."""
-    if not options:
-        return
-        
     code_key, name_key = hint_key(item_code, item_name)
     item_key = f"{code_key}::{name_key}"
     

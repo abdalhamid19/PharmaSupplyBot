@@ -38,15 +38,29 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
     }
 
 
-def manual_review_required(item, summary_status: str, outcome) -> bool:
+def manual_review_required(item, summary_status: str, outcome, config=None) -> bool:
     """Return whether this final item state needs human review."""
     from .manual_review_runtime import saved_manual_review_decision
     decision = saved_manual_review_decision(item)
-    if decision and decision.manual_decision in {"approved_match", "not_matching", "auto_matched"}:
+    
+    if decision and decision.manual_decision == "not_matching":
+        return False
+        
+    if decision and decision.manual_decision == "auto_matched":
+        if summary_status in REVIEWABLE_STATUSES:
+            if config and getattr(config, "enable_auto_match_re_review_on_fail", True):
+                return True # Drift detected! Item is missing, needs human eyes
+        return False
+
+    if decision and decision.manual_decision == "approved_match":
+        if summary_status in REVIEWABLE_STATUSES:
+            if config and getattr(config, "enable_approved_match_re_review_on_fail", True):
+                return True # Out of stock! Item is missing, needs human eyes
         return False
 
     if outcome is not None and outcome.manual_review:
         return True
+    
     return summary_status in REVIEWABLE_STATUSES
 
 

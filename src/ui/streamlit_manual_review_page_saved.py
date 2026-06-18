@@ -38,7 +38,31 @@ def render_saved_decisions() -> None:
         return
         
     display_df = df[selected_columns]
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    
+    st.info("💡 You can delete rows directly from the table below. Select a row and press Delete (or click the trash icon) to revoke the decision and return the item to AI matching.")
+    edited_df = st.data_editor(
+        display_df, 
+        use_container_width=True, 
+        hide_index=True,
+        num_rows="dynamic",
+        key="saved_decisions_editor"
+    )
+    
+    if len(edited_df) < len(display_df):
+        original_codes = set(display_df["item_code"])
+        edited_codes = set(edited_df["item_code"])
+        deleted_codes = original_codes - edited_codes
+        
+        if deleted_codes:
+            if st.button("🗑️ Confirm Deletion of Selected Items"):
+                store = ManualReviewStore()
+                deleted_count = 0
+                for d in decisions:
+                    if d.item_code in deleted_codes:
+                        store.delete(d.item_code, d.item_name)
+                        deleted_count += 1
+                st.success(f"Successfully deleted {deleted_count} items from saved corrections!")
+                st.rerun()
     
     csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
     st.download_button(

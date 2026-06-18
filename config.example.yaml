@@ -71,6 +71,9 @@ matching:
   distinguishing_token_penalty: 3.0
   semantic_mismatch_penalty: 10.0
 
+  enable_auto_match_re_review_on_fail: true
+  enable_auto_save_verified_match: false
+  enable_approved_match_re_review_on_fail: false
 runtime:
   headless: true
   slow_mo_ms: 0

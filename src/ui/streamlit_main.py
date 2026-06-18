@@ -86,7 +86,7 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
         prevented_items_tab, remove_cart_tab, results_tab, manual_review_tab
     ) = tabs
     with overview_tab:
-        render_overview(app_config)
+        render_overview(app_config, config_path)
     with auth_tab:
         render_auth_tab(app_config, default_profile, config_path)
     with order_tab:
