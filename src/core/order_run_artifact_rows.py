@@ -48,13 +48,13 @@ def manual_review_required(item, summary_status: str, outcome, config=None) -> b
         
     if decision and decision.manual_decision == "auto_matched":
         if summary_status in REVIEWABLE_STATUSES:
-            if config and getattr(config, "enable_auto_match_re_review_on_fail", True):
+            if config and getattr(config, "enable_auto_match_re_review_on_fail", False):
                 return True # Drift detected! Item is missing, needs human eyes
         return False
 
     if decision and decision.manual_decision == "approved_match":
         if summary_status in REVIEWABLE_STATUSES:
-            if config and getattr(config, "enable_approved_match_re_review_on_fail", True):
+            if config and getattr(config, "enable_approved_match_re_review_on_fail", False):
                 return True # Out of stock! Item is missing, needs human eyes
         return False
 

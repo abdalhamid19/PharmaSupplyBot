@@ -273,6 +273,10 @@ CRITICAL_MODIFIERS = frozenset(
         "VAGINAL",
         "NASAL",
         "MOUTH",
+        "CARE",
+        "COLLEDGE",
+        "MACRO",
+        "EVA",
     }
 )
 COSMETIC_WORDS = frozenset(
@@ -1243,6 +1247,7 @@ def components_match(
                     m_matched_dosage = True
                 else:
                     return False, "different_dosage"
+            
             if (
                 d_numeric
                 and m_numeric

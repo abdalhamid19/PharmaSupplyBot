@@ -68,7 +68,7 @@ def _build_radio_opts(options: list[ReviewCandidateOption]) -> list[str]:
         name = opt.name_en or opt.name_ar
         label = (
             f"[{i+1}] {name} | {opt.supplier} | "
-            f"Qty: {opt.available_quantity} | {opt.price} EGP | {avail}"
+            f"Qty: {opt.available_quantity} | سعر الجمهور: {opt.price} EGP | {avail}"
         )
         radio_opts.append(label)
     return radio_opts

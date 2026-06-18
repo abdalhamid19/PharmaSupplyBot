@@ -22,16 +22,78 @@ def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> No
     st.subheader("Manual Review")
     store = ManualReviewStore()
     editable_rows = editable_manual_review_rows(rows, store)
-    edited = st.data_editor(pd.DataFrame(editable_rows), use_container_width=True)
-    if st.button("Save Manual Review Decisions"):
-        count = save_manual_review_rows(edited.to_dict("records"), run_dir.name)
+    
+    selected_columns = None
+    if editable_rows:
+        all_cols = list(editable_rows[0].keys())
+        default_cols = [
+            "item_code", "item_name", "matched_product_name_en", "item_qty", "status",
+            "approved_match", "not_matching", 
+            "correct_store_product_id", "correct_product_name", "correct_query"
+        ]
+        # Ensure default cols exist
+        default_cols = [c for c in default_cols if c in all_cols]
+        # Add any remaining columns that weren't specified in the default list
+        for c in all_cols:
+            if c not in default_cols:
+                default_cols.append(c)
+                
+        selected_columns = st.multiselect(
+            "اختر الأعمدة المراد عرضها (Select Columns to Display):",
+            options=all_cols,
+            default=default_cols,
+            key="manual_review_columns_multiselect"
+        )
+        
+    edited = st.data_editor(
+        pd.DataFrame(editable_rows), 
+        use_container_width=True,
+        column_order=selected_columns if selected_columns else None
+    )
+    edited_records = edited.to_dict("records")
+    
+    # 1. Save Decisions
+    decisions = manual_review_decisions_from_rows(edited_records, run_dir.name)
+    st.markdown("### 1. 💾 Save Manual Review Decisions")
+    st.caption("يحفظ هذه التعديلات في قاعدة البيانات كقواعد ثابتة حتى يتعلمها الذكاء الاصطناعي ويطبقها في الطلبيات القادمة.")
+    if decisions:
+        st.info(f"✨ سيتم حفظ **{len(decisions)}** أصناف: " + "، ".join(d.item_name for d in decisions))
+    else:
+        st.warning("⚠️ لا يوجد أي أصناف معدلة ليتم حفظها.")
+    if st.button("Save Manual Review Decisions", disabled=not decisions):
+        count = save_manual_review_rows(edited_records, run_dir.name)
         st.success(f"Saved {count} manual-review decision(s).")
-    if st.button("Remove Not Matching From Cart"):
-        start_not_matching_removal(edited.to_dict("records"), run_dir, st)
+        st.rerun()
+
+    # 2. Remove Not Matching
+    not_matching_rows = [r for r in edited_records if str(r.get("not_matching") or "").lower() in {"1", "true", "yes", "y", "true"}]
+    # Also handle boolean True since it's a dataframe
+    not_matching_rows = [r for r in edited_records if r.get("not_matching") is True or str(r.get("not_matching") or "").lower() in {"1", "true", "yes", "y"}]
+    
+    st.markdown("### 2. 🗑️ Remove Not Matching From Cart")
+    st.caption("يقوم بحذف الأصناف التي حددتها كـ (غير مطابقة) من سلة المشتريات على موقع المورد.")
+    if not_matching_rows:
+        st.info(f"✨ سيتم إزالة **{len(not_matching_rows)}** أصناف من السلة: " + "، ".join(str(r.get("item_name")) for r in not_matching_rows))
+    else:
+        st.warning("⚠️ لم تقم بتحديد أي صنف كـ (غير مطابق) لإزالته من السلة.")
+    if st.button("Remove Not Matching From Cart", disabled=not not_matching_rows):
+        start_not_matching_removal(edited_records, run_dir, st)
         st.success("Not-matching cart-removal flow started.")
-    if st.button("Search Corrected Items"):
-        start_corrected_item_search(edited.to_dict("records"), run_dir, st)
+        st.rerun()
+
+    # 3. Search Corrected
+    from ..core.manual_review_corrections import _has_correction
+    corrected_rows = [r for r in edited_records if _has_correction(r)]
+    st.markdown("### 3. 🔍 Search Corrected Items")
+    st.caption("يقوم بالبحث عن الأصناف التي أدخلت لها (اسماً صحيحاً) أو (كوداً صحيحاً) ليعيد مطابقتها وإضافتها للسلة.")
+    if corrected_rows:
+        st.info(f"✨ سيتم إعادة البحث عن **{len(corrected_rows)}** أصناف مصححة: " + "، ".join(str(r.get("item_name")) for r in corrected_rows))
+    else:
+        st.warning("⚠️ لم تقم بتصحيح اسم أو كود أي صنف لإعادة البحث عنه.")
+    if st.button("Search Corrected Items", disabled=not corrected_rows):
+        start_corrected_item_search(edited_records, run_dir, st)
         st.success("Corrected-item match-only search started.")
+        st.rerun()
 
 
 def save_manual_review_rows(

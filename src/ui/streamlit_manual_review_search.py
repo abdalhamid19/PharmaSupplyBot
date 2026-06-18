@@ -33,6 +33,53 @@ def corrected_review_search_command(
     ]
 
 
+def render_running_search_controls() -> bool:
+    """Render controls and results for a background manual-review search process."""
+    import streamlit as st
+    from .streamlit_process import render_command_result
+    
+    state = st.session_state.get("manual_review_search_process")
+    if not state:
+        return False
+    process = state["process"]
+    returncode = process.poll()
+    
+    output_path = Path(state["output_path"])
+    output_text = ""
+    if output_path.exists():
+        try:
+            output_text = output_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            pass
+
+    if returncode is None:
+        st.warning("Corrected items search is running.")
+        if st.button("Refresh Search Status"):
+            st.rerun()
+        if output_text:
+            st.code(output_text[-4000:], language="text")
+        return True
+
+    # Process finished
+    if "output_file" in state and not state["output_file"].closed:
+        state["output_file"].close()
+
+    render_command_result(
+        {
+            "ok": returncode == 0,
+            "exit_code": returncode,
+            "command": " ".join(state["command"]),
+            "output": output_text,
+            "error_type": "ProcessError" if returncode else "",
+            "error_message": f"Exited with status code {returncode}."
+            if returncode
+            else "",
+        }
+    )
+    st.session_state.pop("manual_review_search_process", None)
+    return False
+
+
 def corrected_review_search_output_path() -> Path:
     """Return the process-output path for manual-review corrected search."""
     output_dir = ARTIFACTS_DIR / "run_control"

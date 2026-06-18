@@ -74,7 +74,6 @@ def render_run_dir_results(command: str, profile_key: str, run_dir: Path) -> Non
     if summary_rows:
         render_timing_metrics(summary_rows)
         st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
-    render_run_table(run_dir, "Manual Review", "manual_review_*.csv")
     render_run_table(run_dir, "Order AI Trace", "order_ai_trace_*.csv")
     render_recent_run_files(run_dir)
 
@@ -106,9 +105,6 @@ def render_run_table(run_dir: Path, title: str, pattern: str) -> None:
         return
     rows = load_csv_rows(paths[0])
     if rows:
-        if title == "Manual Review":
-            render_manual_review_editor(rows, run_dir)
-            return
         st.subheader(title)
         if title == "Order AI Trace":
             render_order_ai_trace_summary(rows)

@@ -33,16 +33,17 @@ def append_order_item_artifacts(
     decision,
     outcome,
     label_suffix: str | None = None,
+    matching_config=None,
 ) -> None:
     """Append one item summary row and optional manual-review row."""
     row = order_item_summary_row(item, summary, decision, outcome)
     _append_item_summary_row(profile_key, row, label_suffix)
     _append_final_trace_row(profile_key, row, label_suffix)
-    requires_review = manual_review_required(item, summary.status, outcome, bot.config.matching)
+    requires_review = manual_review_required(item, summary.status, outcome, matching_config)
 
     if requires_review:
         append_manual_review_artifacts(profile_key, item, summary, decision, outcome, label_suffix)
-    elif bot.config.matching.enable_auto_save_verified_match:
+    elif matching_config and matching_config.enable_auto_save_verified_match:
         _auto_save_verified_match(item, decision)
 
 

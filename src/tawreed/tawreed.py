@@ -741,6 +741,7 @@ class TawreedBot:
             self.last_match_decision,
             self.last_order_ai_outcome,
             self.summary_label_suffix,
+            self.config.matching,
         )
 
     def _build_item_summary(
