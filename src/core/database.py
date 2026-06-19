@@ -4,6 +4,7 @@ Handles connections to the shared cloud database for manual review data synchron
 """
 
 import os
+from dotenv import load_dotenv
 import psycopg2
 from psycopg2 import pool, Error
 from contextlib import contextmanager
@@ -37,6 +38,7 @@ class DatabaseManager:
         
         Defaults to environment variables or hardcoded cloud defaults.
         """
+        load_dotenv()
         self.host = host or os.getenv("DB_HOST", self.DEFAULT_HOST)
         self.port = port or int(os.getenv("DB_PORT", self.DEFAULT_PORT))
         self.database = database or os.getenv("DB_NAME", self.DEFAULT_DATABASE)

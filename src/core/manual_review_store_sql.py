@@ -1,4 +1,4 @@
-"""SQL statements for the manual-review SQLite store."""
+"""SQL statements for the manual-review CockroachDB store."""
 
 SELECT_DECISIONS = (
     "select item_code,item_name,approved,correct_store_product_id,manual_decision,"
@@ -9,7 +9,7 @@ UPSERT_DECISION = """
 insert into manual_review_decisions
 (item_code_key,item_name_key,item_code,item_name,approved,manual_decision,
  correct_store_product_id,correct_product_name,correct_product_name_ar,correct_query,run_id)
-values (?,?,?,?,?,?,?,?,?,?,?)
+values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
 on conflict(item_code_key,item_name_key) do update set
 approved=excluded.approved,
 manual_decision=excluded.manual_decision,
@@ -23,29 +23,29 @@ updated_at=current_timestamp
 
 CREATE_DECISIONS_TABLE = """
 create table if not exists manual_review_decisions (
-    item_code_key text not null,
-    item_name_key text not null,
-    item_code text not null,
-    item_name text not null,
-    approved integer not null,
-    manual_decision text not null default '',
-    correct_store_product_id text not null default '',
-    correct_product_name text not null default '',
-    correct_product_name_ar text not null default '',
-    correct_query text not null default '',
-    run_id text not null default '',
-    created_at text not null default current_timestamp,
-    updated_at text not null default current_timestamp,
+    item_code_key STRING not null,
+    item_name_key STRING not null,
+    item_code STRING not null,
+    item_name STRING not null,
+    approved INT not null,
+    manual_decision STRING not null default '',
+    correct_store_product_id STRING not null default '',
+    correct_product_name STRING not null default '',
+    correct_product_name_ar STRING not null default '',
+    correct_query STRING not null default '',
+    run_id STRING not null default '',
+    created_at TIMESTAMP not null default current_timestamp,
+    updated_at TIMESTAMP not null default current_timestamp,
     primary key (item_code_key, item_name_key)
 )
 """
 
 ALTER_DECISIONS_TABLE = (
     "alter table manual_review_decisions "
-    "add column manual_decision text not null default ''"
+    "add column if not exists manual_decision STRING not null default ''"
 )
 
 ALTER_DECISIONS_TABLE_AR = (
     "alter table manual_review_decisions "
-    "add column correct_product_name_ar text not null default ''"
+    "add column if not exists correct_product_name_ar STRING not null default ''"
 )

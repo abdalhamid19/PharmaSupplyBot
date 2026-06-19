@@ -1,10 +1,8 @@
-"""SQLite persistence for human-approved manual-review matching decisions."""
+"""CockroachDB persistence for human-approved manual-review matching decisions."""
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
-from pathlib import Path
 
 from .manual_review_hints import hint_key
 from .manual_review_store_sql import (
@@ -14,8 +12,9 @@ from .manual_review_store_sql import (
     SELECT_DECISIONS,
     UPSERT_DECISION,
 )
+from .database import get_db_manager
 
-DEFAULT_MANUAL_REVIEW_DB = Path("data") / "manual_review" / "manual_review.sqlite3"
+DEFAULT_MANUAL_REVIEW_DB = None
 
 @dataclass(frozen=True)
 class ManualReviewDecision:
@@ -39,59 +38,47 @@ class ManualReviewDecision:
         object.__setattr__(self, "manual_decision", decision)
 
 class ManualReviewStore:
-    """Small SQLite store for reusable manual-review decisions."""
+    """CockroachDB store for reusable manual-review decisions."""
 
-    def __init__(self, path: Path = DEFAULT_MANUAL_REVIEW_DB):
-        """Open a store at the requested path and create its schema."""
-        self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, path=None):
+        """Initialize the store and create its schema. `path` is ignored since we use DB manager."""
+        self.db = get_db_manager()
         self._init_schema()
 
     def upsert(self, decision: ManualReviewDecision) -> None:
         """Insert or replace one manual-review decision by normalized item key."""
         code_key, name_key = hint_key(decision.item_code, decision.item_name)
-        with sqlite3.connect(self.path, timeout=10.0) as connection:
-            connection.execute("PRAGMA journal_mode=WAL;")
-            connection.execute(
-                UPSERT_DECISION, _decision_values(code_key, name_key, decision)
-            )
+        self.db.execute_update(
+            UPSERT_DECISION, _decision_values(code_key, name_key, decision)
+        )
 
     def lookup(self, item_code: str, item_name: str) -> ManualReviewDecision | None:
         """Return a previously saved decision for an item when one exists."""
         code_key, name_key = hint_key(item_code, item_name)
-        with sqlite3.connect(self.path, timeout=10.0) as connection:
-            connection.execute("PRAGMA journal_mode=WAL;")
-            row = connection.execute(
-                SELECT_DECISIONS + " where item_code_key=? and item_name_key=?",
-                (code_key, name_key),
-            ).fetchone()
-        return _decision_from_row(row) if row else None
+        
+        results = self.db.execute_query(
+            SELECT_DECISIONS + " where item_code_key=%s and item_name_key=%s",
+            (code_key, name_key)
+        )
+        return _decision_from_row(results[0]) if results else None
 
     def delete(self, item_code: str, item_name: str) -> None:
         """Remove a previously saved decision for an item."""
         code_key, name_key = hint_key(item_code, item_name)
-        with sqlite3.connect(self.path, timeout=10.0) as connection:
-            connection.execute("PRAGMA journal_mode=WAL;")
-            connection.execute(
-                "delete from manual_review_decisions where item_code_key=? and item_name_key=?",
-                (code_key, name_key),
-            )
+        self.db.execute_update(
+            "delete from manual_review_decisions where item_code_key=%s and item_name_key=%s",
+            (code_key, name_key)
+        )
 
     def list_decisions(self) -> list[ManualReviewDecision]:
         """Return all saved manual-review decisions in newest-updated order."""
-        with sqlite3.connect(self.path, timeout=10.0) as connection:
-            connection.execute("PRAGMA journal_mode=WAL;")
-            rows = connection.execute(
-                SELECT_DECISIONS + " order by updated_at desc"
-            ).fetchall()
+        rows = self.db.execute_query(SELECT_DECISIONS + " order by updated_at desc")
         return [_decision_from_row(row) for row in rows]
 
     def _init_schema(self) -> None:
-        with sqlite3.connect(self.path, timeout=10.0) as connection:
-            connection.execute("PRAGMA journal_mode=WAL;")
-            connection.execute(CREATE_DECISIONS_TABLE)
-            _ensure_manual_decision_column(connection)
-            _ensure_correct_product_name_ar_column(connection)
+        self.db.execute_update(CREATE_DECISIONS_TABLE)
+        _ensure_manual_decision_column(self.db)
+        _ensure_correct_product_name_ar_column(self.db)
 
 def _decision_values(code_key: str, name_key: str, decision: ManualReviewDecision):
     return (
@@ -107,18 +94,16 @@ def _decision_from_row(row) -> ManualReviewDecision:
         row[0], row[1], bool(row[2]), row[3], row[5], row[6], row[7], row[8], row[4]
     )
 
-def _ensure_manual_decision_column(connection) -> None:
-    columns = _table_columns(connection)
+def _ensure_manual_decision_column(db) -> None:
+    columns = _table_columns(db)
     if "manual_decision" not in columns:
-        connection.execute(ALTER_DECISIONS_TABLE)
+        db.execute_update(ALTER_DECISIONS_TABLE)
 
-
-def _ensure_correct_product_name_ar_column(connection) -> None:
-    columns = _table_columns(connection)
+def _ensure_correct_product_name_ar_column(db) -> None:
+    columns = _table_columns(db)
     if "correct_product_name_ar" not in columns:
-        connection.execute(ALTER_DECISIONS_TABLE_AR)
+        db.execute_update(ALTER_DECISIONS_TABLE_AR)
 
-
-def _table_columns(connection) -> set[str]:
-    rows = connection.execute("pragma table_info(manual_review_decisions)")
-    return {row[1] for row in rows}
+def _table_columns(db) -> set[str]:
+    rows = db.execute_query("select column_name from information_schema.columns where table_name = 'manual_review_decisions'")
+    return {row[0] for row in rows}

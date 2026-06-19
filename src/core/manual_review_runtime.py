@@ -13,10 +13,11 @@ from .utils.excel import Item
 
 
 def saved_manual_review_decision(item: Item) -> ManualReviewDecision | None:
-    """Return a saved manual-review decision without creating a new DB file."""
-    if not DEFAULT_MANUAL_REVIEW_DB.exists():
+    """Return a saved manual-review decision."""
+    try:
+        return ManualReviewStore().lookup(item.code, item.name)
+    except Exception:
         return None
-    return ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup(item.code, item.name)
 
 
 def manual_review_queries(item: Item, base_queries: list[str]) -> list[str]:
