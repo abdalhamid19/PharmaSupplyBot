@@ -29,18 +29,21 @@ def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> No
         default_cols = [
             "item_code", "item_name", "matched_product_name_en", "item_qty", "status",
             "approved_match", "not_matching", 
-            "correct_store_product_id", "correct_product_name", "correct_query"
+            "correct_store_product_id", "correct_product_name", "correct_query",
+            "reason", "matched_query"
         ]
         # Ensure default cols exist
         default_cols = [c for c in default_cols if c in all_cols]
-        # Add any remaining columns that weren't specified in the default list
+        
+        # Sort options so default cols appear first in the dropdown menu
+        sorted_options = list(default_cols)
         for c in all_cols:
-            if c not in default_cols:
-                default_cols.append(c)
+            if c not in sorted_options:
+                sorted_options.append(c)
                 
         selected_columns = st.multiselect(
             "اختر الأعمدة المراد عرضها (Select Columns to Display):",
-            options=all_cols,
+            options=sorted_options,
             default=default_cols,
             key="manual_review_columns_multiselect"
         )

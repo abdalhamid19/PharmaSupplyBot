@@ -36,9 +36,17 @@ def render_saved_decisions() -> None:
     if not selected_columns:
         st.warning("Please select at least one column.")
         return
-        
+    col_sort, col_order = st.columns(2)
+    with col_sort:
+        sort_col = st.selectbox("ترتيب حسب (Sort By):", options=selected_columns, index=selected_columns.index("item_name") if "item_name" in selected_columns else 0)
+    with col_order:
+        sort_asc = st.radio("ترتيب (Order):", options=["تصاعدي (Ascending)", "تنازلي (Descending)"], horizontal=True)
+
     display_df = df[selected_columns]
     
+    if sort_col:
+        is_ascending = sort_asc == "تصاعدي (Ascending)"
+        display_df = display_df.sort_values(by=sort_col, ascending=is_ascending)
     st.info("💡 You can delete rows directly from the table below. Select a row and press Delete (or click the trash icon) to revoke the decision and return the item to AI matching.")
     edited_df = st.data_editor(
         display_df, 
