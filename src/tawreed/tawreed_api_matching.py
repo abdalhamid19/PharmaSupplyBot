@@ -12,6 +12,7 @@ from .tawreed_api import TawreedApiClient
 from .tawreed_match_logs import write_match_log
 from .tawreed_query_cache import cached_query_result, get_bot_query_cache
 from .tawreed_search_decision import decisive_match
+from .tawreed_timing import record_timing
 
 
 def require_api_match(bot, api: TawreedApiClient, item: Item, require_available: bool):
@@ -22,7 +23,7 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
     for query in manual_review_queries(item, _search_queries_for_item(item)):
         queries.append(query)
         found = cached_query_result(
-            query_cache, query, lambda: api.search_products(query)
+            query_cache, query, lambda: _search_products_timed(bot, api, query)
         )
         results.append((query, found))
         match = _check_api_match(
@@ -37,14 +38,36 @@ def _check_api_match(
     bot, item, started_at, queries, results, require_available
 ) -> Any | None:
     """Helper to check manual or automated api match."""
-    manual = manual_review_match(item, results)
-    if manual:
-        bot.last_match_decision, bot.last_searched_queries = manual, queries
-        return manual.best_match
-    decision = explain_best_product_match(item, results, bot.config.matching)
+    decision = _api_match_decision(bot, item, results)
+    if _is_saved_manual_review_match(decision):
+        bot.last_match_decision, bot.last_searched_queries = decision, queries
+        return decision.best_match
     if decisive_match(bot, item, decision, started_at, queries, require_available):
         return bot.last_match_decision.best_match
     return None
+
+
+def _search_products_timed(bot, api: TawreedApiClient, query: str):
+    """Search through the API and accumulate live network timing."""
+    started_at = time.perf_counter()
+    try:
+        return api.search_products(query)
+    finally:
+        record_timing(bot, "api_search_seconds", time.perf_counter() - started_at)
+
+
+def _api_match_decision(bot, item: Item, results):
+    """Return the API match decision and accumulate decision CPU/storage timing."""
+    started_at = time.perf_counter()
+    try:
+        manual = manual_review_match(item, results)
+        if manual:
+            return manual
+        return explain_best_product_match(item, results, bot.config.matching)
+    finally:
+        record_timing(
+            bot, "match_decision_seconds", time.perf_counter() - started_at
+        )
 
 
 def _handle_api_no_match(
@@ -55,7 +78,7 @@ def _handle_api_no_match(
             f"API candidates found for '{item.name}', but none has an orderable "
             "storeProductId."
         )
-    decision = explain_best_product_match(item, results, bot.config.matching)
+    decision = _api_match_decision(bot, item, results)
     decision = bot.resolve_order_ai_decision(item, decision)
     write_match_log(bot, item, decision)
     if decision.best_match:
@@ -80,3 +103,10 @@ def _accepted_api_match(bot, item: Item, decision, require_available: bool):
             f"Matched product is out of stock for '{item.name}'."
         )
     return match
+
+
+def _is_saved_manual_review_match(decision) -> bool:
+    return bool(
+        decision.best_match
+        and str(decision.final_reason).startswith("Approved by saved manual review")
+    )

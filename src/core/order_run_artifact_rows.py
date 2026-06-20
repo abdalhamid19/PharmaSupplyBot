@@ -35,6 +35,11 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
         **blocked_candidate_fields(blocked_candidate),
         **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
         **manual_review_reason_fields(status, summary.reason, outcome),
+        "elapsed_seconds": round(float(getattr(summary, "elapsed_seconds", 0.0)), 3),
+        "match_elapsed_seconds": round(
+            float(getattr(summary, "match_elapsed_seconds", 0.0)), 3
+        ),
+        **_summary_timing_fields(summary),
     }
 
 
@@ -104,3 +109,17 @@ def _final_action(summary_status: str, manual_review: bool) -> str:
 
 def _final_actionable_match(item, summary_status: str, outcome, match) -> bool:
     return bool(match) and not manual_review_required(item, summary_status, outcome)
+
+
+def _summary_timing_fields(summary) -> dict[str, float]:
+    timings = getattr(summary, "timing_seconds", None) or {}
+    return {
+        key: round(float(timings.get(key, 0.0)), 3)
+        for key in (
+            "api_search_seconds",
+            "dom_wait_seconds",
+            "dialog_close_seconds",
+            "match_decision_seconds",
+            "add_to_cart_seconds",
+        )
+    }

@@ -13,6 +13,7 @@ from .tawreed_artifacts import (
     append_xlsx_artifact,
     write_text_artifact,
 )
+from .tawreed_timing import timing_summary_fields
 
 MAX_DETAILED_MATCH_CANDIDATES = 25
 
@@ -34,6 +35,7 @@ class OrderItemSummary:
     searched_queries: str = ""
     elapsed_seconds: float = 0.0
     match_elapsed_seconds: float = 0.0
+    timing_seconds: dict[str, float] | None = None
 
 
 def write_match_log(bot, item: Item, decision: MatchDecision) -> None:
@@ -97,6 +99,7 @@ def append_order_result_summary(
         "searched_queries": summary.searched_queries,
         "elapsed_seconds": round(summary.elapsed_seconds, 3),
         "match_elapsed_seconds": round(summary.match_elapsed_seconds, 3),
+        **timing_summary_fields(summary.timing_seconds),
     }
     if label_suffix:
         append_csv_artifact(

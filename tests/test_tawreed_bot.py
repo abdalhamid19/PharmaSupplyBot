@@ -117,7 +117,7 @@ class TawreedBotTests(unittest.TestCase):
     def test_process_single_item_cleans_up_on_success_skip_and_failure(self) -> None:
         item = Item(code="1", name="Panadol", qty=1)
         scenarios = (
-            ("success", None, 2),
+            ("success", None, 1),
             ("skip", self._bot().skip_item_exception("skip item"), 2),
             ("failure", RuntimeError("technical failure"), 2),
         )
@@ -212,6 +212,7 @@ class TawreedBotTests(unittest.TestCase):
             ),
             patch("src.tawreed.tawreed.sync_playwright") as playwright,
             patch("src.tawreed.tawreed.open_order_page") as open_page,
+            patch.object(bot, "_ensure_valid_auth"),
             patch.object(bot, "_run_match_only_session") as run_browser,
         ):
             open_page.return_value = (object(), object(), object())
@@ -230,6 +231,7 @@ class TawreedBotTests(unittest.TestCase):
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
             patch("src.tawreed.tawreed.sync_playwright") as playwright,
+            patch.object(bot, "_ensure_valid_auth"),
         ):
             with self.assertRaises(TawreedApiUnavailable):
                 bot.match_items_only([Item(code="1", name="Panadol", qty=1)])

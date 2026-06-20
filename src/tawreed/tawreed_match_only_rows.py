@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..core.matching_models import MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_match_logs import OrderItemSummary
+from .tawreed_timing import timing_summary_fields
 from .tawreed_match_only_fields import (
     best_match_attr,
     candidate_summary_fields,
@@ -51,4 +52,5 @@ def _base_row(
         "searched_queries": summary.searched_queries,
         "elapsed_seconds": round(summary.elapsed_seconds, 3),
         "match_elapsed_seconds": round(summary.match_elapsed_seconds, 3),
+        **timing_summary_fields(summary.timing_seconds),
     }

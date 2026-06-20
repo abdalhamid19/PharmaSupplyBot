@@ -6,6 +6,7 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from src.tawreed.tawreed_api import (
     TawreedApiClient,
@@ -40,6 +41,56 @@ class _FakeSubmitBot:
 
     def _stop_requested(self) -> bool:
         return False
+
+
+class _FakeApiResponse:
+    ok = True
+    status = 200
+
+    def json(self):
+        return {"data": [{"productNameEn": "PANADOL", "storeProductId": "s1"}]}
+
+
+class _FakeRequestContext:
+    def __init__(self) -> None:
+        self.post_calls = 0
+        self.dispose_calls = 0
+
+    def post(self, *args, **kwargs):
+        self.post_calls += 1
+        return _FakeApiResponse()
+
+    def dispose(self) -> None:
+        self.dispose_calls += 1
+
+
+class _FakeRequestFactory:
+    def __init__(self, context: _FakeRequestContext) -> None:
+        self.context = context
+        self.new_context_calls = 0
+
+    def new_context(self, **kwargs):
+        self.new_context_calls += 1
+        return self.context
+
+
+class _FakePlaywright:
+    def __init__(self, context: _FakeRequestContext) -> None:
+        self.request = _FakeRequestFactory(context)
+        self.stop_calls = 0
+
+    def stop(self) -> None:
+        self.stop_calls += 1
+
+
+class _FakeSyncPlaywright:
+    def __init__(self, playwright: _FakePlaywright) -> None:
+        self.playwright = playwright
+        self.start_calls = 0
+
+    def start(self):
+        self.start_calls += 1
+        return self.playwright
 
 
 class TawreedApiTests(unittest.TestCase):
@@ -131,6 +182,53 @@ class TawreedApiTests(unittest.TestCase):
             headers = _auth_headers_from_state(state_path)
 
         self.assertEqual(headers, {"Authorization": "Bearer abc.def.ghi"})
+
+    def test_api_client_reuses_one_request_context_for_multiple_searches(self) -> None:
+        context = _FakeRequestContext()
+        playwright = _FakePlaywright(context)
+        launcher = _FakeSyncPlaywright(playwright)
+
+        with (
+            TemporaryDirectory() as temp_dir,
+            patch("src.tawreed.tawreed_api.sync_playwright", return_value=launcher),
+        ):
+            state_path = Path(temp_dir) / "state.json"
+            state_path.write_text("{}", encoding="utf-8")
+            client = TawreedApiClient(
+                "https://seller.tawreed.io/#/login",
+                state_path,
+                Path(temp_dir) / "missing.json",
+            )
+            client.search_products("PANADOL")
+            client.search_products("PANADOL EXTRA")
+            client.close()
+
+        self.assertEqual(launcher.start_calls, 1)
+        self.assertEqual(playwright.request.new_context_calls, 1)
+        self.assertEqual(context.post_calls, 2)
+        self.assertEqual(context.dispose_calls, 1)
+        self.assertEqual(playwright.stop_calls, 1)
+
+    def test_api_client_context_manager_closes_resources(self) -> None:
+        context = _FakeRequestContext()
+        playwright = _FakePlaywright(context)
+        launcher = _FakeSyncPlaywright(playwright)
+
+        with (
+            TemporaryDirectory() as temp_dir,
+            patch("src.tawreed.tawreed_api.sync_playwright", return_value=launcher),
+        ):
+            state_path = Path(temp_dir) / "state.json"
+            state_path.write_text("{}", encoding="utf-8")
+            with TawreedApiClient(
+                "https://seller.tawreed.io/#/login",
+                state_path,
+                Path(temp_dir) / "missing.json",
+            ) as client:
+                client.search_products("PANADOL")
+
+        self.assertEqual(context.dispose_calls, 1)
+        self.assertEqual(playwright.stop_calls, 1)
 
 
 if __name__ == "__main__":

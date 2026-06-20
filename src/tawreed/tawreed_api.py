@@ -31,6 +31,25 @@ class TawreedApiClient:
         self.base_url = base_url
         self.state_path = state_path
         self.contract = load_api_contract(contract_path)
+        self._playwright = None
+        self._request_context = None
+
+    def __enter__(self):
+        """Return this client; the request context opens on the first API call."""
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        """Dispose Playwright resources created by this client."""
+        self.close()
+
+    def close(self) -> None:
+        """Release the reusable API request context and Playwright driver."""
+        if self._request_context is not None:
+            self._request_context.dispose()
+            self._request_context = None
+        if self._playwright is not None:
+            self._playwright.stop()
+            self._playwright = None
 
     def search_products(self, query: str) -> list[dict[str, Any]]:
         """Return product candidates from a discovered API search endpoint."""
@@ -72,20 +91,22 @@ class TawreedApiClient:
 
     def _post_json(self, url: str, body: dict[str, Any]) -> dict[str, Any]:
         """POST JSON with saved auth state without opening Chromium."""
-        with sync_playwright() as playwright:
-            request_context = playwright.request.new_context(
+        response = self._ensure_request_context().post(url, data=body, timeout=60_000)
+        if not response.ok:
+            raise TawreedApiUnavailable(f"Tawreed API returned HTTP {response.status}.")
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {"data": payload}
+
+    def _ensure_request_context(self):
+        """Return a reusable Playwright APIRequestContext for this client."""
+        if self._request_context is None:
+            self._playwright = sync_playwright().start()
+            self._request_context = self._playwright.request.new_context(
                 storage_state=str(self.state_path),
                 base_url=_api_origin(self.base_url),
                 extra_http_headers=_auth_headers_from_state(self.state_path),
             )
-            try:
-                response = request_context.post(url, data=body, timeout=60_000)
-                if not response.ok:
-                    raise TawreedApiUnavailable(f"Tawreed API returned HTTP {response.status}.")
-                payload = response.json()
-                return payload if isinstance(payload, dict) else {"data": payload}
-            finally:
-                request_context.dispose()
+        return self._request_context
 
 
 def _api_origin(base_url: str) -> str:

@@ -12,18 +12,18 @@ def close_visible_dialogs(page: Page) -> None:
     """Close visible dialogs and overlay panels so later items can continue safely."""
     try:
         while visible_dialog_masks(page).count() > 0:
-            dialog = visible_dialog(page, 1000)
+            dialog = visible_dialog(page, 500)  # Reduced from 1000
             close_buttons = dialog_close_buttons(dialog)
             if close_buttons.count() > 0:
                 close_buttons.first.click(force=True)
-                dialog.wait_for(state="hidden", timeout=1500)
+                dialog.wait_for(state="hidden", timeout=800)  # Reduced from 1500
                 continue
             with suppress(Exception):
                 visible_dialog_masks(page).last.click(force=True)
-                dialog.wait_for(state="hidden", timeout=1500)
+                dialog.wait_for(state="hidden", timeout=800)  # Reduced from 1500
                 continue
             page.keyboard.press("Escape")
-            dialog.wait_for(state="hidden", timeout=1500)
+            dialog.wait_for(state="hidden", timeout=800)  # Reduced from 1500
     except Exception:
         pass
     close_visible_overlay_panels(page)
@@ -31,15 +31,15 @@ def close_visible_dialogs(page: Page) -> None:
 def close_visible_overlay_panels(page: Page) -> None:
     """Dismiss PrimeNG overlay panels that are not represented by dialog masks."""
     try:
-        for _ in range(3):
+        for _ in range(2):  # Reduced from 3
             if visible_overlay_panels(page).count() <= 0:
                 return
             with suppress(Exception):
                 page.keyboard.press("Escape")
-            _wait_for_overlay_panels_to_clear(page, timeout_ms=500)
+            _wait_for_overlay_panels_to_clear(page, timeout_ms=300)  # Reduced from 500
         if visible_overlay_panels(page).count() > 0:
             _click_safe_page_area(page)
-            _wait_for_overlay_panels_to_clear(page, timeout_ms=700)
+            _wait_for_overlay_panels_to_clear(page, timeout_ms=400)  # Reduced from 700
     except Exception:
         pass
 

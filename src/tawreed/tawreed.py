@@ -40,6 +40,7 @@ from .tawreed_session import (
     open_order_page,
 )
 from .tawreed_strategy import max_available_warehouse_row
+from .tawreed_timing import record_timing
 
 
 class _SkipItem(Exception):
@@ -106,6 +107,7 @@ class TawreedBot:
         self.last_selected_store_name = ""
         self.last_ordered_total_qty = 0
         self.last_order_ai_outcome = None
+        self.last_item_timings: dict[str, float] = {}
 
     def _build_order_ai_service(self):
         """Return the optional live-order AI decision service."""
@@ -462,13 +464,13 @@ class TawreedBot:
         started_at = time.perf_counter()
         self._reset_last_item_state()
         try:
-            close_visible_dialogs(page)
+            self._close_visible_dialogs_timed(page)
             self._add_item(page, item)
-            close_visible_dialogs(page)
+            # Skip close_visible_dialogs after success - waste of time
             self._record_success(item, started_at)
             return True
         except _SkipItem as error:
-            close_visible_dialogs(page)
+            self._close_visible_dialogs_timed(page)
             self._record_skip(item, error, started_at)
             return False
         except Exception as error:
@@ -480,13 +482,13 @@ class TawreedBot:
         started_at = time.perf_counter()
         self._reset_last_item_state()
         try:
-            close_visible_dialogs(page)
+            self._close_visible_dialogs_timed(page)
             self._match_item_only(page, item)
-            close_visible_dialogs(page)
+            self._close_visible_dialogs_timed(page)
             self._record_match_only_success(item, started_at)
             return True
         except _SkipItem as error:
-            close_visible_dialogs(page)
+            self._close_visible_dialogs_timed(page)
             self._record_match_only_skip(item, error, started_at)
             return False
         except Exception as error:
@@ -536,7 +538,7 @@ class TawreedBot:
     ) -> None:
         """Record a failed match-only item and capture diagnostics."""
         reason = str(error)
-        close_visible_dialogs(page)
+        self._close_visible_dialogs_timed(page)
         self._record_match_only_summary(
             item,
             self._failure_status(reason),
@@ -573,7 +575,7 @@ class TawreedBot:
     ) -> None:
         """Record a technical failure and capture diagnostic artifacts."""
         reason = str(error)
-        close_visible_dialogs(page)
+        self._close_visible_dialogs_timed(page)
         self._record_failure_summary(item, reason, started_at)
         self._print_failed_item(item, error)
         dump_artifacts(
@@ -582,6 +584,12 @@ class TawreedBot:
             label=_item_error_label(item),
             details=_item_error_details(page, item, error),
         )
+
+    def _close_visible_dialogs_timed(self, page: Page) -> None:
+        """Close visible dialogs and accumulate the item-level wait cost."""
+        started_at = time.perf_counter()
+        close_visible_dialogs(page)
+        record_timing(self, "dialog_close_seconds", time.perf_counter() - started_at)
 
     def _record_failure_summary(
         self, item: Item, reason: str, started_at: float
@@ -777,6 +785,7 @@ class TawreedBot:
             searched_queries=" | ".join(self.last_searched_queries),
             elapsed_seconds=elapsed,
             match_elapsed_seconds=match_elapsed,
+            timing_seconds=dict(self.last_item_timings),
         )
 
     def _matched_summary_name_fields(self) -> dict[str, str]:

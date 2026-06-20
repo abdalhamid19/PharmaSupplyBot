@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import Any
 
 from playwright.sync_api import Page
@@ -16,6 +17,7 @@ from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR
 from .tawreed_search_logic import require_product_match
 from .tawreed_selections import stores_from_payload
 from .tawreed_store_selection import choose_next_store_for_remaining_quantity
+from .tawreed_timing import record_timing
 from .tawreed_ui import (
     cart_button,
     fill_quantity_input,
@@ -38,7 +40,7 @@ def add_item_from_products_page(bot, page: Page, item: Item) -> None:
 def matched_product_row(bot, page: Page, match: SearchMatch, active_query: str | None):
     """Re-run winning query and return the visible row corresponding to the match."""
     if active_query != match.query:
-        search_products(bot, page, match.query)
+        search_visible_products_table(bot, page, match.query)
     wait_for_table_overlay_to_clear(page)
     rows = visible_product_rows(page)
     row = _matched_row_by_sig(rows, match)
@@ -53,6 +55,17 @@ def matched_product_row(bot, page: Page, match: SearchMatch, active_query: str |
 
 
 def open_add_to_cart_for_match(
+    bot, page: Page, row, item: Item, match: SearchMatch
+) -> None:
+    """Open add-to-cart dialog for the selected match."""
+    started_at = time.perf_counter()
+    try:
+        _open_add_to_cart_for_match(bot, page, row, item, match)
+    finally:
+        record_timing(bot, "add_to_cart_seconds", time.perf_counter() - started_at)
+
+
+def _open_add_to_cart_for_match(
     bot, page: Page, row, item: Item, match: SearchMatch
 ) -> None:
     """Open add-to-cart dialog for the selected match."""
@@ -118,16 +131,18 @@ def _next_store_choice(bot, page, store_rows, used_ids, sels):
         raise
 
 
-def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
-    """Execute a product search and return candidates from API or DOM."""
+def search_visible_products_table(bot, page: Page, query: str) -> list[dict[str, Any]]:
+    """Search the visible products table so the matched row can be clicked."""
     bot.log(f"Searching for '{query}'...")
     search_input = page.locator(PRODUCT_SEARCH_INPUT_SELECTOR).first
     search_input.fill(query)
+    started_at = time.perf_counter()
     with page.expect_response(
         re.compile(r".*/products/search.*"), timeout=2000
     ) as resp:
         search_input.press("Enter")
         wait_for_table_overlay_to_clear(page)
+        record_timing(bot, "api_search_seconds", time.perf_counter() - started_at)
         try:
             payload = resp.value.json()
             return list(payload.get("data", []) or [])

@@ -22,6 +22,7 @@ from .tawreed_match_logs import write_match_log
 from .tawreed_product_search import search_products
 from .tawreed_query_cache import cached_query_result, get_bot_query_cache
 from .tawreed_search_decision import decisive_match
+from .tawreed_timing import record_timing
 
 
 def require_product_match(
@@ -83,8 +84,14 @@ def _handle_no_match(bot, item, queries, results, require_available):
 
 def _match_decision(bot, item: Item, results: list[tuple[str, list]]):
     """Return the best decision after applying saved manual-review filters."""
+    started_at = time.perf_counter()
     forced_match = manual_review_match(item, results)
-    if forced_match:
-        return forced_match
-    filtered = filter_manual_review_candidates(item, results)
-    return explain_best_product_match(item, filtered, bot.config.matching)
+    try:
+        if forced_match:
+            return forced_match
+        filtered = filter_manual_review_candidates(item, results)
+        return explain_best_product_match(item, filtered, bot.config.matching)
+    finally:
+        record_timing(
+            bot, "match_decision_seconds", time.perf_counter() - started_at
+        )

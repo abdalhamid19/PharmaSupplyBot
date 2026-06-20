@@ -11,6 +11,7 @@ from src.core.matching_models import SearchMatch
 from src.core.utils.excel import Item
 from src.tawreed.tawreed_products_flow import (
     add_item_from_store_dialogs,
+    matched_product_row,
     open_add_to_cart_for_match,
 )
 
@@ -124,6 +125,29 @@ class TawreedProductsFlowTests(unittest.TestCase):
         self.assertEqual(bot.last_ordered_total_qty, 5)
         self.assertEqual(bot.last_selected_discount_percent, "30% (qty 5)")
         self.assertEqual(bot.last_selected_store_name, "Second Store (qty 5)")
+
+    def test_matched_product_row_does_not_research_active_winning_query(self) -> None:
+        """The browser flow should not repeat the winning query when it is active."""
+        bot = _bot(warehouse_mode="first_available")
+        match = SearchMatch(
+            query="PANADOL",
+            row_index=0,
+            score=20.0,
+            data={"productName": "بانادول", "storeProductId": "s1"},
+        )
+        expected_row = object()
+        rows = SimpleNamespace(count=lambda: 1)
+
+        with (
+            patch("src.tawreed.tawreed_products_flow.search_visible_products_table") as search,
+            patch("src.tawreed.tawreed_products_flow.wait_for_table_overlay_to_clear"),
+            patch("src.tawreed.tawreed_products_flow.visible_product_rows", return_value=rows),
+            patch("src.tawreed.tawreed_products_flow._matched_row_by_sig", return_value=expected_row),
+        ):
+            row = matched_product_row(bot, object(), match, active_query="PANADOL")
+
+        self.assertIs(row, expected_row)
+        search.assert_not_called()
 
 
 def _bot(warehouse_mode: str) -> SimpleNamespace:

@@ -5,11 +5,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from src.tawreed.tawreed_api import TawreedApiClient
 from src.tawreed.tawreed_api_discovery import save_api_contract_capture
+from src.tawreed.tawreed_api_flow import match_items_only_with_api
 from src.tawreed.tawreed_api_matching import _has_only_non_orderable_candidates
+from src.core.utils.excel import Item
 
 
 class TawreedApiExecutionModeTests(unittest.TestCase):
@@ -68,6 +72,33 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
             )
         )
 
+    def test_api_match_only_flow_reuses_one_client_for_all_items(self) -> None:
+        """One API flow should use one long-lived API client across item searches."""
+        clients: list[_FakeFlowClient] = []
+
+        def build_client(*_args, **_kwargs):
+            client = _FakeFlowClient()
+            clients.append(client)
+            return client
+
+        def require_match(_bot, api, item, _require_available):
+            api.search_products(item.name)
+            return SimpleNamespace(query=item.name)
+
+        bot = _FlowBot()
+        items = [Item("1", "PANADOL", 1), Item("2", "CATAFLAM", 1)]
+        with (
+            patch("src.tawreed.tawreed_api_flow.TawreedApiClient", side_effect=build_client),
+            patch("src.tawreed.tawreed_api_flow.require_api_match", side_effect=require_match),
+        ):
+            match_items_only_with_api(bot, items)
+
+        self.assertEqual(len(clients), 1)
+        self.assertEqual(clients[0].entered, 1)
+        self.assertEqual(clients[0].closed, 1)
+        self.assertEqual(clients[0].queries, ["PANADOL", "CATAFLAM"])
+        self.assertEqual(bot.successes, 2)
+
 
 class _CapturingClient(TawreedApiClient):
     last_url = ""
@@ -77,6 +108,52 @@ class _CapturingClient(TawreedApiClient):
         self.last_url = url
         self.last_body = body
         return {"data": [{"productName": "BEBELAC", "storeProductId": "s1"}]}
+
+
+class _FakeFlowClient:
+    def __init__(self) -> None:
+        self.entered = 0
+        self.closed = 0
+        self.queries: list[str] = []
+
+    def __enter__(self):
+        self.entered += 1
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.closed += 1
+
+    def contract_field_available(self, field: str) -> bool:
+        return field == "product_search_url"
+
+    def search_products(self, query: str):
+        self.queries.append(query)
+        return [{"productNameEn": query, "storeProductId": "s1"}]
+
+
+class _FlowBot:
+    profile_key = "wardany"
+    config = SimpleNamespace(base_url="https://seller.tawreed.io/#/login")
+    state_path = Path("state/wardany.json")
+    skip_item_exception = RuntimeError
+
+    def __init__(self) -> None:
+        self.successes = 0
+
+    def _stop_before_item(self, item) -> bool:
+        return False
+
+    def _reset_last_item_state(self) -> None:
+        pass
+
+    def log(self, message: str) -> None:
+        pass
+
+    def _record_match_only_success(self, item, started_at) -> None:
+        self.successes += 1
+
+    def _record_match_only_skip(self, item, error, started_at) -> None:
+        raise error
 
 
 if __name__ == "__main__":

@@ -60,6 +60,11 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "searched_queries": "Panadol Extra | Panadol",
             "elapsed_seconds": 0.0,
             "match_elapsed_seconds": 0.0,
+            "api_search_seconds": 0.0,
+            "dom_wait_seconds": 0.0,
+            "dialog_close_seconds": 0.0,
+            "match_decision_seconds": 0.0,
+            "add_to_cart_seconds": 0.0,
         }
         append_csv.assert_called_once_with(
             "wardany", "order_result_summary", [expected_row]

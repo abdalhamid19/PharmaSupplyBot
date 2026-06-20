@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import Any
 
 from playwright.sync_api import Page
 
 from .tawreed_constants import PRODUCT_SEARCH_ENDPOINT
 from .tawreed_product_search_select import has_orderable_candidate, select_search_candidates
+from .tawreed_timing import record_timing
 
 PRODUCT_SEARCH_INPUT_SELECTOR = (
     "#tawreedTableGlobalSearch, "
@@ -28,12 +30,22 @@ def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     from .tawreed_waits import wait_for_table_overlay_to_clear
 
     bot.log(f"Searching for '{query}'...")
+    started_at = time.perf_counter()
     close_visible_dialogs(page)
+    record_timing(bot, "dialog_close_seconds", time.perf_counter() - started_at)
+    started_at = time.perf_counter()
     api_candidates = _submit_product_search_with_api(page, query)
-    wait_for_table_overlay_to_clear(page)
+    record_timing(bot, "api_search_seconds", time.perf_counter() - started_at)
+
+    # Fast path: if API returned good candidates, skip DOM parsing entirely
     if api_candidates is not None and has_orderable_candidate(api_candidates):
         return api_candidates
+
+    # Fallback: wait and check DOM
+    started_at = time.perf_counter()
+    wait_for_table_overlay_to_clear(page)
     rows = _ready_product_rows(page)
+    record_timing(bot, "dom_wait_seconds", time.perf_counter() - started_at)
     if rows is None or is_no_results_row(rows.first):
         return select_search_candidates(api_candidates, [])
     return select_search_candidates(api_candidates, dom_search_results(page, query))
@@ -41,7 +53,7 @@ def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
 
 def _submit_product_search_with_api(page: Page, query: str) -> list[dict[str, Any]] | None:
     try:
-        with page.expect_response(_search_response_pattern(), timeout=3000) as resp:
+        with page.expect_response(_search_response_pattern(), timeout=2000) as resp:
             _submit_product_search(page, query)
         return _api_candidates(resp.value.json())
     except Exception:
@@ -91,7 +103,7 @@ def _ready_product_rows(page: Page):
 
     rows = visible_product_rows(page)
     try:
-        rows.first.wait_for(timeout=3000)
+        rows.first.wait_for(timeout=1500)
     except Exception:
         return None
     return rows if rows.count() > 0 else None

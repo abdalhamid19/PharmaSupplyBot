@@ -12,29 +12,29 @@ from .tawreed_api_matching import require_api_match
 
 def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
     """Match items through Tawreed API without opening Chromium."""
-    api = TawreedApiClient(bot.config.base_url, bot.state_path)
-    _require_contract(api, "product_search_url")
-    for item in items:
-        if bot._stop_before_item(item):
-            return
-        started_at = time.perf_counter()
-        bot._reset_last_item_state()
-        try:
-            match = require_api_match(bot, api, item, False)
-            bot.log(f"API match-only accepted {item.code} / {item.name}: {match.query}")
-            bot._record_match_only_success(item, started_at)
-        except bot.skip_item_exception as error:
-            bot._record_match_only_skip(item, error, started_at)
+    with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
+        _require_contract(api, "product_search_url")
+        for item in items:
+            if bot._stop_before_item(item):
+                return
+            started_at = time.perf_counter()
+            bot._reset_last_item_state()
+            try:
+                match = require_api_match(bot, api, item, False)
+                bot.log(f"API match-only accepted {item.code} / {item.name}: {match.query}")
+                bot._record_match_only_success(item, started_at)
+            except bot.skip_item_exception as error:
+                bot._record_match_only_skip(item, error, started_at)
 
 
 def place_order_with_api(bot, items: Iterable[Item]) -> None:
     """Add items to Tawreed cart through discovered API endpoints."""
-    api = TawreedApiClient(bot.config.base_url, bot.state_path)
-    _require_contract(api, "product_search_url", "add_to_cart_url")
-    if bot.config.runtime.submit_order:
-        _require_contract(api, "submit_order_url")
-    added_any = _add_api_order_items(bot, api, items)
-    _submit_order_if_enabled(bot, api, added_any)
+    with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
+        _require_contract(api, "product_search_url", "add_to_cart_url")
+        if bot.config.runtime.submit_order:
+            _require_contract(api, "submit_order_url")
+        added_any = _add_api_order_items(bot, api, items)
+        _submit_order_if_enabled(bot, api, added_any)
 
 
 def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> bool:
@@ -58,12 +58,12 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
 
 def remove_cart_items_with_api(bot, items: Iterable[object]) -> None:
     """Remove requested cart items through discovered API endpoints."""
-    api = TawreedApiClient(bot.config.base_url, bot.state_path)
-    _require_contract(api, "remove_cart_url")
-    for item in items:
-        if bot._stop_requested():
-            return
-        api.remove_cart_item(item)
+    with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
+        _require_contract(api, "remove_cart_url")
+        for item in items:
+            if bot._stop_requested():
+                return
+            api.remove_cart_item(item)
 
 
 def _submit_order_if_enabled(bot, api: TawreedApiClient, added_any: bool) -> None:
