@@ -312,9 +312,9 @@ def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
     )
     profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=1500)
-    
+
     with st.expander("⚙️ Advanced Options", expanded=False):
-        debug_browser = st.checkbox("Debug browser", value=True)
+        debug_browser = st.checkbox("Debug browser", value=False)
         resume = st.checkbox("Resume from previous summary", value=False)
         match_only = st.checkbox("Match only without adding to cart", value=False)
         execution_mode = st.selectbox(

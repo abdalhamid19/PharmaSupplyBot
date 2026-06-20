@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Iterable
 
@@ -12,6 +13,10 @@ from ..core.cart_removal_items import CartRemovalItem
 from ..core.candidate_identity import candidate_has_store_product_id
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
+from ..core.manual_review_runtime import (
+    manual_review_cache_context,
+    preload_manual_review_decisions,
+)
 from ..core.order_blocked_candidate import missing_store_product_id_outcome
 from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
@@ -100,6 +105,7 @@ class TawreedBot:
 
     def _reset_last_item_state(self) -> None:
         """Reset internal state tracking for the next item to be processed."""
+        pending_timings = getattr(self, "_pending_item_timings", {})
         self.last_match_decision: MatchDecision | None = None
         self.last_match_elapsed_seconds = 0.0
         self.last_searched_queries: list[str] = []
@@ -107,7 +113,8 @@ class TawreedBot:
         self.last_selected_store_name = ""
         self.last_ordered_total_qty = 0
         self.last_order_ai_outcome = None
-        self.last_item_timings: dict[str, float] = {}
+        self.last_item_timings: dict[str, float] = dict(pending_timings)
+        self._pending_item_timings = {}
 
     def _build_order_ai_service(self):
         """Return the optional live-order AI decision service."""
@@ -243,30 +250,31 @@ class TawreedBot:
         """Place an order by processing each item from the provided iterable."""
         self._ensure_valid_auth()
         items = list(items)
-        if self._try_api_order(items):
-            return
-        with sync_playwright() as p:
-            browser, context, page = open_order_page(
-                p,
-                self.config.runtime,
-                self.state_path,
-                debug_browser=self.debug_browser,
-            )
-            api_capture = begin_api_contract_capture(page)
-            try:
-                self._run_order_session(page, items)
-            except Exception as error:
-                dump_artifacts(
-                    page,
-                    self.profile_key,
-                    label="order_flow_error",
-                    details=_artifact_details("order_flow_error", error),
+        with self._manual_review_cache_for_items(items):
+            if self._try_api_order(items):
+                return
+            with sync_playwright() as p:
+                browser, context, page = open_order_page(
+                    p,
+                    self.config.runtime,
+                    self.state_path,
+                    debug_browser=self.debug_browser,
                 )
-                raise
-            finally:
-                _save_api_contract_capture(api_capture)
-                close_context(context)
-                close_browser(browser)
+                api_capture = begin_api_contract_capture(page)
+                try:
+                    self._run_order_session(page, items)
+                except Exception as error:
+                    dump_artifacts(
+                        page,
+                        self.profile_key,
+                        label="order_flow_error",
+                        details=_artifact_details("order_flow_error", error),
+                    )
+                    raise
+                finally:
+                    _save_api_contract_capture(api_capture)
+                    close_context(context)
+                    close_browser(browser)
 
     def _run_order_session(self, page: Page, items: Iterable[Item]) -> None:
         """Prepare the page and process items within an active order session."""
@@ -289,22 +297,41 @@ class TawreedBot:
         """Match Tawreed products for each item without adding anything to the cart."""
         self._ensure_valid_auth()
         items = list(items)
-        if self._try_api_match_only(items):
-            return
-        with sync_playwright() as p:
-            browser, context, page = open_order_page(
-                p,
-                self.config.runtime,
-                self.state_path,
-                debug_browser=self.debug_browser,
-            )
-            api_capture = begin_api_contract_capture(page)
-            try:
-                self._run_match_only_with_artifacts(page, items)
-            finally:
-                _save_api_contract_capture(api_capture)
-                close_context(context)
-                close_browser(browser)
+        with self._manual_review_cache_for_items(items):
+            if self._try_api_match_only(items):
+                return
+            with sync_playwright() as p:
+                browser, context, page = open_order_page(
+                    p,
+                    self.config.runtime,
+                    self.state_path,
+                    debug_browser=self.debug_browser,
+                )
+                api_capture = begin_api_contract_capture(page)
+                try:
+                    self._run_match_only_with_artifacts(page, items)
+                finally:
+                    _save_api_contract_capture(api_capture)
+                    close_context(context)
+                    close_browser(browser)
+
+    def _manual_review_cache_for_items(self, items: list[Item]):
+        """Return a run-scoped manual-review decision cache context."""
+        started_at = time.perf_counter()
+        try:
+            context = manual_review_cache_context(preload_manual_review_decisions(items))
+        except Exception:
+            return nullcontext()
+        self._record_pending_item_timing(
+            "manual_review_lookup_seconds", time.perf_counter() - started_at
+        )
+        return context
+
+    def _record_pending_item_timing(self, key: str, elapsed_seconds: float) -> None:
+        """Attach one setup timing bucket to the next processed item."""
+        pending = getattr(self, "_pending_item_timings", {})
+        pending[key] = float(pending.get(key, 0.0)) + max(0.0, float(elapsed_seconds))
+        self._pending_item_timings = pending
 
     def _run_match_only_with_artifacts(self, page: Page, items: Iterable[Item]) -> None:
         """Run match-only browser flow and capture diagnostics on failure."""
@@ -774,11 +801,14 @@ class TawreedBot:
         self, status: str, reason: str, elapsed: float, match_elapsed: float
     ) -> OrderItemSummary:
         """Build a compact summary object from the current bot state."""
+        started_at = time.perf_counter()
+        matched_name_fields = self._matched_summary_name_fields()
+        record_timing(self, "summary_build_seconds", time.perf_counter() - started_at)
         return OrderItemSummary(
             status=status,
             reason=reason,
             ordered_total_qty=self.last_ordered_total_qty,
-            **self._matched_summary_name_fields(),
+            **matched_name_fields,
             selected_discount_percent=self.last_selected_discount_percent,
             selected_store_name=self.last_selected_store_name,
             searched_queries_count=len(self.last_searched_queries),

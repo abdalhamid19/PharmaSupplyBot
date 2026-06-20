@@ -5,7 +5,11 @@ from __future__ import annotations
 import time
 
 from ..core.candidate_identity import candidate_has_store_product_id
-from ..core.manual_review_runtime import manual_review_match, manual_review_queries
+from ..core.manual_review_runtime import (
+    manual_review_match,
+    manual_review_queries,
+    saved_manual_review_decision,
+)
 from ..core.product_matching import _search_queries_for_item, explain_best_product_match
 from ..core.utils.excel import Item
 from .tawreed_api import TawreedApiClient
@@ -20,27 +24,33 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
     started_at = time.perf_counter()
     queries, results = [], []
     query_cache = get_bot_query_cache(bot)
-    for query in manual_review_queries(item, _search_queries_for_item(item)):
+    review_decision = _manual_review_decision_timed(bot, item)
+    for query in manual_review_queries(
+        item, _search_queries_for_item(item), review_decision
+    ):
         queries.append(query)
         found = cached_query_result(
             query_cache, query, lambda: _search_products_timed(bot, api, query)
         )
         results.append((query, found))
         match = _check_api_match(
-            bot, item, started_at, queries, results, require_available
+            bot, item, started_at, queries, results, require_available, review_decision
         )
         if match:
             return match
-    return _handle_api_no_match(bot, item, queries, results, require_available)
+    return _handle_api_no_match(
+        bot, item, queries, results, require_available, review_decision
+    )
 
 
 def _check_api_match(
-    bot, item, started_at, queries, results, require_available
+    bot, item, started_at, queries, results, require_available, review_decision
 ) -> Any | None:
     """Helper to check manual or automated api match."""
-    decision = _api_match_decision(bot, item, results)
+    decision = _api_match_decision(bot, item, results, review_decision)
     if _is_saved_manual_review_match(decision):
         bot.last_match_decision, bot.last_searched_queries = decision, queries
+        bot.last_match_elapsed_seconds = time.perf_counter() - started_at
         return decision.best_match
     if decisive_match(bot, item, decision, started_at, queries, require_available):
         return bot.last_match_decision.best_match
@@ -56,11 +66,22 @@ def _search_products_timed(bot, api: TawreedApiClient, query: str):
         record_timing(bot, "api_search_seconds", time.perf_counter() - started_at)
 
 
-def _api_match_decision(bot, item: Item, results):
+def _manual_review_decision_timed(bot, item: Item):
+    """Return one saved manual-review decision and record lookup/cache time."""
+    started_at = time.perf_counter()
+    try:
+        return saved_manual_review_decision(item)
+    finally:
+        record_timing(
+            bot, "manual_review_lookup_seconds", time.perf_counter() - started_at
+        )
+
+
+def _api_match_decision(bot, item: Item, results, review_decision=None):
     """Return the API match decision and accumulate decision CPU/storage timing."""
     started_at = time.perf_counter()
     try:
-        manual = manual_review_match(item, results)
+        manual = manual_review_match(item, results, review_decision)
         if manual:
             return manual
         return explain_best_product_match(item, results, bot.config.matching)
@@ -71,14 +92,19 @@ def _api_match_decision(bot, item: Item, results):
 
 
 def _handle_api_no_match(
-    bot, item: Item, queries: list[str], results, require_available: bool
+    bot,
+    item: Item,
+    queries: list[str],
+    results,
+    require_available: bool,
+    review_decision=None,
 ):
     if _has_only_non_orderable_candidates(results):
         raise bot.no_results_exception(
             f"API candidates found for '{item.name}', but none has an orderable "
             "storeProductId."
         )
-    decision = _api_match_decision(bot, item, results)
+    decision = _api_match_decision(bot, item, results, review_decision)
     decision = bot.resolve_order_ai_decision(item, decision)
     write_match_log(bot, item, decision)
     if decision.best_match:

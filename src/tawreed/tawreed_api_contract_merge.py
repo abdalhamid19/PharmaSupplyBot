@@ -11,7 +11,18 @@ from .tawreed_constants import PRODUCT_SEARCH_ENDPOINT
 
 _CONTRACT_MARKERS = {
     "product": (PRODUCT_SEARCH_ENDPOINT, "product-search"),
-    "add": ("cart/add", "carts/add", "add-to-cart", "addtocart"),
+    "add": (
+        "cart/add",
+        "carts/add",
+        "add-to-cart",
+        "addtocart",
+        "add-cart",
+        "cart/add-item",
+        "cart/items/add",
+        "carts/items",
+        "purchase/carts",
+        "shopping-cart",
+    ),
     "remove": ("cart/remove", "carts/remove", "remove-from-cart", "removeitem"),
     "submit": ("checkout", "submit", "confirm", "orders/submit", "order/confirm"),
 }

@@ -51,6 +51,10 @@ class TawreedApiClient:
             self._playwright.stop()
             self._playwright = None
 
+    def warm_up(self) -> None:
+        """Open the reusable request context before item timing starts."""
+        self._ensure_request_context()
+
     def search_products(self, query: str) -> list[dict[str, Any]]:
         """Return product candidates from a discovered API search endpoint."""
         payload = self._post_json(

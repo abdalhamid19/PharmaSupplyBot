@@ -199,6 +199,7 @@ class TawreedApiTests(unittest.TestCase):
                 state_path,
                 Path(temp_dir) / "missing.json",
             )
+            client.warm_up()
             client.search_products("PANADOL")
             client.search_products("PANADOL EXTRA")
             client.close()

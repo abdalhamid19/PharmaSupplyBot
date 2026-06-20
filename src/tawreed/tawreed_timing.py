@@ -4,11 +4,15 @@ from __future__ import annotations
 
 
 TIMING_KEYS = (
+    "api_context_init_seconds",
     "api_search_seconds",
     "dom_wait_seconds",
     "dialog_close_seconds",
+    "manual_review_lookup_seconds",
     "match_decision_seconds",
     "add_to_cart_seconds",
+    "artifact_write_seconds",
+    "summary_build_seconds",
 )
 
 

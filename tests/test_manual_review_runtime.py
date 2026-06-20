@@ -20,6 +20,18 @@ from src.core.utils.excel import Item
 class ManualReviewRuntimeTests(unittest.TestCase):
     """Validate runtime consumption of saved manual-review decisions."""
 
+    def test_lookup_many_loads_multiple_items_with_one_query(self) -> None:
+        db = _FakeManualReviewDb()
+        store = ManualReviewStore(database_manager=db)
+
+        decisions = store.lookup_many(
+            [Item("1", "Panadol", 1), Item("2", "Cataflam", 1)]
+        )
+
+        self.assertEqual(len(db.lookup_queries), 1)
+        self.assertEqual(decisions[("1", "PANADOL")].correct_store_product_id, "s1")
+        self.assertEqual(decisions[("2", "CATAFLAM")].correct_store_product_id, "s2")
+
     def test_manual_review_queries_prepend_saved_correct_query(self) -> None:
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "manual.sqlite3"
@@ -95,6 +107,22 @@ class ManualReviewRuntimeTests(unittest.TestCase):
                 )
 
         self.assertEqual(filtered[0][1], [{"storeProductId": "store-2"}])
+
+class _FakeManualReviewDb:
+    def __init__(self) -> None:
+        self.lookup_queries: list[tuple[str, tuple]] = []
+
+    def execute_update(self, query, params=()):
+        return 1
+
+    def execute_query(self, query, params=()):
+        if "information_schema.columns" in query:
+            return [("manual_decision",), ("correct_product_name_ar",)]
+        self.lookup_queries.append((query, params))
+        return [
+            ("1", "Panadol", 1, "s1", "approved_match", "Panadol", "", "Panadol", ""),
+            ("2", "Cataflam", 1, "s2", "approved_match", "Cataflam", "", "Cataflam", ""),
+        ]
 
 
 if __name__ == "__main__":

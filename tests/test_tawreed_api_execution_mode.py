@@ -12,7 +12,9 @@ from unittest.mock import patch
 from src.tawreed.tawreed_api import TawreedApiClient
 from src.tawreed.tawreed_api_discovery import save_api_contract_capture
 from src.tawreed.tawreed_api_flow import match_items_only_with_api
+from src.tawreed.tawreed_api_matching import require_api_match
 from src.tawreed.tawreed_api_matching import _has_only_non_orderable_candidates
+from src.core.matching_models import MatchDecision, SearchMatch
 from src.core.utils.excel import Item
 
 
@@ -99,6 +101,25 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
         self.assertEqual(clients[0].queries, ["PANADOL", "CATAFLAM"])
         self.assertEqual(bot.successes, 2)
 
+    def test_saved_manual_review_api_match_records_elapsed_time(self) -> None:
+        bot = _ApiMatchBot()
+        item = Item("1", "PANADOL", 1)
+        candidate = {"productNameEn": "PANADOL", "storeProductId": "s1"}
+        decision = MatchDecision(
+            SearchMatch("PANADOL", 0, 999.0, candidate),
+            [],
+            "Approved by saved manual review (ID match).",
+        )
+        with (
+            patch("src.tawreed.tawreed_api_matching.manual_review_queries", return_value=["PANADOL"]),
+            patch("src.tawreed.tawreed_api_matching.saved_manual_review_decision", return_value=object()),
+            patch("src.tawreed.tawreed_api_matching.manual_review_match", return_value=decision),
+        ):
+            match = require_api_match(bot, _ApiSearchClient(candidate), item, False)
+
+        self.assertEqual(match.data["storeProductId"], "s1")
+        self.assertGreater(bot.last_match_elapsed_seconds, 0)
+
 
 class _CapturingClient(TawreedApiClient):
     last_url = ""
@@ -125,6 +146,9 @@ class _FakeFlowClient:
 
     def contract_field_available(self, field: str) -> bool:
         return field == "product_search_url"
+
+    def warm_up(self) -> None:
+        pass
 
     def search_products(self, query: str):
         self.queries.append(query)
@@ -154,6 +178,25 @@ class _FlowBot:
 
     def _record_match_only_skip(self, item, error, started_at) -> None:
         raise error
+
+
+class _ApiMatchBot:
+    config = SimpleNamespace(matching=SimpleNamespace())
+    skip_item_exception = RuntimeError
+
+    def __init__(self) -> None:
+        self.last_match_elapsed_seconds = 0.0
+        self.last_match_decision = None
+        self.last_searched_queries = []
+        self.last_item_timings = {}
+
+
+class _ApiSearchClient:
+    def __init__(self, candidate: dict) -> None:
+        self.candidate = candidate
+
+    def search_products(self, query: str):
+        return [self.candidate]
 
 
 if __name__ == "__main__":

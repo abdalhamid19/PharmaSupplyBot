@@ -261,7 +261,7 @@ def order_command(
         command.append("--resume")
     if form_values.get("match_only"):
         command.append("--match-only")
-    command.extend(["--execution-mode", str(form_values.get("execution_mode", "auto"))])
+    command.extend(["--execution-mode", _order_execution_mode(form_values)])
     item_workers = _int_form_value(form_values, "item_workers", 1)
     command.extend(["--item-workers", str(item_workers)])
     if form_values.get("highest_discount"):
@@ -285,6 +285,14 @@ def _matching_risk_command_args(form_values: dict[str, object]) -> list[str]:
         "--flagged-match-action",
         str(form_values.get("flagged_match_action") or "manual-review-only"),
     ]
+
+
+def _order_execution_mode(form_values: dict[str, object]) -> str:
+    """Return the fastest safe execution mode for the requested order run."""
+    mode = str(form_values.get("execution_mode", "auto") or "auto")
+    if form_values.get("match_only") and mode == "auto":
+        return "api"
+    return mode
 
 
 def _order_ai_command_args(form_values: dict[str, object]) -> list[str]:

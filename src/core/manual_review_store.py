@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable, Any
 
 from .database import get_db_manager
 from .manual_review_hints import hint_key
@@ -41,10 +42,12 @@ class ManualReviewDecision:
 class ManualReviewStore:
     """CockroachDB store for reusable manual-review decisions."""
 
+    _schema_initialized_db_ids: set[int] = set()
+
     def __init__(self, path: Path | None = None, database_manager=None):
         """Initialize the CockroachDB-backed store; `path` is ignored."""
         self.db = database_manager or get_db_manager()
-        self._init_schema()
+        self._init_schema_once()
 
     def upsert(self, decision: ManualReviewDecision) -> None:
         """Insert or replace one manual-review decision by normalized item key."""
@@ -61,6 +64,19 @@ class ManualReviewStore:
             (code_key, name_key),
         )
         return _decision_from_row(rows[0]) if rows else None
+
+    def lookup_many(
+        self, items: Iterable[Any]
+    ) -> dict[tuple[str, str], ManualReviewDecision]:
+        """Return saved decisions for many items keyed by normalized item key."""
+        keys = _unique_item_keys(items)
+        if not keys:
+            return {}
+        rows = []
+        for chunk in _chunks(keys, 100):
+            rows.extend(self.db.execute_query(_lookup_many_sql(chunk), _flat_keys(chunk)))
+        decisions = [_decision_from_row(row) for row in rows]
+        return {hint_key(decision.item_code, decision.item_name): decision for decision in decisions}
 
     def delete(self, item_code: str, item_name: str) -> None:
         """Remove a previously saved decision for an item."""
@@ -79,6 +95,13 @@ class ManualReviewStore:
         self.db.execute_update(CREATE_DECISIONS_TABLE)
         _ensure_column(self.db, "manual_decision", ALTER_DECISIONS_TABLE)
         _ensure_column(self.db, "correct_product_name_ar", ALTER_DECISIONS_TABLE_AR)
+
+    def _init_schema_once(self) -> None:
+        db_id = id(self.db)
+        if db_id in self._schema_initialized_db_ids:
+            return
+        self._init_schema()
+        self._schema_initialized_db_ids.add(db_id)
 
 
 def _decision_values(code_key: str, name_key: str, decision: ManualReviewDecision):
@@ -127,3 +150,29 @@ def _default_decision(approved: bool) -> str:
 def _clean(value: object) -> str:
     text = str(value or "").strip()
     return "" if text.lower() in {"nan", "none", "null"} else text
+
+
+def _unique_item_keys(items: Iterable[Any]) -> list[tuple[str, str]]:
+    keys: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in items:
+        key = hint_key(getattr(item, "code", ""), getattr(item, "name", ""))
+        if key in seen:
+            continue
+        seen.add(key)
+        keys.append(key)
+    return keys
+
+
+def _chunks(values: list[tuple[str, str]], size: int):
+    for index in range(0, len(values), size):
+        yield values[index : index + size]
+
+
+def _lookup_many_sql(keys: list[tuple[str, str]]) -> str:
+    clauses = " or ".join("(item_code_key=%s and item_name_key=%s)" for _ in keys)
+    return f"{SELECT_DECISIONS} where {clauses}"
+
+
+def _flat_keys(keys: list[tuple[str, str]]) -> tuple[str, ...]:
+    return tuple(value for key in keys for value in key)

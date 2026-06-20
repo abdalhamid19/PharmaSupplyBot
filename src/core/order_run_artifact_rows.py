@@ -14,6 +14,17 @@ from .order_winner_fields import candidate_summary_fields
 REVIEWABLE_STATUSES = {
     "no-results", "matched-but-unavailable", "not-orderable", "manual-review-required",
 }
+SUMMARY_TIMING_KEYS = (
+    "api_context_init_seconds",
+    "api_search_seconds",
+    "dom_wait_seconds",
+    "dialog_close_seconds",
+    "manual_review_lookup_seconds",
+    "match_decision_seconds",
+    "add_to_cart_seconds",
+    "artifact_write_seconds",
+    "summary_build_seconds",
+)
 
 
 def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object]:
@@ -115,11 +126,5 @@ def _summary_timing_fields(summary) -> dict[str, float]:
     timings = getattr(summary, "timing_seconds", None) or {}
     return {
         key: round(float(timings.get(key, 0.0)), 3)
-        for key in (
-            "api_search_seconds",
-            "dom_wait_seconds",
-            "dialog_close_seconds",
-            "match_decision_seconds",
-            "add_to_cart_seconds",
-        )
+        for key in SUMMARY_TIMING_KEYS
     }

@@ -4,6 +4,18 @@ from __future__ import annotations
 
 import pandas as pd
 
+TIMING_DETAIL_FIELDS = (
+    "api_context_init_seconds",
+    "api_search_seconds",
+    "dom_wait_seconds",
+    "dialog_close_seconds",
+    "manual_review_lookup_seconds",
+    "match_decision_seconds",
+    "add_to_cart_seconds",
+    "artifact_write_seconds",
+    "summary_build_seconds",
+)
+
 
 def elapsed_seconds_values(rows: list[dict[str, str]]) -> list[float]:
     """Return parsed total elapsed seconds from rows that have the field populated."""
@@ -34,14 +46,19 @@ def timing_breakdown(rows: list[dict[str, str]]) -> pd.DataFrame:
     """Return the compact timing summary dataframe for one row set."""
     elapsed_values = elapsed_seconds_values(rows)
     match_values = match_elapsed_seconds_values(rows)
-    return pd.DataFrame(
-        [
-            _timing_metric("Average total seconds", average_value(elapsed_values)),
-            _timing_metric("Average match seconds", average_value(match_values)),
-            _timing_metric("Max total seconds", max(elapsed_values)),
-            _timing_metric("Min total seconds", min(elapsed_values)),
-        ]
+    metrics = [
+        _timing_metric("Average total seconds", average_value(elapsed_values)),
+        _timing_metric("Average match seconds", average_value(match_values)),
+        _timing_metric("Max total seconds", max(elapsed_values)),
+        _timing_metric("Min total seconds", min(elapsed_values)),
+    ]
+    metrics.extend(
+        _timing_metric(f"Average {field}", average_value(numeric_field_values(rows, field)))
+        for field in TIMING_DETAIL_FIELDS
+        if any(str(row.get(field, "")).strip() for row in rows)
     )
+    metrics.append(_timing_metric("Average unaccounted seconds", _average_unaccounted(rows)))
+    return pd.DataFrame(metrics)
 
 
 def average_value(values: list[float]) -> float:
@@ -68,7 +85,33 @@ def top_slowest_rows(rows: list[dict[str, str]]) -> pd.DataFrame:
         "status",
         "elapsed_seconds",
         "match_elapsed_seconds",
+        "api_search_seconds",
+        "manual_review_lookup_seconds",
+        "match_decision_seconds",
+        "unaccounted_seconds",
         "matched_product_english_name",
     ]
+    if not dataframe.empty:
+        dataframe = dataframe.assign(
+            unaccounted_seconds=[
+                round(_unaccounted_seconds(row), 3) for row in dataframe.to_dict("records")
+            ]
+        )
     visible = [column for column in columns if column in dataframe.columns]
     return dataframe.loc[:, visible] if visible else dataframe
+
+
+def _average_unaccounted(rows: list[dict[str, str]]) -> float:
+    values = [_unaccounted_seconds(row) for row in populated_elapsed_rows(rows)]
+    return average_value(values)
+
+
+def _unaccounted_seconds(row: dict[str, str]) -> float:
+    elapsed = _float_value(row.get("elapsed_seconds", ""))
+    details = sum(_float_value(row.get(field, "")) for field in TIMING_DETAIL_FIELDS)
+    return max(0.0, elapsed - details)
+
+
+def _float_value(value: object) -> float:
+    text = str(value or "").strip()
+    return float(text) if text else 0.0

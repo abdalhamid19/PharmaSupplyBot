@@ -16,9 +16,9 @@ def accepted_manual_review_match(bot, item, decision, started_at, queries):
     return decision.best_match
 
 
-def manual_review_result(bot, item, started_at, queries, results):
+def manual_review_result(bot, item, started_at, queries, results, review_decision=None):
     """Return a saved manual-review match from current candidates when available."""
-    decision = manual_review_match(item, results)
+    decision = manual_review_match(item, results, review_decision)
     if not decision:
         return None
     return accepted_manual_review_match(bot, item, decision, started_at, queries)

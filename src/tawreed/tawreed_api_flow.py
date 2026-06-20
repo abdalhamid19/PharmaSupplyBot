@@ -14,6 +14,7 @@ def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
     """Match items through Tawreed API without opening Chromium."""
     with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
         _require_contract(api, "product_search_url")
+        _warm_up_api_client(bot, api)
         for item in items:
             if bot._stop_before_item(item):
                 return
@@ -33,6 +34,7 @@ def place_order_with_api(bot, items: Iterable[Item]) -> None:
         _require_contract(api, "product_search_url", "add_to_cart_url")
         if bot.config.runtime.submit_order:
             _require_contract(api, "submit_order_url")
+        _warm_up_api_client(bot, api)
         added_any = _add_api_order_items(bot, api, items)
         _submit_order_if_enabled(bot, api, added_any)
 
@@ -60,6 +62,7 @@ def remove_cart_items_with_api(bot, items: Iterable[object]) -> None:
     """Remove requested cart items through discovered API endpoints."""
     with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
         _require_contract(api, "remove_cart_url")
+        _warm_up_api_client(bot, api)
         for item in items:
             if bot._stop_requested():
                 return
@@ -86,3 +89,12 @@ def _require_contract(api: TawreedApiClient, *fields: str) -> None:
     missing = [field for field in fields if not api.contract_field_available(field)]
     if missing:
         raise TawreedApiUnavailable(f"Missing Tawreed API contract fields: {missing}")
+
+
+def _warm_up_api_client(bot, api: TawreedApiClient) -> None:
+    """Open the API request context once before per-item timing starts."""
+    started_at = time.perf_counter()
+    api.warm_up()
+    elapsed = time.perf_counter() - started_at
+    if hasattr(bot, "_record_pending_item_timing"):
+        bot._record_pending_item_timing("api_context_init_seconds", elapsed)
