@@ -102,6 +102,11 @@ def render_running_order_controls() -> bool:
                 st.rerun()
         if output_text:
             st.code(output_text[-4000:], language="text")
+        render_fresh_run_analysis(
+            load_new_summary_rows(
+                _completed_summary_path(state), _completed_previous_count(state)
+            )
+        )
         return True
     close_order_process_output(state)
     result = {

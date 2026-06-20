@@ -205,6 +205,7 @@ def render_running_remove_cart_controls() -> bool:
                 st.rerun()
         if output_text:
             st.code(output_text[-4000:], language="text")
+        render_remove_cart_summary()
         return True
     close_remove_cart_process_output(state)
     render_command_result(

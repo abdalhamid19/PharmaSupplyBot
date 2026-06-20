@@ -92,6 +92,7 @@ def render_running_matching_controls() -> bool:
             st.rerun()
         if output_text:
             st.code(output_text[-4000:], language="text")
+        render_matching_output_table(Path(state["output_csv"]))
         return True
     close_order_process_output(state)
     render_command_result(_matching_process_result(state, returncode, output_text))
