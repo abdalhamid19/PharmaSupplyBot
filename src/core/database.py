@@ -22,7 +22,7 @@ class DatabaseManager:
     DEFAULT_PORT = 26257
     DEFAULT_DATABASE = "defaultdb"
     DEFAULT_USER = "abdalhamid"
-    DEFAULT_SSLMODE = "allow"
+    DEFAULT_SSLMODE = "require"
     
     def __init__(
         self,
@@ -43,13 +43,17 @@ class DatabaseManager:
         self.port = port or int(os.getenv("DB_PORT", self.DEFAULT_PORT))
         self.database = database or os.getenv("DB_NAME", self.DEFAULT_DATABASE)
         self.user = user or os.getenv("DB_USER", self.DEFAULT_USER)
-        self.password = password or os.getenv("DB_PASSWORD", "")
+        self.password = password if password is not None else os.getenv("DB_PASSWORD", "")
         self.sslmode = sslmode or os.getenv("DB_SSLMODE", self.DEFAULT_SSLMODE)
         
         self.connection_pool: Optional[pool.SimpleConnectionPool] = None
     
     def connect(self) -> None:
         """Initialize connection pool to CockroachDB Cloud."""
+        if not self.password:
+            raise RuntimeError(
+                "DB_PASSWORD is not configured. Set DB_PASSWORD for CockroachDB."
+            )
         try:
             self.connection_pool = pool.SimpleConnectionPool(
                 1,

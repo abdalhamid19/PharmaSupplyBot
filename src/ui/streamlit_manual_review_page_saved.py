@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from ..core.manual_review_store import ManualReviewStore
+from .streamlit_manual_review_db import manual_review_store_or_stop
 from .streamlit_manual_review_search import start_corrected_item_search
 from .streamlit_shared import ARTIFACTS_DIR
 
@@ -14,7 +14,8 @@ def render_saved_decisions() -> None:
     """Render a table of previously corrected items and allow re-searching."""
     st.divider()
     st.subheader("Saved Corrections (Manual Review Store)")
-    decisions = ManualReviewStore().list_decisions()
+    store = manual_review_store_or_stop()
+    decisions = store.list_decisions()
     
     if not decisions:
         st.info("No saved decisions found.")
@@ -63,7 +64,6 @@ def render_saved_decisions() -> None:
         
         if deleted_codes:
             if st.button("🗑️ Confirm Deletion of Selected Items"):
-                store = ManualReviewStore()
                 deleted_count = 0
                 for d in decisions:
                     if d.item_code in deleted_codes:

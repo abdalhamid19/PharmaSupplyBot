@@ -46,7 +46,7 @@ CREATE TABLE manual_review_decisions (
 ```
 الحساب: abdalhamid@gmail.com
 المستخدم: abdalhamid
-كلمة المرور: _wJpvGkeXrpD4_mD8jAhYg
+كلمة المرور: <PASSWORD_FROM_SECURE_CHANNEL>
 الكلستر: mahrousdb
 المضيف: mahrousdb-27867.j77.aws-eu-central-1.cockroachlabs.cloud
 المنطقة: AWS EU (Frankfurt)
@@ -77,8 +77,8 @@ DB_HOST=mahrousdb-27867.j77.aws-eu-central-1.cockroachlabs.cloud
 DB_PORT=26257
 DB_NAME=defaultdb
 DB_USER=abdalhamid
-DB_PASSWORD=_wJpvGkeXrpD4_mD8jAhYg
-DB_SSLMODE=verify-full
+DB_PASSWORD=your-db-password-here
+DB_SSLMODE=require
 ```
 
 #### 1.2 التأكد من المكتبات المطلوبة

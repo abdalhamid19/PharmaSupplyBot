@@ -34,8 +34,8 @@ DB_HOST=mahrousdb-27867.j77.aws-eu-central-1.cockroachlabs.cloud
 DB_PORT=26257
 DB_NAME=defaultdb
 DB_USER=abdalhamid
-DB_PASSWORD=_wJpvGkeXrpD4_mD8jAhYg
-DB_SSLMODE=allow
+DB_PASSWORD=your-db-password-here
+DB_SSLMODE=require
 ```
 
 ### 3. Test Connection
@@ -115,10 +115,10 @@ with db.get_connection() as conn:
 
 ## Migration from SQLite
 
-Previous manual review data was stored in `manual_review.sqlite3` locally. This has been migrated to the cloud:
+Previous manual review data was stored in `manual_review.sqlite3` locally. Runtime storage now uses CockroachDB only:
 
-1. **Local SQLite** (`manual_review.sqlite3`): Kept for backward compatibility
-2. **Cloud PostgreSQL** (CockroachDB): New primary storage for collaborative corrections
+1. **Legacy SQLite** (`manual_review.sqlite3`): Historical migration source only
+2. **Cloud PostgreSQL** (CockroachDB): Required storage for collaborative corrections
 
 To migrate existing SQLite data to CockroachDB:
 
@@ -159,12 +159,12 @@ psycopg2.OperationalError: connection to server ... failed
 - Verify DB_HOST and DB_PORT are correct
 - Ensure IP address is whitelisted (if applicable)
 
-### SSL Certificate Error
+### SSL / Encryption Error
 ```
-SSL error: certificate verify failed
+server requires encryption
 ```
-- Ensure `DB_SSLMODE=allow` in .env (or use `sslmode=verify-full` with proper certs)
-- This is handled by default in the `database.py` module
+- Ensure `DB_SSLMODE=require` in `.env`.
+- CockroachDB Cloud requires encrypted connections.
 
 ### Authentication Failed
 ```

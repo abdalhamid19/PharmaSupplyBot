@@ -145,6 +145,18 @@ class TawreedBot:
         """Return whether this bot should try the API backend before the browser."""
         return self.execution_mode in {"api", "auto"}
 
+    def _ensure_valid_auth(self) -> None:
+        """Verify token is valid or refresh authentication automatically."""
+        from .tawreed_auto_auth import auto_refresh_auth_if_needed
+        
+        auto_refresh_auth_if_needed(
+            self.config.base_url,
+            self.state_path,
+            self.config.runtime,
+            self.selectors,
+            self.profile_key,
+        )
+
     def _run_api_or_fallback(self, label: str, operation) -> bool:
         """Run one API operation and decide whether browser fallback may continue."""
         try:
@@ -227,6 +239,8 @@ class TawreedBot:
 
     def place_order_from_items(self, items: Iterable[Item]) -> None:
         """Place an order by processing each item from the provided iterable."""
+        self._ensure_valid_auth()
+        items = list(items)
         if self._try_api_order(items):
             return
         with sync_playwright() as p:
@@ -271,6 +285,8 @@ class TawreedBot:
 
     def match_items_only(self, items: Iterable[Item]) -> None:
         """Match Tawreed products for each item without adding anything to the cart."""
+        self._ensure_valid_auth()
+        items = list(items)
         if self._try_api_match_only(items):
             return
         with sync_playwright() as p:
@@ -307,6 +323,8 @@ class TawreedBot:
 
     def remove_cart_items(self, items: Iterable[CartRemovalItem]) -> None:
         """Remove the requested items from Tawreed carts."""
+        self._ensure_valid_auth()
+        items = list(items)
         if self._try_api_cart_removal(items):
             return
         with sync_playwright() as p:

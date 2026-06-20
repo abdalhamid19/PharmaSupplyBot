@@ -12,6 +12,7 @@ from ..core.manual_review_store import (
     ManualReviewDecision,
     ManualReviewStore,
 )
+from .streamlit_manual_review_db import manual_review_store_or_stop
 from .streamlit_manual_review_remove import start_not_matching_removal
 from .streamlit_manual_review_rows import editable_manual_review_rows
 from .streamlit_manual_review_search import start_corrected_item_search
@@ -20,7 +21,7 @@ from .streamlit_manual_review_search import start_corrected_item_search
 def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> None:
     """Render editable manual-review decisions and persist approved corrections."""
     st.subheader("Manual Review")
-    store = ManualReviewStore()
+    store = manual_review_store_or_stop()
     editable_rows = editable_manual_review_rows(rows, store)
     
     selected_columns = None

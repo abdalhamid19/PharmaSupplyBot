@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 from src.tawreed.tawreed_api import (
     TawreedApiClient,
     TawreedApiUnavailable,
+    _auth_headers_from_state,
 )
 from src.tawreed.tawreed_api_contract import (
     load_api_contract,
@@ -107,6 +108,29 @@ class TawreedApiTests(unittest.TestCase):
         _submit_order_if_enabled(_FakeSubmitBot(True), api, added_any=True)
 
         self.assertTrue(api.submitted)
+
+    def test_auth_headers_read_access_token_from_storage_state(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "origins": [
+                            {
+                                "origin": "https://seller.tawreed.io",
+                                "localStorage": [
+                                    {"name": "access-token", "value": "abc.def.ghi"}
+                                ],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            headers = _auth_headers_from_state(state_path)
+
+        self.assertEqual(headers, {"Authorization": "Bearer abc.def.ghi"})
 
 
 if __name__ == "__main__":

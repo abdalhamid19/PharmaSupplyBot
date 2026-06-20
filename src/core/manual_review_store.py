@@ -1,9 +1,11 @@
-"""CockroachDB persistence for human-approved manual-review matching decisions."""
+"""CockroachDB persistence for human-approved manual-review decisions."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
+from .database import get_db_manager
 from .manual_review_hints import hint_key
 from .manual_review_store_sql import (
     ALTER_DECISIONS_TABLE,
@@ -12,9 +14,9 @@ from .manual_review_store_sql import (
     SELECT_DECISIONS,
     UPSERT_DECISION,
 )
-from .database import get_db_manager
 
 DEFAULT_MANUAL_REVIEW_DB = None
+
 
 @dataclass(frozen=True)
 class ManualReviewDecision:
@@ -32,17 +34,16 @@ class ManualReviewDecision:
 
     def __post_init__(self) -> None:
         """Backfill the explicit decision for old approved-only call sites."""
-        if self.manual_decision:
-            return
-        decision = "approved_match" if self.approved else ""
-        object.__setattr__(self, "manual_decision", decision)
+        if not self.manual_decision:
+            object.__setattr__(self, "manual_decision", _default_decision(self.approved))
+
 
 class ManualReviewStore:
     """CockroachDB store for reusable manual-review decisions."""
 
-    def __init__(self, path=None):
-        """Initialize the store and create its schema. `path` is ignored since we use DB manager."""
-        self.db = get_db_manager()
+    def __init__(self, path: Path | None = None, database_manager=None):
+        """Initialize the CockroachDB-backed store; `path` is ignored."""
+        self.db = database_manager or get_db_manager()
         self._init_schema()
 
     def upsert(self, decision: ManualReviewDecision) -> None:
@@ -55,19 +56,18 @@ class ManualReviewStore:
     def lookup(self, item_code: str, item_name: str) -> ManualReviewDecision | None:
         """Return a previously saved decision for an item when one exists."""
         code_key, name_key = hint_key(item_code, item_name)
-        
-        results = self.db.execute_query(
+        rows = self.db.execute_query(
             SELECT_DECISIONS + " where item_code_key=%s and item_name_key=%s",
-            (code_key, name_key)
+            (code_key, name_key),
         )
-        return _decision_from_row(results[0]) if results else None
+        return _decision_from_row(rows[0]) if rows else None
 
     def delete(self, item_code: str, item_name: str) -> None:
         """Remove a previously saved decision for an item."""
         code_key, name_key = hint_key(item_code, item_name)
         self.db.execute_update(
             "delete from manual_review_decisions where item_code_key=%s and item_name_key=%s",
-            (code_key, name_key)
+            (code_key, name_key),
         )
 
     def list_decisions(self) -> list[ManualReviewDecision]:
@@ -77,33 +77,53 @@ class ManualReviewStore:
 
     def _init_schema(self) -> None:
         self.db.execute_update(CREATE_DECISIONS_TABLE)
-        _ensure_manual_decision_column(self.db)
-        _ensure_correct_product_name_ar_column(self.db)
+        _ensure_column(self.db, "manual_decision", ALTER_DECISIONS_TABLE)
+        _ensure_column(self.db, "correct_product_name_ar", ALTER_DECISIONS_TABLE_AR)
+
 
 def _decision_values(code_key: str, name_key: str, decision: ManualReviewDecision):
     return (
-        code_key, name_key, decision.item_code, decision.item_name,
-        int(decision.approved), decision.manual_decision,
+        code_key,
+        name_key,
+        decision.item_code,
+        decision.item_name,
+        int(decision.approved),
+        decision.manual_decision,
         decision.correct_store_product_id,
-        decision.correct_product_name, decision.correct_product_name_ar,
-        decision.correct_query, decision.run_id,
+        decision.correct_product_name,
+        decision.correct_product_name_ar,
+        decision.correct_query,
+        decision.run_id,
     )
+
 
 def _decision_from_row(row) -> ManualReviewDecision:
     return ManualReviewDecision(
-        row[0], row[1], bool(row[2]), row[3], row[5], row[6], row[7], row[8], row[4]
+        _clean(row[0]),
+        _clean(row[1]),
+        bool(row[2]),
+        _clean(row[3]),
+        _clean(row[5]),
+        _clean(row[6]),
+        _clean(row[7]),
+        _clean(row[8]),
+        _clean(row[4]),
     )
 
-def _ensure_manual_decision_column(db) -> None:
-    columns = _table_columns(db)
-    if "manual_decision" not in columns:
-        db.execute_update(ALTER_DECISIONS_TABLE)
 
-def _ensure_correct_product_name_ar_column(db) -> None:
-    columns = _table_columns(db)
-    if "correct_product_name_ar" not in columns:
-        db.execute_update(ALTER_DECISIONS_TABLE_AR)
+def _ensure_column(db, column: str, alter_query: str) -> None:
+    rows = db.execute_query(
+        "select column_name from information_schema.columns "
+        "where table_name = 'manual_review_decisions'"
+    )
+    if column not in {row[0] for row in rows}:
+        db.execute_update(alter_query)
 
-def _table_columns(db) -> set[str]:
-    rows = db.execute_query("select column_name from information_schema.columns where table_name = 'manual_review_decisions'")
-    return {row[0] for row in rows}
+
+def _default_decision(approved: bool) -> str:
+    return "approved_match" if approved else ""
+
+
+def _clean(value: object) -> str:
+    text = str(value or "").strip()
+    return "" if text.lower() in {"nan", "none", "null"} else text

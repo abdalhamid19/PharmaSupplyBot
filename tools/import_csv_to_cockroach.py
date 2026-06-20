@@ -3,13 +3,13 @@ import os
 import csv
 import psycopg2
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Add project root to path so we can import src
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.core.manual_review_hints import hint_key
 
 DB_USER = "abdalhamid"
-DB_PASS = "_wJpvGkeXrpD4_mD8jAhYg"
 DB_HOST = "mahrousdb-27867.j77.aws-eu-central-1.cockroachlabs.cloud"
 DB_PORT = 26257
 DB_NAME = "defaultdb"
@@ -74,9 +74,19 @@ def import_csv(conn, csv_path):
         print(f"Successfully imported {count} rows.")
 
 if __name__ == "__main__":
-    conn_str = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
+    load_dotenv()
+    db_password = os.getenv("DB_PASSWORD", "").strip()
+    if not db_password:
+        raise SystemExit("Set DB_PASSWORD in .env before importing to CockroachDB.")
     try:
-        conn = psycopg2.connect(conn_str)
+        conn = psycopg2.connect(
+            host=os.getenv("DB_HOST", DB_HOST),
+            port=int(os.getenv("DB_PORT", DB_PORT)),
+            database=os.getenv("DB_NAME", DB_NAME),
+            user=os.getenv("DB_USER", DB_USER),
+            password=db_password,
+            sslmode=os.getenv("DB_SSLMODE", "require"),
+        )
         create_table(conn)
         import_csv(conn, "saved_corrected_items(2).csv")
         conn.close()

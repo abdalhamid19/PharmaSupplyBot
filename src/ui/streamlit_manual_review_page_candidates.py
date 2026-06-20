@@ -9,6 +9,7 @@ from ..core.manual_review_candidate_store import load_review_candidates
 from ..core.manual_review_candidates import ReviewCandidateOption
 from ..core.manual_review_store import ManualReviewStore
 from ..core.utils.excel import Item
+from .streamlit_manual_review_db import manual_review_store_or_stop
 from .streamlit_manual_review_page_form import render_selection_form
 
 
@@ -21,7 +22,7 @@ def render_run_candidates(run_dir: Path) -> None:
         st.success("🎉 All items in this run were processed automatically! No manual review is required.")
         return
 
-    store = ManualReviewStore()
+    store = manual_review_store_or_stop()
     hide_completed = st.checkbox("Hide completed items", value=True)
     
     for item_key, options in candidates_dict.items():

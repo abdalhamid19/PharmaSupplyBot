@@ -10,6 +10,7 @@ from playwright.sync_api import sync_playwright
 from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, load_api_contract
 from .tawreed_api_defaults import product_search_body, product_search_url
 from .tawreed_api_payloads import body_with_item, body_with_match, body_with_query
+from .tawreed_auth_tokens import access_token_from_state
 from .tawreed_product_search import _api_candidates
 
 
@@ -75,6 +76,7 @@ class TawreedApiClient:
             request_context = playwright.request.new_context(
                 storage_state=str(self.state_path),
                 base_url=_api_origin(self.base_url),
+                extra_http_headers=_auth_headers_from_state(self.state_path),
             )
             try:
                 response = request_context.post(url, data=body, timeout=60_000)
@@ -90,3 +92,11 @@ def _api_origin(base_url: str) -> str:
     if "seller.tawreed.io" in base_url:
         return "https://api.tawreed.io"
     return base_url.split("#/", 1)[0].rstrip("/")
+
+
+def _auth_headers_from_state(state_path: Path) -> dict[str, str]:
+    """Return Tawreed API auth headers extracted from Playwright storage state."""
+    token = access_token_from_state(state_path)
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}

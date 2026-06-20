@@ -58,8 +58,11 @@ def attempt_env_login(page: Page, selectors) -> None:
         page.locator(selectors.login_email).first.fill(email)
         page.locator(selectors.login_password).first.fill(password)
         page.locator(selectors.login_submit).first.click()
-    except Exception:
-        pass
+    except Exception as error:
+        raise RuntimeError(
+            "Could not submit Tawreed login credentials. "
+            "Check selectors.login.email_input, password_input, and submit_button."
+        ) from error
 
 
 def print_auth_instructions(wait_seconds: int, headless: bool = False) -> None:

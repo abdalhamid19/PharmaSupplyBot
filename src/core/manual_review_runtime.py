@@ -15,7 +15,7 @@ from .utils.excel import Item
 def saved_manual_review_decision(item: Item) -> ManualReviewDecision | None:
     """Return a saved manual-review decision."""
     try:
-        return ManualReviewStore().lookup(item.code, item.name)
+        return ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup(item.code, item.name)
     except Exception:
         return None
 

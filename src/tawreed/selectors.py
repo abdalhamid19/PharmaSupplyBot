@@ -15,9 +15,17 @@ from .tawreed_constants import (
 
 
 LOGIN_DEFAULTS = {
-    "login_email": ("login", "email_input", "input[type='email']"),
+    "login_email": (
+        "login",
+        "email_input",
+        "#username, input[name='username'], input[type='email'], input[name='email']",
+    ),
     "login_password": ("login", "password_input", "input[type='password']"),
-    "login_submit": ("login", "submit_button", "button[type='submit']"),
+    "login_submit": (
+        "login",
+        "submit_button",
+        "button:has-text('دخول'), button:has-text('Login'), button[type='submit']",
+    ),
     "logged_in_marker": ("nav", "logged_in_marker", "text=Home"),
 }
 
