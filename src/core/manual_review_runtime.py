@@ -89,6 +89,8 @@ def manual_review_match(
                 match = SearchMatch(query, index, 999.0, candidate)
                 return MatchDecision(match, [], "Approved by saved manual review (ID match).")
                 
+            if not c_id:
+                continue
             if not target_id and (target_en or target_ar):
                 if (target_en and c_en == target_en) or (target_ar and c_ar == target_ar):
                     match = SearchMatch(query, index, 999.0, candidate)

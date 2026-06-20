@@ -13,6 +13,7 @@ def body_with_query(body: dict[str, Any], query: str) -> dict[str, Any]:
     payload = _copy_body(body)
     data = payload.setdefault("data", {})
     if isinstance(data, dict):
+        data["productName"] = query
         data.setdefault("globalSearch", query)
         data.setdefault("search", query)
     return payload

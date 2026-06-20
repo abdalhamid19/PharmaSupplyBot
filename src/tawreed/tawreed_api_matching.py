@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+from ..core.candidate_identity import candidate_has_store_product_id
 from ..core.manual_review_runtime import manual_review_match, manual_review_queries
 from ..core.product_matching import _search_queries_for_item, explain_best_product_match
 from ..core.utils.excel import Item
@@ -49,6 +50,11 @@ def _check_api_match(
 def _handle_api_no_match(
     bot, item: Item, queries: list[str], results, require_available: bool
 ):
+    if _has_only_non_orderable_candidates(results):
+        raise bot.no_results_exception(
+            f"API candidates found for '{item.name}', but none has an orderable "
+            "storeProductId."
+        )
     decision = explain_best_product_match(item, results, bot.config.matching)
     decision = bot.resolve_order_ai_decision(item, decision)
     write_match_log(bot, item, decision)
@@ -56,6 +62,14 @@ def _handle_api_no_match(
         return _accepted_api_match(bot, item, decision, require_available)
     raise bot.no_results_exception(
         f"No decisive API match found for '{item.name}' after {len(queries)} queries."
+    )
+
+
+def _has_only_non_orderable_candidates(results) -> bool:
+    """Return whether API search found rows but none can be ordered."""
+    candidates = [candidate for _query, rows in results for candidate in rows]
+    return bool(candidates) and not any(
+        candidate_has_store_product_id(candidate) for candidate in candidates
     )
 
 

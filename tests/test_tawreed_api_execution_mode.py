@@ -9,6 +9,7 @@ import unittest
 
 from src.tawreed.tawreed_api import TawreedApiClient
 from src.tawreed.tawreed_api_discovery import save_api_contract_capture
+from src.tawreed.tawreed_api_matching import _has_only_non_orderable_candidates
 
 
 class TawreedApiExecutionModeTests(unittest.TestCase):
@@ -27,6 +28,7 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
         self.assertEqual(rows[0]["storeProductId"], "s1")
         self.assertIn("stores/products/search/similar5", client.last_url)
         self.assertEqual(client.last_body["data"]["globalSearch"], "BEBELAC AR MILK")
+        self.assertEqual(client.last_body["data"]["productName"], "BEBELAC AR MILK")
         self.assertTrue(client.contract_field_available("product_search_url"))
 
     def test_discovery_merges_browser_captured_endpoints(self) -> None:
@@ -52,6 +54,19 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
         self.assertIn("similar5", payload["product_search_url"])
         self.assertIn("cart/add", payload["add_to_cart_url"])
         self.assertIn("cart/remove", payload["remove_cart_url"])
+
+    def test_detects_api_candidates_without_orderable_ids(self) -> None:
+        """API results without storeProductId should report a clearer skip reason."""
+        results = [
+            ("LEVIASILLS", [{"productNameEn": "LEVIASILLS LOZENGES ORANGE"}])
+        ]
+
+        self.assertTrue(_has_only_non_orderable_candidates(results))
+        self.assertFalse(
+            _has_only_non_orderable_candidates(
+                [("KENACOMB", [{"storeProductId": "1460790"}])]
+            )
+        )
 
 
 class _CapturingClient(TawreedApiClient):
