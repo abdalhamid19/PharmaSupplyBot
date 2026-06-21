@@ -277,6 +277,15 @@ def order_command(
     prevented_items_excel = str(form_values.get("prevented_items_excel") or "")
     if prevented_items_excel:
         command.extend(["--prevented-items-excel", prevented_items_excel])
+        
+    start_item = _int_form_value(form_values, "start_item", 1)
+    if start_item > 1:
+        command.extend(["--start-item", str(start_item)])
+        
+    end_item = _int_form_value(form_values, "end_item", 0)
+    if end_item > 0:
+        command.extend(["--end-item", str(end_item)])
+        
     command.extend(_matching_risk_command_args(form_values))
     command.extend(_order_ai_command_args(form_values))
     return command

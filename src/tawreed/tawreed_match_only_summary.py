@@ -5,7 +5,7 @@ from __future__ import annotations
 from ..core.matching_models import MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_artifacts import append_csv_artifact
-from .tawreed_match_logs import OrderItemSummary
+from .tawreed_match_logs import OrderResultSummary
 from .tawreed_match_only_rows import match_only_summary_rows
 
 MATCH_ONLY_SUMMARY_LABEL = "match_only_summary"
@@ -14,7 +14,7 @@ MATCH_ONLY_SUMMARY_LABEL = "match_only_summary"
 def append_match_only_summary(
     profile_key: str,
     item: Item,
-    summary: OrderItemSummary,
+    summary: OrderResultSummary,
     decision: MatchDecision | None,
     label_suffix: str | None = None,
 ) -> None:

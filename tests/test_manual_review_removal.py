@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from src.core.manual_review_removal import (
     cart_items_from_manual_review_csv,
@@ -29,15 +30,15 @@ class ManualReviewRemovalTests(unittest.TestCase):
         self.assertEqual(items[0].code, "1")
         self.assertEqual(items[0].name, "Panadol")
 
-    def test_saved_not_matching_decisions_become_cart_items(self) -> None:
+    @patch("src.core.manual_review_store.ManualReviewStore.list_decisions")
+    def test_saved_not_matching_decisions_become_cart_items(self, mock_list) -> None:
+        mock_list.return_value = [
+            ManualReviewDecision(
+                "1", "Panadol", False, manual_decision="not_matching"
+            )
+        ]
         with TemporaryDirectory() as temp_dir:
             store = ManualReviewStore(Path(temp_dir) / "manual.sqlite3")
-            store.upsert(
-                ManualReviewDecision(
-                    "1", "Panadol", False, manual_decision="not_matching"
-                )
-            )
-
             items = cart_items_from_saved_not_matching(store)
 
         self.assertEqual(len(items), 1)

@@ -45,7 +45,7 @@ class CliCommandsTests(unittest.TestCase):
                 os.chdir(temp_dir)
                 summary_dir = Path("artifacts") / "wardany"
                 summary_dir.mkdir(parents=True)
-                (summary_dir / "order_result_summary.csv").write_text(
+                (summary_dir / "order_item_summary.csv").write_text(
                     "item_code,item_name,status\n1,Panadol,added-to-cart\n",
                     encoding="utf-8",
                 )
@@ -214,7 +214,7 @@ class CliCommandsTests(unittest.TestCase):
                 summary_rows = [
                     f"{index},Item {index},added-to-cart" for index in range(9)
                 ]
-                (summary_dir / "order_result_summary.csv").write_text(
+                (summary_dir / "order_item_summary.csv").write_text(
                     "item_code,item_name,status\n" + "\n".join(summary_rows) + "\n",
                     encoding="utf-8",
                 )

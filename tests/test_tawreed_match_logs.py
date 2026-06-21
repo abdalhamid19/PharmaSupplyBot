@@ -10,7 +10,7 @@ from src.core.matching_models import (
 from src.core.utils.excel import Item
 from src.tawreed.tawreed_match_logs import (
     MAX_DETAILED_MATCH_CANDIDATES,
-    OrderItemSummary,
+    OrderResultSummary,
     append_order_result_summary,
     match_log_csv_rows,
     write_match_log,
@@ -23,7 +23,7 @@ from src.tawreed.tawreed_match_only_summary import append_match_only_summary
 class TawreedMatchLogsTests(unittest.TestCase):
     def test_append_order_result_summary_writes_structured_status_row(self) -> None:
         item = Item(code="123", name="Panadol Extra", qty=2)
-        summary = OrderItemSummary(
+        summary = OrderResultSummary(
             status="matched-but-unavailable",
             reason="Matched product is unavailable.",
             ordered_total_qty=2,
@@ -89,7 +89,7 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "salePrice": 20.5,
         }
         decision = _accepted_decision(candidate)
-        summary = OrderItemSummary(status="matched-only", reason="match only")
+        summary = OrderResultSummary(status="matched-only", reason="match only")
 
         rows = match_only_summary_rows(item, summary, decision)
 
@@ -103,7 +103,7 @@ class TawreedMatchLogsTests(unittest.TestCase):
 
     def test_append_match_only_summary_writes_independent_csv(self) -> None:
         item = Item(code="123", name="Panadol Extra", qty=2)
-        summary = OrderItemSummary(status="matched-only", reason="match only")
+        summary = OrderResultSummary(status="matched-only", reason="match only")
 
         with patch(
             "src.tawreed.tawreed_match_only_summary.append_csv_artifact"

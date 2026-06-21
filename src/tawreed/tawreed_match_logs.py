@@ -19,7 +19,7 @@ MAX_DETAILED_MATCH_CANDIDATES = 25
 
 
 @dataclass(frozen=True)
-class OrderItemSummary:
+class OrderResultSummary:
     """One compact execution summary row for an item processed during ordering."""
 
     status: str
@@ -73,10 +73,10 @@ def should_write_detailed_match_log(decision: MatchDecision) -> bool:
     return False
 
 
-def append_order_item_summary(
+def append_order_result_summary(
     profile_key: str,
     item: Item,
-    summary: OrderItemSummary,
+    summary: OrderResultSummary,
     label_suffix: str | None = None,
 ) -> None:
     """Append one compact order-result summary row to the table artifacts."""
@@ -103,14 +103,14 @@ def append_order_item_summary(
     }
     if label_suffix:
         append_csv_artifact(
-            profile_key, "order_item_summary", [row], label_suffix=label_suffix
+            profile_key, "order_result_summary", [row], label_suffix=label_suffix
         )
         append_xlsx_artifact(
-            profile_key, "order_item_summary", [row], label_suffix=label_suffix
+            profile_key, "order_result_summary", [row], label_suffix=label_suffix
         )
         return
-    append_csv_artifact(profile_key, "order_item_summary", [row])
-    append_xlsx_artifact(profile_key, "order_item_summary", [row])
+    append_csv_artifact(profile_key, "order_result_summary", [row])
+    append_xlsx_artifact(profile_key, "order_result_summary", [row])
 
 
 def match_log_content(item: Item, decision: MatchDecision) -> str:

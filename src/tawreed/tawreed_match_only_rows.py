@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..core.matching_models import MatchDecision
 from ..core.utils.excel import Item
-from .tawreed_match_logs import OrderItemSummary
+from .tawreed_match_logs import OrderResultSummary
 from .tawreed_timing import timing_summary_fields
 from .tawreed_match_only_fields import (
     best_match_attr,
@@ -14,7 +14,7 @@ from .tawreed_match_only_fields import (
 
 
 def match_only_summary_rows(
-    item: Item, summary: OrderItemSummary, decision: MatchDecision | None
+    item: Item, summary: OrderResultSummary, decision: MatchDecision | None
 ) -> list[dict[str, object]]:
     """Build one summary row per candidate considered during match-only mode."""
     diagnostics = sorted_diagnostics(decision)
@@ -34,7 +34,7 @@ def _candidate_row(item, summary, decision, diagnostic, rank) -> dict[str, objec
 
 
 def _base_row(
-    item: Item, summary: OrderItemSummary, decision: MatchDecision | None
+    item: Item, summary: OrderResultSummary, decision: MatchDecision | None
 ) -> dict[str, object]:
     """Return item-level match-only fields shared by every row."""
     return {

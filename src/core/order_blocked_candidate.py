@@ -28,8 +28,16 @@ def blocked_candidate_query(outcome) -> str:
 
 def blocked_candidate_fields(candidate: dict) -> dict[str, object]:
     """Return artifact fields for a non-orderable AI-selected candidate."""
+    
+    # FIX: Use fallback English name for DOM candidates (Browser mode)
+    en_name = (
+        candidate.get("productNameEn") 
+        or candidate.get("productNameEnFallback") 
+        or ""
+    )
+    
     return {
-        "blocked_candidate_name_en": candidate.get("productNameEn", ""),
+        "blocked_candidate_name_en": en_name,
         "blocked_candidate_name_ar": candidate.get("productName", ""),
         "blocked_candidate_product_id": candidate.get("productId", ""),
         "blocked_candidate_store_product_id": candidate.get("storeProductId", ""),

@@ -10,7 +10,7 @@ from ..core.order_run_artifact_rows import (
 )
 from ..core.utils.excel import Item
 from .tawreed_artifacts import append_csv_artifact, append_text_artifact
-from .tawreed_match_logs import OrderItemSummary
+from .tawreed_match_logs import OrderResultSummary
 
 
 def append_order_ai_trace_artifacts(
@@ -29,7 +29,7 @@ def append_order_ai_trace_artifacts(
 def append_order_item_artifacts(
     profile_key: str,
     item: Item,
-    summary: OrderItemSummary,
+    summary: OrderResultSummary,
     decision,
     outcome,
     label_suffix: str | None = None,
@@ -87,7 +87,7 @@ from ..core.manual_review_candidates import review_candidate_options
 def append_manual_review_artifacts(
     profile_key: str,
     item: Item,
-    summary: OrderItemSummary,
+    summary: OrderResultSummary,
     decision,
     outcome,
     label_suffix: str | None = None,

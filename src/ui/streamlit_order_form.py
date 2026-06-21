@@ -20,7 +20,7 @@ from ..core.prevented_items import (
 )
 from .streamlit_uploads import available_excel_options
 
-OrderRunFields = tuple[str, str, int, bool, bool, bool, str, bool, float]
+OrderRunFields = tuple[str, str, int, bool, bool, bool, str, bool, float, int, int]
 
 
 def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
@@ -128,7 +128,7 @@ def _order_form_values(
 def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
     """Build values related to the selected order run target/options."""
     profile_mode, profile_key, limit, debug_browser, resume, match_only = run_fields[:6]
-    execution_mode, high_disc, min_disc = _extended_order_run_values(run_fields)
+    execution_mode, high_disc, min_disc, start_item, end_item = _extended_order_run_values(run_fields)
     return {
         "profile_mode": profile_mode,
         "profile_key": profile_key,
@@ -139,17 +139,22 @@ def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
         "execution_mode": str(execution_mode),
         "highest_discount": bool(high_disc),
         "min_discount_percent": float(min_disc),
+        "start_item": int(start_item),
+        "end_item": int(end_item),
     }
 
 
-def _extended_order_run_values(run_fields: OrderRunFields) -> tuple[str, bool, float]:
+def _extended_order_run_values(run_fields: OrderRunFields) -> tuple[str, bool, float, int, int]:
     """Return execution mode and discount controls with old-test tuple compatibility."""
     tail = run_fields[6:]
     if len(tail) == 2:
         high_disc, min_disc = tail
-        return "auto", bool(high_disc), float(min_disc)
-    execution_mode, high_disc, min_disc = tail
-    return str(execution_mode), bool(high_disc), float(min_disc)
+        return "auto", bool(high_disc), float(min_disc), 1, 0
+    if len(tail) == 3:
+        execution_mode, high_disc, min_disc = tail
+        return str(execution_mode), bool(high_disc), float(min_disc), 1, 0
+    execution_mode, high_disc, min_disc, start_item, end_item = tail
+    return str(execution_mode), bool(high_disc), float(min_disc), int(start_item), int(end_item)
 
 
 def render_prevented_items_manager(
@@ -314,6 +319,8 @@ def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=1500)
 
     with st.expander("⚙️ Advanced Options", expanded=False):
+        start_item = st.number_input("Start item number", min_value=1, value=1)
+        end_item = st.number_input("End item number (0 for unlimited)", min_value=0, value=0)
         debug_browser = st.checkbox("Debug browser", value=False)
         resume = st.checkbox("Resume from previous summary", value=False)
         match_only = st.checkbox("Match only without adding to cart", value=False)
@@ -343,6 +350,8 @@ def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
         str(execution_mode),
         bool(highest_discount),
         float(min_discount),
+        int(start_item),
+        int(end_item),
     )
     return fields, int(item_workers)
 

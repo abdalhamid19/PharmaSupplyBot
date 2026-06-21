@@ -10,7 +10,7 @@ from src.core.artifact_run import artifact_run
 from src.core.matching_models import MatchDecision, SearchMatch
 from src.core.order_ai_matching import OrderAiOutcome
 from src.core.utils.excel import Item
-from src.tawreed.tawreed_match_logs import OrderItemSummary
+from src.tawreed.tawreed_match_logs import OrderResultSummary
 from src.tawreed.tawreed_order_run_artifacts import (
     append_order_ai_trace_artifacts,
     append_order_item_artifacts,
@@ -85,8 +85,10 @@ class OrderRunArtifactsTests(unittest.TestCase):
             with self.subTest(status=status):
                 self._assert_manual_review_status(status)
 
-    def _assert_manual_review_status(self, status: str) -> None:
+    @patch("src.core.manual_review_runtime.saved_manual_review_decision")
+    def _assert_manual_review_status(self, status: str, mock_saved_decision) -> None:
         """Write one summary and assert it is routed to manual review."""
+        mock_saved_decision.return_value = None
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "artifacts"
             with artifact_run("order", "wardany", "20260513_2030", root):
@@ -103,8 +105,10 @@ class OrderRunArtifactsTests(unittest.TestCase):
             self.assertEqual(rows[0]["deterministic_match_found"], "False")
             self.assertEqual(rows[0]["manual_decision"], "")
 
-    def test_ai_blocked_match_is_not_final_actionable(self) -> None:
+    @patch("src.core.manual_review_runtime.saved_manual_review_decision")
+    def test_ai_blocked_match_is_not_final_actionable(self, mock_saved_decision) -> None:
         """A deterministic match blocked by AI is visible but not actionable."""
+        mock_saved_decision.return_value = None
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "artifacts"
             outcome = OrderAiOutcome(
@@ -130,8 +134,8 @@ class OrderRunArtifactsTests(unittest.TestCase):
         return Item("1", "Panadol", 1)
 
     @staticmethod
-    def _summary(status: str = "matched-only") -> OrderItemSummary:
-        return OrderItemSummary(status=status, reason="done")
+    def _summary(status: str = "matched-only") -> OrderResultSummary:
+        return OrderResultSummary(status=status, reason="done")
 
     def _decision(self) -> MatchDecision:
         match = SearchMatch("Panadol", 0, 95.0, self._candidate())

@@ -28,7 +28,7 @@ from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_t
 from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
-from .tawreed_match_logs import OrderItemSummary, append_order_item_summary
+from .tawreed_match_logs import OrderResultSummary, append_order_result_summary
 from .tawreed_match_only_summary import append_match_only_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_order_run_artifacts import (
@@ -759,7 +759,7 @@ class TawreedBot:
         summary = self._build_item_summary(
             status, reason, elapsed_seconds, match_elapsed_seconds
         )
-        append_order_item_summary(
+        append_order_result_summary(
             self.profile_key, item, summary, label_suffix=self.summary_label_suffix
         )
         self._record_order_run_artifacts(item, summary)
@@ -785,7 +785,7 @@ class TawreedBot:
         )
         self._record_order_run_artifacts(item, summary)
 
-    def _record_order_run_artifacts(self, item: Item, summary: OrderItemSummary) -> None:
+    def _record_order_run_artifacts(self, item: Item, summary: OrderResultSummary) -> None:
         """Append per-item summary and manual-review artifacts for this run."""
         append_order_item_artifacts(
             self.profile_key,
@@ -799,12 +799,12 @@ class TawreedBot:
 
     def _build_item_summary(
         self, status: str, reason: str, elapsed: float, match_elapsed: float
-    ) -> OrderItemSummary:
+    ) -> OrderResultSummary:
         """Build a compact summary object from the current bot state."""
         started_at = time.perf_counter()
         matched_name_fields = self._matched_summary_name_fields()
         record_timing(self, "summary_build_seconds", time.perf_counter() - started_at)
-        return OrderItemSummary(
+        return OrderResultSummary(
             status=status,
             reason=reason,
             ordered_total_qty=self.last_ordered_total_qty,
@@ -819,7 +819,7 @@ class TawreedBot:
         )
 
     def _matched_summary_name_fields(self) -> dict[str, str]:
-        """Return named OrderItemSummary fields for the last matched product."""
+        """Return named OrderResultSummary fields for the last matched product."""
         english_name, english_source, arabic_name, matched_query = (
             self._matched_summary_fields()
         )
@@ -833,12 +833,30 @@ class TawreedBot:
     def _matched_summary_fields(self) -> tuple[str, str, str, str]:
         """Return matched product summary fields from the last recorded match decision."""
         decision = self.last_match_decision
-        if not decision or not decision.best_match:
+        if not decision:
             return "", "", "", ""
-        candidate = decision.best_match.data
+            
+        candidate, query = self._extract_candidate(decision)
+                
+        if not candidate:
+            return "", "", "", ""
+            
         english_name, english_source = self._matched_english_name(candidate)
         arabic_name = str(candidate.get("productName") or "")
-        return english_name, english_source, arabic_name, decision.best_match.query
+        return english_name, english_source, arabic_name, query
+
+    def _extract_candidate(self, decision) -> tuple[dict | None, str]:
+        if decision.best_match:
+            return decision.best_match.data, decision.best_match.query
+            
+        diagnostics = getattr(decision, "diagnostics", None)
+        if not diagnostics:
+            return None, ""
+            
+        best = max(diagnostics, key=lambda d: d.score, default=None)
+        if best and getattr(best, "candidate", None):
+            return best.candidate, best.query
+        return None, ""
 
     def _matched_english_name(self, candidate: dict[str, object]) -> tuple[str, str]:
         """Return matched English name and whether it came from site or fallback."""

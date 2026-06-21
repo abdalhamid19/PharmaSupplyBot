@@ -221,15 +221,32 @@ def _load_items_for_order_mode(
     """Load items with a two-column catalog fallback in match-only mode."""
     limit = _excel_load_limit(args, has_prevented_filter)
     if _match_only(args):
-        return load_match_only_items_from_excel(
+        items = load_match_only_items_from_excel(
             excel_path, app_config.excel, limit=limit
         )
-    return load_items_from_excel(excel_path, app_config.excel, limit=limit)
+    else:
+        items = load_items_from_excel(excel_path, app_config.excel, limit=limit)
+    return _slice_items(items, args)
+
+def _slice_items(items: Iterable[Item], args: argparse.Namespace) -> Iterable[Item]:
+    start_item = max(1, getattr(args, "start_item", 1))
+    end_item = getattr(args, "end_item", 0)
+    
+    if start_item > 1:
+        items = itertools.islice(items, start_item - 1, None)
+        
+    if end_item >= start_item:
+        slice_limit = end_item - start_item + 1
+        items = itertools.islice(items, slice_limit)
+        
+    return items
 
 
 def _excel_load_limit(args: argparse.Namespace, has_prevented_filter: bool) -> int:
     """Return the safe Excel read limit before profile-level filters run."""
     if bool(getattr(args, "resume", False)) or has_prevented_filter:
+        return 0
+    if getattr(args, "start_item", 1) > 1 or getattr(args, "end_item", 0) > 0:
         return 0
     return _order_item_limit(args)
 
