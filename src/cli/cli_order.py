@@ -286,11 +286,11 @@ def _summary_label(args: argparse.Namespace) -> str:
     """Return the canonical summary label for the requested order mode."""
     if _match_only(args):
         return MATCH_ONLY_SUMMARY_LABEL
-    return "order_result_summary"
+    return "order_item_summary"
 
 
 def _processed_summary_item_keys(
-    profile_key: str, summary_label: str = "order_result_summary"
+    profile_key: str, summary_label: str = "order_item_summary"
 ) -> set[tuple[str, str]]:
     """Return item keys already written to the active profile summary."""
     summary_path = _latest_summary_path(profile_key, summary_label)

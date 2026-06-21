@@ -28,7 +28,7 @@ from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_t
 from .tawreed_checkout import confirm_order
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
-from .tawreed_match_logs import OrderItemSummary, append_order_result_summary
+from .tawreed_match_logs import OrderItemSummary, append_order_item_summary
 from .tawreed_match_only_summary import append_match_only_summary
 from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from .tawreed_order_run_artifacts import (
@@ -759,7 +759,7 @@ class TawreedBot:
         summary = self._build_item_summary(
             status, reason, elapsed_seconds, match_elapsed_seconds
         )
-        append_order_result_summary(
+        append_order_item_summary(
             self.profile_key, item, summary, label_suffix=self.summary_label_suffix
         )
         self._record_order_run_artifacts(item, summary)
@@ -856,12 +856,15 @@ class TawreedBot:
         if (
             "no matching product found" in lowered
             or "no decisive match found" in lowered
+            or "no decisive api match found" in lowered
         ):
             return self._unmatched_decision_status() or "no-results"
         if "manual review" in lowered:
             return "manual-review-required"
         if "unavailable" in lowered or "out of stock" in lowered:
             return "matched-but-unavailable"
+        if "cart button disabled" in lowered:
+            return "not-orderable"
         return "skipped"
 
     def _failure_status(self, reason: str) -> str:

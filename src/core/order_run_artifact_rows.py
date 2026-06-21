@@ -32,15 +32,32 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
     match = decision.best_match if decision else None
     blocked_candidate = blocked_ai_candidate(outcome) if not match else {}
     status = effective_order_status(summary.status, outcome)
+
+    best_diagnostic = None
+    if status == "not-orderable" and not blocked_candidate and not match:
+        if decision and getattr(decision, "diagnostics", None):
+            best_diagnostic = max(decision.diagnostics, key=lambda d: d.score, default=None)
+            if best_diagnostic and getattr(best_diagnostic, "candidate", None):
+                blocked_candidate = best_diagnostic.candidate
+
     manual_review = manual_review_required(item, status, outcome)
+
+    matched_query = match.query if match else blocked_candidate_query(outcome)
+    if not matched_query and best_diagnostic:
+        matched_query = best_diagnostic.query
+        
+    det_score = round(match.score, 6) if match else ""
+    if not det_score and best_diagnostic:
+        det_score = round(best_diagnostic.score, 6)
+
     return {
         "item_code": item.code,
         "item_name": item.name,
         "item_qty": item.qty,
         "status": status,
         "reason": summary.reason,
-        "matched_query": match.query if match else blocked_candidate_query(outcome),
-        "deterministic_score": round(match.score, 6) if match else "",
+        "matched_query": matched_query,
+        "deterministic_score": det_score,
         **_match_state_fields(item, status, outcome, match),
         **candidate_summary_fields(match.data if match else blocked_candidate, decision, match),
         **blocked_candidate_fields(blocked_candidate),

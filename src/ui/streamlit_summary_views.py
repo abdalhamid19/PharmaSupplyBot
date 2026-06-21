@@ -37,7 +37,7 @@ def maybe_warn_stale_xlsx(summary_csv: Path, summary_xlsx: Path) -> None:
     if not summary_csv.exists() or not summary_xlsx.exists():
         return
     if summary_xlsx.stat().st_mtime < summary_csv.stat().st_mtime:
-        st.warning("`order_result_summary.xlsx` is older than the CSV and may miss the latest run.")
+        st.warning("`order_item_summary.xlsx` is older than the CSV and may miss the latest run.")
 
 
 def render_summary_tabs(csv_rows: list[dict[str, str]], xlsx_rows: list[dict[str, str]]) -> None:

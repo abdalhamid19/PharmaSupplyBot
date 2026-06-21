@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-
 from ..core.candidate_identity import candidate_has_store_product_id
 from ..core.manual_review_runtime import (
     manual_review_match,
@@ -100,18 +99,44 @@ def _handle_api_no_match(
     review_decision=None,
 ):
     if _has_only_non_orderable_candidates(results):
-        raise bot.no_results_exception(
-            f"API candidates found for '{item.name}', but none has an orderable "
-            "storeProductId."
+        from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
+        from ..core.product_matching import MatchScoreBreakdown
+
+        candidates = [(q, c) for q, rows in results for c in rows]
+        diagnostics = []
+        if candidates:
+            query, candidate = candidates[0]
+            diagnostics.append(
+                CandidateMatchDiagnostic(
+                    query=query,
+                    row_index=0,
+                    score=999.0,
+                    sort_key=(999.0, 0, 0.0, 0, 0, 0),
+                    accepted=False,
+                    accepted_reason="",
+                    rejection_reason="Candidate missing orderable storeProductId",
+                    breakdown=MatchScoreBreakdown(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.0),
+                    candidate=candidate,
+                )
+            )
+        bot.last_match_decision = MatchDecision(
+            best_match=None,
+            diagnostics=diagnostics,
+            final_reason="All API candidates missing orderable storeProductId",
         )
+        raise bot.no_results_exception(
+            f"No decisive match found for '{item.name}'. API candidates found but none has an orderable storeProductId."
+        )
+
     decision = _api_match_decision(bot, item, results, review_decision)
     decision = bot.resolve_order_ai_decision(item, decision)
     write_match_log(bot, item, decision)
     if decision.best_match:
         return _accepted_api_match(bot, item, decision, require_available)
     raise bot.no_results_exception(
-        f"No decisive API match found for '{item.name}' after {len(queries)} queries."
+        f"No decisive match found for '{item.name}' after {len(queries)} queries."
     )
+
 
 
 def _has_only_non_orderable_candidates(results) -> bool:

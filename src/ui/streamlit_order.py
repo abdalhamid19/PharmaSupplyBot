@@ -222,7 +222,7 @@ def order_run_summary_csv_path(
 
 def _latest_order_summary_path(profile_key: str, match_only: bool) -> Path | None:
     """Return the newest order summary from run folders."""
-    label = "match_only_summary" if match_only else "order_result_summary"
+    label = "match_only_summary" if match_only else "order_item_summary"
     paths = sorted((ARTIFACTS_DIR / "order" / profile_key).glob(f"*/{label}_*.csv"))
     return paths[-1] if paths else None
 

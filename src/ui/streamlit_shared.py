@@ -80,12 +80,12 @@ def profile_selector_options() -> list[str]:
 
 def summary_csv_path(profile_key: str) -> Path:
     """Return the order-result summary CSV path for one profile."""
-    return ARTIFACTS_DIR / profile_key / "order_result_summary.csv"
+    return ARTIFACTS_DIR / profile_key / "order_item_summary.csv"
 
 
 def summary_xlsx_path(profile_key: str) -> Path:
     """Return the order-result summary XLSX path for one profile."""
-    return ARTIFACTS_DIR / profile_key / "order_result_summary.xlsx"
+    return ARTIFACTS_DIR / profile_key / "order_item_summary.xlsx"
 
 
 def match_only_summary_csv_path(profile_key: str) -> Path:

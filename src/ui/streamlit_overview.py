@@ -23,7 +23,7 @@ def render_overview(app_config, config_path: Path) -> None:
         sorted(PREVENTED_ITEMS_DIR.glob("*.xlsx")) if PREVENTED_ITEMS_DIR.exists() else []
     )
     remove_files = sorted(REMOVE_ITEMS_DIR.glob("*.xlsx")) if REMOVE_ITEMS_DIR.exists() else []
-    summary_path = ARTIFACTS_DIR / "wardany" / "order_result_summary.csv"
+    summary_path = ARTIFACTS_DIR / "wardany" / "order_item_summary.csv"
     summary_rows = load_csv_rows(summary_path)
     render_overview_metrics(app_config, input_files, prevented_files, summary_rows)
     render_settings_section(app_config, app_config.matching, config_path)
