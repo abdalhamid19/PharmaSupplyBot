@@ -56,6 +56,22 @@ class ManualReviewStore:
             UPSERT_DECISION, _decision_values(code_key, name_key, decision)
         )
 
+    def upsert_batch(self, decisions: list[ManualReviewDecision]) -> None:
+        """Batch insert/update multiple decisions in one transaction (much faster)."""
+        if not decisions:
+            return
+        
+        values = [
+            _decision_values(*hint_key(d.item_code, d.item_name), d)
+            for d in decisions
+        ]
+        
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.executemany(UPSERT_DECISION, values)
+            conn.commit()
+            cur.close()
+
     def lookup(self, item_code: str, item_name: str) -> ManualReviewDecision | None:
         """Return a previously saved decision for an item when one exists."""
         code_key, name_key = hint_key(item_code, item_name)

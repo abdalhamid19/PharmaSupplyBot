@@ -106,8 +106,7 @@ def save_manual_review_rows(
     """Persist edited manual-review rows and return the saved count."""
     store = ManualReviewStore(store_path)
     decisions = manual_review_decisions_from_rows(rows, run_id)
-    for decision in decisions:
-        store.upsert(decision)
+    store.upsert_batch(decisions)  # ⚡ Batch upsert instead of loop
     return len(decisions)
 
 

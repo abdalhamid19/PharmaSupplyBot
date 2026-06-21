@@ -33,12 +33,15 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
     blocked_candidate = blocked_ai_candidate(outcome) if not match else {}
     status = effective_order_status(summary.status, outcome)
 
+    # Extract best diagnostic for not-orderable (FIX: removed blocked_candidate condition)
     best_diagnostic = None
-    if status == "not-orderable" and not blocked_candidate and not match:
+    if status == "not-orderable" and not match:
         if decision and getattr(decision, "diagnostics", None):
             best_diagnostic = max(decision.diagnostics, key=lambda d: d.score, default=None)
             if best_diagnostic and getattr(best_diagnostic, "candidate", None):
-                blocked_candidate = best_diagnostic.candidate
+                # Only fill if blocked_candidate is empty
+                if not blocked_candidate:
+                    blocked_candidate = best_diagnostic.candidate
 
     manual_review = manual_review_required(item, status, outcome)
 
@@ -50,6 +53,9 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
     if not det_score and best_diagnostic:
         det_score = round(best_diagnostic.score, 6)
 
+    # Use blocked_candidate as the match source for not-orderable
+    match_source = match.data if match else blocked_candidate
+
     return {
         "item_code": item.code,
         "item_name": item.name,
@@ -59,7 +65,7 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
         "matched_query": matched_query,
         "deterministic_score": det_score,
         **_match_state_fields(item, status, outcome, match),
-        **candidate_summary_fields(match.data if match else blocked_candidate, decision, match),
+        **candidate_summary_fields(match_source, decision, match),
         **blocked_candidate_fields(blocked_candidate),
         **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
         **manual_review_reason_fields(status, summary.reason, outcome),
