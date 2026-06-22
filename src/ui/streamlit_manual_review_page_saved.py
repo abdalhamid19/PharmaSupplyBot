@@ -24,7 +24,14 @@ def render_saved_decisions() -> None:
     df = pd.DataFrame([_decision_row(d) for d in decisions])
     
     all_columns = list(df.columns)
-    default_columns = ["item_code", "item_name", "decision", "correct_product_name", "correct_product_name_ar"]
+    default_columns = [
+        "item_code",
+        "item_name",
+        "run_date",
+        "decision",
+        "correct_product_name",
+        "correct_product_name_ar",
+    ]
     # Ensure default columns exist in the DataFrame
     default_columns = [col for col in default_columns if col in all_columns]
     
@@ -88,6 +95,7 @@ def _decision_row(d) -> dict:
     return {
         "item_code": d.item_code,
         "item_name": d.item_name,
+        "run_date": d.run_id,
         "decision": d.manual_decision,
         "correct_store_product_id": d.correct_store_product_id,
         "correct_product_name": getattr(d, "correct_product_name", ""),
