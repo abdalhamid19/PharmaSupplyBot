@@ -12,6 +12,7 @@ from src.ui.streamlit_manual_review import (
     manual_review_decisions_from_rows,
     save_manual_review_rows,
 )
+from src.ui.streamlit_manual_review_page_saved import _decision_row
 from src.ui.streamlit_manual_review_remove import (
     manual_review_remove_command,
     write_not_matching_review_csv,
@@ -131,6 +132,19 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         self.assertEqual(command[command.index("--profile") + 1], "wardany")
         self.assertIn("--from-manual-review", command)
+
+    def test_saved_decision_row_exposes_run_date_from_run_id(self) -> None:
+        row = _decision_row(
+            ManualReviewDecision(
+                item_code="123",
+                item_name="Panadol",
+                approved=True,
+                run_id="20260622_1425",
+            )
+        )
+
+        self.assertEqual(row["run_date"], "20260622_1425")
+        self.assertEqual(row["run_id"], "20260622_1425")
 
 
 if __name__ == "__main__":
