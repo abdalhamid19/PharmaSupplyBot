@@ -33,6 +33,10 @@ class TawreedApiClient:
         self.contract = load_api_contract(contract_path)
         self._playwright = None
         self._request_context = None
+        
+        # Extract customer ID from token
+        from .tawreed_auth_tokens import customer_id_from_state
+        self.customer_id = customer_id_from_state(state_path)
 
     def __enter__(self):
         """Return this client; the request context opens on the first API call."""
@@ -75,6 +79,11 @@ class TawreedApiClient:
             raise TawreedApiUnavailable("No trusted Tawreed add-to-cart API contract.")
         
         payload = body_with_match(self.contract.add_to_cart_body or {}, match, quantity)
+        
+        # Inject customer ID
+        if "data" in payload and isinstance(payload["data"], dict):
+            payload["data"]["customerId"] = self.customer_id
+        
         self._post_json(self.contract.add_to_cart_url, payload)
 
     def remove_cart_item(self, item: Any) -> None:

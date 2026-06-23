@@ -22,20 +22,26 @@ def body_with_query(body: dict[str, Any], query: str) -> dict[str, Any]:
 def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str, Any]:
     """Return an add-to-cart body with product identity and quantity populated."""
     payload = _copy_body(body)
-    data = payload.setdefault("data", {})
     candidate = getattr(match, "data", {}) or {}
     
-    if isinstance(data, dict):
-        store_product_id = candidate_store_product_id(candidate)
-        product_id = candidate.get("productId")
-        
-        # Build payload with storesList structure
-        data.clear()
-        data["productId"] = product_id
-        data["quantity"] = int(quantity)
-        data["storesList"] = [{"storeProductId": int(store_product_id)}]
-        
+    store_product_id = candidate_store_product_id(candidate)
+    
+    # Build correct payload structure based on discovered API
+    payload["data"] = {
+        "customerId": _extract_customer_id(),
+        "storeProductId": int(store_product_id),
+        "quantity": int(quantity),
+        "typeId": 1  # Cart type (discovered from browser)
+    }
+    
     return payload
+
+
+def _extract_customer_id() -> int:
+    """Extract customer ID from JWT token in state file."""
+    # This will be populated from token during API initialization
+    # For now, return a placeholder that will be filled by TawreedApiClient
+    return 0
 
 
 def body_with_item(body: dict[str, Any], item: Any) -> dict[str, Any]:
