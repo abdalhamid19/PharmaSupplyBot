@@ -24,10 +24,17 @@ def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str
     payload = _copy_body(body)
     data = payload.setdefault("data", {})
     candidate = getattr(match, "data", {}) or {}
+    
     if isinstance(data, dict):
-        data["storeProductId"] = candidate_store_product_id(candidate)
-        data["productId"] = candidate.get("productId")
+        store_product_id = candidate_store_product_id(candidate)
+        product_id = candidate.get("productId")
+        
+        # Build payload with storesList structure
+        data.clear()
+        data["productId"] = product_id
         data["quantity"] = int(quantity)
+        data["storesList"] = [{"storeProductId": int(store_product_id)}]
+        
     return payload
 
 

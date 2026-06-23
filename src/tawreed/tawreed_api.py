@@ -73,10 +73,9 @@ class TawreedApiClient:
         """Add a matched product to the cart through a discovered API endpoint."""
         if not self.contract.add_to_cart_url:
             raise TawreedApiUnavailable("No trusted Tawreed add-to-cart API contract.")
-        self._post_json(
-            self.contract.add_to_cart_url,
-            body_with_match(self.contract.add_to_cart_body or {}, match, quantity),
-        )
+        
+        payload = body_with_match(self.contract.add_to_cart_body or {}, match, quantity)
+        self._post_json(self.contract.add_to_cart_url, payload)
 
     def remove_cart_item(self, item: Any) -> None:
         """Remove one cart item through a discovered API endpoint."""
@@ -97,8 +96,19 @@ class TawreedApiClient:
         """POST JSON with saved auth state without opening Chromium."""
         response = self._ensure_request_context().post(url, data=body, timeout=60_000)
         if not response.ok:
-            raise TawreedApiUnavailable(f"Tawreed API returned HTTP {response.status}.")
+            raise TawreedApiUnavailable(
+                f"Tawreed API returned HTTP {response.status}: {response.status_text}"
+            )
         payload = response.json()
+        
+        # Check if response indicates failure
+        if isinstance(payload, dict):
+            status = payload.get("status")
+            if status and status >= 400:
+                raise TawreedApiUnavailable(
+                    f"Tawreed API error {status}: {payload.get('message', 'Unknown error')}"
+                )
+        
         return payload if isinstance(payload, dict) else {"data": payload}
 
     def _ensure_request_context(self):
