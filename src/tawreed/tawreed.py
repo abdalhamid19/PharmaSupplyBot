@@ -78,8 +78,15 @@ class TawreedBot:
         execution_mode: str = "browser",
         matching_risk_policy: str = "safe",
         flagged_match_action: str = "manual-review-only",
+        auth_lock=None,
+        worker_id: int | None = None,
     ):
-        """Create a bot instance bound to one Tawreed profile and saved session state."""
+        """Create a bot instance bound to one Tawreed profile and saved session state.
+        
+        Args:
+            auth_lock: Optional multiprocessing.Lock for coordinating auth refresh.
+            worker_id: Optional worker ID for multi-worker logging.
+        """
         self.config = config
         self.profile_key = profile_key
         self.profile = profile
@@ -93,6 +100,8 @@ class TawreedBot:
         self.execution_mode = execution_mode
         self.matching_risk_policy = matching_risk_policy
         self.flagged_match_action = flagged_match_action
+        self.auth_lock = auth_lock
+        self.worker_id = worker_id
         self.order_ai_service = self._build_order_ai_service()
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
@@ -164,6 +173,8 @@ class TawreedBot:
             self.config.runtime,
             self.selectors,
             self.profile_key,
+            auth_lock=self.auth_lock,
+            worker_id=self.worker_id,
         )
 
     def _run_api_or_fallback(self, label: str, operation) -> bool:

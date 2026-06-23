@@ -408,11 +408,17 @@ def _run_parallel_order(
     item_workers: int,
 ) -> None:
     """Split items across multiprocessing workers and merge results."""
+    from multiprocessing import Manager
     from .item_worker_runner import run_order_chunk
 
     materialized = list(items)
     chunks = split_into_chunks(materialized, item_workers)
-    payloads = _build_order_payloads(profile_key, chunks, args)
+    
+    # Create shared lock for coordinating auth refresh
+    manager = Manager()
+    auth_lock = manager.Lock()
+    
+    payloads = _build_order_payloads(profile_key, chunks, args, auth_lock)
     print(f"[{profile_key}] Launching {len(chunks)} parallel item workers...")
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
@@ -433,10 +439,11 @@ def _build_order_payloads(
     profile_key: str,
     chunks: list[list[Any]],
     args: argparse.Namespace,
+    auth_lock,
 ) -> list[dict[str, Any]]:
     """Build serializable payloads for each order worker."""
     config_path = str(Path(getattr(args, "config", "config.yaml")))
-    options = _worker_options(args)
+    options = _worker_options(args, auth_lock)
     return [
         {
             "config_path": config_path,
@@ -449,7 +456,7 @@ def _build_order_payloads(
     ]
 
 
-def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
+def _worker_options(args: argparse.Namespace, auth_lock=None) -> dict[str, Any]:
     """Extract serializable worker options from the CLI namespace."""
     run = current_artifact_run()
     return {
@@ -467,4 +474,5 @@ def _worker_options(args: argparse.Namespace) -> dict[str, Any]:
         "stop_flag": getattr(args, "stop_flag", None),
         "warehouse_mode": getattr(args, "warehouse_mode", None),
         "min_discount_percent": getattr(args, "min_discount_percent", None),
+        "auth_lock": auth_lock,
     }

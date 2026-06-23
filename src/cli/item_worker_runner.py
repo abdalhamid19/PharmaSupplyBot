@@ -71,6 +71,8 @@ def _build_bot_options(options: dict[str, Any], worker_id: int) -> dict[str, Any
         "execution_mode": options.get("execution_mode", "auto"),
         "matching_risk_policy": options.get("matching_risk_policy", "safe"),
         "flagged_match_action": options.get("flagged_match_action", "manual-review-only"),
+        "auth_lock": options.get("auth_lock"),
+        "worker_id": worker_id,
     }
 
 

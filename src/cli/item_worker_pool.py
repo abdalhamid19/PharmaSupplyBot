@@ -23,16 +23,17 @@ def build_cart_payloads(
     profile_key: str,
     chunks: list[list[Any]],
     args: object,
+    auth_lock=None,
 ) -> list[dict[str, Any]]:
     """Build serializable payloads for cart-removal item workers."""
     return [
-        _cart_payload(profile_key, chunk, index, args)
+        _cart_payload(profile_key, chunk, index, args, auth_lock)
         for index, chunk in enumerate(chunks)
     ]
 
 
 def _cart_payload(
-    profile_key: str, chunk: list[Any], index: int, args: object
+    profile_key: str, chunk: list[Any], index: int, args: object, auth_lock=None
 ) -> dict[str, Any]:
     """Build one serializable cart-removal worker payload."""
     return {
@@ -40,11 +41,11 @@ def _cart_payload(
         "profile_key": profile_key,
         "items": [(item.code, item.name) for item in chunk],
         "worker_id": index,
-        "options": _cart_options(args),
+        "options": _cart_options(args, auth_lock),
     }
 
 
-def _cart_options(args: object) -> dict[str, Any]:
+def _cart_options(args: object, auth_lock=None) -> dict[str, Any]:
     """Return serializable cart-removal worker options."""
     run = current_artifact_run()
     return {
@@ -53,6 +54,7 @@ def _cart_options(args: object) -> dict[str, Any]:
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "stop_flag": getattr(args, "stop_flag", None),
         "execution_mode": str(getattr(args, "execution_mode", "auto")),
+        "auth_lock": auth_lock,
     }
 
 

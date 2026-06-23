@@ -88,10 +88,16 @@ def _run_parallel_cart_removal(
     item_workers: int,
 ) -> None:
     """Split cart-removal items across multiprocessing workers and merge."""
+    from multiprocessing import Manager
     from .item_worker_runner import run_cart_removal_chunk
 
     chunks = split_into_chunks(items, item_workers)
-    payloads = build_cart_payloads(profile_key, chunks, args)
+    
+    # Create shared lock for coordinating auth refresh
+    manager = Manager()
+    auth_lock = manager.Lock()
+    
+    payloads = build_cart_payloads(profile_key, chunks, args, auth_lock)
     print(f"[{profile_key}] Launching {len(chunks)} parallel cart-removal workers...")
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:

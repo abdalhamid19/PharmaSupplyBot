@@ -18,21 +18,53 @@ def auto_refresh_auth_if_needed(
     selectors,
     profile_key: str,
     debug: bool = False,
+    auth_lock=None,
+    worker_id: int | None = None,
 ) -> None:
-    """Refresh the saved Tawreed browser state when its access token expired."""
+    """Refresh the saved Tawreed browser state when its access token expired.
+    
+    Args:
+        auth_lock: Optional multiprocessing.Lock for coordinating parallel workers.
+        worker_id: Optional worker ID for logging in multi-worker context.
+    """
     if not is_token_expired(state_path):
         return
 
-    run_headless_auth_refresh(
-        base_url,
-        state_path,
-        runtime_config,
-        selectors,
-        profile_key,
-        wait_seconds=DEFAULT_AUTO_AUTH_WAIT_SECONDS,
-    )
-    if is_token_expired(state_path):
-        raise RuntimeError(_expired_after_refresh_message(profile_key))
+    # Single-worker mode (no lock needed)
+    if auth_lock is None:
+        run_headless_auth_refresh(
+            base_url,
+            state_path,
+            runtime_config,
+            selectors,
+            profile_key,
+            wait_seconds=DEFAULT_AUTO_AUTH_WAIT_SECONDS,
+        )
+        if is_token_expired(state_path):
+            raise RuntimeError(_expired_after_refresh_message(profile_key))
+        return
+
+    # Multi-worker mode: use lock to coordinate
+    worker_label = f"Worker {worker_id}" if worker_id is not None else "Worker"
+    
+    with auth_lock:
+        # Double-check after acquiring lock
+        if not is_token_expired(state_path):
+            print(f"[{profile_key}] {worker_label} using refreshed session from another worker")
+            return
+        
+        print(f"[{profile_key}] {worker_label} refreshing session...")
+        
+        run_headless_auth_refresh(
+            base_url,
+            state_path,
+            runtime_config,
+            selectors,
+            profile_key,
+            wait_seconds=DEFAULT_AUTO_AUTH_WAIT_SECONDS,
+        )
+        if is_token_expired(state_path):
+            raise RuntimeError(_expired_after_refresh_message(profile_key))
 
 
 def _expired_after_refresh_message(profile_key: str) -> str:
