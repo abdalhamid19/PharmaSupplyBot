@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -21,12 +22,61 @@ from .streamlit_manual_review_search import start_corrected_item_search
 def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> None:
     """Render editable manual-review decisions and persist approved corrections."""
     st.subheader("Manual Review")
+    
     store = manual_review_store_or_stop()
-    editable_rows = editable_manual_review_rows(rows, store)
+    
+    # ⚡ Session cache for saved decisions
+    cache_key = f"manual_review_cache_{run_dir.name}"
+    if cache_key not in st.session_state:
+        with st.spinner("Loading saved decisions..."):
+            editable_rows = editable_manual_review_rows(rows, store)
+            st.session_state[cache_key] = editable_rows
+    else:
+        editable_rows = st.session_state[cache_key]
+    
+    # ⚡ Calculate remaining items (uncorrected)
+    remaining_count = sum(
+        1 for row in editable_rows
+        if not row.get("approved_match") and not row.get("not_matching")
+    )
+    total_count = len(editable_rows)
+    corrected_count = total_count - remaining_count
+    
+    # Show dynamic stats
+    st.caption(f"📊 Total: {total_count} items | ✅ Corrected: {corrected_count} | ⏳ Remaining: {remaining_count}")
+    
+    # ⚡ Session cache for saved decisions
+    cache_key = f"manual_review_cache_{run_dir.name}"
+    if cache_key not in st.session_state:
+        with st.spinner("Loading saved decisions..."):
+            editable_rows = editable_manual_review_rows(rows, store)
+            st.session_state[cache_key] = editable_rows
+    else:
+        editable_rows = st.session_state[cache_key]
+    
+    # Pagination
+    items_per_page = 50
+    total_pages = max(1, (len(editable_rows) + items_per_page - 1) // items_per_page)
+    
+    if total_pages > 1:
+        page = st.number_input(
+            f"Page (1-{total_pages})",
+            min_value=1,
+            max_value=total_pages,
+            value=st.session_state.get("manual_review_page", 1),
+            key="manual_review_page_input"
+        )
+        st.session_state["manual_review_page"] = page
+        start_idx = (page - 1) * items_per_page
+        end_idx = min(start_idx + items_per_page, len(editable_rows))
+        visible_rows = editable_rows[start_idx:end_idx]
+        st.caption(f"Showing {start_idx + 1}-{end_idx} of {len(editable_rows)}")
+    else:
+        visible_rows = editable_rows
     
     selected_columns = None
-    if editable_rows:
-        all_cols = list(editable_rows[0].keys())
+    if visible_rows:
+        all_cols = list(visible_rows[0].keys())
         default_cols = [
             "item_code", "item_name", "matched_product_name_en", "item_qty", "status",
             "approved_match", "not_matching", 
@@ -50,7 +100,7 @@ def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> No
         )
         
     edited = st.data_editor(
-        pd.DataFrame(editable_rows), 
+        pd.DataFrame(visible_rows), 
         use_container_width=True,
         column_order=selected_columns if selected_columns else None
     )
@@ -66,8 +116,17 @@ def render_manual_review_editor(rows: list[dict[str, str]], run_dir: Path) -> No
         st.warning("⚠️ لا يوجد أي أصناف معدلة ليتم حفظها.")
     if st.button("Save Manual Review Decisions", disabled=not decisions):
         count = save_manual_review_rows(edited_records, run_dir.name)
-        st.success(f"Saved {count} manual-review decision(s).")
-        st.rerun()
+        # ⚡ Update cache instead of full rerun
+        if cache_key in st.session_state:
+            # Merge edited records back into cache
+            if total_pages > 1:
+                start_idx = (st.session_state.get("manual_review_page", 1) - 1) * items_per_page
+                for i, record in enumerate(edited_records):
+                    st.session_state[cache_key][start_idx + i] = record
+            else:
+                st.session_state[cache_key] = edited_records
+        st.success(f"✅ Saved {count} decision(s)!")
+        # Don't rerun - keep the page state
 
     # 2. Remove Not Matching
     not_matching_rows = [r for r in edited_records if str(r.get("not_matching") or "").lower() in {"1", "true", "yes", "y", "true"}]

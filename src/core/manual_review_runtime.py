@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Iterable, Iterator
@@ -15,6 +17,8 @@ from .manual_review_hints import hint_key
 from .candidate_identity import candidate_store_product_id
 from .matching_models import MatchDecision, SearchMatch
 from .utils.excel import Item
+
+logger = logging.getLogger(__name__)
 
 _MANUAL_REVIEW_CACHE: ContextVar["ManualReviewDecisionCache | None"] = ContextVar(
     "manual_review_decision_cache", default=None
@@ -54,14 +58,31 @@ def manual_review_cache_context(
 
 
 def saved_manual_review_decision(item: Item) -> ManualReviewDecision | None:
-    """Return a saved manual-review decision."""
+    """Return a saved manual-review decision with retry logic."""
     cache = _MANUAL_REVIEW_CACHE.get()
     if cache is not None:
         return cache.lookup(item)
-    try:
-        return ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup(item.code, item.name)
-    except Exception:
-        return None
+    
+    # Retry up to 3 times with exponential backoff
+    for attempt in range(3):
+        try:
+            result = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup(item.code, item.name)
+            if attempt > 0:
+                logger.info(f"Manual review lookup succeeded on attempt {attempt + 1} for {item.code}/{item.name}")
+            return result
+        except Exception as e:
+            if attempt < 2:
+                logger.warning(
+                    f"Manual review lookup attempt {attempt + 1} failed for {item.code}/{item.name}: "
+                    f"{type(e).__name__}: {e}, retrying..."
+                )
+                time.sleep(0.05 * (attempt + 1))
+            else:
+                logger.error(
+                    f"Manual review lookup failed after 3 attempts for {item.code}/{item.name}: "
+                    f"{type(e).__name__}: {e}"
+                )
+                return None
 
 
 def manual_review_queries(

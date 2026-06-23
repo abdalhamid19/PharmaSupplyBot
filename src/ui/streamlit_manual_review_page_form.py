@@ -81,4 +81,31 @@ def _save(
     opt = options[idx - 1] if idx > 0 else None
     decision = decision_from_selection(item, opt, not_matching, query, run_dir.name)
     store.upsert(decision)
-    st.toast(f"Saved decision for {item.name}")
+    
+    # ⚡ Update session cache to sync stats
+    cache_key = f"manual_review_cache_{run_dir.name}"
+    if cache_key in st.session_state:
+        # Find and update matching row
+        for i, row in enumerate(st.session_state[cache_key]):
+            row_code = str(row.get("item_code", "")).strip()
+            row_name = str(row.get("item_name", "")).strip().upper()
+            item_code = str(item.code).strip()
+            item_name = str(item.name).strip().upper()
+            
+            if row_code == item_code and row_name == item_name:
+                # Update the row with decision
+                st.session_state[cache_key][i]["approved_match"] = decision.approved
+                st.session_state[cache_key][i]["not_matching"] = (
+                    decision.manual_decision == "not_matching"
+                )
+                if decision.correct_store_product_id:
+                    st.session_state[cache_key][i]["correct_store_product_id"] = (
+                        decision.correct_store_product_id
+                    )
+                if decision.correct_product_name:
+                    st.session_state[cache_key][i]["correct_product_name"] = (
+                        decision.correct_product_name
+                    )
+                break
+    
+    st.toast(f"✅ Saved decision for {item.name}")

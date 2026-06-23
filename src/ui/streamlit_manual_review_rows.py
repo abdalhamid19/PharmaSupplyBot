@@ -3,18 +3,34 @@
 from __future__ import annotations
 
 from ..core.manual_review_store import ManualReviewDecision, ManualReviewStore
+from ..core.manual_review_hints import hint_key
 
 
 def editable_manual_review_rows(
     rows: list[dict[str, str]], store: ManualReviewStore | None = None
 ) -> list[dict[str, object]]:
     """Return UI rows with saved manual decisions and their source displayed."""
+    # ⚡ Batch load all saved decisions in one query
+    saved_decisions_map = _load_saved_decisions_batch(rows, store) if store else {}
+    
     editable = []
     for row in rows:
         item = _editable_row(row)
-        _apply_saved_decision(item, _saved_decision(store, item))
+        # Lookup from pre-loaded map (O(1) instead of database query)
+        key = hint_key(_clean(item.get("item_code")), _clean(item.get("item_name")))
+        saved = saved_decisions_map.get(key)
+        _apply_saved_decision(item, saved)
         editable.append(item)
     return editable
+
+
+def _load_saved_decisions_batch(
+    rows: list[dict[str, str]], store: ManualReviewStore
+) -> dict[tuple[str, str], ManualReviewDecision]:
+    """Load all saved decisions for rows in one database query."""
+    # Create lightweight item objects for lookup_many
+    items = [{"code": _clean(r.get("item_code")), "name": _clean(r.get("item_name"))} for r in rows]
+    return store.lookup_many(items)
 
 
 def _editable_row(row: dict[str, str]) -> dict[str, object]:
@@ -39,14 +55,6 @@ def _apply_saved_decision(
     item["correct_product_name"] = saved.correct_product_name
     item["correct_query"] = saved.correct_query
     item["decision_source"] = "saved_manual_review"
-
-
-def _saved_decision(
-    store: ManualReviewStore | None, item: dict[str, object]
-) -> ManualReviewDecision | None:
-    if not store:
-        return None
-    return store.lookup(_clean(item.get("item_code")), _clean(item.get("item_name")))
 
 
 def _clean(value: object) -> str:
