@@ -80,6 +80,11 @@ def _save(
 ) -> None:
     opt = options[idx - 1] if idx > 0 else None
     decision = decision_from_selection(item, opt, not_matching, query, run_dir.name)
+    
+    # ⚡ Only save if user made an explicit choice
+    if decision is None:
+        return
+    
     store.upsert(decision)
     
     # ⚡ Update session cache to sync stats

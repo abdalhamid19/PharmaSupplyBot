@@ -63,6 +63,14 @@ class ManualReviewSelectionTests(unittest.TestCase):
         self.assertEqual(decision.correct_product_name, "EN Name")
         self.assertEqual(decision.correct_product_name_ar, "AR Name")
 
+    def test_no_action_returns_none(self) -> None:
+        """Test that no explicit choice returns None (leave unmatched)."""
+        decision = decision_from_selection(
+            self.item, None, not_matching=False, free_text_query="", run_id=self.run_id
+        )
+        
+        self.assertIsNone(decision)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,15 +13,15 @@ def decision_from_selection(
     not_matching: bool,
     free_text_query: str,
     run_id: str,
-) -> ManualReviewDecision:
-    """Return a storable decision based on human feedback."""
+) -> ManualReviewDecision | None:
+    """Return a storable decision based on human feedback, or None if no action taken."""
     if not_matching:
         return _create_not_matching(item, run_id)
     if free_text_query.strip():
         return _create_needs_correction(item, free_text_query.strip(), run_id)
     if selected_option:
         return _create_approved(item, selected_option, run_id)
-    return _create_not_matching(item, run_id)
+    return None
 
 
 def _create_not_matching(item: Item, run_id: str) -> ManualReviewDecision:
