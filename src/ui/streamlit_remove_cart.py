@@ -183,7 +183,7 @@ def remove_cart_target_profile_keys(
     return list(app_config.profiles.keys())
 
 
-def render_running_remove_cart_controls() -> bool:
+def render_running_remove_cart_controls(key_prefix: str = "remove_cart") -> bool:
     """Render controls and results for a background remove-cart process."""
     state = st.session_state.get("remove_cart_process")
     if not state:
@@ -195,13 +195,13 @@ def render_running_remove_cart_controls() -> bool:
         st.warning("Cart-removal flow is running.")
         col_stop, col_refresh = st.columns(2)
         with col_stop:
-            if st.button("Stop Remove Cart", type="primary"):
+            if st.button("Stop Remove Cart", type="primary", key=f"{key_prefix}_stop"):
                 Path(state["stop_flag_path"]).write_text(
                     "stop requested\n", encoding="utf-8"
                 )
                 st.info("Stop requested. Workers will stop before the next item.")
         with col_refresh:
-            if st.button("Refresh Remove Status"):
+            if st.button("Refresh Remove Status", key=f"{key_prefix}_refresh"):
                 st.rerun()
         if output_text:
             st.code(output_text[-4000:], language="text")

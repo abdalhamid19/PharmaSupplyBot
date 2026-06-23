@@ -23,25 +23,19 @@ def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str
     """Return an add-to-cart body with product identity and quantity populated."""
     payload = _copy_body(body)
     candidate = getattr(match, "data", {}) or {}
-    
     store_product_id = candidate_store_product_id(candidate)
-    
-    # Build correct payload structure based on discovered API
+
+    # The discovered add-to-cart request always uses mode "all" with this data
+    # shape; customerId is injected by TawreedApiClient from the JWT token.
+    payload["mode"] = "all"
+    payload.setdefault("langCode", "ar")
     payload["data"] = {
-        "customerId": _extract_customer_id(),
+        "customerId": None,
         "storeProductId": int(store_product_id),
         "quantity": int(quantity),
-        "typeId": 1  # Cart type (discovered from browser)
+        "typeId": 1,
     }
-    
     return payload
-
-
-def _extract_customer_id() -> int:
-    """Extract customer ID from JWT token in state file."""
-    # This will be populated from token during API initialization
-    # For now, return a placeholder that will be filled by TawreedApiClient
-    return 0
 
 
 def body_with_item(body: dict[str, Any], item: Any) -> dict[str, Any]:

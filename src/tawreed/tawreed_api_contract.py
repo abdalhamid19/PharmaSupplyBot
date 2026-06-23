@@ -58,7 +58,9 @@ def save_discovered_api_contract(
 
 def _contract_from_requests(requests: list[dict[str, Any]]) -> TawreedApiContract:
     product = _first_request(requests, (PRODUCT_SEARCH_ENDPOINT, "product-search"))
-    add = _first_request(requests, ("cart/add", "carts/add", "purchase/cart"))
+    add = _first_request(
+        requests, ("carts/items/add", "items/add", "cart/add", "carts/add", "purchase/cart")
+    )
     remove = _first_request(requests, ("cart/remove", "carts/remove", "delete"))
     submit = _first_request(requests, ("checkout", "submit", "confirm"))
     return TawreedApiContract(

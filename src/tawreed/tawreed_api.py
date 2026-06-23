@@ -77,14 +77,15 @@ class TawreedApiClient:
         """Add a matched product to the cart through a discovered API endpoint."""
         if not self.contract.add_to_cart_url:
             raise TawreedApiUnavailable("No trusted Tawreed add-to-cart API contract.")
-        
+
         payload = body_with_match(self.contract.add_to_cart_body or {}, match, quantity)
-        
+
         # Inject customer ID
         if "data" in payload and isinstance(payload["data"], dict):
             payload["data"]["customerId"] = self.customer_id
-        
-        self._post_json(self.contract.add_to_cart_url, payload)
+
+        response = self._post_json(self.contract.add_to_cart_url, payload)
+        _ensure_cart_item_added(response)
 
     def remove_cart_item(self, item: Any) -> None:
         """Remove one cart item through a discovered API endpoint."""
@@ -136,6 +137,21 @@ def _api_origin(base_url: str) -> str:
     if "seller.tawreed.io" in base_url:
         return "https://api.tawreed.io"
     return base_url.split("#/", 1)[0].rstrip("/")
+
+
+def _ensure_cart_item_added(response: dict[str, Any]) -> None:
+    """Raise when an add-to-cart response did not actually add an item.
+
+    The Tawreed cart-read endpoint returns HTTP 200 with an empty ``data`` list
+    when the wrong endpoint or payload is used, which previously made the bot
+    report a false ``added-to-cart`` status. Treat an empty response as failure
+    so the caller can fall back to the browser flow.
+    """
+    data = response.get("data") if isinstance(response, dict) else None
+    if not data:
+        raise TawreedApiUnavailable(
+            "Tawreed add-to-cart returned no cart data; the item was not added."
+        )
 
 
 def _auth_headers_from_state(state_path: Path) -> dict[str, str]:
