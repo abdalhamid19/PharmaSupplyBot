@@ -271,6 +271,13 @@ class TawreedBot:
                     self.state_path,
                     debug_browser=self.debug_browser,
                 )
+                # Enable detailed API capture
+                from .tawreed_api_discovery_enhanced import (
+                    begin_detailed_api_capture,
+                    save_captured_requests,
+                )
+                captured = begin_detailed_api_capture(page)
+                
                 api_capture = begin_api_contract_capture(page)
                 try:
                     self._run_order_session(page, items)
@@ -283,6 +290,9 @@ class TawreedBot:
                     )
                     raise
                 finally:
+                    # Save enhanced capture
+                    if captured:
+                        save_captured_requests(captured, self.profile_key, "order_run_capture")
                     _save_api_contract_capture(api_capture)
                     close_context(context)
                     close_browser(browser)

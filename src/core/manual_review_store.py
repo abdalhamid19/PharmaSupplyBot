@@ -172,7 +172,13 @@ def _unique_item_keys(items: Iterable[Any]) -> list[tuple[str, str]]:
     keys: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
     for item in items:
-        key = hint_key(getattr(item, "code", ""), getattr(item, "name", ""))
+        if isinstance(item, dict):
+            code = item.get("code", "") or item.get("item_code", "")
+            name = item.get("name", "") or item.get("item_name", "")
+        else:
+            code = getattr(item, "code", getattr(item, "item_code", ""))
+            name = getattr(item, "name", getattr(item, "item_name", ""))
+        key = hint_key(code, name)
         if key in seen:
             continue
         seen.add(key)

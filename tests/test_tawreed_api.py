@@ -93,6 +93,57 @@ class _FakeSyncPlaywright:
         return self.playwright
 
 
+class _ConfigurableResponse:
+    ok = True
+    status = 200
+
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+class _RecordingContext:
+    """API request context that records the last POST and returns a fixed body."""
+
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+        self.last_url = None
+        self.last_body = None
+
+    def post(self, url, data=None, timeout=None, **kwargs):
+        self.last_url = url
+        self.last_body = data
+        return _ConfigurableResponse(self._payload)
+
+    def dispose(self) -> None:
+        pass
+
+
+def _add_to_cart_client(temp_dir: str, response_payload: dict):
+    """Return an API client wired to a recording context and add contract."""
+    state_path = Path(temp_dir) / "state.json"
+    state_path.write_text("{}", encoding="utf-8")
+    contract_path = Path(temp_dir) / "contract.json"
+    contract_path.write_text(
+        json.dumps(
+            {
+                "add_to_cart_url": "https://api.tawreed.io/rest/v2/shopping/carts/items/add",
+                "add_to_cart_body": {"mode": "error", "langCode": "ar", "data": {}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    client = TawreedApiClient(
+        "https://seller.tawreed.io/#/login", state_path, contract_path
+    )
+    context = _RecordingContext(response_payload)
+    client._request_context = context
+    client.customer_id = 22823
+    return client, context
+
+
 class TawreedApiTests(unittest.TestCase):
     """Validate local API contract parsing and safe unavailable behavior."""
 
@@ -106,6 +157,59 @@ class TawreedApiTests(unittest.TestCase):
 
         with self.assertRaises(TawreedApiUnavailable):
             client.add_to_cart(object(), 1)
+
+    def test_body_with_match_builds_discovered_add_payload(self) -> None:
+        from types import SimpleNamespace
+
+        from src.tawreed.tawreed_api_payloads import body_with_match
+
+        match = SimpleNamespace(data={"storeProductId": 2066374})
+        payload = body_with_match(
+            {"mode": "error", "langCode": "ar", "data": {"productId": None}},
+            match,
+            3,
+        )
+
+        self.assertEqual(payload["mode"], "all")
+        self.assertEqual(payload["langCode"], "ar")
+        self.assertEqual(
+            payload["data"],
+            {
+                "customerId": None,
+                "storeProductId": 2066374,
+                "quantity": 3,
+                "typeId": 1,
+            },
+        )
+
+    def test_add_to_cart_posts_discovered_add_endpoint_with_customer_id(self) -> None:
+        from types import SimpleNamespace
+
+        match = SimpleNamespace(data={"storeProductId": 2066374})
+        with TemporaryDirectory() as temp_dir:
+            client, context = _add_to_cart_client(
+                temp_dir, {"data": [{"storeProductId": 2066374}], "status": 200}
+            )
+            client.add_to_cart(match, 2)
+
+        self.assertTrue(context.last_url.endswith("/shopping/carts/items/add"))
+        self.assertEqual(context.last_body["mode"], "all")
+        self.assertEqual(context.last_body["data"]["storeProductId"], 2066374)
+        self.assertEqual(context.last_body["data"]["quantity"], 2)
+        self.assertEqual(context.last_body["data"]["typeId"], 1)
+        self.assertEqual(context.last_body["data"]["customerId"], 22823)
+
+    def test_add_to_cart_raises_when_response_has_no_cart_data(self) -> None:
+        from types import SimpleNamespace
+
+        match = SimpleNamespace(data={"storeProductId": 2066374})
+        with TemporaryDirectory() as temp_dir:
+            client, _context = _add_to_cart_client(
+                temp_dir, {"message": None, "data": [], "status": 200}
+            )
+
+            with self.assertRaises(TawreedApiUnavailable):
+                client.add_to_cart(match, 1)
 
     def test_save_discovered_contract_selects_known_endpoint_types(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -124,6 +228,28 @@ class TawreedApiTests(unittest.TestCase):
 
         self.assertIn("product-search", contract.product_search_url)
         self.assertIn("cart/add", payload["add_to_cart_url"])
+
+    def test_discovered_contract_prefers_carts_items_add_over_read_endpoint(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "contract.json"
+            contract = save_discovered_api_contract(
+                [
+                    {
+                        "url": "https://api.tawreed.io/rest/v2/shopping/carts/items",
+                        "body": {"data": {"productId": None, "storesList": None}},
+                    },
+                    {
+                        "url": "https://api.tawreed.io/rest/v2/shopping/carts/items/add",
+                        "body": {
+                            "mode": "all",
+                            "data": {"storeProductId": 2066374, "typeId": 1},
+                        },
+                    },
+                ],
+                output,
+            )
+
+        self.assertTrue(contract.add_to_cart_url.endswith("/shopping/carts/items/add"))
 
     def test_load_api_contract_round_trips_saved_json(self) -> None:
         with TemporaryDirectory() as temp_dir:

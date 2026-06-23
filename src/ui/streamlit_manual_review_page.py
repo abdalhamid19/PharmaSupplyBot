@@ -19,7 +19,7 @@ def render_manual_review_tab() -> None:
     st.markdown("Select an artifact run to evaluate AI matches and correct them.")
     
     # Block UI if a background manual review process is running
-    if render_running_remove_cart_controls():
+    if render_running_remove_cart_controls("manual_review"):
         return
     if render_running_search_controls():
         return

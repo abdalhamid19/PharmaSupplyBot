@@ -22,12 +22,19 @@ def body_with_query(body: dict[str, Any], query: str) -> dict[str, Any]:
 def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str, Any]:
     """Return an add-to-cart body with product identity and quantity populated."""
     payload = _copy_body(body)
-    data = payload.setdefault("data", {})
     candidate = getattr(match, "data", {}) or {}
-    if isinstance(data, dict):
-        data["storeProductId"] = candidate_store_product_id(candidate)
-        data["productId"] = candidate.get("productId")
-        data["quantity"] = int(quantity)
+    store_product_id = candidate_store_product_id(candidate)
+
+    # The discovered add-to-cart request always uses mode "all" with this data
+    # shape; customerId is injected by TawreedApiClient from the JWT token.
+    payload["mode"] = "all"
+    payload.setdefault("langCode", "ar")
+    payload["data"] = {
+        "customerId": None,
+        "storeProductId": int(store_product_id),
+        "quantity": int(quantity),
+        "typeId": 1,
+    }
     return payload
 
 

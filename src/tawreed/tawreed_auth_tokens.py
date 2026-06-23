@@ -27,6 +27,21 @@ def access_token_from_state(state_path: Path) -> str:
     return ""
 
 
+def customer_id_from_state(state_path: Path) -> int:
+    """Extract customer ID from JWT token in state file."""
+    token = access_token_from_state(state_path)
+    if not token:
+        return 0
+    
+    payload = _jwt_payload(token)
+    # Customer ID is in 'sub' field of JWT
+    customer_id = payload.get("sub", "0")
+    try:
+        return int(customer_id)
+    except (ValueError, TypeError):
+        return 0
+
+
 def _access_token_from_origin(origin: dict) -> str:
     """Return the access token from one Playwright storage-state origin."""
     if origin.get("origin") != "https://seller.tawreed.io":

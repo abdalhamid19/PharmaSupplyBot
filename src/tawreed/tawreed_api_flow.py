@@ -41,6 +41,8 @@ def place_order_with_api(bot, items: Iterable[Item]) -> None:
 
 def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> bool:
     """Add every requested item through the API and record summaries."""
+    from .tawreed_timing import record_timing
+    
     added_any = False
     for item in items:
         if bot._stop_before_item(item):
@@ -49,13 +51,20 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
         bot._reset_last_item_state()
         try:
             match = require_api_match(bot, api, item, True)
-            api.add_to_cart(match, item.qty)
-            bot.last_ordered_total_qty = int(item.qty)
+            _add_single_item_to_cart(bot, api, match, item, record_timing)
             bot._record_success(item, started_at)
             added_any = True
         except bot.skip_item_exception as error:
             bot._record_skip(item, error, started_at)
     return added_any
+
+
+def _add_single_item_to_cart(bot, api, match, item, record_timing):
+    """Execute add-to-cart API call and record timing."""
+    cart_start = time.perf_counter()
+    api.add_to_cart(match, item.qty)
+    record_timing(bot, "add_to_cart_seconds", time.perf_counter() - cart_start)
+    bot.last_ordered_total_qty = int(item.qty)
 
 
 def remove_cart_items_with_api(bot, items: Iterable[object]) -> None:
