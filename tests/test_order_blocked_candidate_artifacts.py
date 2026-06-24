@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from src.core.matching_models import MatchDecision
 from src.core.order_ai_matching import OrderAiOutcome
@@ -48,6 +49,37 @@ class OrderBlockedCandidateArtifactsTests(unittest.TestCase):
         self.assertEqual(row["status"], "matched-but-unavailable")
         self.assertEqual(row["manual_review_reason_code"], "ai_rejected")
         self.assertEqual(row["correct_store_product_id"], "")
+
+    @patch("src.core.manual_review_runtime.saved_manual_review_decision", return_value=None)
+    def test_not_orderable_diagnostic_is_not_shown_as_matched_winner(self, _mock):
+        """A rejected diagnostic stays in blocked_* and never fills matched_*."""
+        diagnostic = SimpleNamespace(
+            query="ZOCOZET 10 / 10 MG 14 F.C. TAB.",
+            score=17.15,
+            candidate={
+                "productNameEn": "ZOCOZET 10 / 20 MG 14 F.C. TAB.",
+                "productName": "زوكوزيت 10 / 20",
+                "storeProductId": "17161",
+                "availableQuantity": 20,
+            },
+        )
+        decision = SimpleNamespace(
+            best_match=None, diagnostics=[diagnostic], final_reason="none"
+        )
+
+        row = order_item_summary_row(
+            Item("47853", "ZOCOZET 10MG/10MG  14TAB", 1),
+            SimpleNamespace(status="not-orderable", reason="No decisive match found"),
+            decision,
+            None,
+        )
+
+        self.assertEqual(row["status"], "not-orderable")
+        self.assertEqual(row["matched"], False)
+        self.assertEqual(row["matched_product_name_en"], "")
+        self.assertEqual(row["matched_store_product_id"], "")
+        self.assertEqual(row["blocked_candidate_name_en"], "ZOCOZET 10 / 20 MG 14 F.C. TAB.")
+        self.assertEqual(row["blocked_candidate_store_product_id"], "17161")
 
     @staticmethod
     def _missing_store_id_outcome() -> OrderAiOutcome:

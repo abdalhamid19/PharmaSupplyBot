@@ -129,6 +129,38 @@ class OrderRunArtifactsTests(unittest.TestCase):
         self.assertEqual(rows[0]["manual_review_category"], "ai_rejected")
         self.assertEqual(rows[0]["candidate_safety_reason"], "component mismatch")
 
+    @patch("src.core.manual_review_runtime.saved_manual_review_decision")
+    def test_auto_matched_failure_routes_to_review_when_flag_enabled(self, mock_saved):
+        """A saved auto-match whose product is gone is sent back to review."""
+        from types import SimpleNamespace
+
+        from src.core.manual_review_store import ManualReviewDecision
+        from src.core.order_run_artifact_rows import manual_review_required
+
+        mock_saved.return_value = ManualReviewDecision(
+            "47853", "ZOCOZET", True, "2804012", manual_decision="auto_matched"
+        )
+        item = Item("47853", "ZOCOZET", 1)
+        enabled = SimpleNamespace(enable_auto_match_re_review_on_fail=True)
+        disabled = SimpleNamespace(enable_auto_match_re_review_on_fail=False)
+
+        self.assertTrue(manual_review_required(item, "not-orderable", None, enabled))
+        self.assertFalse(manual_review_required(item, "not-orderable", None, disabled))
+
+    def test_preserve_existing_decision_blocks_overwrite_of_human_decision(self):
+        """Auto-save must never overwrite a human approved/not-matching decision."""
+        from src.core.manual_review_store import ManualReviewDecision
+        from src.tawreed.tawreed_order_run_artifacts import _preserve_existing_decision
+
+        approved = ManualReviewDecision("1", "P", True, "s1", manual_decision="approved_match")
+        not_matching = ManualReviewDecision("1", "P", False, "s1", manual_decision="not_matching")
+        auto = ManualReviewDecision("1", "P", True, "s1", manual_decision="auto_matched")
+
+        self.assertTrue(_preserve_existing_decision(approved))
+        self.assertTrue(_preserve_existing_decision(not_matching))
+        self.assertFalse(_preserve_existing_decision(auto))
+        self.assertFalse(_preserve_existing_decision(None))
+
     @staticmethod
     def _item() -> Item:
         return Item("1", "Panadol", 1)

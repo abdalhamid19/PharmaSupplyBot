@@ -149,26 +149,52 @@ def manual_review_match(
     if not target_id and not target_en and not target_ar:
         return None
 
+    if target_id:
+        id_match = _manual_review_id_match(results, target_id)
+        if id_match is not None:
+            return id_match
+
+    # Fallback: honour the saved correction by exact name even when the saved
+    # store id is missing from the results (e.g. the product was re-listed under
+    # a new orderable id or offered by a different store).
+    return _manual_review_name_match(results, target_en, target_ar)
+
+
+def _manual_review_id_match(
+    results: list[tuple[str, list[dict]]],
+    target_id: str,
+) -> MatchDecision | None:
+    """Force a match when a candidate exposes the saved orderable store id."""
+    from .candidate_identity import candidate_store_product_id
+
+    for query, candidates in results:
+        for index, candidate in enumerate(candidates):
+            if candidate_store_product_id(candidate) == target_id:
+                match = SearchMatch(query, index, 999.0, candidate)
+                return MatchDecision(match, [], "Approved by saved manual review (ID match).")
+    return None
+
+
+def _manual_review_name_match(
+    results: list[tuple[str, list[dict]]],
+    target_en: str,
+    target_ar: str,
+) -> MatchDecision | None:
+    """Force a match when an orderable candidate exactly matches the saved name."""
+    if not target_en and not target_ar:
+        return None
     from .order_ai_records import candidate_name, candidate_ar
     from .candidate_identity import candidate_store_product_id
 
     for query, candidates in results:
         for index, candidate in enumerate(candidates):
-            c_id = candidate_store_product_id(candidate)
+            if not candidate_store_product_id(candidate):
+                continue
             c_en = candidate_name(candidate).lower()
             c_ar = candidate_ar(candidate).lower()
-
-            if target_id and c_id == target_id:
+            if (target_en and c_en == target_en) or (target_ar and c_ar == target_ar):
                 match = SearchMatch(query, index, 999.0, candidate)
-                return MatchDecision(match, [], "Approved by saved manual review (ID match).")
-                
-            if not c_id:
-                continue
-            if not target_id and (target_en or target_ar):
-                if (target_en and c_en == target_en) or (target_ar and c_ar == target_ar):
-                    match = SearchMatch(query, index, 999.0, candidate)
-                    return MatchDecision(match, [], "Approved by saved manual review (Name match).")
-
+                return MatchDecision(match, [], "Approved by saved manual review (Name match).")
     return None
 
 

@@ -63,8 +63,10 @@ matching:
   numeric_overlap_threshold: 0.45
 
   enable_auto_save_verified_match: true
-  enable_approved_match_re_review_on_fail: false
-  enable_auto_match_re_review_on_fail: false
+  # Re-route a saved correction to manual review when its product becomes
+  # unavailable in a later run, instead of silently dropping the item.
+  enable_approved_match_re_review_on_fail: true
+  enable_auto_match_re_review_on_fail: true
 runtime:
   headless: true
   slow_mo_ms: 0

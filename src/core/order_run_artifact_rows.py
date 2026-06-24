@@ -27,7 +27,7 @@ SUMMARY_TIMING_KEYS = (
 )
 
 
-def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object]:
+def order_item_summary_row(item, summary, decision, outcome, config=None) -> dict[str, object]:
     """Return one compact row describing the final item outcome."""
     match = decision.best_match if decision else None
     blocked_candidate = blocked_ai_candidate(outcome) if not match else {}
@@ -35,6 +35,7 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
 
     # Extract best diagnostic for not-orderable (FIX: removed blocked_candidate condition)
     best_diagnostic = None
+    diagnostic_only = False
     if status == "not-orderable" and not match:
         if decision and getattr(decision, "diagnostics", None):
             best_diagnostic = max(decision.diagnostics, key=lambda d: d.score, default=None)
@@ -42,8 +43,9 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
                 # Only fill if blocked_candidate is empty
                 if not blocked_candidate:
                     blocked_candidate = best_diagnostic.candidate
+                    diagnostic_only = True
 
-    manual_review = manual_review_required(item, status, outcome)
+    manual_review = manual_review_required(item, status, outcome, config)
 
     matched_query = match.query if match else blocked_candidate_query(outcome)
     if not matched_query and best_diagnostic:
@@ -53,8 +55,9 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
     if not det_score and best_diagnostic:
         det_score = round(best_diagnostic.score, 6)
 
-    # Use blocked_candidate as the match source for not-orderable
-    match_source = match.data if match else blocked_candidate
+    # A rejected diagnostic candidate stays in blocked_candidate_* only; it must
+    # not be presented as the matched winner when nothing was actually matched.
+    match_source = match.data if match else ({} if diagnostic_only else blocked_candidate)
 
     return {
         "item_code": item.code,
@@ -64,7 +67,7 @@ def order_item_summary_row(item, summary, decision, outcome) -> dict[str, object
         "reason": summary.reason,
         "matched_query": matched_query,
         "deterministic_score": det_score,
-        **_match_state_fields(item, status, outcome, match),
+        **_match_state_fields(item, status, outcome, match, config),
         **candidate_summary_fields(match_source, decision, match),
         **blocked_candidate_fields(blocked_candidate),
         **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
@@ -103,9 +106,9 @@ def manual_review_required(item, summary_status: str, outcome, config=None) -> b
     return summary_status in REVIEWABLE_STATUSES
 
 
-def manual_review_row(item, summary, decision, outcome) -> dict[str, object]:
+def manual_review_row(item, summary, decision, outcome, config=None) -> dict[str, object]:
     """Return a manual-review row with empty human decision columns."""
-    row = order_item_summary_row(item, summary, decision, outcome)
+    row = order_item_summary_row(item, summary, decision, outcome, config)
     row.update(
         {
             "manual_review_reason_code": _manual_review_reason_code(row["status"], outcome),
@@ -117,12 +120,12 @@ def manual_review_row(item, summary, decision, outcome) -> dict[str, object]:
     return row
 
 
-def _match_state_fields(item, summary_status: str, outcome, match) -> dict[str, object]:
+def _match_state_fields(item, summary_status: str, outcome, match, config=None) -> dict[str, object]:
     return {
-        "matched": _final_actionable_match(item, summary_status, outcome, match),
+        "matched": _final_actionable_match(item, summary_status, outcome, match, config),
         "deterministic_match_found": bool(match),
         "manual_review_blocked_match": bool(match)
-        and manual_review_required(item, summary_status, outcome),
+        and manual_review_required(item, summary_status, outcome, config),
     }
 
 
@@ -141,8 +144,8 @@ def _final_action(summary_status: str, manual_review: bool) -> str:
     return "manual_review" if manual_review else summary_status
 
 
-def _final_actionable_match(item, summary_status: str, outcome, match) -> bool:
-    return bool(match) and not manual_review_required(item, summary_status, outcome)
+def _final_actionable_match(item, summary_status: str, outcome, match, config=None) -> bool:
+    return bool(match) and not manual_review_required(item, summary_status, outcome, config)
 
 
 def _summary_timing_fields(summary) -> dict[str, float]:

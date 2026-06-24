@@ -146,6 +146,24 @@ class StreamlitManualReviewTests(unittest.TestCase):
         self.assertEqual(row["run_date"], "20260622_1425")
         self.assertEqual(row["run_id"], "20260622_1425")
 
+    def test_deleted_identity_pairs_targets_exact_row_not_shared_code(self) -> None:
+        """Deletion must remove only the exact (code, name) row, not its twin."""
+        import pandas as pd
+
+        from src.ui.streamlit_manual_review_page_saved import deleted_identity_pairs
+
+        original = pd.DataFrame(
+            [
+                {"item_code": "47853", "item_name": "ZOCOZET 10/10"},
+                {"item_code": "47853", "item_name": "ZOCOZET 10/20"},
+            ]
+        )
+        edited = pd.DataFrame([{"item_code": "47853", "item_name": "ZOCOZET 10/20"}])
+
+        self.assertEqual(
+            deleted_identity_pairs(original, edited), [("47853", "ZOCOZET 10/10")]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

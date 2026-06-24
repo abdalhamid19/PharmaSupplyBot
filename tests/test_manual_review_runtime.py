@@ -108,6 +108,59 @@ class ManualReviewRuntimeTests(unittest.TestCase):
 
         self.assertEqual(filtered[0][1], [{"storeProductId": "store-2"}])
 
+    def test_manual_review_match_falls_back_to_name_when_saved_id_missing(self) -> None:
+        """Honour a saved correction by exact name when its store id is gone.
+
+        Covers the ZOCOZET case: the corrected product was re-listed under a new
+        orderable store id, so the saved id is absent from the search results.
+        """
+        decision = ManualReviewDecision(
+            "47853",
+            "ZOCOZET 10MG/10MG  14TAB",
+            True,
+            "2804012",
+            "ZOCOZET 10 / 10 MG 14 F.C. TAB.",
+        )
+        results = [
+            (
+                "ZOCOZET 10 / 10 MG 14 F.C. TAB.",
+                [
+                    {
+                        "storeProductId": "9999",
+                        "productNameEn": "ZOCOZET 10 / 10 MG 14 F.C. TAB.",
+                    }
+                ],
+            )
+        ]
+
+        match = manual_review_match(
+            Item("47853", "ZOCOZET 10MG/10MG  14TAB", 1), results, decision
+        )
+
+        self.assertIsNotNone(match)
+        self.assertEqual(match.best_match.data["storeProductId"], "9999")
+        self.assertIn("Name match", match.final_reason)
+
+    def test_manual_review_match_prefers_saved_id_over_name(self) -> None:
+        """When the saved store id is present it wins over name fallback."""
+        decision = ManualReviewDecision(
+            "47853", "ZOCOZET", True, "2804012", "ZOCOZET 10 / 10 MG 14 F.C. TAB."
+        )
+        results = [
+            (
+                "q",
+                [
+                    {"storeProductId": "9999", "productNameEn": "ZOCOZET 10 / 10 MG 14 F.C. TAB."},
+                    {"storeProductId": "2804012", "productNameEn": "OTHER NAME"},
+                ],
+            )
+        ]
+
+        match = manual_review_match(Item("47853", "ZOCOZET", 1), results, decision)
+
+        self.assertEqual(match.best_match.data["storeProductId"], "2804012")
+        self.assertIn("ID match", match.final_reason)
+
 class _FakeManualReviewDb:
     def __init__(self) -> None:
         self.lookup_queries: list[tuple[str, tuple]] = []

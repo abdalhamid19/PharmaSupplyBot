@@ -44,13 +44,16 @@ def render_saved_decisions() -> None:
     if not selected_columns:
         st.warning("Please select at least one column.")
         return
+    # Always keep the identity columns so deletion targets the exact saved row.
+    identity_columns = ["item_code", "item_name"]
+    editor_columns = identity_columns + [c for c in selected_columns if c not in identity_columns]
     col_sort, col_order = st.columns(2)
     with col_sort:
         sort_col = st.selectbox("ترتيب حسب (Sort By):", options=selected_columns, index=selected_columns.index("item_name") if "item_name" in selected_columns else 0)
     with col_order:
         sort_asc = st.radio("ترتيب (Order):", options=["تصاعدي (Ascending)", "تنازلي (Descending)"], horizontal=True)
 
-    display_df = df[selected_columns]
+    display_df = df[editor_columns]
     
     if sort_col:
         is_ascending = sort_asc == "تصاعدي (Ascending)"
@@ -65,18 +68,15 @@ def render_saved_decisions() -> None:
     )
     
     if len(edited_df) < len(display_df):
-        original_codes = set(display_df["item_code"])
-        edited_codes = set(edited_df["item_code"])
-        deleted_codes = original_codes - edited_codes
+        deleted_pairs = deleted_identity_pairs(display_df, edited_df)
         
-        if deleted_codes:
+        if deleted_pairs:
             if st.button("🗑️ Confirm Deletion of Selected Items"):
-                deleted_count = 0
-                for d in decisions:
-                    if d.item_code in deleted_codes:
-                        store.delete(d.item_code, d.item_name)
-                        deleted_count += 1
-                st.success(f"Successfully deleted {deleted_count} items from saved corrections!")
+                for code, name in deleted_pairs:
+                    store.delete(code, name)
+                st.success(
+                    f"Successfully deleted {len(deleted_pairs)} items from saved corrections!"
+                )
                 st.rerun()
     
     csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
@@ -89,6 +89,17 @@ def render_saved_decisions() -> None:
     
     if st.button("Search Corrected Items (Run Match-Only)"):
         _trigger_search(decisions)
+
+
+def deleted_identity_pairs(original_df, edited_df) -> list[tuple[str, str]]:
+    """Return (item_code, item_name) pairs removed from the edited table.
+
+    Matching on the full identity pair prevents deleting unrelated corrections
+    that happen to share the same item_code.
+    """
+    original = set(zip(original_df["item_code"], original_df["item_name"]))
+    edited = set(zip(edited_df["item_code"], edited_df["item_name"]))
+    return sorted(original - edited)
 
 
 def _decision_row(d) -> dict:

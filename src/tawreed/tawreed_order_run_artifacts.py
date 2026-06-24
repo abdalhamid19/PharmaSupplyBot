@@ -36,13 +36,15 @@ def append_order_item_artifacts(
     matching_config=None,
 ) -> None:
     """Append one item summary row and optional manual-review row."""
-    row = order_item_summary_row(item, summary, decision, outcome)
+    row = order_item_summary_row(item, summary, decision, outcome, matching_config)
     _append_item_summary_row(profile_key, row, label_suffix)
     _append_final_trace_row(profile_key, row, label_suffix)
     requires_review = manual_review_required(item, summary.status, outcome, matching_config)
 
     if requires_review:
-        append_manual_review_artifacts(profile_key, item, summary, decision, outcome, label_suffix)
+        append_manual_review_artifacts(
+            profile_key, item, summary, decision, outcome, label_suffix, matching_config
+        )
     elif matching_config and matching_config.enable_auto_save_verified_match:
         _auto_save_verified_match(item, decision)
 
@@ -59,6 +61,10 @@ def _auto_save_verified_match(item: Item, decision) -> None:
     from ..core.order_ai_records import candidate_name, candidate_ar
     from ..core.manual_review_store import ManualReviewStore, ManualReviewDecision, DEFAULT_MANUAL_REVIEW_DB
     
+    store = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB)
+    if _preserve_existing_decision(store.lookup(item.code, item.name)):
+        return  # Never let an automatic match overwrite a human decision.
+
     store_id = candidate_store_product_id(match.data)
     name_en = candidate_name(match.data)
     name_ar = candidate_ar(match.data)
@@ -77,7 +83,12 @@ def _auto_save_verified_match(item: Item, decision) -> None:
         correct_product_name=name_en,
         correct_product_name_ar=name_ar
     )
-    ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).upsert(new_decision)
+    store.upsert(new_decision)
+
+
+def _preserve_existing_decision(existing) -> bool:
+    """Return whether a saved human decision must survive auto-save overwrite."""
+    return bool(existing and existing.manual_decision in ("approved_match", "not_matching"))
 
 
 from ..core.artifact_run import current_artifact_run
@@ -91,9 +102,10 @@ def append_manual_review_artifacts(
     decision,
     outcome,
     label_suffix: str | None = None,
+    matching_config=None,
 ) -> None:
     """Append one manual-review row to CSV and TXT artifacts, and candidates to JSONL."""
-    row = manual_review_row(item, summary, decision, outcome)
+    row = manual_review_row(item, summary, decision, outcome, matching_config)
     append_csv_artifact(profile_key, "manual_review", [row], label_suffix)
     append_text_artifact(
         profile_key, "manual_review", text_block("manual_review", row), label_suffix
