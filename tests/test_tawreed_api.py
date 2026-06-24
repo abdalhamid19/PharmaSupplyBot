@@ -211,6 +211,20 @@ class TawreedApiTests(unittest.TestCase):
             with self.assertRaises(TawreedApiUnavailable):
                 client.add_to_cart(match, 1)
 
+    def test_add_to_cart_rejects_cart_read_endpoint(self) -> None:
+        from dataclasses import replace
+        from types import SimpleNamespace
+
+        match = SimpleNamespace(data={"storeProductId": 2066374})
+        read_url = "https://api.tawreed.io/rest/v2/shopping/carts/items"
+        with TemporaryDirectory() as temp_dir:
+            client, _context = _add_to_cart_client(temp_dir, {"data": [{"x": 1}]})
+            client.contract = replace(client.contract, add_to_cart_url=read_url)
+
+            self.assertFalse(client.contract_field_available("add_to_cart_url"))
+            with self.assertRaises(TawreedApiUnavailable):
+                client.add_to_cart(match, 1)
+
     def test_save_discovered_contract_selects_known_endpoint_types(self) -> None:
         with TemporaryDirectory() as temp_dir:
             output = Path(temp_dir) / "contract.json"

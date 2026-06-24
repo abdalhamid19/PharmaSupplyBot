@@ -61,6 +61,27 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
         self.assertIn("cart/add", payload["add_to_cart_url"])
         self.assertIn("cart/remove", payload["remove_cart_url"])
 
+    def test_discovery_prefers_add_endpoint_over_cart_read_endpoint(self) -> None:
+        """Capturing the cart-read endpoint must not become the add endpoint."""
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "contract.json"
+            save_api_contract_capture(
+                [
+                    {
+                        "url": "https://api.tawreed.io/rest/v2/shopping/carts/items",
+                        "body": {"data": {"productId": None, "storesList": None}},
+                    },
+                    {
+                        "url": "https://api.tawreed.io/rest/v2/shopping/carts/items/add",
+                        "body": {"mode": "all", "data": {"storeProductId": 2066374}},
+                    },
+                ],
+                path,
+            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertTrue(payload["add_to_cart_url"].endswith("/shopping/carts/items/add"))
+
     def test_detects_api_candidates_without_orderable_ids(self) -> None:
         """API results without storeProductId should report a clearer skip reason."""
         results = [

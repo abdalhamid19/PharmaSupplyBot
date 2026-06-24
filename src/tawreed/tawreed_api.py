@@ -71,11 +71,13 @@ class TawreedApiClient:
         """Return whether a required API field is available or safely defaulted."""
         if field == "product_search_url":
             return bool(product_search_url(self.contract))
+        if field == "add_to_cart_url":
+            return _is_trusted_add_to_cart_url(self.contract.add_to_cart_url)
         return bool(getattr(self.contract, field, ""))
 
     def add_to_cart(self, match: Any, quantity: int) -> None:
         """Add a matched product to the cart through a discovered API endpoint."""
-        if not self.contract.add_to_cart_url:
+        if not _is_trusted_add_to_cart_url(self.contract.add_to_cart_url):
             raise TawreedApiUnavailable("No trusted Tawreed add-to-cart API contract.")
 
         payload = body_with_match(self.contract.add_to_cart_body or {}, match, quantity)
@@ -137,6 +139,20 @@ def _api_origin(base_url: str) -> str:
     if "seller.tawreed.io" in base_url:
         return "https://api.tawreed.io"
     return base_url.split("#/", 1)[0].rstrip("/")
+
+
+def _is_trusted_add_to_cart_url(url: str) -> bool:
+    """Return whether a URL is a real add endpoint and not the cart-read endpoint.
+
+    The Tawreed cart-read endpoint ``.../shopping/carts/items`` returns HTTP 200
+    with the existing cart, so posting to it reports a false ``added-to-cart``
+    while nothing is added. A trusted add endpoint must be the dedicated
+    ``.../carts/items/add`` route, never the bare cart-read route.
+    """
+    path = str(url or "").split("?", 1)[0].rstrip("/").lower()
+    if not path:
+        return False
+    return not path.endswith("carts/items")
 
 
 def _ensure_cart_item_added(response: dict[str, Any]) -> None:
