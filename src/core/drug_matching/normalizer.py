@@ -279,6 +279,23 @@ CRITICAL_MODIFIERS = frozenset(
         "EVA",
     }
 )
+BABY_FORMULA_MODIFIERS = frozenset(
+    {
+        "LF",
+        "HA",
+        "AR",
+        "PRE",
+        "COMFORT",
+        "SENSITIVE",
+        "DIGEST",
+        "IT",
+        "AC",
+        "EC",
+        "PRO",
+        "EXPERT",
+        "OPTIPRO",
+    }
+)
 COSMETIC_WORDS = frozenset(
     {
         "BODY",
@@ -1139,6 +1156,17 @@ def _has_reliable_english_name(c: DrugComponents) -> bool:
     return any(char.isalpha() and char.isascii() for char in text)
 
 
+def _has_stage_mismatch(d_numeric: tuple[str, ...], m_numeric: tuple[str, ...]) -> bool:
+    """Return True if one baby formula has a different stage than the other."""
+    d_stages = {s for s in d_numeric if s in {"1", "2", "3", "4", "5"}}
+    m_stages = {s for s in m_numeric if s in {"1", "2", "3", "4", "5"}}
+    if d_stages and m_stages and d_stages != m_stages:
+        return True
+    if (d_stages and not m_stages) or (m_stages and not d_stages):
+        return True
+    return False
+
+
 def components_match(
     d: DrugComponents,
     m: DrugComponents,
@@ -1165,7 +1193,11 @@ def components_match(
     m_words = set(m.normalized.split())
 
     if _has_reliable_english_name(d) and _has_reliable_english_name(m):
-        for modifier in CRITICAL_MODIFIERS | VITAMIN_MODIFIERS:
+        modifiers_to_check = CRITICAL_MODIFIERS | VITAMIN_MODIFIERS
+        if d.product_class == "baby_food" or m.product_class == "baby_food":
+            modifiers_to_check |= BABY_FORMULA_MODIFIERS
+            
+        for modifier in modifiers_to_check:
             if (modifier in d_words) != (modifier in m_words):
                 if _modifier_is_optional(modifier, d_words, m_words):
                     continue
@@ -1247,6 +1279,10 @@ def components_match(
                     m_matched_dosage = True
                 else:
                     return False, "different_dosage"
+            
+            if d.product_class == "baby_food" or m.product_class == "baby_food":
+                if _has_stage_mismatch(d_numeric, m_numeric):
+                    return False, "different_baby_formula_stage"
             
             if (
                 d_numeric

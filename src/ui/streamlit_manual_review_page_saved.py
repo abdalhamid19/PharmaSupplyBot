@@ -53,12 +53,16 @@ def render_saved_decisions() -> None:
     with col_order:
         sort_asc = st.radio("ترتيب (Order):", options=["تصاعدي (Ascending)", "تنازلي (Descending)"], horizontal=True)
 
-    display_df = df[editor_columns]
+    display_df = df[editor_columns].copy()
+    display_df.insert(0, "تحديد (Select)", False)
     
     if sort_col:
         is_ascending = sort_asc == "تصاعدي (Ascending)"
         display_df = display_df.sort_values(by=sort_col, ascending=is_ascending)
+        
     st.info("💡 You can delete rows directly from the table below. Select a row and press Delete (or click the trash icon) to revoke the decision and return the item to AI matching.")
+    st.info("💡 You can check the 'تحديد (Select)' box to select 'auto_matched' items and convert them to 'approved_match' using the button below.")
+    
     edited_df = st.data_editor(
         display_df, 
         use_container_width=True, 
@@ -67,6 +71,22 @@ def render_saved_decisions() -> None:
         key="saved_decisions_editor"
     )
     
+    # Check for approval selection
+    selected_auto_matched = edited_df[
+        (edited_df["تحديد (Select)"] == True) & 
+        (edited_df["decision"] == "auto_matched")
+    ]
+    if not selected_auto_matched.empty:
+        if st.button(f"✔️ تحويل {len(selected_auto_matched)} صنف محدد من auto_matched إلى approved_match", type="primary"):
+            import dataclasses
+            for _, row in selected_auto_matched.iterrows():
+                decision_obj = store.lookup(str(row["item_code"]), str(row["item_name"]))
+                if decision_obj and decision_obj.manual_decision == "auto_matched":
+                    new_decision = dataclasses.replace(decision_obj, manual_decision="approved_match")
+                    store.upsert(new_decision)
+            st.success(f"Successfully converted {len(selected_auto_matched)} items to approved_match!")
+            st.rerun()
+
     if len(edited_df) < len(display_df):
         deleted_pairs = deleted_identity_pairs(display_df, edited_df)
         
@@ -79,7 +99,9 @@ def render_saved_decisions() -> None:
                 )
                 st.rerun()
     
-    csv_data = display_df.to_csv(index=False).encode('utf-8-sig')
+    # Drop the "تحديد (Select)" column before downloading
+    download_df = display_df.drop(columns=["تحديد (Select)"], errors="ignore")
+    csv_data = download_df.to_csv(index=False).encode('utf-8-sig')
     st.download_button(
         label="📥 Download Corrected Items (CSV)",
         data=csv_data,

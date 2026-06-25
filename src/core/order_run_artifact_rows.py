@@ -33,17 +33,29 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
     blocked_candidate = blocked_ai_candidate(outcome) if not match else {}
     status = effective_order_status(summary.status, outcome)
 
-    # Extract best diagnostic for not-orderable (FIX: removed blocked_candidate condition)
+    # Extract best diagnostic for not-orderable
     best_diagnostic = None
-    diagnostic_only = False
+    match_source = match.data if match else {}
+    
     if status == "not-orderable" and not match:
         if decision and getattr(decision, "diagnostics", None):
             best_diagnostic = max(decision.diagnostics, key=lambda d: d.score, default=None)
+            
+            # Find the best diagnostic that was rejected purely for being not-orderable
+            orderable_missing_diag = next(
+                (d for d in decision.diagnostics if getattr(d, "rejection_reason", "") == "Candidate missing orderable storeProductId"), 
+                None
+            )
+            
             if best_diagnostic and getattr(best_diagnostic, "candidate", None):
                 # Only fill if blocked_candidate is empty
                 if not blocked_candidate:
                     blocked_candidate = best_diagnostic.candidate
-                    diagnostic_only = True
+            
+            if orderable_missing_diag:
+                match_source = orderable_missing_diag.candidate
+                # Use the correct diagnostic for query and score reporting
+                best_diagnostic = orderable_missing_diag
 
     manual_review = manual_review_required(item, status, outcome, config)
 
@@ -54,10 +66,6 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
     det_score = round(match.score, 6) if match else ""
     if not det_score and best_diagnostic:
         det_score = round(best_diagnostic.score, 6)
-
-    # A rejected diagnostic candidate stays in blocked_candidate_* only; it must
-    # not be presented as the matched winner when nothing was actually matched.
-    match_source = match.data if match else ({} if diagnostic_only else blocked_candidate)
 
     return {
         "item_code": item.code,
