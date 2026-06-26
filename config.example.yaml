@@ -54,6 +54,18 @@ warehouse_strategy:
   mode: "first_available"
   # Set to 0 to allow any discount, or e.g. 12 to require stores with >= 12% discount.
   min_discount_percent: 0
+  
+  # Preferred warehouses (highest to lowest priority)
+  # When discounts are equal (within 0.3%), prefer these warehouses in order
+  preferred_warehouses:
+    - "شركه البركه (الجيزه)"
+    - "شركه الماسه (مالك سابقا ) (الجيزه)"
+    - "شركه الشفاء ميدكو - الريحان سابقا (الجيزه)"
+    - "شركه الفا فارما (الجيزه)"
+    - "شركه مصر مديكال (الجيزه)"
+    - "شركه نيو سيدرا (القليوبيه)"
+    - "شركه الريان (القاهره)"
+  
   selectors:
     warehouse_rows: ".warehouse-row, [data-testid='warehouse-row']"
     available_qty: ".available, [data-testid='available']"

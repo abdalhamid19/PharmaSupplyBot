@@ -73,7 +73,14 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
 def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, record_timing) -> None:
     """Order from multiple stores natively using the API payload."""
     from .tawreed_store_selection import choose_next_store_for_remaining_quantity
-    from .tawreed_products_flow import _wh_mode, _effective_min_discount, _record_stores, _find_max_discount, _min_disc
+    from .tawreed_products_flow import (
+        _wh_mode,
+        _effective_min_discount,
+        _record_stores,
+        _find_max_discount,
+        _min_disc,
+        _preferred_warehouses,
+    )
 
     store_rows = api.get_store_details(match.data.get("productId") or match.data.get("id"))
     if not store_rows:
@@ -96,7 +103,7 @@ def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, rec
     while rem > 0:
         min_disc = _effective_min_discount(bot, sels)
         choice = choose_next_store_for_remaining_quantity(
-            store_rows, used_ids, mode, bot.skip_item_exception, min_disc
+            store_rows, used_ids, mode, bot.skip_item_exception, min_disc, _preferred_warehouses(bot)
         )
         if choice is None:
             break

@@ -138,6 +138,7 @@ def _next_store_choice(bot, page, store_rows, used_ids, sels):
             _wh_mode(bot),
             bot.skip_item_exception,
             _effective_min_discount(bot, sels),
+            _preferred_warehouses(bot),
         )
         if choice is None:
             close_visible_dialogs(page)
@@ -251,6 +252,10 @@ def _wh_mode(bot):
 
 def _min_disc(bot):
     return float(bot.config.warehouse_strategy.get("min_discount_percent", 0))
+
+
+def _preferred_warehouses(bot) -> list[str]:
+    return bot.config.warehouse_strategy.get("preferred_warehouses", [])
 
 
 def _find_max_discount(stores: list[dict[str, Any]]) -> float:
