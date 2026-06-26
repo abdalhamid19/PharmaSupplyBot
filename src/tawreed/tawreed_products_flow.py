@@ -88,8 +88,21 @@ def _open_add_to_cart_for_match(
 def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
     """Add requested quantity across stores until fulfilled."""
     rem, used_ids, sels = int(item.qty), set(), []
+    store_rows = open_stores_dialog(bot, page, row)
+    mode = _wh_mode(bot)
+    
+    # In max_discount mode, find the highest discount first
+    max_discount_value = None
+    if mode == "max_discount" and store_rows:
+        max_discount_value = _find_max_discount(store_rows)
+        # Check if highest discount meets minimum requirement
+        min_discount = _min_disc(bot)
+        if max_discount_value < min_discount - 0.001:
+            raise bot.skip_item_exception(
+                f"Highest discount ({max_discount_value:g}%) is below minimum ({min_discount:g}%)."
+            )
+    
     while rem > 0:
-        store_rows = open_stores_dialog(bot, page, row)
         try:
             choice = _next_store_choice(bot, page, store_rows, used_ids, sels)
         except bot.skip_item_exception:
@@ -104,6 +117,12 @@ def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
         sels.append((choice.store, ordered))
         used_ids.add(choice.identity)
         rem -= ordered
+        
+        # In max_discount mode, only use stores within 0.5% of max discount
+        if mode == "max_discount" and max_discount_value is not None:
+            if choice.discount_percent < max_discount_value - 0.5:
+                break
+            
     if not sels:
         raise bot.skip_item_exception("All stores out of stock.")
     bot.last_ordered_total_qty = sum(q for _, q in sels)
@@ -188,7 +207,17 @@ def _cart_enabled(row) -> bool:
 
 def _click_cart(bot, row, item, match):
     from .tawreed_store_summary import record_single_store
-
+    from .tawreed_pricing import discount_value_as_percent, first_discount_value
+    
+    # Check min_discount_percent for single-store products
+    min_discount = _min_disc(bot)
+    if min_discount > 0:
+        store_discount = discount_value_as_percent(first_discount_value(match.data))
+        if store_discount < min_discount - 0.001:
+            raise bot.skip_item_exception(
+                f"Store discount ({store_discount:g}%) is below minimum ({min_discount:g}%)."
+            )
+    
     record_single_store(bot, match.data)
     wait_for_row_to_settle(row)
     cart_button(row).click()
@@ -222,6 +251,18 @@ def _wh_mode(bot):
 
 def _min_disc(bot):
     return float(bot.config.warehouse_strategy.get("min_discount_percent", 0))
+
+
+def _find_max_discount(stores: list[dict[str, Any]]) -> float:
+    """Find the maximum discount percent among available stores."""
+    from .tawreed_pricing import discount_value_as_percent, first_discount_value
+    
+    max_discount = 0.0
+    for store in stores:
+        if int(store.get("availableQuantity", 0) or 0) > 0:
+            discount = discount_value_as_percent(first_discount_value(store))
+            max_discount = max(max_discount, discount)
+    return max_discount
 
 
 def _effective_min_discount(bot, sels) -> float:

@@ -21,6 +21,23 @@ def first_discount_value(source: dict[str, Any]) -> Any:
         if isinstance(nest, dict):
             nest_val = first_discount_value(nest)
             if nest_val not in (None, ""): return nest_val
+            
+    try:
+        sale_price = float(str(source.get("salePrice") or "0").replace(",", ""))
+        pub_price = float(
+            str(
+                source.get("retailPrice") or 
+                source.get("publicPrice") or 
+                source.get("price") or 
+                source.get("sellingPrice") or 
+                "0"
+            ).replace(",", "")
+        )
+        if pub_price > 0 and sale_price > 0 and sale_price < pub_price:
+            return round(((pub_price - sale_price) / pub_price) * 100, 2)
+    except Exception:
+        pass
+
     return ""
 
 def format_discount_percent(value: Any) -> str:

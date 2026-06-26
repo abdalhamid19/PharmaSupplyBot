@@ -75,6 +75,26 @@ class TawreedApiClient:
             return _is_trusted_add_to_cart_url(self.contract.add_to_cart_url)
         return bool(getattr(self.contract, field, ""))
 
+    def get_store_details(self, product_id: Any) -> list[dict[str, Any]]:
+        """Fetch multiple stores for a product via API."""
+        try:
+            pid = int(float(str(product_id).strip()))
+        except (ValueError, TypeError):
+            return []
+
+        from .tawreed_constants import STORE_DETAILS_ENDPOINT
+        from .tawreed_selections import stores_from_payload
+        url = f"/rest/v2/{STORE_DETAILS_ENDPOINT}?productId={pid}"
+        payload = self._post_json(
+            url,
+            {
+                "mode": "error",
+                "langCode": "ar",
+                "data": {"productId": pid},
+            },
+        )
+        return stores_from_payload(payload)
+
     def add_to_cart(self, match: Any, quantity: int) -> None:
         """Add a matched product to the cart through a discovered API endpoint."""
         if not _is_trusted_add_to_cart_url(self.contract.add_to_cart_url):

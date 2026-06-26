@@ -22,7 +22,7 @@ def body_with_query(body: dict[str, Any], query: str) -> dict[str, Any]:
 def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str, Any]:
     """Return an add-to-cart body with product identity and quantity populated."""
     payload = _copy_body(body)
-    candidate = getattr(match, "data", {}) or {}
+    candidate = match if isinstance(match, dict) else (getattr(match, "data", {}) or {})
     store_product_id = candidate_store_product_id(candidate)
 
     # The discovered add-to-cart request always uses mode "all" with this data

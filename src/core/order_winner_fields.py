@@ -5,7 +5,7 @@ from __future__ import annotations
 from .candidate_identity import candidate_store_product_id
 
 
-def candidate_summary_fields(candidate: dict, decision, match) -> dict[str, object]:
+def candidate_summary_fields(candidate: dict, decision, match, summary=None) -> dict[str, object]:
     """Return matched-candidate and winner fields for summary artifacts."""
     candidate_id = candidate_store_product_id(candidate)
     
@@ -19,6 +19,21 @@ def candidate_summary_fields(candidate: dict, decision, match) -> dict[str, obje
         or ""
     )
     
+    store_name = candidate.get("storeName", "")
+    discount = ""
+    if summary:
+        if getattr(summary, "selected_store_name", ""):
+            store_name = summary.selected_store_name
+        discount = getattr(summary, "selected_discount_percent", "")
+        
+    public_price = (
+        candidate.get("retailPrice") or 
+        candidate.get("publicPrice") or 
+        candidate.get("price") or 
+        candidate.get("sellingPrice") or 
+        ""
+    )
+
     return {
         "matched_product_name_en": en_name,
         "matched_product_name_ar": candidate.get("productName", ""),
@@ -27,8 +42,9 @@ def candidate_summary_fields(candidate: dict, decision, match) -> dict[str, obje
         "winner_product_id": candidate.get("productId", ""),
         "winner_store_product_id": candidate_id,
         "winner_available_quantity": candidate.get("availableQuantity", ""),
-        "winner_sale_price": candidate.get("salePrice", ""),
-        "winner_store_name": candidate.get("storeName", ""),
+        "winner_sale_price": public_price,
+        "winner_store_name": store_name,
+        "winner_discount": discount,
         "tie_break_reason": _tie_break_reason(decision, match),
     }
 

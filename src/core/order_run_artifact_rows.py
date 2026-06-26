@@ -37,7 +37,7 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
     best_diagnostic = None
     match_source = match.data if match else {}
     
-    if status == "not-orderable" and not match:
+    if status in ("not-orderable", "matched-but-unavailable") and not match:
         if decision and getattr(decision, "diagnostics", None):
             best_diagnostic = max(decision.diagnostics, key=lambda d: d.score, default=None)
             
@@ -57,6 +57,11 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
                 # Use the correct diagnostic for query and score reporting
                 best_diagnostic = orderable_missing_diag
 
+    if not match and not match_source:
+        from .order_blocked_candidate import missing_store_product_id_outcome
+        if missing_store_product_id_outcome(outcome):
+            match_source = blocked_candidate
+
     manual_review = manual_review_required(item, status, outcome, config)
 
     matched_query = match.query if match else blocked_candidate_query(outcome)
@@ -73,10 +78,11 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
         "item_qty": item.qty,
         "status": status,
         "reason": summary.reason,
+        "ordered_total_qty": getattr(summary, "ordered_total_qty", ""),
         "matched_query": matched_query,
         "deterministic_score": det_score,
         **_match_state_fields(item, status, outcome, match, config),
-        **candidate_summary_fields(match_source, decision, match),
+        **candidate_summary_fields(match_source, decision, match, summary=summary),
         **blocked_candidate_fields(blocked_candidate),
         **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
         **manual_review_reason_fields(status, summary.reason, outcome),

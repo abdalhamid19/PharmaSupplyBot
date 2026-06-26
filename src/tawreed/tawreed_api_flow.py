@@ -23,6 +23,10 @@ def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
             try:
                 match = require_api_match(bot, api, item, False)
                 bot.log(f"API match-only accepted {item.code} / {item.name}: {match.query}")
+                
+                from .tawreed_store_summary import record_single_store
+                record_single_store(bot, getattr(match, "data", {}))
+                
                 bot._record_match_only_success(item, started_at)
             except bot.skip_item_exception as error:
                 bot._record_match_only_skip(item, error, started_at)
@@ -42,6 +46,7 @@ def place_order_with_api(bot, items: Iterable[Item]) -> None:
 def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> bool:
     """Add every requested item through the API and record summaries."""
     from .tawreed_timing import record_timing
+    from .tawreed_store_summary import record_single_store
     
     added_any = False
     for item in items:
@@ -51,7 +56,13 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
         bot._reset_last_item_state()
         try:
             match = require_api_match(bot, api, item, True)
-            _add_single_item_to_cart(bot, api, match, item, record_timing)
+            has_product_id = bool(match.data.get("productId") or match.data.get("id"))
+            is_multi = int(match.data.get("productsCount") or 0) > 0 and has_product_id
+            if is_multi:
+                _add_multi_store_item_api(bot, api, match, item, record_timing)
+            else:
+                _add_single_item_to_cart(bot, api, match, item, record_timing)
+                record_single_store(bot, match.data)
             bot._record_success(item, started_at)
             added_any = True
         except bot.skip_item_exception as error:
@@ -59,10 +70,76 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
     return added_any
 
 
+def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, record_timing) -> None:
+    """Order from multiple stores natively using the API payload."""
+    from .tawreed_store_selection import choose_next_store_for_remaining_quantity
+    from .tawreed_products_flow import _wh_mode, _effective_min_discount, _record_stores, _find_max_discount, _min_disc
+
+    store_rows = api.get_store_details(match.data.get("productId") or match.data.get("id"))
+    if not store_rows:
+        raise bot.skip_item_exception("API multi-store returned no stores.")
+
+    rem, used_ids, sels = int(item.qty), set(), []
+    mode = _wh_mode(bot)
+    
+    # In max_discount mode, find the highest discount first
+    max_discount_value = None
+    if mode == "max_discount" and store_rows:
+        max_discount_value = _find_max_discount(store_rows)
+        # Check if highest discount meets minimum requirement
+        min_discount = _min_disc(bot)
+        if max_discount_value < min_discount - 0.001:
+            raise bot.skip_item_exception(
+                f"Highest discount ({max_discount_value:g}%) is below minimum ({min_discount:g}%)."
+            )
+    
+    while rem > 0:
+        min_disc = _effective_min_discount(bot, sels)
+        choice = choose_next_store_for_remaining_quantity(
+            store_rows, used_ids, mode, bot.skip_item_exception, min_disc
+        )
+        if choice is None:
+            break
+            
+        ordered = min(rem, choice.available_quantity)
+        if ordered <= 0:
+            break
+
+        cart_start = time.perf_counter()
+        api.add_to_cart(choice.store, ordered)
+        record_timing(bot, "add_to_cart_seconds", time.perf_counter() - cart_start)
+
+        sels.append((choice.store, ordered))
+        used_ids.add(choice.identity)
+        rem -= ordered
+        
+        # In max_discount mode, only use stores within 0.5% of max discount
+        if mode == "max_discount" and max_discount_value is not None:
+            if choice.discount_percent < max_discount_value - 0.5:
+                break
+
+    if not sels:
+        raise bot.skip_item_exception("All stores out of stock.")
+    bot.last_ordered_total_qty = sum(q for _, q in sels)
+    _record_stores(bot, sels)
+
+
 def _add_single_item_to_cart(bot, api, match, item, record_timing):
     """Execute add-to-cart API call and record timing."""
+    from .tawreed_products_flow import _min_disc
+    from .tawreed_pricing import discount_value_as_percent, first_discount_value
+    
+    # Check min_discount_percent for single-store products
+    min_discount = _min_disc(bot)
+    if min_discount > 0:
+        store_discount = discount_value_as_percent(first_discount_value(match.data))
+        if store_discount < min_discount - 0.001:
+            raise bot.skip_item_exception(
+                f"Store discount ({store_discount:g}%) is below minimum ({min_discount:g}%)."
+            )
+    
     cart_start = time.perf_counter()
-    api.add_to_cart(match, item.qty)
+    api.add_to_cart(match, int(item.qty))
     record_timing(bot, "add_to_cart_seconds", time.perf_counter() - cart_start)
     bot.last_ordered_total_qty = int(item.qty)
 

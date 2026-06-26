@@ -31,7 +31,7 @@ def available_store_choices(
         for choice in _all_store_choices(stores)
         if choice.identity not in used_ids
         if choice.available_quantity > 0
-        if choice.discount_percent >= min_discount_percent
+        if choice.discount_percent >= min_discount_percent - 0.001
     ]
 
 
