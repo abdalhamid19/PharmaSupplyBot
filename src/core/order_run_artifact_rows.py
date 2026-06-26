@@ -32,38 +32,74 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
     match = decision.best_match if decision else None
     blocked_candidate = blocked_ai_candidate(outcome) if not match else {}
     status = effective_order_status(summary.status, outcome)
+    
+    best_diagnostic, match_source, blocked_candidate = _extract_diagnostic_and_match(
+        status, match, decision, blocked_candidate, outcome
+    )
+    manual_review = manual_review_required(item, status, outcome, config)
+    matched_query, det_score = _extract_query_and_score(
+        match, blocked_candidate, outcome, best_diagnostic
+    )
+    
+    return _build_summary_row(
+        item, summary, status, matched_query, det_score, 
+        outcome, match, match_source, blocked_candidate, 
+        decision, manual_review, config
+    )
 
-    # Extract best diagnostic for not-orderable
+
+def _extract_diagnostic_and_match(status, match, decision, blocked_candidate, outcome):
+    """Extract best diagnostic and match source for not-orderable items."""
     best_diagnostic = None
     match_source = match.data if match else {}
     
     if status in ("not-orderable", "matched-but-unavailable") and not match:
-        if decision and getattr(decision, "diagnostics", None):
-            best_diagnostic = max(decision.diagnostics, key=lambda d: d.score, default=None)
-            
-            # Find the best diagnostic that was rejected purely for being not-orderable
-            orderable_missing_diag = next(
-                (d for d in decision.diagnostics if getattr(d, "rejection_reason", "") == "Candidate missing orderable storeProductId"), 
-                None
-            )
-            
-            if best_diagnostic and getattr(best_diagnostic, "candidate", None):
-                # Only fill if blocked_candidate is empty
-                if not blocked_candidate:
-                    blocked_candidate = best_diagnostic.candidate
-            
-            if orderable_missing_diag:
-                match_source = orderable_missing_diag.candidate
-                # Use the correct diagnostic for query and score reporting
-                best_diagnostic = orderable_missing_diag
-
+        best_diagnostic = _find_best_diagnostic(decision)
+        if best_diagnostic and getattr(best_diagnostic, "candidate", None):
+            if not blocked_candidate:
+                blocked_candidate = best_diagnostic.candidate
+        match_source, best_diagnostic = _resolve_match_source(
+            decision, best_diagnostic, match_source
+        )
+    
     if not match and not match_source:
         from .order_blocked_candidate import missing_store_product_id_outcome
         if missing_store_product_id_outcome(outcome):
             match_source = blocked_candidate
+    
+    return best_diagnostic, match_source, blocked_candidate
 
-    manual_review = manual_review_required(item, status, outcome, config)
 
+def _find_best_diagnostic(decision):
+    """Find the best diagnostic from decision."""
+    if not decision or not getattr(decision, "diagnostics", None):
+        return None
+    return max(decision.diagnostics, key=lambda d: d.score, default=None)
+
+
+def _resolve_match_source(decision, best_diagnostic, match_source):
+    """Find match_source for orderable-missing diagnostics."""
+    if not decision or not getattr(decision, "diagnostics", None):
+        return match_source, best_diagnostic
+        
+    orderable_missing_diag = next(
+        (
+            d for d in decision.diagnostics
+            if getattr(d, "rejection_reason", "") ==
+            "Candidate missing orderable storeProductId"
+        ),
+        None
+    )
+    
+    if orderable_missing_diag:
+        match_source = orderable_missing_diag.candidate
+        best_diagnostic = orderable_missing_diag
+    
+    return match_source, best_diagnostic
+
+
+def _extract_query_and_score(match, blocked_candidate, outcome, best_diagnostic):
+    """Extract matched query and deterministic score."""
     matched_query = match.query if match else blocked_candidate_query(outcome)
     if not matched_query and best_diagnostic:
         matched_query = best_diagnostic.query
@@ -71,7 +107,29 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
     det_score = round(match.score, 6) if match else ""
     if not det_score and best_diagnostic:
         det_score = round(best_diagnostic.score, 6)
+    
+    return matched_query, det_score
 
+
+def _build_summary_row(
+    item, summary, status, matched_query, det_score, 
+    outcome, match, match_source, blocked_candidate, 
+    decision, manual_review, config
+):
+    """Build the final summary row dictionary."""
+    return {
+        **_basic_item_fields(item, summary, status, matched_query, det_score),
+        **_match_state_fields(item, status, outcome, match, config),
+        **candidate_summary_fields(match_source, decision, match, summary=summary),
+        **blocked_candidate_fields(blocked_candidate),
+        **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
+        **manual_review_reason_fields(status, summary.reason, outcome),
+        **_timing_fields(summary),
+    }
+
+
+def _basic_item_fields(item, summary, status, matched_query, det_score):
+    """Extract basic item fields."""
     return {
         "item_code": item.code,
         "item_name": item.name,
@@ -81,11 +139,12 @@ def order_item_summary_row(item, summary, decision, outcome, config=None) -> dic
         "ordered_total_qty": getattr(summary, "ordered_total_qty", ""),
         "matched_query": matched_query,
         "deterministic_score": det_score,
-        **_match_state_fields(item, status, outcome, match, config),
-        **candidate_summary_fields(match_source, decision, match, summary=summary),
-        **blocked_candidate_fields(blocked_candidate),
-        **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
-        **manual_review_reason_fields(status, summary.reason, outcome),
+    }
+
+
+def _timing_fields(summary):
+    """Extract timing fields from summary."""
+    return {
         "elapsed_seconds": round(float(getattr(summary, "elapsed_seconds", 0.0)), 3),
         "match_elapsed_seconds": round(
             float(getattr(summary, "match_elapsed_seconds", 0.0)), 3
@@ -102,16 +161,15 @@ def manual_review_required(item, summary_status: str, outcome, config=None) -> b
     if decision and decision.manual_decision == "not_matching":
         return False
         
-    if decision and decision.manual_decision == "auto_matched":
+    if decision and decision.manual_decision in ("auto_matched", "approved_match"):
         if summary_status in REVIEWABLE_STATUSES:
-            if config and getattr(config, "enable_auto_match_re_review_on_fail", False):
-                return True # Drift detected! Item is missing, needs human eyes
-        return False
-
-    if decision and decision.manual_decision == "approved_match":
-        if summary_status in REVIEWABLE_STATUSES:
-            if config and getattr(config, "enable_approved_match_re_review_on_fail", False):
-                return True # Out of stock! Item is missing, needs human eyes
+            re_review_key = (
+                "enable_auto_match_re_review_on_fail"
+                if decision.manual_decision == "auto_matched"
+                else "enable_approved_match_re_review_on_fail"
+            )
+            if config and getattr(config, re_review_key, False):
+                return True
         return False
 
     if outcome is not None and outcome.manual_review:
@@ -134,12 +192,18 @@ def manual_review_row(item, summary, decision, outcome, config=None) -> dict[str
     return row
 
 
-def _match_state_fields(item, summary_status: str, outcome, match, config=None) -> dict[str, object]:
+def _match_state_fields(
+    item, summary_status: str, outcome, match, config=None
+) -> dict[str, object]:
     return {
-        "matched": _final_actionable_match(item, summary_status, outcome, match, config),
+        "matched": _final_actionable_match(
+            item, summary_status, outcome, match, config
+        ),
         "deterministic_match_found": bool(match),
-        "manual_review_blocked_match": bool(match)
-        and manual_review_required(item, summary_status, outcome, config),
+        "manual_review_blocked_match": (
+            bool(match) and
+            manual_review_required(item, summary_status, outcome, config)
+        ),
     }
 
 

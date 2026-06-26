@@ -48,20 +48,16 @@ def _share_brand_identity_token(query: str, candidate: dict[str, Any]) -> bool:
     from rapidfuzz import fuzz
 
     req = parse_drug(query)
-    cand_name = candidate_name(candidate)
-    off = parse_drug(cand_name)
-
+    off = parse_drug(candidate_name(candidate))
     if not req.brand or not off.brand:
         return False
 
     req_tokens = set(re.findall(r"[A-Z0-9]+", req.brand.upper()))
     off_tokens = set(re.findall(r"[A-Z0-9]+", off.brand.upper()))
-
     for var in req.brand_variants:
         req_tokens.update(re.findall(r"[A-Z0-9]+", var.upper()))
     for var in off.brand_variants:
         off_tokens.update(re.findall(r"[A-Z0-9]+", var.upper()))
-
     if req_tokens & off_tokens:
         return True
 
@@ -72,7 +68,6 @@ def _share_brand_identity_token(query: str, candidate: dict[str, Any]) -> bool:
             return True
         if fuzz.ratio(req_clean, off_clean) >= 80:
             return True
-
     return False
 
 

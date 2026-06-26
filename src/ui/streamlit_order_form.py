@@ -128,7 +128,8 @@ def _order_form_values(
 def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
     """Build values related to the selected order run target/options."""
     profile_mode, profile_key, limit, debug_browser, resume, match_only = run_fields[:6]
-    execution_mode, high_disc, min_disc, start_item, end_item = _extended_order_run_values(run_fields)
+    extended_vals = _extended_order_run_values(run_fields)
+    execution_mode, high_disc, min_disc, start_item, end_item = extended_vals
     return {
         "profile_mode": profile_mode,
         "profile_key": profile_key,

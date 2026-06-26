@@ -125,7 +125,8 @@ def _handle_api_no_match(
             final_reason="All API candidates missing orderable storeProductId",
         )
         raise bot.no_results_exception(
-            f"No decisive match found for '{item.name}'. API candidates found but none has an orderable storeProductId."
+            f"No decisive match found for '{item.name}'. API candidates "
+            f"found but none has an orderable storeProductId."
         )
 
     decision = _api_match_decision(bot, item, results, review_decision)

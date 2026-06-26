@@ -92,7 +92,10 @@ class ManualReviewStore:
         for chunk in _chunks(keys, 100):
             rows.extend(self.db.execute_query(_lookup_many_sql(chunk), _flat_keys(chunk)))
         decisions = [_decision_from_row(row) for row in rows]
-        return {hint_key(decision.item_code, decision.item_name): decision for decision in decisions}
+        return {
+            hint_key(decision.item_code, decision.item_name): decision
+            for decision in decisions
+        }
 
     def delete(self, item_code: str, item_name: str) -> None:
         """Remove a previously saved decision for an item."""

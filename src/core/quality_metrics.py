@@ -60,9 +60,12 @@ class RunQualityMetrics:
             "=" * 60,
             "",
             f"Total items:                {self.total_items}",
-            f"Auto-matched:               {self.auto_matched} ({self.auto_match_rate}%)",
-            f"Manual review required:     {self.manual_review_required} ({self.manual_review_rate}%)",
-            f"No results:                 {self.no_results} ({self.no_results_rate}%)",
+            f"Auto-matched:               {self.auto_matched} "
+            f"({self.auto_match_rate}%)",
+            f"Manual review required:     {self.manual_review_required} "
+            f"({self.manual_review_rate}%)",
+            f"No results:                 {self.no_results} "
+            f"({self.no_results_rate}%)",
             f"Matched but unavailable:    {self.matched_but_unavailable}",
             f"Not orderable:              {self.not_orderable}",
             "",
@@ -99,45 +102,60 @@ def compute_quality_metrics(summary_csv_path: Path) -> RunQualityMetrics:
 
     for row in rows:
         metrics.total_items += 1
-        status = _cell(row, "status")
-        matched = _cell(row, "matched").lower() in {"true", "1", "yes"}
-        manual_review = _cell(row, "manual_review_required").lower() in {"true", "1", "yes"}
-        ai_status = _cell(row, "ai_status")
-        category = _cell(row, "manual_review_category")
-        deterministic_found = _cell(row, "deterministic_match_found").lower() in {"true", "1", "yes"}
-
-        _increment(metrics.status_counts, status)
-
-        if matched and not manual_review:
-            metrics.auto_matched += 1
-
-        if manual_review:
-            metrics.manual_review_required += 1
-            if category:
-                _increment(metrics.category_counts, category)
-
-        if status == "no-results":
-            metrics.no_results += 1
-        elif status == "matched-but-unavailable":
-            metrics.matched_but_unavailable += 1
-        elif status == "not-orderable":
-            metrics.not_orderable += 1
-
-        if deterministic_found:
-            metrics.deterministic_matched += 1
-
-        if ai_status == "ai_verified":
-            metrics.ai_verified += 1
-        elif ai_status == "ai_search_accepted":
-            metrics.ai_searched += 1
-        elif ai_status == "ai_review_rejected":
-            metrics.ai_reviewed += 1
-        elif ai_status == "ai_rejected":
-            metrics.ai_rejected += 1
-        elif ai_status == "ai_low_confidence":
-            metrics.ai_low_confidence += 1
+        _process_row_metrics(row, metrics)
 
     return metrics
+
+
+def _process_row_metrics(row: dict, metrics: RunQualityMetrics) -> None:
+    """Process a single row and update metrics."""
+    status = _cell(row, "status")
+    matched = _cell(row, "matched").lower() in {"true", "1", "yes"}
+    manual_review = _cell(row, "manual_review_required").lower() in {"true", "1", "yes"}
+    ai_status = _cell(row, "ai_status")
+    category = _cell(row, "manual_review_category")
+    deterministic_found = _cell(row, "deterministic_match_found").lower() in {"true", "1", "yes"}
+
+    _increment(metrics.status_counts, status)
+
+    if matched and not manual_review:
+        metrics.auto_matched += 1
+
+    if manual_review:
+        metrics.manual_review_required += 1
+        if category:
+            _increment(metrics.category_counts, category)
+
+    _update_status_metrics(status, metrics)
+    
+    if deterministic_found:
+        metrics.deterministic_matched += 1
+
+    _update_ai_metrics(ai_status, metrics)
+
+
+def _update_status_metrics(status: str, metrics: RunQualityMetrics) -> None:
+    """Update status-specific metrics."""
+    if status == "no-results":
+        metrics.no_results += 1
+    elif status == "matched-but-unavailable":
+        metrics.matched_but_unavailable += 1
+    elif status == "not-orderable":
+        metrics.not_orderable += 1
+
+
+def _update_ai_metrics(ai_status: str, metrics: RunQualityMetrics) -> None:
+    """Update AI-specific metrics."""
+    if ai_status == "ai_verified":
+        metrics.ai_verified += 1
+    elif ai_status == "ai_search_accepted":
+        metrics.ai_searched += 1
+    elif ai_status == "ai_review_rejected":
+        metrics.ai_reviewed += 1
+    elif ai_status == "ai_rejected":
+        metrics.ai_rejected += 1
+    elif ai_status == "ai_low_confidence":
+        metrics.ai_low_confidence += 1
 
 
 def compute_quality_metrics_from_directory(run_directory: Path) -> RunQualityMetrics:

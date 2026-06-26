@@ -16,7 +16,8 @@ def match_confidence(decision: MatchDecision, item: Item, query: str) -> float:
     match = decision.best_match
     req = parse_drug(item.name)
     cand_name = (
-        match.data.get("productNameEn") or match.data.get("productNameEnFallback") or ""
+        match.data.get("productNameEn") or 
+        match.data.get("productNameEnFallback") or ""
     )
     off = parse_drug(cand_name)
     off.is_synthetic = bool(match.data.get("productNameEnSynthetic"))
@@ -26,10 +27,7 @@ def match_confidence(decision: MatchDecision, item: Item, query: str) -> float:
     f3 = 1.0 if _is_exact_dosage(req, off) else 0.3
     f4 = 1.0 if components_match(req, off)[0] else 0.0
     f5 = 0.8 if int(match.data.get("availableQuantity") or 0) > 0 else 0.4
-
-    weights = [0.3, 0.25, 0.25, 0.15, 0.05]
-    factors = [f1, f2, f3, f4, f5]
-    return sum(f * w for f, w in zip(factors, weights))
+    return sum(f * w for f, w in zip([f1, f2, f3, f4, f5], [0.3, 0.25, 0.25, 0.15, 0.05]))
 
 
 def _is_brand_clean(brand: str) -> str:

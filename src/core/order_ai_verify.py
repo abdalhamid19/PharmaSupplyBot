@@ -15,14 +15,34 @@ async def verify_current_match(settings, verifier, item, decision):
         return None, {}
     if local_rejection := local_match_rejection(item, match):
         return None, local_rejection_result(local_rejection)
+    
     result = await _verify_match(verifier, item, match, decision)
     apply_provider_cooldown(verifier, result)
+    
     confidence = float(result.get("confidence", 0.0) or 0.0)
+    is_borderline = _is_borderline_accept(result, confidence, settings)
+    
+    if not result.get("is_correct"):
+        return None, result
+    
+    if confidence < settings.accept_confidence and not is_borderline:
+        return None, result
+    
+    reviewed = await review_order_ai(
+        settings, verifier, item, match, confidence, result
+    )
+    if reviewed:
+        return with_ai_results(reviewed, verify_result=result), result
+    return _verified_outcome(decision, result, confidence), result
+
+
+def _is_borderline_accept(result, confidence, settings):
+    """Check if result is borderline accept requiring review."""
     is_correct = bool(result.get("is_correct"))
     is_accept = result.get("decision") == "accept"
     no_conflicts = not result.get("hard_conflicts")
-
-    is_borderline = (
+    
+    return (
         is_correct
         and is_accept
         and no_conflicts
@@ -31,18 +51,6 @@ async def verify_current_match(settings, verifier, item, decision):
         < settings.accept_confidence
         and bool(settings.api_config.review_model)
     )
-
-    if not is_correct:
-        return None, result
-
-    if confidence < settings.accept_confidence and not is_borderline:
-        return None, result
-    reviewed = await review_order_ai(
-        settings, verifier, item, match, confidence, result
-    )
-    if reviewed:
-        return with_ai_results(reviewed, verify_result=result), result
-    return _verified_outcome(decision, result, confidence), result
 
 
 def _verified_outcome(decision, result, confidence):

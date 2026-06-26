@@ -63,32 +63,32 @@ def saved_manual_review_decision(item: Item) -> ManualReviewDecision | None:
     if cache is not None:
         return cache.lookup(item)
     
-    # Retry up to 3 times with exponential backoff
     for attempt in range(3):
         try:
             result = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup(item.code, item.name)
             if attempt > 0:
-                logger.info(f"Manual review lookup succeeded on attempt {attempt + 1} for {item.code}/{item.name}")
+                logger.info(
+                    f"Manual review lookup succeeded on attempt {attempt + 1} "
+                    f"for {item.code}/{item.name}"
+                )
             return result
         except Exception as e:
             if attempt < 2:
                 logger.warning(
-                    f"Manual review lookup attempt {attempt + 1} failed for {item.code}/{item.name}: "
-                    f"{type(e).__name__}: {e}, retrying..."
+                    f"Manual review lookup attempt {attempt + 1} failed for "
+                    f"{item.code}/{item.name}: {type(e).__name__}: {e}, retrying..."
                 )
                 time.sleep(0.05 * (attempt + 1))
             else:
                 logger.error(
-                    f"Manual review lookup failed after 3 attempts for {item.code}/{item.name}: "
-                    f"{type(e).__name__}: {e}"
+                    f"Manual review lookup failed after 3 attempts for "
+                    f"{item.code}/{item.name}: {type(e).__name__}: {e}"
                 )
                 return None
 
 
 def manual_review_queries(
-    item: Item,
-    base_queries: list[str],
-    decision: ManualReviewDecision | None = None,
+    item: Item, base_queries: list[str], decision: ManualReviewDecision | None = None
 ) -> list[str]:
     """Prepend saved corrected queries to the normal Tawreed search queries."""
     decision = saved_manual_review_decision(item) if decision is None else decision
@@ -96,17 +96,10 @@ def manual_review_queries(
     if not preferred:
         return base_queries
         
-    final_queries = []
-    # Add preferred in order without duplicates
-    for p in preferred:
-        if p and p not in final_queries:
-            final_queries.append(p)
-            
-    # Add base queries without duplicates
+    final_queries = [p for p in preferred if p]
     for q in base_queries:
         if q not in final_queries:
             final_queries.append(q)
-            
     return final_queries
 
 
@@ -154,9 +147,6 @@ def manual_review_match(
         if id_match is not None:
             return id_match
 
-    # Fallback: honour the saved correction by exact name even when the saved
-    # store id is missing from the results (e.g. the product was re-listed under
-    # a new orderable id or offered by a different store).
     return _manual_review_name_match(results, target_en, target_ar)
 
 
@@ -176,9 +166,7 @@ def _manual_review_id_match(
 
 
 def _manual_review_name_match(
-    results: list[tuple[str, list[dict]]],
-    target_en: str,
-    target_ar: str,
+    results: list[tuple[str, list[dict]]], target_en: str, target_ar: str
 ) -> MatchDecision | None:
     """Force a match when an orderable candidate exactly matches the saved name."""
     if not target_en and not target_ar:
@@ -194,7 +182,9 @@ def _manual_review_name_match(
             c_ar = candidate_ar(candidate).lower()
             if (target_en and c_en == target_en) or (target_ar and c_ar == target_ar):
                 match = SearchMatch(query, index, 999.0, candidate)
-                return MatchDecision(match, [], "Approved by saved manual review (Name match).")
+                return MatchDecision(
+                    match, [], "Approved by saved manual review (Name match)."
+                )
     return None
 
 

@@ -11,11 +11,15 @@ def update_matching_flags_in_config(config_path: Path | str, new_flags: dict[str
 
     content = path.read_text(encoding="utf-8")
     lines = content.split("\n")
-    
+    new_lines, _ = _process_config_lines(lines, new_flags)
+    path.write_text("\n".join(new_lines), encoding="utf-8")
+
+
+def _process_config_lines(lines: list[str], new_flags: dict[str, bool]):
+    """Process config lines and update matching flags."""
     in_matching_section = False
     matching_indent = ""
     updated_keys = set()
-    
     new_lines = []
     
     for line in lines:
@@ -25,40 +29,48 @@ def update_matching_flags_in_config(config_path: Path | str, new_flags: dict[str
             continue
             
         if in_matching_section:
-            # Check if we left the section
-            if line.strip() and not line.startswith(" ") and not line.startswith("\t") and not line.startswith("#"):
-                # We left the section! Inject any missing keys before leaving
-                missing_keys = set(new_flags.keys()) - updated_keys
-                for key in missing_keys:
-                    val_str = "true" if new_flags[key] else "false"
-                    indent = matching_indent if matching_indent else "  "
-                    new_lines.append(f"{indent}{key}: {val_str}")
+            if _is_section_end(line):
+                new_lines.extend(_inject_missing_keys(new_flags, updated_keys, matching_indent))
                 in_matching_section = False
                 new_lines.append(line)
                 continue
-                
-            # If it's a key-value pair in matching section
-            match = re.match(r"^(\s+)([\w_]+)\s*:\s*(true|false|True|False)(.*)$", line)
-            if match:
-                indent, key, old_val, rest = match.groups()
+            
+            line, indent, updated = _process_matching_line(line, new_flags, updated_keys)
+            new_lines.append(line)
+            if indent:
                 matching_indent = indent
-                if key in new_flags:
-                    val_str = "true" if new_flags[key] else "false"
-                    new_lines.append(f"{indent}{key}: {val_str}{rest}")
-                    updated_keys.add(key)
-                else:
-                    new_lines.append(line)
-            else:
-                new_lines.append(line)
         else:
             new_lines.append(line)
-            
-    # If we reached the end and are still in matching section
+    
     if in_matching_section:
-        missing_keys = set(new_flags.keys()) - updated_keys
-        for key in missing_keys:
-            val_str = "true" if new_flags[key] else "false"
-            indent = matching_indent if matching_indent else "  "
-            new_lines.append(f"{indent}{key}: {val_str}")
+        new_lines.extend(_inject_missing_keys(new_flags, updated_keys, matching_indent))
+    
+    return new_lines, updated_keys
 
-    path.write_text("\n".join(new_lines), encoding="utf-8")
+
+def _is_section_end(line: str) -> bool:
+    """Check if line marks end of section."""
+    return (
+        line.strip() and not line.startswith(" ") and
+        not line.startswith("\t") and not line.startswith("#")
+    )
+
+
+def _process_matching_line(line: str, new_flags: dict, updated_keys: set):
+    """Process a line in matching section."""
+    match = re.match(r"^(\s+)([\w_]+)\s*:\s*(true|false|True|False)(.*)$", line)
+    if match:
+        indent, key, old_val, rest = match.groups()
+        if key in new_flags:
+            val_str = "true" if new_flags[key] else "false"
+            updated_keys.add(key)
+            return f"{indent}{key}: {val_str}{rest}", indent, True
+        return line, indent, False
+    return line, None, False
+
+
+def _inject_missing_keys(new_flags: dict, updated_keys: set, indent: str) -> list[str]:
+    """Inject missing keys at end of section."""
+    missing_keys = set(new_flags.keys()) - updated_keys
+    indent = indent if indent else "  "
+    return [f"{indent}{key}: {'true' if new_flags[key] else 'false'}" for key in missing_keys]

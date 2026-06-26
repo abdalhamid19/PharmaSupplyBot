@@ -24,20 +24,14 @@ def first_discount_value(source: dict[str, Any]) -> Any:
             
     try:
         sale_price = float(str(source.get("salePrice") or "0").replace(",", ""))
+        price_keys = ["retailPrice", "publicPrice", "price", "sellingPrice"]
         pub_price = float(
-            str(
-                source.get("retailPrice") or 
-                source.get("publicPrice") or 
-                source.get("price") or 
-                source.get("sellingPrice") or 
-                "0"
-            ).replace(",", "")
+            str(next((source.get(k) for k in price_keys if source.get(k)), "0")).replace(",", "")
         )
         if pub_price > 0 and sale_price > 0 and sale_price < pub_price:
             return round(((pub_price - sale_price) / pub_price) * 100, 2)
     except Exception:
         pass
-
     return ""
 
 def format_discount_percent(value: Any) -> str:

@@ -62,27 +62,17 @@ def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
     matching_values = dict(raw_values.get("matching", {}))
     default_config = MatchingConfig()
     kwargs = _matching_float_values(matching_values, default_config)
-    for k in (
-        "exact_match_accept",
-        "candidate_top_k",
-        "fuzzy_prefix_len",
-        "query_cache_size",
-        "require_identity_token_for_flag",
-        "enable_auto_save_verified_match",
-        "enable_auto_match_re_review_on_fail",
-        "enable_approved_match_re_review_on_fail",
-    ):
+    bool_keys = {
+        "exact_match_accept", "require_identity_token_for_flag",
+        "enable_auto_save_verified_match", "enable_auto_match_re_review_on_fail",
+        "enable_approved_match_re_review_on_fail"
+    }
+    int_keys = {"candidate_top_k", "fuzzy_prefix_len", "query_cache_size"}
+    all_keys = bool_keys | int_keys
+    
+    for k in all_keys:
         val = _matching_value(matching_values, default_config, k)
-        if k in {
-            "exact_match_accept", 
-            "require_identity_token_for_flag",
-            "enable_auto_save_verified_match",
-            "enable_auto_match_re_review_on_fail",
-            "enable_approved_match_re_review_on_fail",
-        }:
-            kwargs[k] = bool(val)
-        else:
-            kwargs[k] = int(val)
+        kwargs[k] = bool(val) if k in bool_keys else int(val)
     return MatchingConfig(**kwargs)
 
 

@@ -59,7 +59,9 @@ def _auto_save_verified_match(item: Item, decision) -> None:
         
     from ..core.candidate_identity import candidate_store_product_id
     from ..core.order_ai_records import candidate_name, candidate_ar
-    from ..core.manual_review_store import ManualReviewStore, ManualReviewDecision, DEFAULT_MANUAL_REVIEW_DB
+    from ..core.manual_review_store import (
+        ManualReviewStore, ManualReviewDecision, DEFAULT_MANUAL_REVIEW_DB
+    )
     
     store = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB)
     if _preserve_existing_decision(store.lookup(item.code, item.name)):

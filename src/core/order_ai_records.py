@@ -25,7 +25,10 @@ def candidate_ar(candidate: dict[str, Any]) -> str:
 
 def candidate_price(candidate: dict[str, Any]) -> object:
     """Return candidate price when Tawreed exposes one."""
-    return candidate.get("retailPrice") or candidate.get("publicPrice") or candidate.get("price") or candidate.get("sellingPrice")
+    return (
+        candidate.get("retailPrice") or candidate.get("publicPrice") or
+        candidate.get("price") or candidate.get("sellingPrice")
+    )
 
 
 def ai_candidates(decision: MatchDecision) -> list[tuple[dict, float, int]]:

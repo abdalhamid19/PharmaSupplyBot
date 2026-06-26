@@ -35,29 +35,20 @@ async def _search(settings, verifier, item, decision, verify_result):
     apply_provider_cooldown(verifier, result)
     if not result or not result.get("record"):
         return None
+    
     confidence = float(result.get("confidence", 0.0) or 0.0)
-    is_correct = bool(result.get("is_correct"))
-    is_accept = result.get("decision") == "accept"
-    no_conflicts = not result.get("hard_conflicts")
-
-    is_borderline = (
-        is_correct
-        and is_accept
-        and no_conflicts
-        and settings.verify_soft_accept_confidence
-        <= confidence
-        < settings.accept_confidence
-        and bool(settings.api_config.review_model)
-    )
-
+    is_borderline = _is_borderline_search(result, confidence, settings)
+    
     if confidence < settings.accept_confidence and not is_borderline:
         return low_confidence(decision, result, confidence, verify_result)
+    
     match = match_from_record(result["record"], result.get("score", 0.0))
     local_rejection = local_match_rejection(item, match)
     if local_rejection:
         return rejected_search(
             decision, result, confidence, verify_result, local_rejection
         )
+    
     reviewed = await review_order_ai(
         settings, verifier, item, match, confidence, result
     )
@@ -66,3 +57,20 @@ async def _search(settings, verifier, item, decision, verify_result):
             reviewed, verify_result=verify_result, search_result=result
         )
     return accepted_search(decision, match, result, confidence, verify_result)
+
+
+def _is_borderline_search(result, confidence, settings):
+    """Check if search result is borderline accept requiring review."""
+    is_correct = bool(result.get("is_correct"))
+    is_accept = result.get("decision") == "accept"
+    no_conflicts = not result.get("hard_conflicts")
+    
+    return (
+        is_correct
+        and is_accept
+        and no_conflicts
+        and settings.verify_soft_accept_confidence
+        <= confidence
+        < settings.accept_confidence
+        and bool(settings.api_config.review_model)
+    )

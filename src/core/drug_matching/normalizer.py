@@ -556,11 +556,7 @@ def normalize(name: str) -> str:
 
 def _convert_arabic_to_english_terms(name: str) -> str:
     """Convert Arabic numerals and unit/form keywords to English equivalents."""
-    arabic_digits = "٠١٢٣٤٥٦٧٨٩"
-    english_digits = "0123456789"
-    digit_map = str.maketrans(arabic_digits, english_digits)
-    text = name.translate(digit_map)
-
+    text = name.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
     replacements = {
         r"\b(?:مجم|ملجم|مليجرام|مليجرم)\b": " MG ",
         r"\b(?:مل|ملل|مللي|ميللي|مللتر)\b": " ML ",
@@ -1178,8 +1174,14 @@ def components_match(
     m_clean = re.sub(r"[^A-Z0-9]", "", m.brand)
 
     # Critical chemicals and substances identity check
-    d_words_upper = set(w.upper() for w in d.normalized.split()) | set(w.upper() for w in d.brand.split())
-    m_words_upper = set(w.upper() for w in m.normalized.split()) | set(w.upper() for w in m.brand.split())
+    d_words_upper = (
+        set(w.upper() for w in d.normalized.split()) |
+        set(w.upper() for w in d.brand.split())
+    )
+    m_words_upper = (
+        set(w.upper() for w in m.normalized.split()) |
+        set(w.upper() for w in m.brand.split())
+    )
     d_chems = d_words_upper & CRITICAL_CHEMICALS
     m_chems = m_words_upper & CRITICAL_CHEMICALS
     if d_chems and m_chems and d_chems != m_chems:

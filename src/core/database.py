@@ -17,13 +17,6 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """Manages connections to CockroachDB Cloud."""
     
-    # Default connection parameters
-    DEFAULT_HOST = "mahrousdb-27867.j77.aws-eu-central-1.cockroachlabs.cloud"
-    DEFAULT_PORT = 26257
-    DEFAULT_DATABASE = "defaultdb"
-    DEFAULT_USER = "abdalhamid"
-    DEFAULT_SSLMODE = "require"
-    
     def __init__(
         self,
         host: Optional[str] = None,
@@ -36,15 +29,25 @@ class DatabaseManager:
         """
         Initialize database manager with connection parameters.
         
-        Defaults to environment variables or hardcoded cloud defaults.
+        All parameters must be provided via environment variables or arguments.
         """
         load_dotenv()
-        self.host = host or os.getenv("DB_HOST", self.DEFAULT_HOST)
-        self.port = port or int(os.getenv("DB_PORT", self.DEFAULT_PORT))
-        self.database = database or os.getenv("DB_NAME", self.DEFAULT_DATABASE)
-        self.user = user or os.getenv("DB_USER", self.DEFAULT_USER)
-        self.password = password if password is not None else os.getenv("DB_PASSWORD", "")
-        self.sslmode = sslmode or os.getenv("DB_SSLMODE", self.DEFAULT_SSLMODE)
+        
+        self.host = host or os.getenv("DB_HOST")
+        self.port = port or int(os.getenv("DB_PORT", "26257"))
+        self.database = database or os.getenv("DB_NAME")
+        self.user = user or os.getenv("DB_USER")
+        self.password = password if password is not None else os.getenv("DB_PASSWORD")
+        self.sslmode = sslmode or os.getenv("DB_SSLMODE", "require")
+        
+        if not self.host:
+            raise RuntimeError("DB_HOST environment variable is required")
+        if not self.database:
+            raise RuntimeError("DB_NAME environment variable is required")
+        if not self.user:
+            raise RuntimeError("DB_USER environment variable is required")
+        if not self.password:
+            raise RuntimeError("DB_PASSWORD environment variable is required")
         
         self.connection_pool: Optional[pool.SimpleConnectionPool] = None
     

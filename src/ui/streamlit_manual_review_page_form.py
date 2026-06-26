@@ -81,36 +81,40 @@ def _save(
     opt = options[idx - 1] if idx > 0 else None
     decision = decision_from_selection(item, opt, not_matching, query, run_dir.name)
     
-    # ⚡ Only save if user made an explicit choice
     if decision is None:
         return
     
     store.upsert(decision)
-    
-    # ⚡ Update session cache to sync stats
-    cache_key = f"manual_review_cache_{run_dir.name}"
-    if cache_key in st.session_state:
-        # Find and update matching row
-        for i, row in enumerate(st.session_state[cache_key]):
-            row_code = str(row.get("item_code", "")).strip()
-            row_name = str(row.get("item_name", "")).strip().upper()
-            item_code = str(item.code).strip()
-            item_name = str(item.name).strip().upper()
-            
-            if row_code == item_code and row_name == item_name:
-                # Update the row with decision
-                st.session_state[cache_key][i]["approved_match"] = decision.approved
-                st.session_state[cache_key][i]["not_matching"] = (
-                    decision.manual_decision == "not_matching"
-                )
-                if decision.correct_store_product_id:
-                    st.session_state[cache_key][i]["correct_store_product_id"] = (
-                        decision.correct_store_product_id
-                    )
-                if decision.correct_product_name:
-                    st.session_state[cache_key][i]["correct_product_name"] = (
-                        decision.correct_product_name
-                    )
-                break
-    
+    _update_session_cache(item, decision, run_dir)
     st.toast(f"✅ Saved decision for {item.name}")
+
+
+def _update_session_cache(item: Item, decision, run_dir: Path) -> None:
+    """Update session cache to sync stats after saving decision."""
+    cache_key = f"manual_review_cache_{run_dir.name}"
+    if cache_key not in st.session_state:
+        return
+    
+    for i, row in enumerate(st.session_state[cache_key]):
+        if _is_matching_row(row, item):
+            _apply_decision_to_row(st.session_state[cache_key][i], decision)
+            break
+
+
+def _is_matching_row(row: dict, item: Item) -> bool:
+    """Check if row matches the item."""
+    row_code = str(row.get("item_code", "")).strip()
+    row_name = str(row.get("item_name", "")).strip().upper()
+    item_code = str(item.code).strip()
+    item_name = str(item.name).strip().upper()
+    return row_code == item_code and row_name == item_name
+
+
+def _apply_decision_to_row(row: dict, decision) -> None:
+    """Apply decision fields to cache row."""
+    row["approved_match"] = decision.approved
+    row["not_matching"] = decision.manual_decision == "not_matching"
+    if decision.correct_store_product_id:
+        row["correct_store_product_id"] = decision.correct_store_product_id
+    if decision.correct_product_name:
+        row["correct_product_name"] = decision.correct_product_name
