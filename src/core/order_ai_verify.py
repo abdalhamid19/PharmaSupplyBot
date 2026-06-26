@@ -22,15 +22,15 @@ async def verify_current_match(settings, verifier, item, decision):
     confidence = float(result.get("confidence", 0.0) or 0.0)
     is_borderline = _is_borderline_accept(result, confidence, settings)
     
-    if not result.get("is_correct"):
+    if not result.get("is_correct") or (confidence < settings.accept_confidence and not is_borderline):
         return None, result
     
-    if confidence < settings.accept_confidence and not is_borderline:
-        return None, result
-    
-    reviewed = await review_order_ai(
-        settings, verifier, item, match, confidence, result
-    )
+    return await _finalize_verification(settings, verifier, item, match, confidence, result, decision)
+
+
+async def _finalize_verification(settings, verifier, item, match, confidence, result, decision):
+    """Finalize verification with review if needed."""
+    reviewed = await review_order_ai(settings, verifier, item, match, confidence, result)
     if reviewed:
         return with_ai_results(reviewed, verify_result=result), result
     return _verified_outcome(decision, result, confidence), result

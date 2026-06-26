@@ -38,48 +38,45 @@ def render_settings_section(app_config, matching_config, config_path: Path) -> N
         
         col1, col2 = st.columns(2)
         with col1:
-            st.write("🛡️ **Auto-Save Verified Matches**")
-            st.caption(
-                "Automatically save perfectly matched items so you never "
-                "have to review them again."
-            )
-            auto_save = st.toggle(
-                "Enable Auto-Save",
-                value=matching_config.enable_auto_save_verified_match
-            )
-            
-            st.write("⚠️ **Re-review Missing Auto-Matches**")
-            st.caption(
-                "If an auto-saved item is completely out of stock, send it "
-                "back to manual review to find an alternative."
-            )
-            re_review_auto = st.toggle(
-                "Re-review Auto-Matches",
-                value=matching_config.enable_auto_match_re_review_on_fail
-            )
-
+            auto_save, re_review_auto = _render_col1_settings(matching_config)
         with col2:
-            st.write("⚠️ **Re-review Missing Approved Matches**")
-            st.caption(
-                "If a manually approved item is out of stock, send it back "
-                "to manual review to find an alternative."
-            )
-            re_review_approved = st.toggle(
-                "Re-review Approved",
-                value=matching_config.enable_approved_match_re_review_on_fail
-            )
-            
-            st.write("💾 **Save Configuration**")
-            st.caption(f"Save these settings directly to `{config_path.name}`.")
-            if st.button("Apply Changes", type="primary"):
-                new_flags = {
-                    "enable_auto_save_verified_match": auto_save,
-                    "enable_auto_match_re_review_on_fail": re_review_auto,
-                    "enable_approved_match_re_review_on_fail": re_review_approved,
-                }
-                update_matching_flags_in_config(config_path, new_flags)
-                st.success("Settings saved successfully! They will apply on the next run.")
-                st.rerun()
+            re_review_approved = _render_col2_settings(matching_config, config_path, auto_save, re_review_auto)
+
+
+def _render_col1_settings(matching_config):
+    """Render column 1 settings toggles."""
+    st.write("🛡️ **Auto-Save Verified Matches**")
+    st.caption("Automatically save perfectly matched items so you never have to review them again.")
+    auto_save = st.toggle("Enable Auto-Save", value=matching_config.enable_auto_save_verified_match)
+    
+    st.write("⚠️ **Re-review Missing Auto-Matches**")
+    st.caption("If an auto-saved item is completely out of stock, send it back to manual review to find an alternative.")
+    re_review_auto = st.toggle("Re-review Auto-Matches", value=matching_config.enable_auto_match_re_review_on_fail)
+    
+    return auto_save, re_review_auto
+
+
+def _render_col2_settings(matching_config, config_path, auto_save, re_review_auto):
+    """Render column 2 settings toggles and save button."""
+    from ..core.config.config_updater import update_matching_flags_in_config
+    
+    st.write("⚠️ **Re-review Missing Approved Matches**")
+    st.caption("If a manually approved item is out of stock, send it back to manual review to find an alternative.")
+    re_review_approved = st.toggle("Re-review Approved", value=matching_config.enable_approved_match_re_review_on_fail)
+    
+    st.write("💾 **Save Configuration**")
+    st.caption(f"Save these settings directly to `{config_path.name}`.")
+    if st.button("Apply Changes", type="primary"):
+        new_flags = {
+            "enable_auto_save_verified_match": auto_save,
+            "enable_auto_match_re_review_on_fail": re_review_auto,
+            "enable_approved_match_re_review_on_fail": re_review_approved,
+        }
+        update_matching_flags_in_config(config_path, new_flags)
+        st.success("Settings saved successfully! They will apply on the next run.")
+        st.rerun()
+    
+    return re_review_approved
 
 
 def render_overview_metrics(

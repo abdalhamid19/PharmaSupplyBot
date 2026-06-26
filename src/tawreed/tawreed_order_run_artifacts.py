@@ -26,25 +26,19 @@ def append_order_ai_trace_artifacts(
     )
 
 
-def append_order_item_artifacts(
-    profile_key: str,
-    item: Item,
-    summary: OrderResultSummary,
-    decision,
-    outcome,
-    label_suffix: str | None = None,
-    matching_config=None,
-) -> None:
+def append_order_item_artifacts(profile_key: str, item: Item, summary: OrderResultSummary, decision, outcome, label_suffix: str | None = None, matching_config=None) -> None:
     """Append one item summary row and optional manual-review row."""
     row = order_item_summary_row(item, summary, decision, outcome, matching_config)
     _append_item_summary_row(profile_key, row, label_suffix)
     _append_final_trace_row(profile_key, row, label_suffix)
-    requires_review = manual_review_required(item, summary.status, outcome, matching_config)
+    _handle_manual_review_or_auto_save(profile_key, item, summary, decision, outcome, label_suffix, matching_config)
 
+
+def _handle_manual_review_or_auto_save(profile_key, item, summary, decision, outcome, label_suffix, matching_config):
+    """Handle manual review or auto-save based on config."""
+    requires_review = manual_review_required(item, summary.status, outcome, matching_config)
     if requires_review:
-        append_manual_review_artifacts(
-            profile_key, item, summary, decision, outcome, label_suffix, matching_config
-        )
+        append_manual_review_artifacts(profile_key, item, summary, decision, outcome, label_suffix, matching_config)
     elif matching_config and matching_config.enable_auto_save_verified_match:
         _auto_save_verified_match(item, decision)
 
@@ -52,21 +46,26 @@ def append_order_item_artifacts(
 def _auto_save_verified_match(item: Item, decision) -> None:
     if not decision or not decision.best_match:
         return
-        
+    
     match = decision.best_match
     if match.score == 999.0 and "Approved by saved manual review" in (decision.final_reason or ""):
         return
-        
-    from ..core.candidate_identity import candidate_store_product_id
-    from ..core.order_ai_records import candidate_name, candidate_ar
-    from ..core.manual_review_store import (
-        ManualReviewStore, ManualReviewDecision, DEFAULT_MANUAL_REVIEW_DB
-    )
+    
+    from ..core.manual_review_store import ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
     
     store = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB)
     if _preserve_existing_decision(store.lookup(item.code, item.name)):
-        return  # Never let an automatic match overwrite a human decision.
+        return
+    
+    _create_and_save_decision(item, match, store)
 
+
+def _create_and_save_decision(item, match, store):
+    """Create and save auto-matched decision."""
+    from ..core.candidate_identity import candidate_store_product_id
+    from ..core.order_ai_records import candidate_name, candidate_ar
+    from ..core.manual_review_store import ManualReviewDecision
+    
     store_id = candidate_store_product_id(match.data)
     name_en = candidate_name(match.data)
     name_ar = candidate_ar(match.data)
@@ -75,14 +74,9 @@ def _auto_save_verified_match(item: Item, decision) -> None:
     run_id = run.directory.name if run else ""
     
     new_decision = ManualReviewDecision(
-        item_code=item.code,
-        item_name=item.name,
-        approved=True,
-        correct_store_product_id=store_id,
-        manual_decision="auto_matched",
-        correct_query="",
-        run_id=run_id,
-        correct_product_name=name_en,
+        item_code=item.code, item_name=item.name, approved=True,
+        correct_store_product_id=store_id, manual_decision="auto_matched",
+        correct_query="", run_id=run_id, correct_product_name=name_en,
         correct_product_name_ar=name_ar
     )
     store.upsert(new_decision)

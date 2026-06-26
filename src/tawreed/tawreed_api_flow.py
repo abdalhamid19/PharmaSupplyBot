@@ -46,7 +46,6 @@ def place_order_with_api(bot, items: Iterable[Item]) -> None:
 def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> bool:
     """Add every requested item through the API and record summaries."""
     from .tawreed_timing import record_timing
-    from .tawreed_store_summary import record_single_store
     
     added_any = False
     for item in items:
@@ -55,19 +54,25 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
         started_at = time.perf_counter()
         bot._reset_last_item_state()
         try:
-            match = require_api_match(bot, api, item, True)
-            has_product_id = bool(match.data.get("productId") or match.data.get("id"))
-            is_multi = int(match.data.get("productsCount") or 0) > 0 and has_product_id
-            if is_multi:
-                _add_multi_store_item_api(bot, api, match, item, record_timing)
-            else:
-                _add_single_item_to_cart(bot, api, match, item, record_timing)
-                record_single_store(bot, match.data)
+            _add_single_api_item(bot, api, item, record_timing)
             bot._record_success(item, started_at)
             added_any = True
         except bot.skip_item_exception as error:
             bot._record_skip(item, error, started_at)
     return added_any
+
+
+def _add_single_api_item(bot, api, item, record_timing):
+    """Add a single item via API."""
+    from .tawreed_store_summary import record_single_store
+    match = require_api_match(bot, api, item, True)
+    has_product_id = bool(match.data.get("productId") or match.data.get("id"))
+    is_multi = int(match.data.get("productsCount") or 0) > 0 and has_product_id
+    if is_multi:
+        _add_multi_store_item_api(bot, api, match, item, record_timing)
+    else:
+        _add_single_item_to_cart(bot, api, match, item, record_timing)
+        record_single_store(bot, match.data)
 
 
 def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, record_timing) -> None:
@@ -116,18 +121,14 @@ def _select_stores_and_add_to_cart(
     rem, used_ids, sels = int(item.qty), set(), []
     
     while rem > 0:
-        min_disc = _effective_min_discount(bot, sels)
         choice = choose_next_store_for_remaining_quantity(
-            store_rows, used_ids, mode, bot.skip_item_exception, min_disc,
-            preferred_warehouses
+            store_rows, used_ids, mode, bot.skip_item_exception,
+            _effective_min_discount(bot, sels), preferred_warehouses
         )
-        if choice is None:
+        if not choice or min(rem, choice.available_quantity) <= 0:
             break
         
         ordered = min(rem, choice.available_quantity)
-        if ordered <= 0:
-            break
-        
         _add_store_to_cart(api, choice, ordered, bot, record_timing)
         sels.append((choice.store, ordered))
         used_ids.add(choice.identity)

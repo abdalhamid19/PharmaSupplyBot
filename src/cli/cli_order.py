@@ -413,18 +413,22 @@ def _run_parallel_order(
 
     materialized = list(items)
     chunks = split_into_chunks(materialized, item_workers)
-    
-    # Create shared lock for coordinating auth refresh
     manager = Manager()
     auth_lock = manager.Lock()
     
     payloads = _build_order_payloads(profile_key, chunks, args, auth_lock)
+    results = _execute_order_workers(profile_key, chunks, payloads)
+    _merge_order_worker_outputs(profile_key, args)
+    report_worker_results(app_config.base_url, profile_key, results)
+
+
+def _execute_order_workers(profile_key, chunks, payloads):
+    """Execute order workers in parallel."""
+    from .item_worker_runner import run_order_chunk
     print(f"[{profile_key}] Launching {len(chunks)} parallel item workers...")
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
-        results = pool.map(run_order_chunk, payloads)
-    _merge_order_worker_outputs(profile_key, args)
-    report_worker_results(app_config.base_url, profile_key, results)
+        return pool.map(run_order_chunk, payloads)
 
 
 def _merge_order_worker_outputs(profile_key: str, args: argparse.Namespace) -> None:

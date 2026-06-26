@@ -24,24 +24,33 @@ _PRODUCT_LIST_KEYS = ("data", "content", "items", "products", "result", "results
 
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     """Search products and prefer API candidates over DOM fallbacks."""
-    from .tawreed_dialogs import close_visible_dialogs
-    from .tawreed_dom_parsing import dom_search_results
-    from .tawreed_ui import is_no_results_row
-    from .tawreed_waits import wait_for_table_overlay_to_clear
-
     bot.log(f"Searching for '{query}'...")
+    api_candidates = _execute_api_search(bot, page, query)
+    
+    if api_candidates is not None and has_orderable_candidate(api_candidates):
+        return api_candidates
+    
+    return _execute_dom_fallback(bot, page, query, api_candidates)
+
+
+def _execute_api_search(bot, page, query):
+    """Execute API search with timing."""
+    from .tawreed_dialogs import close_visible_dialogs
     started_at = time.perf_counter()
     close_visible_dialogs(page)
     record_timing(bot, "dialog_close_seconds", time.perf_counter() - started_at)
     started_at = time.perf_counter()
     api_candidates = _submit_product_search_with_api(page, query)
     record_timing(bot, "api_search_seconds", time.perf_counter() - started_at)
+    return api_candidates
 
-    # Fast path: if API returned good candidates, skip DOM parsing entirely
-    if api_candidates is not None and has_orderable_candidate(api_candidates):
-        return api_candidates
 
-    # Fallback: wait and check DOM
+def _execute_dom_fallback(bot, page, query, api_candidates):
+    """Execute DOM fallback search."""
+    from .tawreed_dom_parsing import dom_search_results
+    from .tawreed_ui import is_no_results_row
+    from .tawreed_waits import wait_for_table_overlay_to_clear
+    
     started_at = time.perf_counter()
     wait_for_table_overlay_to_clear(page)
     rows = _ready_product_rows(page)

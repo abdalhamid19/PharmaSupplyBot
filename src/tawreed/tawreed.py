@@ -321,20 +321,22 @@ class TawreedBot:
         with self._manual_review_cache_for_items(items):
             if self._try_api_match_only(items):
                 return
-            with sync_playwright() as p:
-                browser, context, page = open_order_page(
-                    p,
-                    self.config.runtime,
-                    self.state_path,
-                    debug_browser=self.debug_browser,
-                )
-                api_capture = begin_api_contract_capture(page)
-                try:
-                    self._run_match_only_with_artifacts(page, items)
-                finally:
-                    _save_api_contract_capture(api_capture)
-                    close_context(context)
-                    close_browser(browser)
+            self._match_items_browser_mode(items)
+
+
+    def _match_items_browser_mode(self, items: list[Item]) -> None:
+        """Match items using browser mode."""
+        with sync_playwright() as p:
+            browser, context, page = open_order_page(
+                p, self.config.runtime, self.state_path, debug_browser=self.debug_browser
+            )
+            api_capture = begin_api_contract_capture(page)
+            try:
+                self._run_match_only_with_artifacts(page, items)
+            finally:
+                _save_api_contract_capture(api_capture)
+                close_context(context)
+                close_browser(browser)
 
     def _manual_review_cache_for_items(self, items: list[Item]):
         """Return a run-scoped manual-review decision cache context."""

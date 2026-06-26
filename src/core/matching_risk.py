@@ -45,24 +45,35 @@ def _share_brand_identity_token(query: str, candidate: dict[str, Any]) -> bool:
     from .drug_matching.normalizer import parse_drug
     from .order_ai_records import candidate_name
     import re
-    from rapidfuzz import fuzz
 
     req = parse_drug(query)
     off = parse_drug(candidate_name(candidate))
     if not req.brand or not off.brand:
         return False
 
+    if _brands_share_tokens(req, off):
+        return True
+    return _brands_similar_fuzzy(req.brand, off.brand)
+
+
+def _brands_share_tokens(req, off):
+    """Check if brands share identity tokens."""
+    import re
     req_tokens = set(re.findall(r"[A-Z0-9]+", req.brand.upper()))
     off_tokens = set(re.findall(r"[A-Z0-9]+", off.brand.upper()))
     for var in req.brand_variants:
         req_tokens.update(re.findall(r"[A-Z0-9]+", var.upper()))
     for var in off.brand_variants:
         off_tokens.update(re.findall(r"[A-Z0-9]+", var.upper()))
-    if req_tokens & off_tokens:
-        return True
+    return bool(req_tokens & off_tokens)
 
-    req_clean = re.sub(r"[^A-Z0-9]", "", req.brand.upper())
-    off_clean = re.sub(r"[^A-Z0-9]", "", off.brand.upper())
+
+def _brands_similar_fuzzy(req_brand, off_brand):
+    """Check brands similarity with fuzzy matching."""
+    import re
+    from rapidfuzz import fuzz
+    req_clean = re.sub(r"[^A-Z0-9]", "", req_brand.upper())
+    off_clean = re.sub(r"[^A-Z0-9]", "", off_brand.upper())
     if req_clean and off_clean:
         if req_clean in off_clean or off_clean in req_clean:
             return True

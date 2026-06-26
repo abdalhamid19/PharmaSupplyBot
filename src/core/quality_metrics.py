@@ -54,21 +54,29 @@ class RunQualityMetrics:
 
     def format_report(self) -> str:
         """Return a human-readable quality report string."""
-        lines = [
-            "=" * 60,
-            "ORDER MATCHING QUALITY REPORT",
-            "=" * 60,
-            "",
+        lines = ["=" * 60, "ORDER MATCHING QUALITY REPORT", "=" * 60, ""]
+        lines.extend(self._format_summary_section())
+        lines.extend(self._format_ai_section())
+        lines.extend(self._format_status_section())
+        lines.extend(self._format_category_section())
+        lines.append("=" * 60)
+        return "\n".join(lines)
+
+    def _format_summary_section(self):
+        """Format summary statistics section."""
+        return [
             f"Total items:                {self.total_items}",
-            f"Auto-matched:               {self.auto_matched} "
-            f"({self.auto_match_rate}%)",
-            f"Manual review required:     {self.manual_review_required} "
-            f"({self.manual_review_rate}%)",
-            f"No results:                 {self.no_results} "
-            f"({self.no_results_rate}%)",
+            f"Auto-matched:               {self.auto_matched} ({self.auto_match_rate}%)",
+            f"Manual review required:     {self.manual_review_required} ({self.manual_review_rate}%)",
+            f"No results:                 {self.no_results} ({self.no_results_rate}%)",
             f"Matched but unavailable:    {self.matched_but_unavailable}",
             f"Not orderable:              {self.not_orderable}",
             "",
+        ]
+
+    def _format_ai_section(self):
+        """Format AI decision breakdown section."""
+        return [
             "--- AI Decision Breakdown ---",
             f"Deterministic matched:      {self.deterministic_matched}",
             f"AI verified:                {self.ai_verified}",
@@ -79,20 +87,25 @@ class RunQualityMetrics:
             "",
         ]
 
-        if self.status_counts:
-            lines.append("--- Status Distribution ---")
-            for status, count in sorted(self.status_counts.items(), key=lambda pair: -pair[1]):
-                lines.append(f"  {status:<35s} {count}")
-            lines.append("")
+    def _format_status_section(self):
+        """Format status distribution section."""
+        if not self.status_counts:
+            return []
+        lines = ["--- Status Distribution ---"]
+        for status, count in sorted(self.status_counts.items(), key=lambda p: -p[1]):
+            lines.append(f"  {status:<35s} {count}")
+        lines.append("")
+        return lines
 
-        if self.category_counts:
-            lines.append("--- Manual Review Categories ---")
-            for category, count in sorted(self.category_counts.items(), key=lambda pair: -pair[1]):
-                lines.append(f"  {category:<35s} {count}")
-            lines.append("")
-
-        lines.append("=" * 60)
-        return "\n".join(lines)
+    def _format_category_section(self):
+        """Format manual review categories section."""
+        if not self.category_counts:
+            return []
+        lines = ["--- Manual Review Categories ---"]
+        for category, count in sorted(self.category_counts.items(), key=lambda p: -p[1]):
+            lines.append(f"  {category:<35s} {count}")
+        lines.append("")
+        return lines
 
 
 def compute_quality_metrics(summary_csv_path: Path) -> RunQualityMetrics:
@@ -112,8 +125,6 @@ def _process_row_metrics(row: dict, metrics: RunQualityMetrics) -> None:
     status = _cell(row, "status")
     matched = _cell(row, "matched").lower() in {"true", "1", "yes"}
     manual_review = _cell(row, "manual_review_required").lower() in {"true", "1", "yes"}
-    ai_status = _cell(row, "ai_status")
-    category = _cell(row, "manual_review_category")
     deterministic_found = _cell(row, "deterministic_match_found").lower() in {"true", "1", "yes"}
 
     _increment(metrics.status_counts, status)
@@ -121,17 +132,22 @@ def _process_row_metrics(row: dict, metrics: RunQualityMetrics) -> None:
     if matched and not manual_review:
         metrics.auto_matched += 1
 
-    if manual_review:
-        metrics.manual_review_required += 1
-        if category:
-            _increment(metrics.category_counts, category)
-
+    _update_manual_review_metrics(row, metrics, manual_review)
     _update_status_metrics(status, metrics)
     
     if deterministic_found:
         metrics.deterministic_matched += 1
 
-    _update_ai_metrics(ai_status, metrics)
+    _update_ai_metrics(_cell(row, "ai_status"), metrics)
+
+
+def _update_manual_review_metrics(row, metrics, manual_review):
+    """Update manual review metrics."""
+    if manual_review:
+        metrics.manual_review_required += 1
+        category = _cell(row, "manual_review_category")
+        if category:
+            _increment(metrics.category_counts, category)
 
 
 def _update_status_metrics(status: str, metrics: RunQualityMetrics) -> None:

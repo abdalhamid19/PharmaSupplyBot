@@ -41,43 +41,57 @@ def render_running_search_controls() -> bool:
     state = st.session_state.get("manual_review_search_process")
     if not state:
         return False
+    
     process = state["process"]
     returncode = process.poll()
-    
-    output_path = Path(state["output_path"])
-    output_text = ""
-    if output_path.exists():
-        try:
-            output_text = output_path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            pass
+    output_text = _read_output_file(state.get("output_path"))
 
     if returncode is None:
-        st.warning("Corrected items search is running.")
-        if st.button("Refresh Search Status"):
-            st.rerun()
-        if output_text:
-            st.code(output_text[-4000:], language="text")
+        _render_running_status(output_text)
         return True
 
-    # Process finished
+    _finish_search_process(state, returncode, output_text)
+    return False
+
+
+def _read_output_file(output_path_str):
+    """Read output file content."""
+    if not output_path_str:
+        return ""
+    output_path = Path(output_path_str)
+    if not output_path.exists():
+        return ""
+    try:
+        return output_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _render_running_status(output_text):
+    """Render running status UI."""
+    st.warning("Corrected items search is running.")
+    if st.button("Refresh Search Status"):
+        st.rerun()
+    if output_text:
+        st.code(output_text[-4000:], language="text")
+
+
+def _finish_search_process(state, returncode, output_text):
+    """Finish and clean up search process."""
+    from .streamlit_process import render_command_result
+    
     if "output_file" in state and not state["output_file"].closed:
         state["output_file"].close()
 
-    render_command_result(
-        {
-            "ok": returncode == 0,
-            "exit_code": returncode,
-            "command": " ".join(state["command"]),
-            "output": output_text,
-            "error_type": "ProcessError" if returncode else "",
-            "error_message": f"Exited with status code {returncode}."
-            if returncode
-            else "",
-        }
-    )
+    render_command_result({
+        "ok": returncode == 0,
+        "exit_code": returncode,
+        "command": " ".join(state["command"]),
+        "output": output_text,
+        "error_type": "ProcessError" if returncode else "",
+        "error_message": f"Exited with status code {returncode}." if returncode else "",
+    })
     st.session_state.pop("manual_review_search_process", None)
-    return False
 
 
 def corrected_review_search_output_path() -> Path:

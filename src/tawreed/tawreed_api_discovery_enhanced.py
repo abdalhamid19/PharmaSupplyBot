@@ -19,24 +19,10 @@ def begin_detailed_api_capture(page) -> list[dict[str, Any]]:
         """Capture detailed request information."""
         if request.method != "POST":
             return
-            
-        url = str(request.url).lower()
         
-        # Capture cart-related and product-related requests
+        url = str(request.url).lower()
         if any(keyword in url for keyword in ["cart", "product", "shopping", "order"]):
-            try:
-                post_data = request.post_data_json
-            except Exception:
-                post_data = None
-                
-            captured.append({
-                "timestamp": time.time(),
-                "url": request.url,
-                "method": request.method,
-                "headers": dict(request.all_headers()),
-                "post_data": post_data,
-                "resource_type": request.resource_type,
-            })
+            _capture_request_details(request, captured)
     
     if hasattr(page, "on"):
         page.on("request", capture_handler)
@@ -44,52 +30,71 @@ def begin_detailed_api_capture(page) -> list[dict[str, Any]]:
     return captured
 
 
-def save_captured_requests(
-    captured: list[dict[str, Any]], 
-    profile_key: str,
-    label: str = "api_capture"
-) -> Path:
+def _capture_request_details(request, captured):
+    """Capture request details to list."""
+    try:
+        post_data = request.post_data_json
+    except Exception:
+        post_data = None
+    
+    captured.append({
+        "timestamp": time.time(), "url": request.url, "method": request.method,
+        "headers": dict(request.all_headers()), "post_data": post_data,
+        "resource_type": request.resource_type
+    })
+    
+    return captured
+
+
+def save_captured_requests(captured: list[dict[str, Any]], profile_key: str, label: str = "api_capture") -> Path:
     """Save captured requests to JSON file for analysis."""
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     output_dir = Path("artifacts") / "api_discovery" / profile_key
     output_dir.mkdir(parents=True, exist_ok=True)
     
     output_file = output_dir / f"{label}_{timestamp}.json"
+    output_file.write_text(json.dumps(captured, indent=2, ensure_ascii=False), encoding="utf-8")
     
-    output_file.write_text(
-        json.dumps(captured, indent=2, ensure_ascii=False),
-        encoding="utf-8"
-    )
-    
-    print(f"[API Discovery] Captured {len(captured)} requests")
-    print(f"[API Discovery] Saved to: {output_file}")
-    
+    _print_capture_summary(len(captured), output_file)
     return output_file
+
+
+def _print_capture_summary(count, output_file):
+    """Print capture summary."""
+    print(f"[API Discovery] Captured {count} requests")
+    print(f"[API Discovery] Saved to: {output_file}")
 
 
 def analyze_add_to_cart_payload(captured_file: Path) -> dict[str, Any]:
     """Analyze captured requests to find add-to-cart pattern."""
     captured = json.loads(captured_file.read_text(encoding="utf-8"))
-    
-    add_to_cart_requests = []
-    for req in captured:
-        url = req.get("url", "").lower()
-        if "cart" in url and "add" in url or "items" in url:
-            add_to_cart_requests.append(req)
+    add_to_cart_requests = _filter_cart_requests(captured)
     
     if not add_to_cart_requests:
         return {"error": "No add-to-cart requests found"}
     
-    # Analyze the structure
-    analysis = {
-        "total_requests": len(add_to_cart_requests),
-        "urls": list(set(r["url"] for r in add_to_cart_requests)),
-        "sample_payload": add_to_cart_requests[0].get("post_data"),
-        "common_headers": _find_common_headers(add_to_cart_requests),
-        "payload_fields": _analyze_payload_structure(add_to_cart_requests),
+    return _build_analysis(add_to_cart_requests)
+
+
+def _filter_cart_requests(captured):
+    """Filter cart-related requests."""
+    result = []
+    for req in captured:
+        url = req.get("url", "").lower()
+        if "cart" in url and "add" in url or "items" in url:
+            result.append(req)
+    return result
+
+
+def _build_analysis(requests):
+    """Build analysis from cart requests."""
+    return {
+        "total_requests": len(requests),
+        "urls": list(set(r["url"] for r in requests)),
+        "sample_payload": requests[0].get("post_data"),
+        "common_headers": _find_common_headers(requests),
+        "payload_fields": _analyze_payload_structure(requests),
     }
-    
-    return analysis
 
 
 def _find_common_headers(requests: list[dict]) -> dict[str, str]:

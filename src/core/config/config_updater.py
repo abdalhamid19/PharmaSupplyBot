@@ -29,16 +29,9 @@ def _process_config_lines(lines: list[str], new_flags: dict[str, bool]):
             continue
             
         if in_matching_section:
-            if _is_section_end(line):
-                new_lines.extend(_inject_missing_keys(new_flags, updated_keys, matching_indent))
-                in_matching_section = False
-                new_lines.append(line)
-                continue
-            
-            line, indent, updated = _process_matching_line(line, new_flags, updated_keys)
-            new_lines.append(line)
-            if indent:
-                matching_indent = indent
+            in_matching_section, matching_indent = _process_matching_section(
+                line, new_flags, updated_keys, new_lines, matching_indent
+            )
         else:
             new_lines.append(line)
     
@@ -46,6 +39,20 @@ def _process_config_lines(lines: list[str], new_flags: dict[str, bool]):
         new_lines.extend(_inject_missing_keys(new_flags, updated_keys, matching_indent))
     
     return new_lines, updated_keys
+
+
+def _process_matching_section(line, new_flags, updated_keys, new_lines, matching_indent):
+    """Process a line within matching section."""
+    if _is_section_end(line):
+        new_lines.extend(_inject_missing_keys(new_flags, updated_keys, matching_indent))
+        new_lines.append(line)
+        return False, matching_indent
+    
+    line, indent, updated = _process_matching_line(line, new_flags, updated_keys)
+    new_lines.append(line)
+    if indent:
+        matching_indent = indent
+    return True, matching_indent
 
 
 def _is_section_end(line: str) -> bool:

@@ -26,20 +26,26 @@ class DatabaseManager:
         password: Optional[str] = None,
         sslmode: Optional[str] = None,
     ):
-        """
-        Initialize database manager with connection parameters.
-        
-        All parameters must be provided via environment variables or arguments.
-        """
+        """Initialize database manager with connection parameters."""
         load_dotenv()
-        
+        self._load_credentials(host, port, database, user, password, sslmode)
+        self._validate_credentials()
+        self.conn: Optional[connection] = None
+        self.cur: Optional[cursor] = None
+
+
+    def _load_credentials(self, host, port, database, user, password, sslmode):
+        """Load credentials from arguments or environment."""
         self.host = host or os.getenv("DB_HOST")
         self.port = port or int(os.getenv("DB_PORT", "26257"))
         self.database = database or os.getenv("DB_NAME")
         self.user = user or os.getenv("DB_USER")
         self.password = password if password is not None else os.getenv("DB_PASSWORD")
         self.sslmode = sslmode or os.getenv("DB_SSLMODE", "require")
-        
+
+
+    def _validate_credentials(self):
+        """Validate required credentials are present."""
         if not self.host:
             raise RuntimeError("DB_HOST environment variable is required")
         if not self.database:
@@ -48,27 +54,24 @@ class DatabaseManager:
             raise RuntimeError("DB_USER environment variable is required")
         if not self.password:
             raise RuntimeError("DB_PASSWORD environment variable is required")
+            raise RuntimeError("DB_PASSWORD environment variable is required")
         
         self.connection_pool: Optional[pool.SimpleConnectionPool] = None
     
     def connect(self) -> None:
         """Initialize connection pool to CockroachDB Cloud."""
         if not self.password:
-            raise RuntimeError(
-                "DB_PASSWORD is not configured. Set DB_PASSWORD for CockroachDB."
-            )
+            raise RuntimeError("DB_PASSWORD is not configured. Set DB_PASSWORD for CockroachDB.")
+        self._create_connection_pool()
+        logger.info(f"Connected to CockroachDB: {self.host}:{self.port}")
+    
+    def _create_connection_pool(self):
+        """Create the connection pool."""
         try:
             self.connection_pool = pool.SimpleConnectionPool(
-                1,
-                5,  # Min 1, Max 5 connections
-                host=self.host,
-                port=self.port,
-                database=self.database,
-                user=self.user,
-                password=self.password,
-                sslmode=self.sslmode,
+                1, 5, host=self.host, port=self.port, database=self.database,
+                user=self.user, password=self.password, sslmode=self.sslmode
             )
-            logger.info(f"Connected to CockroachDB: {self.host}:{self.port}")
         except Error as e:
             logger.error(f"Failed to connect to database: {e}")
             raise

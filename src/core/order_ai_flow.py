@@ -42,20 +42,20 @@ async def _search(settings, verifier, item, decision, verify_result):
     if confidence < settings.accept_confidence and not is_borderline:
         return low_confidence(decision, result, confidence, verify_result)
     
+    return await _process_search_match(settings, verifier, item, decision, result, verify_result, confidence)
+
+
+async def _process_search_match(settings, verifier, item, decision, result, verify_result, confidence):
+    """Process the search match result."""
     match = match_from_record(result["record"], result.get("score", 0.0))
     local_rejection = local_match_rejection(item, match)
     if local_rejection:
-        return rejected_search(
-            decision, result, confidence, verify_result, local_rejection
-        )
+        return rejected_search(decision, result, confidence, verify_result, local_rejection)
     
-    reviewed = await review_order_ai(
-        settings, verifier, item, match, confidence, result
-    )
+    reviewed = await review_order_ai(settings, verifier, item, match, confidence, result)
     if reviewed:
-        return with_ai_results(
-            reviewed, verify_result=verify_result, search_result=result
-        )
+        return with_ai_results(reviewed, verify_result=verify_result, search_result=result)
+    return accepted_search(decision, match, result, confidence, verify_result)
     return accepted_search(decision, match, result, confidence, verify_result)
 
 

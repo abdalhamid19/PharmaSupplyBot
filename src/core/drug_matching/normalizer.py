@@ -557,6 +557,11 @@ def normalize(name: str) -> str:
 def _convert_arabic_to_english_terms(name: str) -> str:
     """Convert Arabic numerals and unit/form keywords to English equivalents."""
     text = name.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+    return _apply_term_replacements(text)
+
+
+def _apply_term_replacements(text: str) -> str:
+    """Apply Arabic-to-English term replacements."""
     replacements = {
         r"\b(?:مجم|ملجم|مليجرام|مليجرم)\b": " MG ",
         r"\b(?:مل|ملل|مللي|ميللي|مللتر)\b": " ML ",

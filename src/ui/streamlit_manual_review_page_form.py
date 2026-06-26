@@ -23,6 +23,12 @@ def render_selection_form(
     nm_key = f"nm_{item_key}"
     query_key = f"query_{item_key}"
 
+    callbacks = _create_callbacks(item, options, run_dir, store, idx_key, nm_key, query_key)
+    _render_form_ui(options, idx_key, nm_key, query_key, callbacks)
+
+
+def _create_callbacks(item, options, run_dir, store, idx_key, nm_key, query_key):
+    """Create callback functions for form interactions."""
     def _trigger_save() -> None:
         idx = st.session_state.get(idx_key, 0)
         not_matching = st.session_state.get(nm_key, False)
@@ -47,6 +53,12 @@ def render_selection_form(
             st.session_state[nm_key] = False
         _trigger_save()
 
+    return on_radio, on_nm, on_query
+
+
+def _render_form_ui(options, idx_key, nm_key, query_key, callbacks):
+    """Render the form UI components."""
+    on_radio, on_nm, on_query = callbacks
     radio_opts = _build_radio_opts(options)
     st.radio(
         "Select best match:", range(len(radio_opts)),

@@ -16,18 +16,22 @@ def first_discount_value(source: dict[str, Any]) -> Any:
             if nest not in (None, ""): return nest
             continue
         if val not in (None, ""): return val
+    
     for o_key in NESTED_STORE_KEYS:
         nest = source.get(o_key)
         if isinstance(nest, dict):
             nest_val = first_discount_value(nest)
             if nest_val not in (None, ""): return nest_val
-            
+    
+    return _calculate_discount_from_prices(source)
+
+
+def _calculate_discount_from_prices(source):
+    """Calculate discount from sale and public prices."""
     try:
         sale_price = float(str(source.get("salePrice") or "0").replace(",", ""))
         price_keys = ["retailPrice", "publicPrice", "price", "sellingPrice"]
-        pub_price = float(
-            str(next((source.get(k) for k in price_keys if source.get(k)), "0")).replace(",", "")
-        )
+        pub_price = float(str(next((source.get(k) for k in price_keys if source.get(k)), "0")).replace(",", ""))
         if pub_price > 0 and sale_price > 0 and sale_price < pub_price:
             return round(((pub_price - sale_price) / pub_price) * 100, 2)
     except Exception:

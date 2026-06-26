@@ -37,29 +37,33 @@ def run_headless_auth_refresh(
     """Re-authenticate headlessly and atomically replace the saved state file."""
     require_env_credentials(profile_key)
     with sync_playwright() as playwright:
-        temp_state_path = auth_temp_state_path(state_path)
-        discard_session_state(temp_state_path)
-        browser, context, page = open_auth_page(
-            playwright, base_url, runtime_config, headless=True
+        _run_auth_refresh_session(
+            playwright, base_url, runtime_config, selectors, 
+            state_path, profile_key, wait_seconds
         )
-        try:
-            capture_headless_state(page, context, selectors, temp_state_path, wait_seconds)
-            validate_saved_session(
-                playwright,
-                runtime_config,
-                temp_state_path,
-                products_page_url(base_url),
-                selectors,
-                selectors.item_search_input,
-            )
-            promote_session_state(temp_state_path, state_path)
-            print(f"[{profile_key}] Auto-refreshed Tawreed session state: {state_path}")
-        except Exception:
-            discard_session_state(temp_state_path)
-            raise
-        finally:
-            close_context(context)
-            close_browser(browser)
+
+
+def _run_auth_refresh_session(playwright, base_url, runtime_config, selectors, state_path, profile_key, wait_seconds):
+    """Run the auth refresh session."""
+    temp_state_path = auth_temp_state_path(state_path)
+    discard_session_state(temp_state_path)
+    browser, context, page = open_auth_page(playwright, base_url, runtime_config, headless=True)
+    try:
+        _capture_and_validate_session(playwright, runtime_config, page, context, selectors, temp_state_path, base_url, wait_seconds)
+        promote_session_state(temp_state_path, state_path)
+        print(f"[{profile_key}] Auto-refreshed Tawreed session state: {state_path}")
+    except Exception:
+        discard_session_state(temp_state_path)
+        raise
+    finally:
+        close_context(context)
+        close_browser(browser)
+
+
+def _capture_and_validate_session(playwright, runtime_config, page, context, selectors, temp_state_path, base_url, wait_seconds):
+    """Capture and validate the session."""
+    capture_headless_state(page, context, selectors, temp_state_path, wait_seconds)
+    validate_saved_session(playwright, runtime_config, temp_state_path, products_page_url(base_url), selectors, selectors.item_search_input)
 
 
 def capture_headless_state(page, context, selectors, state_path: Path, wait_seconds: int):
