@@ -103,8 +103,7 @@ def _handle_api_no_match(
 
 def _raise_non_orderable_exception(bot, item, results):
     """Raise exception for non-orderable candidates."""
-    from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
-    from ..core.product_matching import MatchScoreBreakdown
+    from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown
 
     candidates = [(q, c) for q, rows in results for c in rows]
     diagnostics = []
