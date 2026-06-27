@@ -19,18 +19,9 @@ def start_corrected_item_search(rows: list[dict], run_dir: Path, st_module) -> N
     st_module.session_state["manual_review_search_process"] = state
 
 
-def corrected_review_search_command(
-    config_path: Path, run_dir: Path, corrections_csv: Path
-) -> list[str]:
+def corrected_review_search_command(config_path: Path, run_dir: Path, corrections_csv: Path) -> list[str]:
     """Return the order match-only command for corrected manual-review rows."""
-    return [
-        "order", "--config", str(config_path),
-        "--profile", run_dir.parent.name,
-        "--excel", str(corrections_csv),
-        "--from-manual-review-corrections", str(corrections_csv),
-        "--match-only",
-        "--execution-mode", "auto",
-    ]
+    return ["order", "--config", str(config_path), "--profile", run_dir.parent.name, "--excel", str(corrections_csv), "--from-manual-review-corrections", str(corrections_csv), "--match-only", "--execution-mode", "auto"]
 
 
 def render_running_search_controls() -> bool:
@@ -79,18 +70,12 @@ def _render_running_status(output_text):
 def _finish_search_process(state, returncode, output_text):
     """Finish and clean up search process."""
     from .streamlit_process import render_command_result
+    import streamlit as st
     
     if "output_file" in state and not state["output_file"].closed:
         state["output_file"].close()
 
-    render_command_result({
-        "ok": returncode == 0,
-        "exit_code": returncode,
-        "command": " ".join(state["command"]),
-        "output": output_text,
-        "error_type": "ProcessError" if returncode else "",
-        "error_message": f"Exited with status code {returncode}." if returncode else "",
-    })
+    render_command_result({"ok": returncode == 0, "exit_code": returncode, "command": " ".join(state["command"]), "output": output_text, "error_type": "ProcessError" if returncode else "", "error_message": f"Exited with status code {returncode}." if returncode else ""})
     st.session_state.pop("manual_review_search_process", None)
 
 

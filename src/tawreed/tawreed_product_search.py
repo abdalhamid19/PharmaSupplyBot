@@ -34,7 +34,6 @@ def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
 
 
 def _execute_api_search(bot, page, query):
-    """Execute API search with timing."""
     from .tawreed_dialogs import close_visible_dialogs
     started_at = time.perf_counter()
     close_visible_dialogs(page)
@@ -46,7 +45,6 @@ def _execute_api_search(bot, page, query):
 
 
 def _execute_dom_fallback(bot, page, query, api_candidates):
-    """Execute DOM fallback search."""
     from .tawreed_dom_parsing import dom_search_results
     from .tawreed_ui import is_no_results_row
     from .tawreed_waits import wait_for_table_overlay_to_clear
@@ -62,15 +60,18 @@ def _execute_dom_fallback(bot, page, query, api_candidates):
 
 def _submit_product_search_with_api(page: Page, query: str) -> list[dict[str, Any]] | None:
     try:
-        with page.expect_response(_search_response_pattern(), timeout=2000) as resp:
+        pattern = _search_response_pattern()
+        with page.expect_response(pattern, timeout=2000) as resp:
             _submit_product_search(page, query)
         return _api_candidates(resp.value.json())
     except Exception:
         return None
 
-def _search_response_pattern(): return re.compile(f".*{PRODUCT_SEARCH_ENDPOINT}.*")
+def _search_response_pattern():
+    return re.compile(f".*{PRODUCT_SEARCH_ENDPOINT}.*")
 
-def _api_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]: return _product_dicts(payload)
+def _api_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    return _product_dicts(payload)
 
 
 def _product_dicts(value: Any) -> list[dict[str, Any]]:
@@ -92,13 +93,10 @@ def _first_nested_product_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _is_product_dict(value: Any) -> bool:
-    return isinstance(value, dict) and bool(
-        value.get("productName") or value.get("productNameEn")
-    )
+    return isinstance(value, dict) and bool(value.get("productName") or value.get("productNameEn"))
 
 
 def _submit_product_search(page: Page, query: str) -> None:
-    """Fill and submit the products-table search input."""
     search = page.locator(PRODUCT_SEARCH_INPUT_SELECTOR).first
     search.click()
     search.fill("")
@@ -107,9 +105,7 @@ def _submit_product_search(page: Page, query: str) -> None:
 
 
 def _ready_product_rows(page: Page):
-    """Return product rows when the table has rendered at least one row."""
     from .tawreed_ui import visible_product_rows
-
     rows = visible_product_rows(page)
     try:
         rows.first.wait_for(timeout=1500)

@@ -20,25 +20,14 @@ class StoreChoice:
     discount_percent: float
     priority_score: int = 999  # 1=highest priority, 999=unknown
 
-def available_store_choices(
-    stores: list[dict[str, Any]], used_store_ids: set[str] | None = None,
-    min_discount_percent: float = 0.0, preferred_warehouses: list[str] | None = None,
-) -> list[StoreChoice]:
+def available_store_choices(stores: list[dict[str, Any]], used_store_ids: set[str] | None = None, min_discount_percent: float = 0.0, preferred_warehouses: list[str] | None = None) -> list[StoreChoice]:
     """Return unused stores that have stock and satisfy the minimum discount."""
     used_ids, preferred = used_store_ids or set(), preferred_warehouses or []
-    return [c for c in _all_store_choices(stores, preferred)
-            if c.identity not in used_ids and c.available_quantity > 0
-            and c.discount_percent >= min_discount_percent - 0.001]
+    return [c for c in _all_store_choices(stores, preferred) if c.identity not in used_ids and c.available_quantity > 0 and c.discount_percent >= min_discount_percent - 0.001]
 
-def choose_next_store_for_remaining_quantity(
-    stores: list[dict[str, Any]], used_store_ids: set[str] | None = None,
-    mode: str = "first_available", skip_exception_cls: type[Exception] = RuntimeError,
-    min_discount_percent: float = 0.0, preferred_warehouses: list[str] | None = None,
-) -> StoreChoice | None:
+def choose_next_store_for_remaining_quantity(stores: list[dict[str, Any]], used_store_ids: set[str] | None = None, mode: str = "first_available", skip_exception_cls: type[Exception] = RuntimeError, min_discount_percent: float = 0.0, preferred_warehouses: list[str] | None = None) -> StoreChoice | None:
     """Choose the next store for a remaining item quantity."""
-    choices = available_store_choices(
-        stores, used_store_ids, min_discount_percent, preferred_warehouses
-    )
+    choices = available_store_choices(stores, used_store_ids, min_discount_percent, preferred_warehouses)
     if choices:
         return _select_choice(choices, mode)
     if available_store_choices(stores, None, min_discount_percent, preferred_warehouses):
@@ -46,17 +35,13 @@ def choose_next_store_for_remaining_quantity(
     raise skip_exception_cls(_empty_selection_reason(min_discount_percent))
 
 def _select_choice(choices: list[StoreChoice], mode: str) -> StoreChoice:
-    tier = lambda c: round(c.discount_percent / 0.3) * 0.3  # tolerance 0.3%
+    tier = lambda c: round(c.discount_percent / 0.3) * 0.3
     if mode == "first_available":
         return choices[0]
     if mode == "max_available":
-        return max(
-            choices, key=lambda c: (c.available_quantity, tier(c), -c.priority_score)
-        )
+        return max(choices, key=lambda c: (c.available_quantity, tier(c), -c.priority_score))
     if mode == "max_discount":
-        return max(
-            choices, key=lambda c: (tier(c), -c.priority_score, c.available_quantity)
-        )
+        return max(choices, key=lambda c: (tier(c), -c.priority_score, c.available_quantity))
     raise ValueError(f"Unknown warehouse strategy mode: {mode}")
 
 def _all_store_choices(
@@ -64,17 +49,8 @@ def _all_store_choices(
 ) -> list[StoreChoice]:
     return [_store_choice(i, s, preferred_warehouses) for i, s in enumerate(stores)]
 
-def _store_choice(
-    index: int, store: dict[str, Any], preferred_warehouses: list[str]
-) -> StoreChoice:
-    return StoreChoice(
-        index=index, store=store, identity=_store_identity(index, store),
-        available_quantity=_available_quantity(store),
-        discount_percent=_discount_percent(store),
-        priority_score=_calculate_priority_score(
-            store_name(store), preferred_warehouses
-        ),
-    )
+def _store_choice(index: int, store: dict[str, Any], preferred_warehouses: list[str]) -> StoreChoice:
+    return StoreChoice(index=index, store=store, identity=_store_identity(index, store), available_quantity=_available_quantity(store), discount_percent=_discount_percent(store), priority_score=_calculate_priority_score(store_name(store), preferred_warehouses))
 
 def _store_identity(index: int, store: dict[str, Any]) -> str:
     for key in ("storeProductId", "productStoreId", "storeId", "supplierId", "id"):

@@ -61,21 +61,16 @@ class OrderAiDecisionService:
             return self._no_key_outcome(decision)
         return _run_async(self._resolve_async(item, decision))
 
-    async def _resolve_async(
-        self, item: Item, decision: MatchDecision
-    ) -> OrderAiOutcome:
-        verifier = self._verifier_factory(
-            self._settings.api_config, max_concurrent=self._settings.concurrency
-        )
+    async def _resolve_async(self, item: Item, decision: MatchDecision) -> OrderAiOutcome:
+        verifier = self._verifier_factory(self._settings.api_config, max_concurrent=self._settings.concurrency)
         try:
             return await resolve_order_ai(self._settings, verifier, item, decision)
         finally:
             await _close_verifier(verifier)
 
     def _no_key_outcome(self, decision: MatchDecision) -> OrderAiOutcome:
-        if decision.best_match:
-            return OrderAiOutcome(decision, "ai_skipped", "no_api_key", 0.0)
-        return OrderAiOutcome(decision, "ai_skipped", "no_api_key", 0.0, True)
+        manual = not decision.best_match
+        return OrderAiOutcome(decision, "ai_skipped", "no_api_key", 0.0, manual)
 
 
 def _has_api_key(config: APIConfig) -> bool:
@@ -95,7 +90,5 @@ async def _close_verifier(verifier) -> None:
     close = getattr(verifier, "close", None)
     if close:
         await close()
-        return
-    session = getattr(verifier, "_session", None)
-    if session:
-        await session.close()
+    elif hasattr(verifier, "_session"):
+        await verifier._session.close()

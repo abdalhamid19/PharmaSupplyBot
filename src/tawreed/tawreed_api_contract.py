@@ -39,7 +39,7 @@ def load_api_contract(path: Path = DEFAULT_CONTRACT_PATH) -> TawreedApiContract:
         remove_cart_url=str(payload.get("remove_cart_url") or ""),
         remove_cart_body=_dict_or_none(payload.get("remove_cart_body")),
         submit_order_url=str(payload.get("submit_order_url") or ""),
-        submit_order_body=_dict_or_none(payload.get("submit_order_body")),
+        submit_order_body=_dict_or_none(payload.get("submit_order_body"))
     )
 
 
@@ -58,21 +58,10 @@ def save_discovered_api_contract(
 
 def _contract_from_requests(requests: list[dict[str, Any]]) -> TawreedApiContract:
     product = _first_request(requests, (PRODUCT_SEARCH_ENDPOINT, "product-search"))
-    add = _first_request(
-        requests, ("carts/items/add", "items/add", "cart/add", "carts/add", "purchase/cart")
-    )
+    add = _first_request(requests, ("carts/items/add", "items/add", "cart/add", "carts/add", "purchase/cart"))
     remove = _first_request(requests, ("cart/remove", "carts/remove", "delete"))
     submit = _first_request(requests, ("checkout", "submit", "confirm"))
-    return TawreedApiContract(
-        product.get("url", ""),
-        _dict_or_none(product.get("body")),
-        add.get("url", ""),
-        _dict_or_none(add.get("body")),
-        remove.get("url", ""),
-        _dict_or_none(remove.get("body")),
-        submit.get("url", ""),
-        _dict_or_none(submit.get("body")),
-    )
+    return TawreedApiContract(product.get("url", ""), _dict_or_none(product.get("body")), add.get("url", ""), _dict_or_none(add.get("body")), remove.get("url", ""), _dict_or_none(remove.get("body")), submit.get("url", ""), _dict_or_none(submit.get("body")))
 
 
 def _first_request(

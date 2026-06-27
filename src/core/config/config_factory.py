@@ -62,11 +62,7 @@ def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
     matching_values = dict(raw_values.get("matching", {}))
     default_config = MatchingConfig()
     kwargs = _matching_float_values(matching_values, default_config)
-    bool_keys = {
-        "exact_match_accept", "require_identity_token_for_flag",
-        "enable_auto_save_verified_match", "enable_auto_match_re_review_on_fail",
-        "enable_approved_match_re_review_on_fail"
-    }
+    bool_keys = {"exact_match_accept", "require_identity_token_for_flag", "enable_auto_save_verified_match", "enable_auto_match_re_review_on_fail", "enable_approved_match_re_review_on_fail"}
     int_keys = {"candidate_top_k", "fuzzy_prefix_len", "query_cache_size"}
     all_keys = bool_keys | int_keys
     
@@ -76,25 +72,10 @@ def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
     return MatchingConfig(**kwargs)
 
 
-def _matching_float_values(
-    matching_values: dict[str, Any], default_config: MatchingConfig
-) -> dict[str, float]:
+def _matching_float_values(matching_values: dict[str, Any], default_config: MatchingConfig) -> dict[str, float]:
     """Return all float matching settings parsed from raw config."""
-    names = (
-        "high_overlap_threshold",
-        "medium_score_threshold",
-        "medium_overlap_threshold",
-        "numeric_score_threshold",
-        "numeric_overlap_threshold",
-        "numeric_score_weight",
-        "critical_token_penalty",
-        "distinguishing_token_penalty",
-        "semantic_mismatch_penalty",
-        "early_stop_confidence",
-    )
-    return {
-        n: float(_matching_value(matching_values, default_config, n)) for n in names
-    }
+    names = ("high_overlap_threshold", "medium_score_threshold", "medium_overlap_threshold", "numeric_score_threshold", "numeric_overlap_threshold", "numeric_score_weight", "critical_token_penalty", "distinguishing_token_penalty", "semantic_mismatch_penalty", "early_stop_confidence")
+    return {n: float(_matching_value(matching_values, default_config, n)) for n in names}
 
 
 def _matching_value(matching_values, default_config: MatchingConfig, name: str) -> Any:

@@ -26,19 +26,12 @@ def aggressive_review_decision(
 
 
 def is_aggressive_flagged_decision(decision: MatchDecision | None) -> bool:
-    """Return whether a decision was produced by the aggressive policy."""
     return bool(decision and decision.final_reason.startswith("Aggressive flagged"))
 
 
-def _best_aggressive_diagnostic(
-    diagnostics: list[CandidateMatchDiagnostic], cfg: Any = None
-) -> CandidateMatchDiagnostic | None:
-    candidates = [
-        diagnostic
-        for diagnostic in diagnostics
-        if _can_aggressively_flag(diagnostic, cfg)
-    ]
-    return max(candidates, key=lambda diagnostic: diagnostic.sort_key, default=None)
+def _best_aggressive_diagnostic(diagnostics: list[CandidateMatchDiagnostic], cfg: Any = None) -> CandidateMatchDiagnostic | None:
+    candidates = [d for d in diagnostics if _can_aggressively_flag(d, cfg)]
+    return max(candidates, key=lambda d: d.sort_key, default=None)
 
 
 def _share_brand_identity_token(query: str, candidate: dict[str, Any]) -> bool:
@@ -57,7 +50,6 @@ def _share_brand_identity_token(query: str, candidate: dict[str, Any]) -> bool:
 
 
 def _brands_share_tokens(req, off):
-    """Check if brands share identity tokens."""
     import re
     req_tokens = set(re.findall(r"[A-Z0-9]+", req.brand.upper()))
     off_tokens = set(re.findall(r"[A-Z0-9]+", off.brand.upper()))
@@ -69,7 +61,6 @@ def _brands_share_tokens(req, off):
 
 
 def _brands_similar_fuzzy(req_brand, off_brand):
-    """Check brands similarity with fuzzy matching."""
     import re
     from rapidfuzz import fuzz
     req_clean = re.sub(r"[^A-Z0-9]", "", req_brand.upper())
@@ -82,40 +73,24 @@ def _brands_similar_fuzzy(req_brand, off_brand):
     return False
 
 
-def _can_aggressively_flag(
-    diagnostic: CandidateMatchDiagnostic, cfg: Any = None
-) -> bool:
+def _can_aggressively_flag(diagnostic: CandidateMatchDiagnostic, cfg: Any = None) -> bool:
     if not candidate_has_store_product_id(diagnostic.candidate):
         return False
     if diagnostic.score < AGGRESSIVE_MIN_SCORE:
         return False
     if diagnostic.breakdown.overlap_score < AGGRESSIVE_MIN_OVERLAP:
         return False
-
-    require_token = (
-        True
-        if cfg is None
-        else getattr(cfg, "require_identity_token_for_flag", True)
-    )
+    require_token = True if cfg is None else getattr(cfg, "require_identity_token_for_flag", True)
     if require_token:
         if not _share_brand_identity_token(diagnostic.query, diagnostic.candidate):
             return False
-
     return True
 
 
 def _aggressive_reason(diagnostic: CandidateMatchDiagnostic) -> str:
     reason = diagnostic.rejection_reason or diagnostic.accepted_reason
-    return (
-        "Aggressive flagged match requires manual review: "
-        f"score={diagnostic.score:.3f}; reason={reason}"
-    )
+    return f"Aggressive flagged match requires manual review: score={diagnostic.score:.3f}; reason={reason}"
 
 
 def _search_match(diagnostic: CandidateMatchDiagnostic) -> SearchMatch:
-    return SearchMatch(
-        diagnostic.query,
-        diagnostic.row_index,
-        diagnostic.score,
-        diagnostic.candidate,
-    )
+    return SearchMatch(diagnostic.query, diagnostic.row_index, diagnostic.score, diagnostic.candidate)

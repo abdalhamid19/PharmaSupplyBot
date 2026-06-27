@@ -1,12 +1,10 @@
 """CLI command runner for Tawreed cart-removal workflows."""
 
 from __future__ import annotations
-
 import argparse
 import multiprocessing
 from pathlib import Path
 from typing import Any
-
 from ..core.artifact_run import artifact_run
 from ..core.cart_removal_items import load_cart_removal_items
 from ..core.config.config_models import AppConfig, ProfileConfig
@@ -16,11 +14,7 @@ from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import build_bot, invalid_session_exit, require_state_file
 from .cli_cart_removal_source import cart_removal_items
-from .item_worker_pool import (
-    build_cart_payloads,
-    report_worker_results,
-    resolve_item_workers,
-)
+from .item_worker_pool import build_cart_payloads, report_worker_results, resolve_item_workers
 
 
 def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> int:
@@ -53,20 +47,15 @@ def _run_remove_cart_profile(
 
 
 def _remove_cart_bot(
-    app_config: AppConfig,
-    profile_key: str,
-    profile: ProfileConfig,
-    args: argparse.Namespace,
+    app_config: AppConfig, profile_key: str, 
+    profile: ProfileConfig, args: argparse.Namespace
 ) -> TawreedBot:
-    """Build the bot used for one profile cart-removal run."""
     stop_flag = getattr(args, "stop_flag", None)
     return build_bot(
-        app_config,
-        profile_key,
-        profile,
+        app_config, profile_key, profile,
         debug_browser=bool(getattr(args, "debug_browser", False)),
         stop_flag_path=Path(stop_flag) if stop_flag else None,
-        execution_mode=str(getattr(args, "execution_mode", "auto")),
+        execution_mode=str(getattr(args, "execution_mode", "auto"))
     )
 
 

@@ -1,39 +1,22 @@
 """Headless Tawreed login refresh for expired saved sessions."""
 
 from __future__ import annotations
-
 import os
 from pathlib import Path
-
 from playwright.sync_api import sync_playwright
-
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_session import (
-    attempt_env_login,
-    auth_temp_state_path,
-    close_browser,
-    close_context,
-    discard_session_state,
-    headless_auth_failure_message,
-    open_auth_page,
-    print_auth_instructions,
-    print_login_detection_result,
-    promote_session_state,
-    save_session_state,
-    validate_saved_session,
-    wait_for_login_detection,
-    wait_for_network_idle,
+    attempt_env_login, auth_temp_state_path, close_browser, close_context,
+    discard_session_state, headless_auth_failure_message, open_auth_page,
+    print_auth_instructions, print_login_detection_result, promote_session_state,
+    save_session_state, validate_saved_session, wait_for_login_detection, wait_for_network_idle
 )
 
 
 def run_headless_auth_refresh(
-    base_url: str,
-    state_path: Path,
-    runtime_config,
-    selectors,
-    profile_key: str,
-    wait_seconds: int,
-) -> None:
+    base_url, state_path, runtime_config, selectors, 
+    profile_key, wait_seconds
+):
     """Re-authenticate headlessly and atomically replace the saved state file."""
     require_env_credentials(profile_key)
     with sync_playwright() as playwright:
@@ -43,15 +26,23 @@ def run_headless_auth_refresh(
         )
 
 
-def _run_auth_refresh_session(playwright, base_url, runtime_config, selectors, state_path, profile_key, wait_seconds):
-    """Run the auth refresh session."""
+def _run_auth_refresh_session(
+    playwright, base_url, runtime_config, selectors, 
+    state_path, profile_key, wait_seconds
+):
     temp_state_path = auth_temp_state_path(state_path)
     discard_session_state(temp_state_path)
-    browser, context, page = open_auth_page(playwright, base_url, runtime_config, headless=True)
+    browser, context, page = open_auth_page(
+        playwright, base_url, runtime_config, headless=True
+    )
     try:
-        _capture_and_validate_session(playwright, runtime_config, page, context, selectors, temp_state_path, base_url, wait_seconds)
+        _capture_and_validate_session(
+            playwright, runtime_config, page, context, selectors, 
+            temp_state_path, base_url, wait_seconds
+        )
         promote_session_state(temp_state_path, state_path)
-        print(f"[{profile_key}] Auto-refreshed Tawreed session state: {state_path}")
+        msg = f"[{profile_key}] Auto-refreshed Tawreed session state: {state_path}"
+        print(msg)
     except Exception:
         discard_session_state(temp_state_path)
         raise
@@ -60,25 +51,29 @@ def _run_auth_refresh_session(playwright, base_url, runtime_config, selectors, s
         close_browser(browser)
 
 
-def _capture_and_validate_session(playwright, runtime_config, page, context, selectors, temp_state_path, base_url, wait_seconds):
-    """Capture and validate the session."""
-    capture_headless_state(page, context, selectors, temp_state_path, wait_seconds)
-    validate_saved_session(playwright, runtime_config, temp_state_path, products_page_url(base_url), selectors, selectors.item_search_input)
+def _capture_and_validate_session(
+    playwright, runtime_config, page, context, selectors, 
+    temp_state_path, base_url, wait_seconds
+):
+    capture_headless_state(
+        page, context, selectors, temp_state_path, wait_seconds
+    )
+    validate_saved_session(
+        playwright, runtime_config, temp_state_path, 
+        products_page_url(base_url), selectors, 
+        selectors.item_search_input
+    )
 
 
-def capture_headless_state(page, context, selectors, state_path: Path, wait_seconds: int):
-    """Submit credentials and save the resulting storage state."""
+def capture_headless_state(
+    page, context, selectors, state_path: Path, wait_seconds: int
+):
     attempt_env_login(page, selectors)
     print_auth_instructions(wait_seconds, headless=True)
     detected = wait_for_login_detection(
-        page,
-        context,
-        wait_seconds,
-        selectors.login_email,
-        selectors.login_password,
-        selectors.logged_in_marker,
-        state_path,
-        save_intermediate=False,
+        page, context, wait_seconds, selectors.login_email, 
+        selectors.login_password, selectors.logged_in_marker, 
+        state_path, save_intermediate=False
     )
     wait_for_network_idle(page)
     print_login_detection_result(detected)
@@ -88,8 +83,9 @@ def capture_headless_state(page, context, selectors, state_path: Path, wait_seco
 
 
 def require_env_credentials(profile_key: str) -> None:
-    """Raise when automatic auth cannot run because credentials are absent."""
-    if os.getenv("TAWREED_EMAIL", "").strip() and os.getenv("TAWREED_PASSWORD", "").strip():
+    email = os.getenv("TAWREED_EMAIL", "").strip()
+    password = os.getenv("TAWREED_PASSWORD", "").strip()
+    if email and password:
         return
     raise RuntimeError(
         f"Token expired for profile '{profile_key}', but automatic login credentials "
@@ -99,7 +95,6 @@ def require_env_credentials(profile_key: str) -> None:
 
 
 def products_page_url(base_url: str) -> str:
-    """Return the product page URL used to validate the refreshed session."""
     if "#/" in base_url:
         origin, _ = base_url.split("#/", 1)
         return f"{origin}{PRODUCTS_PAGE_ROUTE}"
