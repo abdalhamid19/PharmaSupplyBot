@@ -9,7 +9,7 @@ from ..core.config.config import load_config
 from .streamlit_auth import render_auth_tab
 from .streamlit_order import render_order_tab
 from .streamlit_overview import render_overview
-from .streamlit_prevented_items import render_prevented_items_tab
+from .streamlit_prevented_items import render_prevented_items_manager
 from .streamlit_product_matching import render_product_matching_tab
 from .streamlit_remove_cart import render_remove_cart_tab
 from .streamlit_results import render_results_tab
@@ -94,7 +94,7 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
     with matching_tab:
         render_product_matching_tab(app_config, default_profile, config_path)
     with prevented_items_tab:
-        render_prevented_items_tab()
+        render_prevented_items_manager()
     with remove_cart_tab:
         render_remove_cart_tab(app_config, default_profile, config_path)
     with results_tab:

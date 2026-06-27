@@ -60,7 +60,7 @@ def _render_col2_settings(matching_config, config_path, auto_save, re_review_aut
     st.write("⚠️ **Re-review Missing Approved Matches**")
     st.caption("If a manually approved item is out of stock, send it back to manual review to find an alternative.")
     re_review_approved = st.toggle("Re-review Approved", value=matching_config.enable_approved_match_re_review_on_fail)
-    st.write("💾 **Save Configuration**)
+    st.write("💾 **Save Configuration**")
     st.caption(f"Save these settings directly to `{config_path.name}`.")
     if st.button("Apply Changes", type="primary"):
         new_flags = {

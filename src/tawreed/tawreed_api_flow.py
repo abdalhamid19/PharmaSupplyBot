@@ -27,9 +27,9 @@ def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
                 from .tawreed_store_summary import record_single_store
                 record_single_store(bot, getattr(match, "data", {}))
                 
-                bot._record_match_only_success(item, started_at)
+                bot.order_flow.summary_recorder.record_match_only_success(item, started_at)
             except bot.skip_item_exception as error:
-                bot._record_match_only_skip(item, error, started_at)
+                bot.order_flow.summary_recorder.record_match_only_skip(item, error, started_at)
 
 
 def place_order_with_api(bot, items: Iterable[Item]) -> None:
@@ -55,10 +55,10 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
         bot._reset_last_item_state()
         try:
             _add_single_api_item(bot, api, item, record_timing)
-            bot._record_success(item, started_at)
+            bot.order_flow.summary_recorder.record_success(item, started_at)
             added_any = True
         except bot.skip_item_exception as error:
-            bot._record_skip(item, error, started_at)
+            bot.order_flow.summary_recorder.record_skip(item, error, started_at)
     return added_any
 
 
