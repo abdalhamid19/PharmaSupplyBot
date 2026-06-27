@@ -29,30 +29,20 @@ def render_selection_form(
 
 def _create_callbacks(item, options, run_dir, store, idx_key, nm_key, query_key):
     """Create callback functions for form interactions."""
-    def _trigger_save() -> None:
-        idx = st.session_state.get(idx_key, 0)
-        not_matching = st.session_state.get(nm_key, False)
-        query = st.session_state.get(query_key, "")
-        _save(item, options, idx, not_matching, query, run_dir, store)
-
-    def on_radio() -> None:
+    def _trigger_save():
+        _save(item, options, st.session_state.get(idx_key, 0), st.session_state.get(nm_key, False), st.session_state.get(query_key, ""), run_dir, store)
+    def on_radio():
         if st.session_state.get(idx_key, 0) > 0:
-            st.session_state[nm_key] = False
-            st.session_state[query_key] = ""
+            st.session_state[nm_key], st.session_state[query_key] = False, ""
         _trigger_save()
-
-    def on_nm() -> None:
+    def on_nm():
         if st.session_state.get(nm_key, False):
-            st.session_state[idx_key] = 0
-            st.session_state[query_key] = ""
+            st.session_state[idx_key], st.session_state[query_key] = 0, ""
         _trigger_save()
-
-    def on_query() -> None:
+    def on_query():
         if st.session_state.get(query_key, "").strip():
-            st.session_state[idx_key] = 0
-            st.session_state[nm_key] = False
+            st.session_state[idx_key], st.session_state[nm_key] = 0, False
         _trigger_save()
-
     return on_radio, on_nm, on_query
 
 

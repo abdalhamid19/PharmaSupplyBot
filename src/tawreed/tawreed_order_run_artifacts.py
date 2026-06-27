@@ -91,25 +91,18 @@ from ..core.artifact_run import current_artifact_run
 from ..core.manual_review_candidate_store import append_review_candidates
 from ..core.manual_review_candidates import review_candidate_options
 
-def append_manual_review_artifacts(
-    profile_key: str,
-    item: Item,
-    summary: OrderResultSummary,
-    decision,
-    outcome,
-    label_suffix: str | None = None,
-    matching_config=None,
-) -> None:
+def append_manual_review_artifacts(profile_key: str, item: Item, summary: OrderResultSummary, decision, outcome, label_suffix: str | None = None, matching_config=None) -> None:
     """Append one manual-review row to CSV and TXT artifacts, and candidates to JSONL."""
     row = manual_review_row(item, summary, decision, outcome, matching_config)
     append_csv_artifact(profile_key, "manual_review", [row], label_suffix)
-    append_text_artifact(
-        profile_key, "manual_review", text_block("manual_review", row), label_suffix
-    )
-    
+    append_text_artifact(profile_key, "manual_review", text_block("manual_review", row), label_suffix)
+    _save_review_candidates_if_available(decision, item)
+
+
+def _save_review_candidates_if_available(decision, item):
+    """Save review candidates to JSONL if available."""
     run = current_artifact_run()
     if run and decision:
-        # Save up to 5 candidates for the UI
         options = review_candidate_options(decision, limit=5)
         append_review_candidates(run.directory, item.code, item.name, options)
 

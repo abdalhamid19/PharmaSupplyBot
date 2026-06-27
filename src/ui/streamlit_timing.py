@@ -73,30 +73,13 @@ def _timing_metric(metric: str, value: float) -> dict[str, object]:
 
 def top_slowest_rows(rows: list[dict[str, str]]) -> pd.DataFrame:
     """Return the slowest summary rows, sorted by total elapsed seconds."""
-    top_rows = sorted(
-        populated_elapsed_rows(rows),
-        key=lambda row: float(row["elapsed_seconds"]),
-        reverse=True,
-    )[:15]
+    top_rows = sorted(populated_elapsed_rows(rows), key=lambda row: float(row["elapsed_seconds"]), reverse=True)[:15]
     dataframe = pd.DataFrame(top_rows)
-    columns = [
-        "item_code",
-        "item_name",
-        "status",
-        "elapsed_seconds",
-        "match_elapsed_seconds",
-        "api_search_seconds",
-        "manual_review_lookup_seconds",
-        "match_decision_seconds",
-        "unaccounted_seconds",
-        "matched_product_english_name",
-    ]
+    columns = ["item_code", "item_name", "status", "elapsed_seconds", "match_elapsed_seconds", "api_search_seconds", "manual_review_lookup_seconds", "match_decision_seconds", "unaccounted_seconds", "matched_product_english_name"]
+    
     if not dataframe.empty:
-        dataframe = dataframe.assign(
-            unaccounted_seconds=[
-                round(_unaccounted_seconds(row), 3) for row in dataframe.to_dict("records")
-            ]
-        )
+        dataframe = dataframe.assign(unaccounted_seconds=[round(_unaccounted_seconds(row), 3) for row in dataframe.to_dict("records")])
+    
     visible = [column for column in columns if column in dataframe.columns]
     return dataframe.loc[:, visible] if visible else dataframe
 

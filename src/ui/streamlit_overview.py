@@ -67,11 +67,7 @@ def _render_col2_settings(matching_config, config_path, auto_save, re_review_aut
     st.write("💾 **Save Configuration**")
     st.caption(f"Save these settings directly to `{config_path.name}`.")
     if st.button("Apply Changes", type="primary"):
-        new_flags = {
-            "enable_auto_save_verified_match": auto_save,
-            "enable_auto_match_re_review_on_fail": re_review_auto,
-            "enable_approved_match_re_review_on_fail": re_review_approved,
-        }
+        new_flags = {"enable_auto_save_verified_match": auto_save, "enable_auto_match_re_review_on_fail": re_review_auto, "enable_approved_match_re_review_on_fail": re_review_approved}
         update_matching_flags_in_config(config_path, new_flags)
         st.success("Settings saved successfully! They will apply on the next run.")
         st.rerun()

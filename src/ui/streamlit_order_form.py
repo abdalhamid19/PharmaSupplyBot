@@ -334,22 +334,12 @@ def _render_advanced_options(app_config):
         debug_browser = st.checkbox("Debug browser", value=False)
         resume = st.checkbox("Resume from previous summary", value=False)
         match_only = st.checkbox("Match only without adding to cart", value=False)
-        execution_mode = st.selectbox(
-            "Execution mode", ["auto", "api", "browser"], index=0,
-            help="auto uses API when a safe contract exists, then falls back to browser."
-        )
+        execution_mode = st.selectbox("Execution mode", ["auto", "api", "browser"], index=0, help="auto uses API when a safe contract exists, then falls back to browser.")
         item_workers = item_workers_field(app_config)
         highest_discount = st.checkbox("Highest discount only", value=False)
-        min_discount = st.number_input(
-            "Minimum discount percent", min_value=0.0, max_value=100.0, 
-            value=0.0, step=1.0
-        )
+        min_discount = st.number_input("Minimum discount percent", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
     
-    return (
-        bool(debug_browser), bool(resume), bool(match_only),
-        str(execution_mode), bool(highest_discount), float(min_discount),
-        int(start_item), int(end_item), int(item_workers)
-    )
+    return (bool(debug_browser), bool(resume), bool(match_only), str(execution_mode), bool(highest_discount), float(min_discount), int(start_item), int(end_item), int(item_workers))
 
 
 def item_workers_field(app_config) -> int:

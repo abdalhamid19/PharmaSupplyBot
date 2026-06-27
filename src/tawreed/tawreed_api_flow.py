@@ -111,32 +111,23 @@ def _validate_max_discount_if_needed(bot, mode, store_rows):
     return max_discount_value
 
 
-def _select_stores_and_add_to_cart(
-    bot, api, item, store_rows, mode, max_discount_value, preferred_warehouses, record_timing
-):
+def _select_stores_and_add_to_cart(bot, api, item, store_rows, mode, max_discount_value, preferred_warehouses, record_timing):
     """Select stores and add items to cart until quantity is fulfilled."""
     from .tawreed_store_selection import choose_next_store_for_remaining_quantity
     from .tawreed_products_flow import _effective_min_discount
     
     rem, used_ids, sels = int(item.qty), set(), []
-    
     while rem > 0:
-        choice = choose_next_store_for_remaining_quantity(
-            store_rows, used_ids, mode, bot.skip_item_exception,
-            _effective_min_discount(bot, sels), preferred_warehouses
-        )
+        choice = choose_next_store_for_remaining_quantity(store_rows, used_ids, mode, bot.skip_item_exception, _effective_min_discount(bot, sels), preferred_warehouses)
         if not choice or min(rem, choice.available_quantity) <= 0:
             break
-        
         ordered = min(rem, choice.available_quantity)
         _add_store_to_cart(api, choice, ordered, bot, record_timing)
         sels.append((choice.store, ordered))
         used_ids.add(choice.identity)
         rem -= ordered
-        
         if _should_stop_in_max_discount_mode(mode, max_discount_value, choice):
             break
-    
     return sels
 
 

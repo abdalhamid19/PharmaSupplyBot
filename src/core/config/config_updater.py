@@ -17,21 +17,14 @@ def update_matching_flags_in_config(config_path: Path | str, new_flags: dict[str
 
 def _process_config_lines(lines: list[str], new_flags: dict[str, bool]):
     """Process config lines and update matching flags."""
-    in_matching_section = False
-    matching_indent = ""
-    updated_keys = set()
-    new_lines = []
+    in_matching_section, matching_indent, updated_keys, new_lines = False, "", set(), []
     
     for line in lines:
         if line.strip().startswith("matching:"):
             in_matching_section = True
             new_lines.append(line)
-            continue
-            
-        if in_matching_section:
-            in_matching_section, matching_indent = _process_matching_section(
-                line, new_flags, updated_keys, new_lines, matching_indent
-            )
+        elif in_matching_section:
+            in_matching_section, matching_indent = _process_matching_section(line, new_flags, updated_keys, new_lines, matching_indent)
         else:
             new_lines.append(line)
     

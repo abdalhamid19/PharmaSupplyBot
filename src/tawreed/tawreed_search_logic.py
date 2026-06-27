@@ -26,61 +26,35 @@ from .tawreed_search_decision import decisive_match
 from .tawreed_timing import record_timing
 
 
-def require_product_match(
-    bot, page: Page, item: Item, require_available: bool = True
-) -> tuple[SearchMatch, str]:
+def require_product_match(bot, page: Page, item: Item, require_available: bool = True) -> tuple[SearchMatch, str]:
     """Search Tawreed query variants until a decisive match is found."""
     queries, results = [], []
     cache = get_bot_query_cache(bot)
     started_at = time.perf_counter()
     review_decision = _manual_review_decision_timed(bot, item)
+    
     for q in manual_review_queries(item, _search_queries_for_item(item), review_decision):
-        match = _search_one_query(
-            bot,
-            page,
-            item,
-            q,
-            started_at,
-            queries,
-            results,
-            cache,
-            require_available,
-            review_decision,
-        )
+        match = _search_one_query(bot, page, item, q, started_at, queries, results, cache, require_available, review_decision)
         if match:
             return match, q
-    return _handle_no_match(
-        bot, item, queries, results, require_available, review_decision
-    )
+    
+    return _handle_no_match(bot, item, queries, results, require_available, review_decision)
 
 
-def _search_one_query(
-    bot,
-    page,
-    item,
-    query,
-    started_at,
-    queries,
-    results,
-    query_cache,
-    require_available,
-    review_decision,
-):
+def _search_one_query(bot, page, item, query, started_at, queries, results, query_cache, require_available, review_decision):
     """Search one query and return the final match when it is decisive."""
     _append_search_result(bot, page, query, queries, results, query_cache)
-    manual_match = manual_review_result(
-        bot, item, started_at, queries, results, review_decision
-    )
+    manual_match = manual_review_result(bot, item, started_at, queries, results, review_decision)
     if manual_match:
         return manual_match
+    
     decision = _match_decision(bot, item, results, review_decision)
     match = decision.best_match
     if not match:
         decisive_match(bot, item, decision, started_at, queries, require_available)
         return None
-    is_final = decisive_match(
-        bot, item, decision, started_at, queries, require_available
-    )
+    
+    is_final = decisive_match(bot, item, decision, started_at, queries, require_available)
     return bot.last_match_decision.best_match if is_final else None
 
 

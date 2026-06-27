@@ -110,24 +110,14 @@ def _raise_non_orderable_exception(bot, item, results):
     diagnostics = []
     if candidates:
         query, candidate = candidates[0]
-        diagnostics.append(
-            CandidateMatchDiagnostic(
-                query=query, row_index=0, score=999.0,
-                sort_key=(999.0, 0, 0.0, 0, 0, 0),
-                accepted=False, accepted_reason="",
-                rejection_reason="Candidate missing orderable storeProductId",
-                breakdown=MatchScoreBreakdown(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.0),
-                candidate=candidate
-            )
-        )
-    bot.last_match_decision = MatchDecision(
-        best_match=None, diagnostics=diagnostics,
-        final_reason="All API candidates missing orderable storeProductId"
-    )
-    raise bot.no_results_exception(
-        f"No decisive match found for '{item.name}'. API candidates "
-        f"found but none has an orderable storeProductId."
-    )
+        diagnostics.append(CandidateMatchDiagnostic(
+            query=query, row_index=0, score=999.0, sort_key=(999.0, 0, 0.0, 0, 0, 0),
+            accepted=False, accepted_reason="", rejection_reason="Candidate missing orderable storeProductId",
+            breakdown=MatchScoreBreakdown(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.0), candidate=candidate
+        ))
+    
+    bot.last_match_decision = MatchDecision(best_match=None, diagnostics=diagnostics, final_reason="All API candidates missing orderable storeProductId")
+    raise bot.no_results_exception(f"No decisive match found for '{item.name}'. API candidates found but none has an orderable storeProductId.")
 
 
 

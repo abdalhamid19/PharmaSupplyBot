@@ -563,20 +563,13 @@ def _convert_arabic_to_english_terms(name: str) -> str:
 def _apply_term_replacements(text: str) -> str:
     """Apply Arabic-to-English term replacements."""
     replacements = {
-        r"\b(?:مجم|ملجم|مليجرام|مليجرم)\b": " MG ",
-        r"\b(?:مل|ملل|مللي|ميللي|مللتر)\b": " ML ",
-        r"\b(?:جم|جرام|جرم)\b": " GM ",
-        r"\b(?:قرص|اقراص|قراص)\b": " TAB ",
-        r"\b(?:كبسول|كبسولات|كبسوله)\b": " CAP ",
-        r"\b(?:امبول|امبولات)\b": " AMP ",
-        r"\b(?:فيال|فيلات|فيالات)\b": " VIAL ",
-        r"\b(?:نقط|قطره|قطرات)\b": " DROPS ",
-        r"\b(?:بخاخ|بخاخة|سبراي)\b": " SPRAY ",
-        r"\b(?:لبن|حليب)\b": " MILK ",
-        r"\b(?:شراب|شرب)\b": " SYRUP ",
-        r"\b(?:كريم|دهان)\b": " CREAM ",
-        r"\b(?:جل|جيل)\b": " GEL ",
-        r"\b(?:مرهم)\b": " OINTMENT ",
+        r"\b(?:مجم|ملجم|مليجرام|مليجرم)\b": " MG ", r"\b(?:مل|ملل|مللي|ميللي|مللتر)\b": " ML ",
+        r"\b(?:جم|جرام|جرم)\b": " GM ", r"\b(?:قرص|اقراص|قراص)\b": " TAB ",
+        r"\b(?:كبسول|كبسولات|كبسوله)\b": " CAP ", r"\b(?:امبول|امبولات)\b": " AMP ",
+        r"\b(?:فيال|فيلات|فيالات)\b": " VIAL ", r"\b(?:نقط|قطره|قطرات)\b": " DROPS ",
+        r"\b(?:بخاخ|بخاخة|سبراي)\b": " SPRAY ", r"\b(?:لبن|حليب)\b": " MILK ",
+        r"\b(?:شراب|شرب)\b": " SYRUP ", r"\b(?:كريم|دهان)\b": " CREAM ",
+        r"\b(?:جل|جيل)\b": " GEL ", r"\b(?:مرهم)\b": " OINTMENT ",
         r"\b(?:ايه\s+ار|اي\s+ار|ارتجاع)\b": " AR ",
     }
     for pattern, repl in replacements.items():
