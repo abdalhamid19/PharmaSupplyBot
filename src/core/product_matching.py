@@ -6,83 +6,25 @@ import re
 from difflib import SequenceMatcher
 from typing import Any, Iterable
 
-_OCR_ZERO_RE = re.compile(r"(?<=\d)[Oo](?=\b|[^A-Za-z0-9])")
-_TOKEN_BOUNDARY_RE = re.compile(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)")
-_NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
-_WHITESPACE_RE = re.compile(r"\s+")
-_ARABIC_NON_WORD_RE = re.compile(r"[^\w\u0600-\u06FF]+")
-_ARABIC_WHITESPACE_RE = re.compile(r"\s+")
-_NUMERIC_PART_RE = re.compile(r"\d+")
-MAX_SEARCH_QUERY_VARIANTS = 24
-_ARABIC_REQUIRED_TOKEN_ALIASES = {
-    "APPLE": ("تفاح", "ابل"),
-    "AR": ("ايه ار", "اي ار", "ارتجاع"),
-    "DOUCHE": ("دش", "غسول", "مهبل"),
-    "EFF": ("فوار",),
-    "LOTION": ("لوشن", "لوسيون"),
-    "ML": ("مل", "مللي", "ميللي"),
-    "VAG": ("مهبل", "المهبل", "نسائي"),
-    "VAGINAL": ("مهبل", "المهبل", "نسائي"),
-}
-_GENERIC_IDENTITY_TOKENS = {
-    "ANTISEPTIC",
-    "AMP",
-    "AMPS",
-    "CAP",
-    "CAPS",
-    "COUGH",
-    "BAG",
-    "BAGS",
-    "CAPSULE",
-    "CAPSULES",
-    "CREAM",
-    "DROP",
-    "DROPS",
-    "EFF",
-    "EYE",
-    "FILTER",
-    "FLAVOR",
-    "FLAVOUR",
-    "G",
-    "GEL",
-    "GM",
-    "IMP",
-    "INJ",
-    "INJECTION",
-    "LOTION",
-    "MCG",
-    "MG",
-    "MILK",
-    "ML",
-    "O",
-    "OINTMENT",
-    "ORAL",
-    "POWDER",
-    "SHAMPOO",
-    "SOAP",
-    "SOLN",
-    "SOLUTION",
-    "SPRAY",
-    "SYRUP",
-    "TAB",
-    "TABS",
-    "TABLET",
-    "TABLETS",
-    "VIAL",
-}
-
-from .candidate_identity import (
-    candidate_has_store_product_id,
-    candidate_store_product_id,
+# Import constants and helpers from split modules
+from .product_matching_helpers import (
+    _ARABIC_NON_WORD_RE,
+    _ARABIC_REQUIRED_TOKEN_ALIASES,
+    _ARABIC_WHITESPACE_RE,
+    _GENERIC_IDENTITY_TOKENS,
+    _NON_ALNUM_RE,
+    _NUMERIC_PART_RE,
+    _OCR_ZERO_RE,
+    _TOKEN_BOUNDARY_RE,
+    _WHITESPACE_RE,
+    MAX_SEARCH_QUERY_VARIANTS,
 )
+from .product_matching_queries import search_queries_for_item as _search_queries_for_item
+
+from .candidate_identity import candidate_has_store_product_id, candidate_store_product_id
 from .config.config_models import MatchingConfig
 from .drug_matching.normalizer import components_match, parse_drug
-from .matching_models import (
-    CandidateMatchDiagnostic,
-    MatchDecision,
-    MatchScoreBreakdown,
-    SearchMatch,
-)
+from .matching_models import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown, SearchMatch
 from .matching_penalties import compatibility_rejection_reason, penalty_breakdown
 from .matching_rules import acceptance_details, default_matching_config
 from .search_query_templates import category_queries

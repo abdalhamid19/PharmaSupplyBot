@@ -3,61 +3,35 @@
 from __future__ import annotations
 
 import time
-from contextlib import nullcontext
 from pathlib import Path
 from typing import Iterable
 
-from playwright.sync_api import Page, sync_playwright
+from playwright.sync_api import sync_playwright
 
 from ..core.cart_removal_items import CartRemovalItem
-from ..core.candidate_identity import candidate_has_store_product_id
 from ..core.config.config_models import AppConfig, ProfileConfig
-from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
-from ..core.manual_review_runtime import (
-    manual_review_cache_context,
-    preload_manual_review_decisions,
-)
-from ..core.order_blocked_candidate import missing_store_product_id_outcome
+from ..core.matching_models import MatchDecision
 from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
 from .selectors import _selectors
-from .tawreed_artifacts import append_csv_artifact, dump_artifacts
 from .tawreed_api import TawreedApiUnavailable
-from .tawreed_api_discovery import begin_api_contract_capture, save_api_contract_capture
-from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
-from .tawreed_checkout import confirm_order
+from .tawreed_artifacts import append_csv_artifact
+from .tawreed_auth_flow import TawreedAuthFlow
+from .tawreed_cart_flow import TawreedCartFlow
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
-from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
-from .tawreed_match_logs import OrderResultSummary, append_order_result_summary
-from .tawreed_match_only_summary import append_match_only_summary
-from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
-from .tawreed_order_run_artifacts import (
-    append_order_ai_trace_artifacts,
-    append_order_item_artifacts,
-)
-from .tawreed_products_flow import add_item_from_products_page
+from .tawreed_dialogs import close_visible_dialogs
+from .tawreed_match_logs import OrderResultSummary
+from .tawreed_order_flow import TawreedOrderFlow
+from .tawreed_order_exceptions import _SkipItem, _NoResultsItem
+from .tawreed_order_run_artifacts import append_order_ai_trace_artifacts
 from .tawreed_search_logic import require_product_match
-from .tawreed_session import (
-    close_browser,
-    close_context,
-    ensure_logged_in,
-    headless_auth_failure_message,
-    open_order_page,
-)
-from .tawreed_strategy import max_available_warehouse_row
+from .tawreed_session import open_order_page
 from .tawreed_timing import record_timing
 
-
-class _SkipItem(Exception):
-    """Signal that one item should be skipped without failing the whole order run."""
-
-    pass
-
-
-class _NoResultsItem(_SkipItem):
-    """Signal that one item had no Tawreed results and should be skipped quickly."""
-
-    pass
+# Import for backward compatibility with tests
+from .tawreed_artifacts import dump_artifacts
+from .tawreed_dialogs import visible_overlay_diagnostics
+from .tawreed_match_only_summary import append_match_only_summary
 
 
 class TawreedBot:
@@ -82,7 +56,7 @@ class TawreedBot:
         worker_id: int | None = None,
     ):
         """Create a bot instance bound to one Tawreed profile and saved session state.
-        
+
         Args:
             auth_lock: Optional multiprocessing.Lock for coordinating auth refresh.
             worker_id: Optional worker ID for multi-worker logging.
@@ -107,6 +81,11 @@ class TawreedBot:
         self.skip_item_exception = _SkipItem
         self.no_results_exception = _NoResultsItem
         self._reset_last_item_state()
+
+        # Initialize flow handlers
+        self.auth_flow = TawreedAuthFlow(self)
+        self.order_flow = TawreedOrderFlow(self)
+        self.cart_flow = TawreedCartFlow(self)
 
     def log(self, message: str) -> None:
         """Print a profile-scoped diagnostic message."""
@@ -165,17 +144,7 @@ class TawreedBot:
 
     def _ensure_valid_auth(self) -> None:
         """Verify token is valid or refresh authentication automatically."""
-        from .tawreed_auto_auth import auto_refresh_auth_if_needed
-        
-        auto_refresh_auth_if_needed(
-            self.config.base_url,
-            self.state_path,
-            self.config.runtime,
-            self.selectors,
-            self.profile_key,
-            auth_lock=self.auth_lock,
-            worker_id=self.worker_id,
-        )
+        self.auth_flow.ensure_valid_auth()
 
     def _run_api_or_fallback(self, label: str, operation) -> bool:
         """Run one API operation and decide whether browser fallback may continue."""
@@ -241,239 +210,27 @@ class TawreedBot:
 
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""
-        self._auth(wait_seconds=wait_seconds, headless=False)
+        self.auth_flow.auth_interactive(wait_seconds)
 
     def auth_headless(self, wait_seconds: int = 120) -> None:
         """Run a headless login attempt and persist session state when credentials succeed."""
-        self._auth(wait_seconds=wait_seconds, headless=True)
-
-    def _auth(self, wait_seconds: int, headless: bool) -> None:
-        """Authenticate in either interactive or headless mode and save session state."""
-        from .tawreed_session import perform_tawreed_auth
-
-        perform_tawreed_auth(self, wait_seconds, headless)
+        self.auth_flow.auth_headless(wait_seconds)
 
     def _headless_auth_error(self) -> Exception:
         """Return the explicit auth failure used when hosted login never leaves the login page."""
-        return RuntimeError(headless_auth_failure_message())
+        return self.auth_flow._headless_auth_error()
 
     def place_order_from_items(self, items: Iterable[Item]) -> None:
         """Place an order by processing each item from the provided iterable."""
-        self._ensure_valid_auth()
-        items = list(items)
-        with self._manual_review_cache_for_items(items):
-            if self._try_api_order(items):
-                return
-            with sync_playwright() as p:
-                browser, context, page = open_order_page(
-                    p,
-                    self.config.runtime,
-                    self.state_path,
-                    debug_browser=self.debug_browser,
-                )
-                # Enable detailed API capture
-                from .tawreed_api_discovery_enhanced import (
-                    begin_detailed_api_capture,
-                    save_captured_requests,
-                )
-                captured = begin_detailed_api_capture(page)
-                
-                api_capture = begin_api_contract_capture(page)
-                try:
-                    self._run_order_session(page, items)
-                except Exception as error:
-                    dump_artifacts(
-                        page,
-                        self.profile_key,
-                        label="order_flow_error",
-                        details=_artifact_details("order_flow_error", error),
-                    )
-                    raise
-                finally:
-                    # Save enhanced capture
-                    if captured:
-                        save_captured_requests(captured, self.profile_key, "order_run_capture")
-                    _save_api_contract_capture(api_capture)
-                    close_context(context)
-                    close_browser(browser)
-
-    def _run_order_session(self, page: Page, items: Iterable[Item]) -> None:
-        """Prepare the page and process items within an active order session."""
-        self._prepare_order_page(page)
-        completed = self._process_items(page, items)
-        if completed and not self._stop_requested():
-            if not self.config.runtime.submit_order:
-                print(
-                    f"[{self.profile_key}] Items added to cart. "
-                    "Final order submission is disabled for manual human review."
-                )
-                return
-            confirm_order(page, self.selectors, self.config.runtime.timeout_ms)
-        else:
-            print(
-                f"[{self.profile_key}] Stop requested or incomplete. Order confirmation skipped."
-            )
+        self.order_flow.place_order_from_items(items)
 
     def match_items_only(self, items: Iterable[Item]) -> None:
         """Match Tawreed products for each item without adding anything to the cart."""
-        self._ensure_valid_auth()
-        items = list(items)
-        with self._manual_review_cache_for_items(items):
-            if self._try_api_match_only(items):
-                return
-            self._match_items_browser_mode(items)
-
-
-    def _match_items_browser_mode(self, items: list[Item]) -> None:
-        """Match items using browser mode."""
-        with sync_playwright() as p:
-            browser, context, page = open_order_page(
-                p, self.config.runtime, self.state_path, debug_browser=self.debug_browser
-            )
-            api_capture = begin_api_contract_capture(page)
-            try:
-                self._run_match_only_with_artifacts(page, items)
-            finally:
-                _save_api_contract_capture(api_capture)
-                close_context(context)
-                close_browser(browser)
-
-    def _manual_review_cache_for_items(self, items: list[Item]):
-        """Return a run-scoped manual-review decision cache context."""
-        started_at = time.perf_counter()
-        try:
-            context = manual_review_cache_context(preload_manual_review_decisions(items))
-        except Exception:
-            return nullcontext()
-        self._record_pending_item_timing(
-            "manual_review_lookup_seconds", time.perf_counter() - started_at
-        )
-        return context
-
-    def _record_pending_item_timing(self, key: str, elapsed_seconds: float) -> None:
-        """Attach one setup timing bucket to the next processed item."""
-        pending = getattr(self, "_pending_item_timings", {})
-        pending[key] = float(pending.get(key, 0.0)) + max(0.0, float(elapsed_seconds))
-        self._pending_item_timings = pending
-
-    def _run_match_only_with_artifacts(self, page: Page, items: Iterable[Item]) -> None:
-        """Run match-only browser flow and capture diagnostics on failure."""
-        try:
-            self._run_match_only_session(page, items)
-        except Exception as error:
-            self._handle_match_only_error(page, error)
-            raise
-
-    def _handle_match_only_error(self, page: Page, error: Exception) -> None:
-        """Capture diagnostics for match-only failures."""
-        dump_artifacts(
-            page,
-            self.profile_key,
-            label="match_only_flow_error",
-            details=_artifact_details("match_only_flow_error", error),
-        )
+        self.order_flow.match_items_only(items)
 
     def remove_cart_items(self, items: Iterable[CartRemovalItem]) -> None:
         """Remove the requested items from Tawreed carts."""
-        self._ensure_valid_auth()
-        items = list(items)
-        if self._try_api_cart_removal(items):
-            return
-        with sync_playwright() as p:
-            browser, context, page = open_order_page(
-                p,
-                self.config.runtime,
-                self.state_path,
-                debug_browser=self.debug_browser,
-            )
-            api_capture = begin_api_contract_capture(page)
-            try:
-                self._prepare_order_page(page)
-                targets = resolve_cart_removal_targets(self, page, items)
-                self._prepare_cart_page(page)
-                remove_items_from_cart(self, page, targets)
-            except Exception as error:
-                self._handle_removal_error(page, error)
-                raise
-            finally:
-                _save_api_contract_capture(api_capture)
-                close_context(context)
-                close_browser(browser)
-
-    def _handle_removal_error(self, page: Page, error: Exception) -> None:
-        """Capture diagnostics for cart removal failures."""
-        dump_artifacts(
-            page,
-            self.profile_key,
-            label="cart_removal_error",
-            details=_artifact_details("cart_removal_error", error),
-        )
-
-    def _prepare_cart_page(self, page: Page) -> None:
-        """Open Tawreed's cart page for cart-removal processing."""
-        page.goto(self._cart_page_url(), wait_until="domcontentloaded")
-        ensure_logged_in(
-            page,
-            self.selectors,
-            self.config.runtime.timeout_ms,
-            ready_selector=self.selectors.cart_rows,
-        )
-        maybe_switch_pharmacy(page, self.profile.pharmacy_switch or {})
-        try:
-            page.locator(self.selectors.cart_rows).first.wait_for(timeout=3000)
-        except Exception:
-            pass
-
-    def _cart_page_url(self) -> str:
-        """Return the direct Tawreed cart page URL."""
-        route = self.selectors.cart_route
-        if "#/" in self.config.base_url and route.startswith("#/"):
-            origin, _ = self.config.base_url.split("#/", 1)
-            return f"{origin}{route}"
-        return route or self.config.base_url
-
-    def _prepare_order_page(self, page: Page) -> None:
-        """Open the site and navigate to the ordering surface for item processing."""
-        page.goto(self._products_page_url(), wait_until="domcontentloaded")
-        self._ensure_logged_in(page)
-        maybe_switch_pharmacy(page, self.profile.pharmacy_switch or {})
-        if self._order_surface_ready(page):
-            return
-        go_to_orders(page, self.selectors.go_to_orders, self._order_surface_selector())
-        start_new_order(
-            page, self.selectors.new_order, self.selectors.item_search_input
-        )
-
-    def _process_items(self, page: Page, items: Iterable[Item]) -> bool:
-        """Process each requested Excel item on the current order page."""
-        added_any = False
-        for item in items:
-            if self._stop_before_item(item):
-                return False
-            added_any = self._process_single_item(page, item) or added_any
-        return added_any
-
-    def _run_match_only_session(self, page: Page, items: Iterable[Item]) -> None:
-        """Prepare Tawreed and process item matching without cart actions."""
-        self._prepare_order_page(page)
-        completed = self._process_match_only_items(page, items)
-        if completed and not self._stop_requested():
-            print(f"[{self.profile_key}] Match-only run completed. Cart was unchanged.")
-        else:
-            print(
-                f"[{self.profile_key}] Stop requested or incomplete. Matching stopped."
-            )
-
-    def _process_match_only_items(self, page: Page, items: Iterable[Item]) -> bool:
-        """Run matching only for each requested Excel item."""
-        matched_any = False
-        for item in items:
-            if self._stop_before_item(item):
-                return False
-            matched_any = (
-                self._process_single_match_only_item(page, item) or matched_any
-            )
-        return matched_any
+        self.cart_flow.remove_cart_items(items)
 
     def _stop_before_item(self, item: Item) -> bool:
         """Return True and print a diagnostic when a run should stop before an item."""
@@ -488,12 +245,6 @@ class TawreedBot:
         """Return whether an external stop request has been written for this run."""
         return bool(self.stop_flag_path and self.stop_flag_path.exists())
 
-    def _order_surface_selector(self) -> str:
-        """Return the selector that best indicates the order surface is ready."""
-        if self.selectors.new_order:
-            return self.selectors.new_order
-        return self.selectors.item_search_input
-
     def _products_page_url(self) -> str:
         """Return the direct Tawreed products page URL for faster order startup."""
         if "#/" in self.config.base_url:
@@ -501,476 +252,60 @@ class TawreedBot:
             return f"{origin}{PRODUCTS_PAGE_ROUTE}"
         return self.config.base_url
 
-    def _order_surface_ready(self, page: Page) -> bool:
-        """Return whether the products ordering surface is already interactive."""
-        try:
-            page.locator(self.selectors.item_search_input).first.wait_for(timeout=1500)
-            return True
-        except Exception:
-            return False
+    def _record_pending_item_timing(self, key: str, elapsed_seconds: float) -> None:
+        """Attach one setup timing bucket to the next processed item."""
+        pending = getattr(self, "_pending_item_timings", {})
+        pending[key] = float(pending.get(key, 0.0)) + max(0.0, float(elapsed_seconds))
+        self._pending_item_timings = pending
 
-    def _process_single_item(self, page: Page, item: Item) -> bool:
-        """Add one item or save artifacts when a technical failure happens."""
-        started_at = time.perf_counter()
-        self._reset_last_item_state()
-        try:
-            self._close_visible_dialogs_timed(page)
-            self._add_item(page, item)
-            # Skip close_visible_dialogs after success - waste of time
-            self._record_success(item, started_at)
-            return True
-        except _SkipItem as error:
-            self._close_visible_dialogs_timed(page)
-            self._record_skip(item, error, started_at)
-            return False
-        except Exception as error:
-            self._record_failure(page, item, error, started_at)
-            return False
-
-    def _process_single_match_only_item(self, page: Page, item: Item) -> bool:
-        """Match one item without running any add-to-cart action."""
-        started_at = time.perf_counter()
-        self._reset_last_item_state()
-        try:
-            self._close_visible_dialogs_timed(page)
-            self._match_item_only(page, item)
-            self._close_visible_dialogs_timed(page)
-            self._record_match_only_success(item, started_at)
-            return True
-        except _SkipItem as error:
-            self._close_visible_dialogs_timed(page)
-            self._record_match_only_skip(item, error, started_at)
-            return False
-        except Exception as error:
-            self._record_match_only_failure(page, item, error, started_at)
-            return False
-
-    def _record_success(self, item: Item, started_at: float) -> None:
-        """Record a successful add-to-cart summary."""
-        self._record_item_summary(
-            item,
-            status="added-to-cart",
-            reason="Added to cart.",
-            elapsed_seconds=time.perf_counter() - started_at,
-            match_elapsed_seconds=self.last_match_elapsed_seconds,
-        )
-
-    def _record_match_only_success(self, item: Item, started_at: float) -> None:
-        """Record a successful product match that did not touch the cart."""
-        self._record_match_only_summary(
-            item,
-            status="matched-only",
-            reason="Matched product only; item was not added to cart.",
-            elapsed_seconds=time.perf_counter() - started_at,
-            match_elapsed_seconds=self.last_match_elapsed_seconds,
-        )
-
-    def _record_match_only_skip(
-        self, item: Item, error: _SkipItem, started_at: float
-    ) -> None:
-        """Record a skipped item during match-only mode."""
-        reason = str(error)
-        self._record_match_only_summary(
-            item,
-            self._skip_status(reason),
-            reason,
-            time.perf_counter() - started_at,
-            self.last_match_elapsed_seconds,
-        )
-        print(
-            _console_safe(
-                f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}"
-            )
-        )
-
-    def _record_match_only_failure(
-        self, page: Page, item: Item, error: Exception, started_at: float
-    ) -> None:
-        """Record a failed match-only item and capture diagnostics."""
-        reason = str(error)
-        self._close_visible_dialogs_timed(page)
-        self._record_match_only_summary(
-            item,
-            self._failure_status(reason),
-            reason,
-            time.perf_counter() - started_at,
-            self.last_match_elapsed_seconds,
-        )
-        self._print_failed_item(item, error)
-        dump_artifacts(
-            page,
-            self.profile_key,
-            _item_error_label(item),
-            _item_error_details(page, item, error),
-        )
-
-    def _record_skip(self, item: Item, error: _SkipItem, started_at: float) -> None:
-        """Record a skipped item summary."""
-        reason = str(error)
-        self._record_item_summary(
-            item,
-            status=self._skip_status(reason),
-            reason=reason,
-            elapsed_seconds=time.perf_counter() - started_at,
-            match_elapsed_seconds=self.last_match_elapsed_seconds,
-        )
-        print(
-            _console_safe(
-                f"[{self.profile_key}] Skipped item {item.code} / {item.name}: {error}"
-            )
-        )
-
-    def _record_failure(
-        self, page: Page, item: Item, error: Exception, started_at: float
-    ) -> None:
-        """Record a technical failure and capture diagnostic artifacts."""
-        reason = str(error)
-        self._close_visible_dialogs_timed(page)
-        self._record_failure_summary(item, reason, started_at)
-        self._print_failed_item(item, error)
-        dump_artifacts(
-            page,
-            self.profile_key,
-            label=_item_error_label(item),
-            details=_item_error_details(page, item, error),
-        )
-
-    def _close_visible_dialogs_timed(self, page: Page) -> None:
-        """Close visible dialogs and accumulate the item-level wait cost."""
-        started_at = time.perf_counter()
-        close_visible_dialogs(page)
-        record_timing(self, "dialog_close_seconds", time.perf_counter() - started_at)
-
-    def _record_failure_summary(
-        self, item: Item, reason: str, started_at: float
-    ) -> None:
-        """Append the summary row for one failed item."""
-        self._record_item_summary(
-            item,
-            self._failure_status(reason),
-            reason,
-            time.perf_counter() - started_at,
-            self.last_match_elapsed_seconds,
-        )
-
-    def _print_failed_item(self, item: Item, error: Exception) -> None:
-        """Print one console-safe failed item message."""
-        message = f"[{self.profile_key}] Failed item {item.code} / {item.name}: {error}"
-        print(_console_safe(message))
-
-    def _ensure_logged_in(self, page: Page) -> None:
-        """Verify that the saved session is still authenticated before ordering begins."""
-        ensure_logged_in(
-            page,
-            self.selectors,
-            self.config.runtime.timeout_ms,
-            ready_selector=self.selectors.item_search_input,
-        )
-
-    def _add_item(self, page: Page, item: Item) -> None:
-        """Add one item using either the products-page flow or the legacy configured flow."""
-        if self._is_products_page(page):
-            add_item_from_products_page(self, page, item)
-            return
-
-        self._add_item_with_configured_flow(page, item)
-
-    def _match_item_only(self, page: Page, item: Item) -> None:
-        """Run Tawreed matching for one item without opening the cart dialog."""
-        self._ensure_match_only_surface(page)
-        match, _ = require_product_match(self, page, item, require_available=False)
-        self.log(f"Match-only accepted {item.code} / {item.name}: {match.query}")
-
-    def _ensure_match_only_surface(self, page: Page) -> None:
-        """Ensure match-only can use Tawreed's product-search surface."""
-        if self._is_products_page(page) or self._order_surface_ready(page):
-            return
-        self._prepare_order_page(page)
-        if not (self._is_products_page(page) or self._order_surface_ready(page)):
-            raise RuntimeError("Match-only mode requires Tawreed products page flow.")
-
-    def _is_products_page(self, page: Page) -> bool:
-        """Return whether the current page is Tawreed's products ordering page."""
-        return PRODUCTS_PAGE_ROUTE in page.url
-
-    def _add_item_with_configured_flow(self, page: Page, item: Item) -> None:
-        """Execute the selector-driven fallback flow for non-products ordering pages."""
-        search = page.locator(self.selectors.item_search_input).first
-        search.click()
-        search.fill("")
-        query = item.code if item.code else item.name
-        search.fill(query)
-
-        self._pick_configured_search_result(page, search)
-        self._fill_configured_quantity(page, item.qty)
-        page.locator(self.selectors.add_item_button).first.click()
-        self.last_ordered_total_qty = int(item.qty)
-        self._wait_for_legacy_add_completion(page)
-
-    def _pick_configured_search_result(self, page: Page, search) -> None:
-        """Select the configured search result when that selector exists."""
-        if not self.selectors.item_first_result:
-            return
-        try:
-            page.locator(self.selectors.item_first_result).first.wait_for(timeout=5000)
-            page.locator(self.selectors.item_first_result).first.click()
-        except Exception:
-            search.press("Enter")
-
-    def _fill_configured_quantity(self, page: Page, quantity: int) -> None:
-        """Fill the configured quantity input when that selector exists."""
-        if not self.selectors.qty_input:
-            return
-        quantity_input = page.locator(self.selectors.qty_input).first
-        quantity_input.fill("")
-        quantity_input.fill(str(quantity))
-
-    def _pick_warehouse_if_needed(self, page: Page) -> None:
-        """Pick a warehouse row from a warehouse chooser when that flow is active."""
-        mode = self._warehouse_mode()
-        rows = page.locator(self.selectors.warehouse_rows)
-        if rows.count() == 0:
-            return
-
-        if mode == "first_available":
-            self._click_warehouse_row(page, rows.first)
-            return
-
-        if mode == "max_available":
-            row_index = max_available_warehouse_row(
-                rows, self.selectors.warehouse_available_qty
-            )
-            self._click_warehouse_row(page, rows.nth(row_index))
-            return
-
-        raise ValueError(f"Unknown warehouse strategy mode: {mode}")
-
-    def _warehouse_mode(self) -> str:
-        """Return the configured warehouse-selection mode."""
-        return str(self.config.warehouse_strategy.get("mode", "first_available"))
-
-    def _click_warehouse_row(self, page: Page, row) -> None:
-        """Click the warehouse pick button for the provided row."""
-        row.locator(self.selectors.warehouse_pick_button).first.click()
-        self._wait_for_warehouse_selection(page)
-
-    def _wait_for_legacy_add_completion(self, page: Page) -> None:
-        """Wait briefly for the legacy add-item flow to settle after submission."""
-        try:
-            page.locator(self.selectors.item_search_input).first.wait_for(timeout=1000)
-        except Exception:
-            pass
-
-    def _wait_for_warehouse_selection(self, page: Page) -> None:
-        """Wait briefly for the warehouse chooser to settle after selecting a row."""
-        try:
-            page.locator(self.selectors.warehouse_rows).first.wait_for(
-                state="hidden", timeout=1000
-            )
-        except Exception:
-            pass
-
-    def _record_item_summary(
-        self,
-        item: Item,
-        status: str,
-        reason: str,
-        elapsed_seconds: float,
-        match_elapsed_seconds: float,
-    ) -> None:
-        """Append one execution-summary row for the processed item."""
-        summary = self._build_item_summary(
-            status, reason, elapsed_seconds, match_elapsed_seconds
-        )
-        append_order_result_summary(
-            self.profile_key, item, summary, label_suffix=self.summary_label_suffix
-        )
-        self._record_order_run_artifacts(item, summary)
-
-    def _record_match_only_summary(
-        self,
-        item: Item,
-        status: str,
-        reason: str,
-        elapsed_seconds: float,
-        match_elapsed_seconds: float,
-    ) -> None:
-        """Append one detailed match-only summary for the processed item."""
-        summary = self._build_item_summary(
-            status, reason, elapsed_seconds, match_elapsed_seconds
-        )
-        append_match_only_summary(
-            self.profile_key,
-            item,
-            summary,
-            self.last_match_decision,
-            label_suffix=self.summary_label_suffix,
-        )
-        self._record_order_run_artifacts(item, summary)
-
-    def _record_order_run_artifacts(self, item: Item, summary: OrderResultSummary) -> None:
-        """Append per-item summary and manual-review artifacts for this run."""
-        append_order_item_artifacts(
-            self.profile_key,
-            item,
-            summary,
-            self.last_match_decision,
-            self.last_order_ai_outcome,
-            self.summary_label_suffix,
-            self.config.matching,
-        )
-
-    def _build_item_summary(
-        self, status: str, reason: str, elapsed: float, match_elapsed: float
-    ) -> OrderResultSummary:
-        """Build a compact summary object from the current bot state."""
-        started_at = time.perf_counter()
-        matched_name_fields = self._matched_summary_name_fields()
-        record_timing(self, "summary_build_seconds", time.perf_counter() - started_at)
-        return OrderResultSummary(
-            status=status,
-            reason=reason,
-            ordered_total_qty=self.last_ordered_total_qty,
-            **matched_name_fields,
-            selected_discount_percent=self.last_selected_discount_percent,
-            selected_store_name=self.last_selected_store_name,
-            searched_queries_count=len(self.last_searched_queries),
-            searched_queries=" | ".join(self.last_searched_queries),
-            elapsed_seconds=elapsed,
-            match_elapsed_seconds=match_elapsed,
-            timing_seconds=dict(self.last_item_timings),
-        )
-
-    def _matched_summary_name_fields(self) -> dict[str, str]:
-        """Return named OrderResultSummary fields for the last matched product."""
-        english_name, english_source, arabic_name, matched_query = (
-            self._matched_summary_fields()
-        )
-        return {
-            "matched_product_english_name": english_name,
-            "matched_product_english_name_source": english_source,
-            "matched_product_arabic_name": arabic_name,
-            "matched_query": matched_query,
-        }
-
-    def _matched_summary_fields(self) -> tuple[str, str, str, str]:
-        """Return matched product summary fields from the last recorded match decision."""
-        decision = self.last_match_decision
-        if not decision:
-            return "", "", "", ""
-            
-        candidate, query = self._extract_candidate(decision)
-                
-        if not candidate:
-            return "", "", "", ""
-            
-        english_name, english_source = self._matched_english_name(candidate)
-        arabic_name = str(candidate.get("productName") or "")
-        return english_name, english_source, arabic_name, query
-
-    def _extract_candidate(self, decision) -> tuple[dict | None, str]:
-        if decision.best_match:
-            return decision.best_match.data, decision.best_match.query
-            
-        diagnostics = getattr(decision, "diagnostics", None)
-        if not diagnostics:
-            return None, ""
-            
-        best = max(diagnostics, key=lambda d: d.score, default=None)
-        if best and getattr(best, "candidate", None):
-            return best.candidate, best.query
-        return None, ""
-
-    def _matched_english_name(self, candidate: dict[str, object]) -> tuple[str, str]:
-        """Return matched English name and whether it came from site or fallback."""
-        site_name = str(candidate.get("productNameEn") or "")
-        if site_name:
-            return site_name, "site"
-        fallback = str(candidate.get("productNameEnFallback") or "")
-        if fallback:
-            return fallback, "fallback"
-        return "", ""
-
+    # Delegation methods for backward compatibility with tests
     def _skip_status(self, reason: str) -> str:
         """Return the structured summary status for one skipped item."""
-        lowered = reason.lower()
-        if (
-            "no matching product found" in lowered
-            or "no decisive match found" in lowered
-            or "no decisive api match found" in lowered
-        ):
-            return self._unmatched_decision_status() or "no-results"
-        if "manual review" in lowered:
-            return "manual-review-required"
-        if "unavailable" in lowered or "out of stock" in lowered:
-            return "matched-but-unavailable"
-        if "cart button disabled" in lowered:
-            return "not-orderable"
-        return "skipped"
+        return self.order_flow._skip_status(reason)
 
-    def _failure_status(self, reason: str) -> str:
-        """Return the structured summary status for one failed item."""
-        if "No matching product found" in reason or "No decisive match found" in reason:
-            return self._unmatched_decision_status() or "no-results"
-        return "failed"
+    def _build_item_summary(self, status: str, reason: str, elapsed: float, match_elapsed: float):
+        """Build a compact summary object from the current bot state."""
+        return self.order_flow._build_item_summary(status, reason, elapsed, match_elapsed)
 
-    def _unmatched_decision_status(self) -> str:
-        """Return a more precise status for a rejected but recognized candidate."""
-        if missing_store_product_id_outcome(self.last_order_ai_outcome):
-            return "matched-but-unavailable"
-        if getattr(self.last_order_ai_outcome, "manual_review", False):
-            return "manual-review-required"
-        decision = self.last_match_decision
-        if not decision or decision.best_match:
-            return ""
-        if any(_diagnostic_missing_orderable_identity(row) for row in decision.diagnostics):
-            return "not-orderable"
-        return ""
+    def _order_surface_ready(self, page) -> bool:
+        """Return whether the products ordering surface is already interactive."""
+        return self.order_flow._order_surface_ready(page)
 
+    def _process_single_item(self, page, item):
+        """Add one item or save artifacts when a technical failure happens."""
+        return self.order_flow._process_single_item(page, item)
 
-def _item_error_label(item: Item) -> str:
-    """Return the artifact label for one failed item."""
-    return f"item_error_{item.code or 'no_code'}"
+    def _process_single_match_only_item(self, page, item):
+        """Match one item without running any add-to-cart action."""
+        return self.order_flow._process_single_match_only_item(page, item)
 
+    def _prepare_order_page(self, page):
+        """Open the site and navigate to the ordering surface for item processing."""
+        return self.order_flow._prepare_order_page(page)
 
-def _diagnostic_missing_orderable_identity(
-    diagnostic: CandidateMatchDiagnostic,
-) -> bool:
-    """Return whether a diagnostic found an otherwise acceptable non-orderable row."""
-    if candidate_has_store_product_id(diagnostic.candidate):
-        return False
-    reason = diagnostic.rejection_reason.lower()
-    if "candidate missing orderable storeproductid" in reason:
-        return True
-    hard_rejections = ("component mismatch", "identity token", "different_brand")
-    return diagnostic.score >= 12.0 and not any(text in reason for text in hard_rejections)
+    def _process_items(self, page, items):
+        """Process each requested Excel item on the current order page."""
+        return self.order_flow._process_items(page, items)
 
+    def _is_products_page(self, page):
+        """Return whether the current page is Tawreed's products ordering page."""
+        return self.order_flow._is_products_page(page)
 
-def _item_error_details(page: Page, item: Item, error: Exception) -> str:
-    """Build diagnostic artifact details for one failed item."""
-    return _artifact_details(
-        _item_error_label(item),
-        error,
-        overlay_diagnostics=visible_overlay_diagnostics(page),
-        item_code=item.code,
-        item_name=item.name,
-        item_qty=item.qty,
-    )
+    def _record_item_summary(self, item, status, reason, elapsed_seconds, match_elapsed_seconds):
+        """Append one execution-summary row for the processed item."""
+        return self.order_flow._record_item_summary(item, status, reason, elapsed_seconds, match_elapsed_seconds)
 
+    def _match_item_only(self, page, item):
+        """Run Tawreed matching for one item without opening the cart dialog."""
+        return self.order_flow._match_item_only(page, item)
 
-def _artifact_details(label: str, error: Exception, **extra: object) -> str:
-    """Build plain-text diagnostic details for saved failure artifacts."""
-    lines = [f"label={label}", f"error_type={type(error).__name__}", f"error={error}"]
-    for key, value in extra.items():
-        lines.append(f"{key}={value}")
-    return "\n".join(lines) + "\n"
+    def _run_match_only_session(self, page, items):
+        """Prepare Tawreed and process item matching without cart actions."""
+        return self.order_flow._run_match_only_session(page, items)
 
-
-def _save_api_contract_capture(captured: list[dict]) -> None:
-    try:
-        save_api_contract_capture(captured)
-    except Exception:
-        pass
+    def _add_item(self, page, item):
+        """Add one item using either the products-page flow or the legacy configured flow."""
+        return self.order_flow._add_item(page, item)
 
 
 def _console_safe(text: str) -> str:

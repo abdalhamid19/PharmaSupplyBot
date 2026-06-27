@@ -13,7 +13,7 @@ from typing import Any
 import aiohttp
 
 from .config import PROVIDERS
-from .verifier import _extract_json
+from .verifier import extract_json
 
 OPENCODE_BASE_URL = PROVIDERS["opencode"]["base_url"]
 OUT_DIR = Path("output/api_model_tests")
@@ -230,7 +230,7 @@ def content_from_response(data: Any) -> tuple[str, str]:
 
 
 def validate_model_json(content: str) -> tuple[bool, str, dict[str, Any] | None]:
-    parsed = _extract_json(content)
+    parsed = extract_json(content)
     if parsed is None:
         return False, "invalid_json", None
     required = {"is_correct", "reason", "confidence"}
