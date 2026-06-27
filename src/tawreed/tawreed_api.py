@@ -10,8 +10,14 @@ from playwright.sync_api import sync_playwright
 from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, load_api_contract
 from .tawreed_api_defaults import product_search_body, product_search_url
 from .tawreed_api_payloads import body_with_item, body_with_match, body_with_query
-from .tawreed_auth_tokens import access_token_from_state
+from .tawreed_auth_tokens import access_token_from_state, customer_id_from_state
 from .tawreed_product_search import _api_candidates
+from .tawreed_api_helpers import (
+    _api_origin,
+    _auth_headers_from_state,
+    _ensure_cart_item_added,
+    _is_trusted_add_to_cart_url,
+)
 
 
 class TawreedApiUnavailable(RuntimeError):
@@ -35,7 +41,6 @@ class TawreedApiClient:
         self._request_context = None
         
         # Extract customer ID from token
-        from .tawreed_auth_tokens import customer_id_from_state
         self.customer_id = customer_id_from_state(state_path)
 
     def __enter__(self):
@@ -155,44 +160,4 @@ class TawreedApiClient:
         return self._request_context
 
 
-def _api_origin(base_url: str) -> str:
-    if "seller.tawreed.io" in base_url:
-        return "https://api.tawreed.io"
-    return base_url.split("#/", 1)[0].rstrip("/")
-
-
-def _is_trusted_add_to_cart_url(url: str) -> bool:
-    """Return whether a URL is a real add endpoint and not the cart-read endpoint.
-
-    The Tawreed cart-read endpoint ``.../shopping/carts/items`` returns HTTP 200
-    with the existing cart, so posting to it reports a false ``added-to-cart``
-    while nothing is added. A trusted add endpoint must be the dedicated
-    ``.../carts/items/add`` route, never the bare cart-read route.
-    """
-    path = str(url or "").split("?", 1)[0].rstrip("/").lower()
-    if not path:
-        return False
-    return not path.endswith("carts/items")
-
-
-def _ensure_cart_item_added(response: dict[str, Any]) -> None:
-    """Raise when an add-to-cart response did not actually add an item.
-
-    The Tawreed cart-read endpoint returns HTTP 200 with an empty ``data`` list
-    when the wrong endpoint or payload is used, which previously made the bot
-    report a false ``added-to-cart`` status. Treat an empty response as failure
-    so the caller can fall back to the browser flow.
-    """
-    data = response.get("data") if isinstance(response, dict) else None
-    if not data:
-        raise TawreedApiUnavailable(
-            "Tawreed add-to-cart returned no cart data; the item was not added."
-        )
-
-
-def _auth_headers_from_state(state_path: Path) -> dict[str, str]:
-    """Return Tawreed API auth headers extracted from Playwright storage state."""
-    token = access_token_from_state(state_path)
-    if not token:
-        return {}
-    return {"Authorization": f"Bearer {token}"}
+__all__ = ["TawreedApiUnavailable", "TawreedApiClient"]

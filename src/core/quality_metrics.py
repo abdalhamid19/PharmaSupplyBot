@@ -6,10 +6,15 @@ acceptance rate, manual-review breakdown, and category-level counts.
 
 from __future__ import annotations
 
-import csv
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+
+from .quality_metrics_helpers import (
+    _cell,
+    _increment,
+    _process_row_metrics,
+    _read_csv_rows,
+)
 
 
 @dataclass
@@ -120,60 +125,6 @@ def compute_quality_metrics(summary_csv_path: Path) -> RunQualityMetrics:
     return metrics
 
 
-def _process_row_metrics(row: dict, metrics: RunQualityMetrics) -> None:
-    """Process a single row and update metrics."""
-    status = _cell(row, "status")
-    matched = _cell(row, "matched").lower() in {"true", "1", "yes"}
-    manual_review = _cell(row, "manual_review_required").lower() in {"true", "1", "yes"}
-    deterministic_found = _cell(row, "deterministic_match_found").lower() in {"true", "1", "yes"}
-
-    _increment(metrics.status_counts, status)
-
-    if matched and not manual_review:
-        metrics.auto_matched += 1
-
-    _update_manual_review_metrics(row, metrics, manual_review)
-    _update_status_metrics(status, metrics)
-    
-    if deterministic_found:
-        metrics.deterministic_matched += 1
-
-    _update_ai_metrics(_cell(row, "ai_status"), metrics)
-
-
-def _update_manual_review_metrics(row, metrics, manual_review):
-    """Update manual review metrics."""
-    if manual_review:
-        metrics.manual_review_required += 1
-        category = _cell(row, "manual_review_category")
-        if category:
-            _increment(metrics.category_counts, category)
-
-
-def _update_status_metrics(status: str, metrics: RunQualityMetrics) -> None:
-    """Update status-specific metrics."""
-    if status == "no-results":
-        metrics.no_results += 1
-    elif status == "matched-but-unavailable":
-        metrics.matched_but_unavailable += 1
-    elif status == "not-orderable":
-        metrics.not_orderable += 1
-
-
-def _update_ai_metrics(ai_status: str, metrics: RunQualityMetrics) -> None:
-    """Update AI-specific metrics."""
-    if ai_status == "ai_verified":
-        metrics.ai_verified += 1
-    elif ai_status == "ai_search_accepted":
-        metrics.ai_searched += 1
-    elif ai_status == "ai_review_rejected":
-        metrics.ai_reviewed += 1
-    elif ai_status == "ai_rejected":
-        metrics.ai_rejected += 1
-    elif ai_status == "ai_low_confidence":
-        metrics.ai_low_confidence += 1
-
-
 def compute_quality_metrics_from_directory(run_directory: Path) -> RunQualityMetrics:
     """Find and parse the order_item_summary CSV inside a run directory."""
     summary_files = list(run_directory.glob("order_item_summary_*.csv"))
@@ -192,18 +143,9 @@ def save_quality_report(run_directory: Path) -> Path:
     return report_path
 
 
-def _read_csv_rows(csv_path: Path) -> list[dict[str, Any]]:
-    """Read all rows from a CSV file into a list of dicts."""
-    with csv_path.open(encoding="utf-8") as handle:
-        reader = csv.DictReader(handle)
-        return list(reader)
-
-
-def _cell(row: dict[str, Any], key: str) -> str:
-    """Return a cleaned string value from a CSV row."""
-    return str(row.get(key) or "").strip()
-
-
-def _increment(counter: dict[str, int], key: str) -> None:
-    """Increment a counter dict for the given key."""
-    counter[key] = counter.get(key, 0) + 1
+__all__ = [
+    "RunQualityMetrics",
+    "compute_quality_metrics",
+    "compute_quality_metrics_from_directory",
+    "save_quality_report",
+]

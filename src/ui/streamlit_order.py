@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 import streamlit as st
@@ -12,19 +11,11 @@ from ..core.prevented_items import (
     is_prevented_items_excel_path,
 )
 from .streamlit_order_form import order_form_values
-from .streamlit_process import render_command_result, start_cli_subprocess
-from .streamlit_results import render_fresh_run_analysis
-from .streamlit_shared import (
-    ARTIFACTS_DIR,
-    csv_row_count,
-    load_new_summary_rows,
-    match_only_summary_csv_path,
-    summary_csv_path,
-)
-from .streamlit_state import (
-    ensure_default_state_files,
-    missing_state_profiles,
-)
+from .streamlit_order_process import render_running_order_controls, start_order_process
+from .streamlit_order_paths import order_run_summary_csv_path, order_stop_flag_path
+from .streamlit_order_state import prepare_order_state_files
+from .streamlit_order_command import order_command
+from .streamlit_shared import csv_row_count
 from .streamlit_uploads import resolve_excel_path
 
 
@@ -75,286 +66,114 @@ def run_order_submission(
     previous_row_count = csv_row_count(summary_path)
     command = order_command(config_path, form_values, excel_path)
     stop_flag_path = order_stop_flag_path()
-    start_order_process(command, summary_path, previous_row_count, stop_flag_path, form_values)
+    start_order_process(
+        command, summary_path, previous_row_count, stop_flag_path, form_values
+    )
     st.success("Order flow started. Use Stop Order to stop after the current item.")
     st.rerun()
 
 
+# Backward compatibility: redirect to refactored modules
 def render_running_order_controls() -> bool:
-    """Render controls for a background order process when one is active."""
-    state = st.session_state.get("order_process")
-    if not state:
-        return False
-    process = state["process"]
-    returncode = process.poll()
-    output_text = order_process_output(Path(state["output_path"]))
-    if returncode is None:
-        st.warning("Order flow is running.")
-        col_stop, col_refresh = st.columns(2)
-        with col_stop:
-            if st.button("Stop Order", type="primary"):
-                Path(state["stop_flag_path"]).write_text(
-                    "stop requested\n", encoding="utf-8"
-                )
-                st.info("Stop requested. The run will stop before the next item.")
-        with col_refresh:
-            if st.button("Refresh Status"):
-                st.rerun()
-        if output_text:
-            st.code(output_text[-4000:], language="text")
-        render_fresh_run_analysis(
-            load_new_summary_rows(
-                _completed_summary_path(state), _completed_previous_count(state)
-            )
-        )
-        return True
-    close_order_process_output(state)
-    result = {
-        "ok": returncode == 0,
-        "exit_code": returncode,
-        "command": " ".join(state["command"]),
-        "output": output_text,
-        "error_type": "ProcessError" if returncode else "",
-        "error_message": f"Exited with status code {returncode}." if returncode else "",
-    }
-    render_command_result(result)
-    render_fresh_run_analysis(
-        load_new_summary_rows(
-            _completed_summary_path(state), _completed_previous_count(state)
-        )
-    )
-    st.session_state.pop("order_process", None)
-    return False
+    from .streamlit_order_process import render_running_order_controls as _fn
+    return _fn()
 
 
-def start_order_process(
-    command: list[str],
-    summary_path: Path,
-    previous_row_count: int,
-    stop_flag_path: Path,
-    form_values: dict[str, object],
-) -> None:
-    """Start one order command in the background and remember its UI state."""
-    stop_flag_path.parent.mkdir(parents=True, exist_ok=True)
-    if stop_flag_path.exists():
-        stop_flag_path.unlink()
-    command = [*command, "--stop-flag", str(stop_flag_path)]
-    output_path = order_output_path()
-    state = start_cli_subprocess(command, output_path)
-    state.update(
-        {
-            "summary_path": str(summary_path),
-            "previous_row_count": previous_row_count,
-            "profile_key": str(_profile_key_for_state(form_values)),
-            "match_only": bool(form_values.get("match_only")),
-            "stop_flag_path": str(stop_flag_path),
-        }
-    )
-    st.session_state["order_process"] = state
+def start_order_process(command, summary_path, previous_row_count, stop_flag_path, form_values):
+    from .streamlit_order_process import start_order_process as _fn
+    return _fn(command, summary_path, previous_row_count, stop_flag_path, form_values)
 
 
 def order_output_path() -> Path:
-    """Return a unique output path for the current background order run."""
-    return run_control_dir() / f"order_output_{int(time.time())}.log"
+    from .streamlit_order_paths import order_output_path as _fn
+    return _fn()
 
 
 def order_stop_flag_path() -> Path:
-    """Return the shared stop-request flag path for Streamlit order runs."""
-    return run_control_dir() / "order_stop.flag"
+    from .streamlit_order_paths import order_stop_flag_path as _fn
+    return _fn()
 
 
 def run_control_dir() -> Path:
-    """Return the directory used for Streamlit process-control artifacts."""
-    return ARTIFACTS_DIR / "run-control" / "order"
+    from .streamlit_order_paths import run_control_dir as _fn
+    return _fn()
 
 
 def order_process_output(output_path: Path) -> str:
-    """Return captured order-process output when available."""
-    if not output_path.exists():
-        return ""
-    return output_path.read_text(encoding="utf-8", errors="replace")
+    from .streamlit_order_process import order_process_output as _fn
+    return _fn(output_path)
 
 
-def close_order_process_output(state: dict[str, object]) -> None:
-    """Close the stored process output file handle if it is still open."""
-    output_file = state.get("output_file")
-    if output_file is None:
-        return
-    try:
-        getattr(output_file, "close")()
-    except Exception:
-        pass
+def close_order_process_output(state):
+    from .streamlit_order_process import close_order_process_output as _fn
+    return _fn(state)
 
 
-def prepare_order_state_files(app_config, form_values: dict[str, object]) -> bool:
-    """Ensure every target profile has a ready session-state file."""
-    target_profiles = target_profile_keys(app_config, form_values)
-    ensure_default_state_files(target_profiles)
-    missing_profiles = missing_state_profiles(target_profiles)
-    if not missing_profiles:
-        return True
-    missing_text = ", ".join(f"`{profile_key}`" for profile_key in missing_profiles)
-    st.error(f"Missing session-state JSON for: {missing_text}")
-    st.info(
-        "Upload `state/<profile>.json` from a machine where you already ran `py run.py auth`."
-    )
-    return False
+def prepare_order_state_files(app_config, form_values):
+    from .streamlit_order_state import prepare_order_state_files as _fn
+    return _fn(app_config, form_values)
 
 
-def target_profile_keys(app_config, form_values: dict[str, object]) -> list[str]:
-    """Return the profiles targeted by one order submission."""
-    if form_values["profile_mode"] == "Single profile":
-        return [str(form_values["profile_key"])]
-    return list(app_config.profiles.keys())
+def target_profile_keys(app_config, form_values):
+    from .streamlit_order_state import target_profile_keys as _fn
+    return _fn(app_config, form_values)
 
 
-def order_run_summary_csv_path(
-    profile_key: str, form_values: dict[str, object]
-) -> Path:
-    """Return the CSV summary watched for one Streamlit order run."""
-    latest = _latest_order_summary_path(profile_key, bool(form_values.get("match_only")))
-    if latest:
-        return latest
-    if form_values.get("match_only"):
-        return match_only_summary_csv_path(profile_key)
-    return summary_csv_path(profile_key)
+def _profile_key_for_state(form_values):
+    from .streamlit_order_state import _profile_key_for_state as _fn
+    return _fn(form_values)
 
 
-def _latest_order_summary_path(profile_key: str, match_only: bool) -> Path | None:
-    """Return the newest order summary from run folders."""
-    label = "match_only_summary" if match_only else "order_item_summary"
-    paths = sorted((ARTIFACTS_DIR / "order" / profile_key).glob(f"*/{label}_*.csv"))
-    return paths[-1] if paths else None
+def _completed_summary_path(state):
+    from .streamlit_order_state import _completed_summary_path as _fn
+    return _fn(state)
 
 
-def _completed_summary_path(state: dict[str, object]) -> Path:
-    """Return the completed run summary path for process rendering."""
-    latest = _latest_order_summary_path(
-        str(state.get("profile_key", "wardany")), bool(state.get("match_only"))
-    )
-    return latest or Path(str(state["summary_path"]))
+def _completed_previous_count(state):
+    from .streamlit_order_state import _completed_previous_count as _fn
+    return _fn(state)
 
 
-def _completed_previous_count(state: dict[str, object]) -> int:
-    """Return previous row count only when the watched path did not change."""
-    completed = _completed_summary_path(state)
-    if completed == Path(str(state["summary_path"])):
-        return int(state["previous_row_count"])
-    return 0
+def _latest_order_summary_path(profile_key, match_only):
+    from .streamlit_order_paths import _latest_order_summary_path as _fn
+    return _fn(profile_key, match_only)
 
 
-def _profile_key_for_state(form_values: dict[str, object]) -> str:
-    """Return the single profile key used for result watching."""
-    return str(form_values.get("profile_key") or "wardany")
+def _matching_risk_command_args(form_values):
+    from .streamlit_order_command import _matching_risk_command_args as _fn
+    return _fn(form_values)
 
 
-def order_command(
-    config_path: Path,
-    form_values: dict[str, object],
-    excel_path: Path,
-) -> list[str]:
-    """Return the CLI command arguments for one order run."""
-    command = ["order", "--config", str(config_path), "--excel", str(excel_path)]
-    command.extend(["--limit", str(form_values["limit"])])
-    if form_values["profile_mode"] == "Single profile":
-        command.extend(["--profile", str(form_values["profile_key"])])
-    else:
-        command.append("--all-profiles")
-    if form_values["debug_browser"]:
-        command.append("--debug-browser")
-    if form_values.get("resume"):
-        command.append("--resume")
-    if form_values.get("match_only"):
-        command.append("--match-only")
-    command.extend(["--execution-mode", _order_execution_mode(form_values)])
-    item_workers = _int_form_value(form_values, "item_workers", 1)
-    command.extend(["--item-workers", str(item_workers)])
-    if form_values.get("highest_discount"):
-        command.extend(["--warehouse-mode", "max_discount"])
-    min_discount_percent = _float_form_value(form_values, "min_discount_percent", 0.0)
-    if min_discount_percent > 0:
-        command.extend(["--min-discount-percent", f"{min_discount_percent:g}"])
-    prevented_items_excel = str(form_values.get("prevented_items_excel") or "")
-    if prevented_items_excel:
-        command.extend(["--prevented-items-excel", prevented_items_excel])
-        
-    start_item = _int_form_value(form_values, "start_item", 1)
-    if start_item > 1:
-        command.extend(["--start-item", str(start_item)])
-        
-    end_item = _int_form_value(form_values, "end_item", 0)
-    if end_item > 0:
-        command.extend(["--end-item", str(end_item)])
-        
-    command.extend(_matching_risk_command_args(form_values))
-    command.extend(_order_ai_command_args(form_values))
-    return command
+def _order_execution_mode(form_values):
+    from .streamlit_order_command import _order_execution_mode as _fn
+    return _fn(form_values)
 
 
-def _matching_risk_command_args(form_values: dict[str, object]) -> list[str]:
-    """Return CLI arguments for safe or aggressive matching policy."""
-    return [
-        "--matching-risk-policy",
-        str(form_values.get("matching_risk_policy") or "safe"),
-        "--flagged-match-action",
-        str(form_values.get("flagged_match_action") or "manual-review-only"),
-    ]
+def _order_ai_command_args(form_values):
+    from .streamlit_order_command import _order_ai_command_args as _fn
+    return _fn(form_values)
 
 
-def _order_execution_mode(form_values: dict[str, object]) -> str:
-    """Return the fastest safe execution mode for the requested order run."""
-    mode = str(form_values.get("execution_mode", "auto") or "auto")
-    if form_values.get("match_only") and mode == "auto":
-        return "api"
-    return mode
+def _order_ai_provider_args(form_values):
+    from .streamlit_order_command import _order_ai_provider_args as _fn
+    return _fn(form_values)
 
 
-def _order_ai_command_args(form_values: dict[str, object]) -> list[str]:
-    """Return CLI arguments for optional live-order AI matching."""
-    if not form_values.get("enable_order_ai"):
-        return []
-    args = ["--ai", *_order_ai_provider_args(form_values)]
-    args.extend(_order_ai_threshold_args(form_values))
-    _append_optional_ai_text(args, "--model", form_values.get("ai_model"))
-    _append_optional_ai_text(args, "--review-model", form_values.get("ai_review_model"))
-    return args
+def _order_ai_threshold_args(form_values):
+    from .streamlit_order_command import _order_ai_threshold_args as _fn
+    return _fn(form_values)
 
 
-def _order_ai_provider_args(form_values: dict[str, object]) -> list[str]:
-    """Return provider and policy CLI args for order AI."""
-    return [
-        "--provider",
-        str(form_values.get("ai_provider") or "openrouter"),
-        "--concurrency",
-        str(_int_form_value(form_values, "ai_concurrency", 5)),
-        "--ai-verify-policy",
-        str(form_values.get("ai_verify_policy") or "score"),
-        "--ai-search-policy",
-        str(form_values.get("ai_search_policy") or "review-candidates"),
-    ]
+def _append_optional_ai_text(args, flag, value):
+    from .streamlit_order_helpers import _append_optional_ai_text as _fn
+    return _fn(args, flag, value)
 
 
-def _order_ai_threshold_args(form_values: dict[str, object]) -> list[str]:
-    """Return confidence threshold CLI args for order AI."""
-    accept = _float_form_value(form_values, "ai_accept_confidence", 0.9)
-    review = _float_form_value(form_values, "ai_review_threshold", 0.95)
-    return ["--ai-accept-confidence", f"{accept:g}", "--ai-review-threshold", f"{review:g}"]
+def _int_form_value(form_values, key, default):
+    from .streamlit_order_helpers import _int_form_value as _fn
+    return _fn(form_values, key, default)
 
 
-def _append_optional_ai_text(args: list[str], flag: str, value: object) -> None:
-    """Append an optional text CLI flag."""
-    text = str(value or "").strip()
-    if text:
-        args.extend([flag, text])
-
-
-def _int_form_value(form_values: dict[str, object], key: str, default: int) -> int:
-    """Return one integer form value with a safe fallback."""
-    return int(str(form_values.get(key, default) or default))
-
-
-def _float_form_value(
-    form_values: dict[str, object], key: str, default: float
-) -> float:
-    """Return one float form value with a safe fallback."""
-    return float(str(form_values.get(key, default) or default))
+def _float_form_value(form_values, key, default):
+    from .streamlit_order_helpers import _float_form_value as _fn
+    return _fn(form_values, key, default)
