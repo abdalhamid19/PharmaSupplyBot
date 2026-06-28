@@ -11,7 +11,7 @@ from .tawreed_api_matching import require_api_match
 def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, record_timing) -> None:
     """Order from multiple stores natively using the API payload."""
     from .tawreed_store_selection import choose_next_store_for_remaining_quantity
-    from .tawreed_products_flow import _wh_mode, _min_disc, _preferred_warehouses
+    from .tawreed_products_flow_discount import _wh_mode, _min_disc, _preferred_warehouses
     
     store_rows = api.get_store_details(match.data.get("productId") or match.data.get("id"))
     if not store_rows:
@@ -30,7 +30,7 @@ def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, rec
 
 def _validate_max_discount_if_needed(bot, mode, store_rows):
     """Validate max discount meets minimum requirement if in max_discount mode."""
-    from .tawreed_products_flow import _find_max_discount, _min_disc
+    from .tawreed_products_flow_discount import _find_max_discount, _min_disc
     
     if mode != "max_discount" or not store_rows:
         return None
@@ -50,7 +50,7 @@ def _select_stores_and_add_to_cart(
 ):
     """Select stores and add items to cart until quantity is fulfilled."""
     from .tawreed_store_selection import choose_next_store_for_remaining_quantity
-    from .tawreed_products_flow import _effective_min_discount
+    from .tawreed_products_flow_discount import _effective_min_discount
     
     rem, used_ids, sels = int(item.qty), set(), []
     while rem > 0:
@@ -87,7 +87,7 @@ def _should_stop_in_max_discount_mode(mode, max_discount_value, choice):
 
 def _finalize_multi_store_order(bot, sels):
     """Finalize multi-store order and record stores."""
-    from .tawreed_products_flow import _record_stores
+    from .tawreed_products_flow_stores import _record_stores
     
     if not sels:
         raise bot.skip_item_exception("All stores out of stock.")
