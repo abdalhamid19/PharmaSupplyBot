@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
-from .streamlit_order import (
-    close_order_process_output,
-    order_process_output,
-    run_control_dir,
+from .streamlit_product_matching_form import product_matching_form
+from .streamlit_product_matching_output import (
+    render_running_matching_controls,
+    matching_output_csv_path,
+    matching_output_log_path,
 )
-from .streamlit_excel_fields import existing_excel_path, uploaded_excel_file
-from .streamlit_process import render_command_result, start_cli_subprocess
-from .streamlit_shared import ARTIFACTS_DIR, load_csv_rows
-from .streamlit_uploads import available_excel_options, resolve_excel_path
+from .streamlit_product_matching_command import product_matching_command
+from .streamlit_process import start_cli_subprocess
+from .streamlit_uploads import resolve_excel_path
 
 
 def render_product_matching_tab(
@@ -42,119 +40,4 @@ def render_product_matching_tab(
     st.rerun()
 
 
-def product_matching_form(app_config, default_profile: str | None) -> tuple[bool, dict]:
-    """Return submitted state and product matching form values."""
-    with st.form("product_matching_form"):
-        input_mode = st.radio(
-            "Excel source", ["Existing file", "Upload file"], horizontal=True
-        )
-        excel_path = existing_excel_path(input_mode, available_excel_options())
-        upload = uploaded_excel_file(input_mode)
-        profile = st.selectbox(
-            "Profile",
-            list(app_config.profiles.keys()),
-            index=_profile_index(app_config, default_profile),
-        )
-        limit = st.number_input("Item limit", min_value=0, max_value=100000, value=50)
-        trace = st.checkbox("Trace", value=True)
-        no_ai = st.checkbox("No AI", value=True)
-        provider = st.selectbox(
-            "AI provider", ["", "rotation", "groq", "opencode", "openrouter"]
-        )
-        model = st.text_input("AI model", value="")
-        review_model = st.text_input("Review model", value="")
-        concurrency = st.number_input("AI concurrency", min_value=1, max_value=20, value=5)
-        submitted = st.form_submit_button("Run Product Matching")
-    return bool(submitted), {
-        "excel_path": excel_path,
-        "upload": upload,
-        "profile_key": profile,
-        "limit": int(limit),
-        "trace": bool(trace),
-        "no_ai": bool(no_ai),
-        "provider": str(provider),
-        "model": str(model),
-        "review_model": str(review_model),
-        "concurrency": int(concurrency),
-    }
-
-
-def render_running_matching_controls() -> bool:
-    """Render a running or completed matching subprocess."""
-    state = st.session_state.get("product_matching_process")
-    if not state:
-        return False
-    returncode = state["process"].poll()
-    output_text = order_process_output(Path(state["output_path"]))
-    if returncode is None:
-        st.warning("Product matching is running.")
-        if st.button("Refresh Matching Status"):
-            st.rerun()
-        if output_text:
-            st.code(output_text[-4000:], language="text")
-        render_matching_output_table(Path(state["output_csv"]))
-        return True
-    close_order_process_output(state)
-    render_command_result(_matching_process_result(state, returncode, output_text))
-    render_matching_output_table(Path(state["output_csv"]))
-    st.session_state.pop("product_matching_process", None)
-    return False
-
-
-def product_matching_command(
-    config_path: Path, values: dict, excel_path: Path, output_path: Path
-) -> list[str]:
-    """Return CLI arguments for one product matching run."""
-    command = [
-        "match-products", "--config", str(config_path),
-        "--profile", str(values["profile_key"]),
-        "--excel", str(excel_path), "--output", str(output_path),
-        "--limit", str(values["limit"]),
-        "--concurrency", str(values["concurrency"]),
-    ]
-    if values["trace"]:
-        command.append("--trace")
-    if values["no_ai"]:
-        command.append("--no-ai")
-    command.extend(_optional_arg("--provider", values["provider"]))
-    command.extend(_optional_arg("--model", values["model"]))
-    command.extend(_optional_arg("--review-model", values["review_model"]))
-    return command
-
-
-def render_matching_output_table(output_path: Path) -> None:
-    """Render the latest product matching CSV output."""
-    rows = load_csv_rows(output_path)
-    if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-
-
-def matching_output_csv_path(profile_key: str) -> Path:
-    """Return a unique CSV path for a Streamlit matching run."""
-    return ARTIFACTS_DIR / profile_key / f"product_matching_{int(time.time())}.csv"
-
-
-def matching_output_log_path() -> Path:
-    """Return a unique output log path for a Streamlit matching run."""
-    return run_control_dir() / f"product_matching_output_{int(time.time())}.log"
-
-
-def _profile_index(app_config, default_profile: str | None) -> int:
-    profiles = list(app_config.profiles.keys())
-    return profiles.index(default_profile) if default_profile in profiles else 0
-
-
-def _optional_arg(name: str, value: object) -> list[str]:
-    text = str(value or "").strip()
-    return [name, text] if text else []
-
-
-def _matching_process_result(state: dict, returncode: int, output_text: str) -> dict:
-    return {
-        "ok": returncode == 0,
-        "exit_code": returncode,
-        "command": " ".join(state["command"]),
-        "output": output_text,
-        "error_type": "ProcessError" if returncode else "",
-        "error_message": f"Exited with status code {returncode}." if returncode else "",
-    }
+__all__ = ["render_product_matching_tab"]

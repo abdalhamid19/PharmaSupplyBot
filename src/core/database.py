@@ -3,20 +3,18 @@ CockroachDB Cloud Connection Manager
 Handles connections to the shared cloud database for manual review data synchronization.
 """
 
-import os
-from dotenv import load_dotenv
-import psycopg2
-from psycopg2 import pool, Error
-from contextlib import contextmanager
-from typing import Optional, Generator, Any
-import logging
+from __future__ import annotations
 
-logger = logging.getLogger(__name__)
+from typing import Optional
+
+from .database_credentials import DatabaseCredentials
+from .database_pool import DatabasePool
+from .database_queries import DatabaseQueries
 
 
-class DatabaseManager:
+class DatabaseManager(DatabaseQueries):
     """Manages connections to CockroachDB Cloud."""
-    
+
     def __init__(
         self,
         host: Optional[str] = None,
@@ -27,112 +25,23 @@ class DatabaseManager:
         sslmode: Optional[str] = None,
     ):
         """Initialize database manager with connection parameters."""
-        load_dotenv()
-        self._load_credentials(host, port, database, user, password, sslmode)
-        self._validate_credentials()
-        self.conn: Optional[connection] = None
-        self.cur: Optional[cursor] = None
+        credentials = DatabaseCredentials(host, port, database, user, password, sslmode)
+        self.credentials = credentials
+        self._pool = DatabasePool(credentials)
+        super().__init__(self._pool)
 
-
-    def _load_credentials(self, host, port, database, user, password, sslmode):
-        """Load credentials from arguments or environment."""
-        self.host = host or os.getenv("DB_HOST")
-        self.port = port or int(os.getenv("DB_PORT", "26257"))
-        self.database = database or os.getenv("DB_NAME")
-        self.user = user or os.getenv("DB_USER")
-        self.password = password if password is not None else os.getenv("DB_PASSWORD")
-        self.sslmode = sslmode or os.getenv("DB_SSLMODE", "require")
-
-
-    def _validate_credentials(self):
-        """Validate required credentials are present."""
-        if not self.host:
-            raise RuntimeError("DB_HOST environment variable is required")
-        if not self.database:
-            raise RuntimeError("DB_NAME environment variable is required")
-        if not self.user:
-            raise RuntimeError("DB_USER environment variable is required")
-        if not self.password:
-            raise RuntimeError("DB_PASSWORD environment variable is required")
-            raise RuntimeError("DB_PASSWORD environment variable is required")
-        
-        self.connection_pool: Optional[pool.SimpleConnectionPool] = None
-    
     def connect(self) -> None:
         """Initialize connection pool to CockroachDB Cloud."""
-        if not self.password:
-            raise RuntimeError("DB_PASSWORD is not configured. Set DB_PASSWORD for CockroachDB.")
-        self._create_connection_pool()
-        logger.info(f"Connected to CockroachDB: {self.host}:{self.port}")
-    
-    def _create_connection_pool(self):
-        """Create the connection pool."""
-        try:
-            self.connection_pool = pool.SimpleConnectionPool(
-                1, 5, host=self.host, port=self.port, database=self.database,
-                user=self.user, password=self.password, sslmode=self.sslmode
-            )
-        except Error as e:
-            logger.error(f"Failed to connect to database: {e}")
-            raise
-    
+        self._pool.connect()
+
     def close(self) -> None:
         """Close all connections in the pool."""
-        if self.connection_pool:
-            self.connection_pool.closeall()
-            logger.info("Database connections closed")
-    
-    @contextmanager
-    def get_connection(self) -> Generator:
-        """
-        Get a connection from the pool (context manager).
-        
-        Usage:
-            with db_manager.get_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT * FROM table")
-        """
-        if not self.connection_pool:
-            raise RuntimeError("Database not connected. Call connect() first.")
-        
-        conn = self.connection_pool.getconn()
-        try:
-            yield conn
-        finally:
-            self.connection_pool.putconn(conn)
-    
-    def execute_query(self, query: str, params: tuple = ()) -> list:
-        """Execute a SELECT query and return results."""
-        with self.get_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(query, params)
-            results = cur.fetchall()
-            cur.close()
-            return results
-    
-    def execute_update(self, query: str, params: tuple = ()) -> int:
-        """Execute an INSERT/UPDATE/DELETE query and return affected rows."""
-        with self.get_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(query, params)
-            affected = cur.rowcount
-            conn.commit()
-            cur.close()
-            return affected
-    
-    def test_connection(self) -> bool:
-        """Test the database connection."""
-        try:
-            with self.get_connection() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT version();")
-                result = cur.fetchone()
-                logger.info(f"Database test successful: {result[0][:50]}...")
-                cur.close()
-                return True
-        except Error as e:
-            logger.error(f"Database test failed: {e}")
-            return False
+        self._pool.close()
+
+    @property
+    def get_connection(self):
+        """Get connection from pool (alias for backward compatibility)."""
+        return self._pool.get_connection
 
 
 # Global database manager instance
@@ -161,3 +70,11 @@ def close_db() -> None:
     global _db_manager
     if _db_manager:
         _db_manager.close()
+
+
+__all__ = [
+    "DatabaseManager",
+    "get_db_manager",
+    "init_db",
+    "close_db",
+]

@@ -72,7 +72,8 @@ class RunQualityMetrics:
         return [
             f"Total items:                {self.total_items}",
             f"Auto-matched:               {self.auto_matched} ({self.auto_match_rate}%)",
-            f"Manual review required:     {self.manual_review_required} ({self.manual_review_rate}%)",
+            f"Manual review required:     "
+            f"{self.manual_review_required} ({self.manual_review_rate}%)",
             f"No results:                 {self.no_results} ({self.no_results_rate}%)",
             f"Matched but unavailable:    {self.matched_but_unavailable}",
             f"Not orderable:              {self.not_orderable}",

@@ -9,11 +9,23 @@ from typing import Iterable, Any
 from .database import get_db_manager
 from .manual_review_hints import hint_key
 from .manual_review_store_sql import (
-    ALTER_DECISIONS_TABLE,
-    ALTER_DECISIONS_TABLE_AR,
     CREATE_DECISIONS_TABLE,
     SELECT_DECISIONS,
     UPSERT_DECISION,
+    ALTER_DECISIONS_TABLE,
+    ALTER_DECISIONS_TABLE_AR,
+)
+from .manual_review_store_helpers import (
+    _decision_values,
+    _decision_from_row,
+    _ensure_column,
+    _default_decision,
+)
+from .manual_review_store_query import (
+    _unique_item_keys,
+    _chunks,
+    _lookup_many_sql,
+    _flat_keys,
 )
 
 DEFAULT_MANUAL_REVIEW_DB = None
@@ -123,81 +135,8 @@ class ManualReviewStore:
         self._schema_initialized_db_ids.add(db_id)
 
 
-def _decision_values(code_key: str, name_key: str, decision: ManualReviewDecision):
-    return (
-        code_key,
-        name_key,
-        decision.item_code,
-        decision.item_name,
-        int(decision.approved),
-        decision.manual_decision,
-        decision.correct_store_product_id,
-        decision.correct_product_name,
-        decision.correct_product_name_ar,
-        decision.correct_query,
-        decision.run_id,
-    )
-
-
-def _decision_from_row(row) -> ManualReviewDecision:
-    return ManualReviewDecision(
-        _clean(row[0]),
-        _clean(row[1]),
-        bool(row[2]),
-        _clean(row[3]),
-        _clean(row[5]),
-        _clean(row[6]),
-        _clean(row[7]),
-        _clean(row[8]),
-        _clean(row[4]),
-    )
-
-
-def _ensure_column(db, column: str, alter_query: str) -> None:
-    rows = db.execute_query(
-        "select column_name from information_schema.columns "
-        "where table_name = 'manual_review_decisions'"
-    )
-    if column not in {row[0] for row in rows}:
-        db.execute_update(alter_query)
-
-
-def _default_decision(approved: bool) -> str:
-    return "approved_match" if approved else ""
-
-
-def _clean(value: object) -> str:
-    text = str(value or "").strip()
-    return "" if text.lower() in {"nan", "none", "null"} else text
-
-
-def _unique_item_keys(items: Iterable[Any]) -> list[tuple[str, str]]:
-    keys: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for item in items:
-        if isinstance(item, dict):
-            code = item.get("code", "") or item.get("item_code", "")
-            name = item.get("name", "") or item.get("item_name", "")
-        else:
-            code = getattr(item, "code", getattr(item, "item_code", ""))
-            name = getattr(item, "name", getattr(item, "item_name", ""))
-        key = hint_key(code, name)
-        if key in seen:
-            continue
-        seen.add(key)
-        keys.append(key)
-    return keys
-
-
-def _chunks(values: list[tuple[str, str]], size: int):
-    for index in range(0, len(values), size):
-        yield values[index : index + size]
-
-
-def _lookup_many_sql(keys: list[tuple[str, str]]) -> str:
-    clauses = " or ".join("(item_code_key=%s and item_name_key=%s)" for _ in keys)
-    return f"{SELECT_DECISIONS} where {clauses}"
-
-
-def _flat_keys(keys: list[tuple[str, str]]) -> tuple[str, ...]:
-    return tuple(value for key in keys for value in key)
+__all__ = [
+    "DEFAULT_MANUAL_REVIEW_DB",
+    "ManualReviewDecision",
+    "ManualReviewStore",
+]

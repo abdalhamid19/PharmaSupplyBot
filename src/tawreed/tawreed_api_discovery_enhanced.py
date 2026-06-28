@@ -46,7 +46,11 @@ def _capture_request_details(request, captured):
     return captured
 
 
-def save_captured_requests(captured: list[dict[str, Any]], profile_key: str, label: str = "api_capture") -> Path:
+def save_captured_requests(
+    captured: list[dict[str, Any]],
+    profile_key: str,
+    label: str = "api_capture"
+) -> Path:
     """Save captured requests to JSON file for analysis."""
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     output_dir = Path("artifacts") / "api_discovery" / profile_key
