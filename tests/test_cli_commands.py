@@ -140,7 +140,7 @@ class CliCommandsTests(unittest.TestCase):
     ) -> None:
         with (
             patch(
-                "src.core.utils.excel_readers.load_items_from_excel", return_value=items
+                "src.core.utils.excel.load_items_from_excel", return_value=items
             ) as load,
             patch("pathlib.Path.is_file", return_value=False),
             patch("src.cli.cli_shared.require_state_file"),

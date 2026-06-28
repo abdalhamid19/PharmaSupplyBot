@@ -11,7 +11,7 @@ from src.core.config.config_models import (
     ProfileConfig,
     RuntimeConfig,
 )
-from src.core.matching_models import (
+from src.core.matching_types import (
     CandidateMatchDiagnostic,
     MatchDecision,
     MatchScoreBreakdown,

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock, patch
 
-from src.core.matching_models import SearchMatch
+from src.core.matching_types import SearchMatch
 from src.core.utils.excel import Item
 from src.tawreed.tawreed_products_flow import (
     add_item_from_store_dialogs,

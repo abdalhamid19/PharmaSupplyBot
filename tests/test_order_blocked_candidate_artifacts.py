@@ -6,7 +6,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.core.matching_models import MatchDecision
+from src.core.matching_types import MatchDecision
 from src.core.order_ai_matching import OrderAiOutcome
 from src.core.order_run_artifact_rows import manual_review_row, order_item_summary_row
 from src.core.utils.excel import Item

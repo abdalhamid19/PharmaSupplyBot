@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from src.core.matching_models import (
+from src.core.matching_types import (
     CandidateMatchDiagnostic,
     MatchDecision,
     MatchScoreBreakdown,

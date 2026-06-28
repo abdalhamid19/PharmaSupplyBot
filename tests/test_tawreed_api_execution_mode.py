@@ -14,7 +14,7 @@ from src.tawreed.tawreed_api_discovery import save_api_contract_capture
 from src.tawreed.tawreed_api_flow import match_items_only_with_api
 from src.tawreed.tawreed_api_matching import require_api_match
 from src.tawreed.tawreed_api_matching import _has_only_non_orderable_candidates
-from src.core.matching_models import MatchDecision, SearchMatch
+from src.core.matching_types import MatchDecision, SearchMatch
 from src.core.utils.excel import Item
 
 

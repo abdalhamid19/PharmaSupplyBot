@@ -13,7 +13,7 @@ from src.core.manual_review_candidates import (
     ReviewCandidateOption,
     review_candidate_options,
 )
-from src.core.matching_models import CandidateMatchDiagnostic, MatchDecision
+from src.core.matching_types import CandidateMatchDiagnostic, MatchDecision
 
 
 class ManualReviewCandidatesTests(TestCase):

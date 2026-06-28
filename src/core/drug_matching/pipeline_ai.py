@@ -49,3 +49,6 @@ class PipelineAI:
     def _require_results(self):
         if self._results is None:
             raise RuntimeError("Call run_matching() first")
+
+
+__all__ = ["PipelineAI"]
