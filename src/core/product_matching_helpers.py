@@ -132,3 +132,9 @@ def vitacid_c_calcium_conflict(query: str, candidate: dict[str, Any]) -> bool:
     if "VITACIDCALCIUM" in query_norm or "VITACID CALCIUM" in query_norm:
         return any("VITACIDC" in t and "CALCIUM" not in t for t in cand_texts)
     return False
+
+
+# --- Private aliases (merged from product_matching_normalization.py) ---
+
+_normalize_text = normalize_text
+_normalized_tokens = normalized_tokens

@@ -1,8 +1,210 @@
 """Configuration constants for AI provider/model rotation."""
 
-from __future__ import annotations
+from __future__ annotations
 
-from .ai_rotation_config_main import PROVIDER_ORDER
-from .ai_rotation_config_providers import DEFAULT_MODELS
+# Provider order for rotation
+PROVIDER_ORDER = (
+    "groq",
+    "opencode",
+    "openrouter",
+    "github",
+    "cerebras",
+    "google",
+    "mistral",
+    "cloudflare",
+)
 
-__all__ = ["PROVIDER_ORDER", "DEFAULT_MODELS"]
+# Provider-specific model configurations
+GROQ_MODELS = (
+    "openai/gpt-oss-120b",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "qwen/qwen3-32b",
+    "llama-3.3-70b-versatile",
+    "groq/compound",
+    "openai/gpt-oss-20b",
+    "groq/compound-mini",
+    "llama-3.1-8b-instant",
+    "allam-2-7b",
+)
+
+OPENCODE_MODELS = (
+    "big-pickle",
+    "nemotron-3-super-free",
+    "minimax-m2.5-free",
+    "deepseek-v4-flash-free",
+    "ring-2.6-1t-free",
+    "trinity-large-preview-free",
+    "hy3-preview-free",
+)
+
+OPENROUTER_MODELS = (
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "deepseek/deepseek-r1",
+    "openai/gpt-4o",
+    "meta-llama/llama-3.3-70b-instruct",
+    "openai/gpt-4o-mini",
+    "meta-llama/llama-3.1-8b-instruct",
+)
+
+CEREBRAS_MODELS = (
+    "qwen-3-235b-a22b-instruct-2507",
+    "gpt-oss-120b",
+    "zai-glm-4.7",
+    "llama-4-scout-17b-16e-instruct",
+    "llama3.1-8b",
+)
+
+GOOGLE_MODELS = (
+    "models/gemini-2.5-pro",
+    "models/gemini-3.1-pro-preview",
+    "models/gemini-3.1-pro-preview-customtools",
+    "models/gemini-3-pro-preview",
+    "models/gemini-2.5-flash",
+    "models/gemini-3.1-flash-lite-preview",
+    "models/gemini-3.1-flash-lite",
+    "models/gemini-3-flash-preview",
+    "models/gemini-2.0-flash",
+    "models/gemini-2.0-flash-001",
+    "models/gemini-flash-latest",
+    "models/gemma-4-31b-it",
+    "models/gemma-4-26b-a4b-it",
+    "models/gemini-2.5-flash-lite",
+    "models/gemini-2.0-flash-lite",
+    "models/gemini-2.0-flash-lite-001",
+    "models/gemini-flash-lite-latest",
+    "models/gemini-pro-latest",
+)
+
+MISTRAL_MODELS = (
+    "mistral-large-latest",
+    "mistral-medium-latest",
+    "mistral-small-latest",
+    "open-mistral-7b",
+    "open-mixtral-8x7b",
+    "open-mixtral-8x22b",
+)
+
+CLOUDFLARE_MODELS = (
+    "@cf/openai/gpt-oss-120b",
+    "@cf/nvidia/nemotron-3-120b-a12b",
+    "@cf/moonshotai/kimi-k2.6",
+    "@cf/moonshotai/kimi-k2.5",
+    "@cf/meta/llama-4-scout-17b-16e-instruct",
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "@cf/qwen/qwen3-30b-a3b-fp8",
+    "@cf/qwen/qwq-32b",
+    "@cf/google/gemma-4-26b-a4b-it",
+    "@cf/mistralai/mistral-small-3.1-24b-instruct",
+    "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+    "@cf/aisingapore/gemma-sea-lion-v4-27b-it",
+    "@cf/ibm-granite/granite-4.0-h-micro",
+    "@cf/google/gemma-3-12b-it",
+    "@cf/openai/gpt-oss-20b",
+    "@cf/meta/llama-3.1-8b-instruct-fp8",
+    "@cf/meta/llama-3.1-8b-instruct-awq",
+    "@cf/meta/llama-3-8b-instruct",
+    "@cf/meta/llama-3-8b-instruct-awq",
+    "@cf/meta/llama-3.2-3b-instruct",
+    "@cf/meta/llama-3.2-1b-instruct",
+    "@cf/deepseek-ai/deepseek-math-7b-instruct",
+    "@cf/zai-org/glm-4.7-flash",
+    "@cf/mistral/mistral-7b-instruct-v0.1",
+    "@cf/qwen/qwen1.5-14b-chat-awq",
+    "@cf/qwen/qwen1.5-7b-chat-awq",
+    "@cf/openchat/openchat-3.5-0106",
+    "@cf/meta/llama-2-7b-chat-fp16",
+    "@cf/meta/llama-2-7b-chat-int8",
+    "@cf/microsoft/phi-2",
+    "@cf/qwen/qwen1.5-1.8b-chat",
+    "@cf/qwen/qwen1.5-0.5b-chat",
+    "@cf/tinyllama/tinyllama-1.1b-chat-v1.0",
+    "@cf/tiiuae/falcon-7b-instruct",
+    "@hf/google/gemma-7b-it",
+    "@hf/mistral/mistral-7b-instruct-v0.2",
+    "@hf/nousresearch/hermes-2-pro-mistral-7b",
+    "@hf/thebloke/llama-2-13b-chat-awq",
+    "@hf/thebloke/mistral-7b-instruct-v0.1-awq",
+    "@hf/thebloke/neural-chat-7b-v3-1-awq",
+    "@hf/thebloke/openhermes-2.5-mistral-7b-awq",
+    "@hf/thebloke/zephyr-7b-beta-awq",
+    "@hf/nexusflow/starling-lm-7b-beta",
+    "@hf/thebloke/deepseek-coder-6.7b-instruct-awq",
+    "@cf/defog/sqlcoder-7b-2",
+    "@cf/fblgit/una-cybertron-7b-v2-bf16",
+    "@cf/thebloke/discolm-german-7b-v1-awq",
+    "@hf/thebloke/deepseek-coder-6.7b-base-awq",
+    "@cf/mistral/mistral-7b-instruct-v0.2-lora",
+    "@cf/google/gemma-7b-it-lora",
+    "@cf/google/gemma-2b-it-lora",
+    "@cf/meta-llama/llama-2-7b-chat-hf-lora",
+)
+
+GITHUB_MODELS = (
+    "meta/meta-llama-3.1-405b-instruct",
+    "deepseek/deepseek-r1-0528",
+    "deepseek/deepseek-r1",
+    "deepseek/deepseek-v3-0324",
+    "xai/grok-3",
+    "meta/llama-4-scout-17b-16e-instruct",
+    "openai/gpt-5",
+    "openai/o3",
+    "openai/o1",
+    "openai/o1-preview",
+    "meta/llama-3.3-70b-instruct",
+    "ai21-labs/ai21-jamba-1.5-large",
+    "cohere/cohere-command-a",
+    "openai/gpt-4.1",
+    "openai/gpt-4o",
+    "xai/grok-3-mini",
+    "openai/gpt-5-chat",
+    "openai/gpt-5-mini",
+    "mistral-ai/mistral-medium-2505",
+    "meta/llama-4-maverick-17b-128e-instruct-fp8",
+    "microsoft/phi-4-reasoning",
+    "microsoft/phi-4",
+    "openai/o4-mini",
+    "openai/o3-mini",
+    "openai/o1-mini",
+    "cohere/cohere-command-r-plus-08-2024",
+    "mistral-ai/mistral-small-2503",
+    "openai/gpt-4.1-mini",
+    "openai/gpt-4o-mini",
+    "meta/llama-3.2-90b-vision-instruct",
+    "openai/gpt-5-nano",
+    "openai/gpt-4.1-nano",
+    "microsoft/phi-4-multimodal-instruct",
+    "meta/llama-3.2-11b-vision-instruct",
+    "microsoft/phi-4-mini-reasoning",
+    "mistral-ai/codestral-2501",
+    "microsoft/phi-4-mini-instruct",
+    "cohere/cohere-command-r-08-2024",
+    "meta/meta-llama-3.1-8b-instruct",
+    "mistral-ai/ministral-3b",
+    "microsoft/mai-ds-r1",
+)
+
+# Default models registry
+DEFAULT_MODELS = {
+    "groq": GROQ_MODELS,
+    "opencode": OPENCODE_MODELS,
+    "openrouter": OPENROUTER_MODELS,
+    "cerebras": CEREBRAS_MODELS,
+    "google": GOOGLE_MODELS,
+    "mistral": MISTRAL_MODELS,
+    "cloudflare": CLOUDFLARE_MODELS,
+    "github": GITHUB_MODELS,
+}
+
+__all__ = [
+    "PROVIDER_ORDER",
+    "GROQ_MODELS",
+    "OPENCODE_MODELS",
+    "OPENROUTER_MODELS",
+    "CEREBRAS_MODELS",
+    "GOOGLE_MODELS",
+    "MISTRAL_MODELS",
+    "CLOUDFLARE_MODELS",
+    "GITHUB_MODELS",
+    "DEFAULT_MODELS",
+]
