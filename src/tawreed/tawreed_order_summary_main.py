@@ -16,3 +16,7 @@ class OrderSummaryRecorderBase:
         self._summary_builder = SummaryBuilder(bot)
         self._status = SummaryStatus(bot)
         self._dialog_handler = SummaryDialogHandler(bot)
+
+    def close_visible_dialogs_timed(self, page) -> None:
+        """Close visible dialogs and accumulate the item-level wait cost."""
+        self._dialog_handler.close_visible_dialogs_timed(page)

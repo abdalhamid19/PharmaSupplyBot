@@ -68,11 +68,18 @@ class AIVerifier(AIVerifierMethods):
             await self._session.close()
 
 
+# Backward-compatible private aliases for existing public/test interface.
+_extract_json = extract_json
+_resolve_ai_conflicts = resolve_ai_conflicts
+
+
 __all__ = [
     "AIVerifier",
     # Re-exported helpers for backward compatibility
     "extract_json",
     "resolve_ai_conflicts",
+    "_extract_json",
+    "_resolve_ai_conflicts",
     "component_context",
     "coerce_best_index",
     "normalize_verify_item",

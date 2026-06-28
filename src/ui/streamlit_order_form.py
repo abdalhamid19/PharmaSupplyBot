@@ -9,7 +9,10 @@ import streamlit as st
 from ..core.prevented_items import DEFAULT_PREVENTED_ITEMS_PATH
 from .streamlit_ai_fields import ai_matching_fields, matching_risk_fields
 from .streamlit_excel_fields import excel_source_fields, order_excel_options
-from .streamlit_prevented_items import render_prevented_items_manager
+from .streamlit_prevented_items import (
+    render_prevented_items_manager,
+    add_and_save_prevented_item,
+)
 from .streamlit_profile_fields import profile_run_fields_with_workers, OrderRunFields
 
 

@@ -22,7 +22,7 @@ class StreamlitMainTests(unittest.TestCase):
             patch("src.ui.streamlit_main.render_auth_tab"),
             patch("src.ui.streamlit_main.render_order_tab"),
             patch("src.ui.streamlit_main.render_product_matching_tab"),
-            patch("src.ui.streamlit_main.render_prevented_items_tab") as prevented_tab,
+            patch("src.ui.streamlit_main.render_prevented_items_manager") as prevented_tab,
             patch("src.ui.streamlit_main.render_remove_cart_tab") as remove_cart_tab,
             patch("src.ui.streamlit_main.render_results_tab"),
             patch("src.ui.streamlit_main.render_manual_review_tab") as manual_review_tab,

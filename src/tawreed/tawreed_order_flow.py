@@ -39,6 +39,26 @@ class TawreedOrderFlow:
         """Match Tawreed products for each item without adding anything to the cart."""
         return self._match_flow.match_items_only(items)
 
+    def _process_single_item(self, page, item):
+        """Add one item or save artifacts when a technical failure happens."""
+        return self._placement_flow._process_single_item(page, item)
+
+    def _process_items(self, page, items):
+        """Process each requested Excel item on the current order page."""
+        return self._placement_flow._process_items(page, items)
+
+    def _run_order_session(self, page, items):
+        """Prepare the page and process items within an active order session."""
+        return self._placement_flow._run_order_session(page, items)
+
+    def _process_single_match_only_item(self, page, item):
+        """Match one item without running any add-to-cart action."""
+        return self._match_flow._process_single_match_only_item(page, item)
+
+    def _run_match_only_session(self, page, items):
+        """Prepare Tawreed and process item matching without cart actions."""
+        return self._match_flow._run_match_only_session(page, items)
+
     # Delegation methods for backward compatibility
     def _add_item(self, page, item):
         """Add one item using either the products-page flow or the legacy configured flow."""

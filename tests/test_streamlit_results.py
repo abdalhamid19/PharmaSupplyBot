@@ -20,7 +20,7 @@ class StreamlitResultsTests(unittest.TestCase):
             other_profile_dir.mkdir()
             (other_profile_dir / "keep.csv").write_text("keep\n", encoding="utf-8")
 
-            with patch("src.ui.streamlit_results.ARTIFACTS_DIR", artifacts_dir):
+            with patch("src.ui.streamlit_results_management.ARTIFACTS_DIR", artifacts_dir):
                 removed_count = streamlit_results.clear_profile_result_data("wardany")
 
             self.assertEqual(removed_count, 2)
@@ -34,7 +34,7 @@ class StreamlitResultsTests(unittest.TestCase):
             artifacts_dir.mkdir()
             outside_dir.mkdir()
 
-            with patch("src.ui.streamlit_results.ARTIFACTS_DIR", artifacts_dir):
+            with patch("src.ui.streamlit_results_management.ARTIFACTS_DIR", artifacts_dir):
                 with self.assertRaisesRegex(ValueError, "Refusing"):
                     streamlit_results.safe_profile_artifact_paths(outside_dir)
 

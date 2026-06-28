@@ -125,21 +125,29 @@ class TawreedBotTests(unittest.TestCase):
         for _label, error, expected_cleanup_calls in scenarios:
             bot = self._bot()
             with (
-                patch("src.tawreed.tawreed.close_visible_dialogs") as cleanup,
-                patch.object(bot, "_record_item_summary") as record_summary,
-                patch("src.tawreed.tawreed.dump_artifacts") as dump_artifacts,
                 patch(
-                    "src.tawreed.tawreed.visible_overlay_diagnostics",
+                    "src.tawreed.tawreed_summary_dialog.close_visible_dialogs"
+                ) as cleanup,
+                patch.object(
+                    bot.order_flow.summary_recorder, "record_item_summary"
+                ) as record_summary,
+                patch(
+                    "src.tawreed.tawreed_order_summary_failure.dump_artifacts"
+                ) as dump_artifacts,
+                patch(
+                    "src.tawreed.tawreed_summary_utils.visible_overlay_diagnostics",
                     return_value="overlay_panels=1",
                 ),
             ):
                 if error is None:
                     page: Any = object()
-                    with patch.object(bot, "_add_item"):
+                    with patch.object(bot.order_flow.item_processor, "add_item"):
                         bot._process_single_item(page, item)
                 else:
                     page = object()
-                    with patch.object(bot, "_add_item", side_effect=error):
+                    with patch.object(
+                        bot.order_flow.item_processor, "add_item", side_effect=error
+                    ):
                         bot._process_single_item(page, item)
 
             self.assertEqual(cleanup.call_count, expected_cleanup_calls)
@@ -163,9 +171,15 @@ class TawreedBotTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed.tawreed.close_visible_dialogs") as cleanup,
-            patch("src.tawreed.tawreed.require_product_match") as require_match,
-            patch("src.tawreed.tawreed.append_match_only_summary") as append_summary,
+            patch(
+                "src.tawreed.tawreed_summary_dialog.close_visible_dialogs"
+            ) as cleanup,
+            patch(
+                "src.tawreed.tawreed_order_processing.require_product_match"
+            ) as require_match,
+            patch(
+                "src.tawreed.tawreed_order_summary_builders.append_match_only_summary"
+            ) as append_summary,
             patch.object(bot, "_add_item") as add_item,
         ):
             require_match.return_value = (match, "Panadol")
@@ -192,9 +206,14 @@ class TawreedBotTests(unittest.TestCase):
         )
 
         with (
-            patch.object(bot, "_order_surface_ready", return_value=True),
+            patch.object(
+                bot.order_flow.item_processor,
+                "order_surface_ready",
+                return_value=True,
+            ),
             patch(
-                "src.tawreed.tawreed.require_product_match", return_value=(match, "")
+                "src.tawreed.tawreed_order_processing.require_product_match",
+                return_value=(match, ""),
             ) as require_match,
         ):
             bot._match_item_only(page, item)
@@ -210,10 +229,16 @@ class TawreedBotTests(unittest.TestCase):
                 "src.tawreed.tawreed_api_flow.match_items_only_with_api",
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
-            patch("src.tawreed.tawreed.sync_playwright") as playwright,
-            patch("src.tawreed.tawreed.open_order_page") as open_page,
+            patch(
+                "src.tawreed.tawreed_order_flow_match.sync_playwright"
+            ) as playwright,
+            patch(
+                "src.tawreed.tawreed_order_flow_match.open_order_page"
+            ) as open_page,
             patch.object(bot, "_ensure_valid_auth"),
-            patch.object(bot, "_run_match_only_session") as run_browser,
+            patch.object(
+                bot.order_flow._match_flow, "_run_match_only_session"
+            ) as run_browser,
         ):
             open_page.return_value = (object(), object(), object())
             bot.match_items_only([Item(code="1", name="Panadol", qty=1)])
@@ -230,7 +255,9 @@ class TawreedBotTests(unittest.TestCase):
                 "src.tawreed.tawreed_api_flow.match_items_only_with_api",
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
-            patch("src.tawreed.tawreed.sync_playwright") as playwright,
+            patch(
+                "src.tawreed.tawreed_order_flow_match.sync_playwright"
+            ) as playwright,
             patch.object(bot, "_ensure_valid_auth"),
         ):
             with self.assertRaises(TawreedApiUnavailable):

@@ -8,9 +8,14 @@ from .tawreed_products_flow_main import (
 from .tawreed_products_flow_stores import (
     add_item_from_store_dialogs,
     open_stores_dialog,
+    _click_cart,
 )
 from .tawreed_products_flow_search import (
     search_visible_products_table,
+)
+from .tawreed_products_flow_discount import (
+    _effective_min_discount,
+    _find_max_discount,
 )
 
 
@@ -21,4 +26,7 @@ __all__ = [
     "add_item_from_store_dialogs",
     "open_stores_dialog",
     "search_visible_products_table",
+    "_click_cart",
+    "_effective_min_discount",
+    "_find_max_discount",
 ]

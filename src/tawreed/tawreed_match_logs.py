@@ -5,6 +5,7 @@ from __future__ import annotations
 from ..core.matching_models import MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_match_logs_models import OrderResultSummary
+from .tawreed_match_logs_helpers import MAX_DETAILED_MATCH_CANDIDATES
 from .tawreed_match_logs_main import write_match_log, append_order_result_summary
 
 
@@ -106,6 +107,7 @@ def _score_csv_fields(diagnostic, breakdown):
 
 __all__ = [
     "OrderResultSummary",
+    "MAX_DETAILED_MATCH_CANDIDATES",
     "write_match_log",
     "append_order_result_summary",
     "match_log_content",

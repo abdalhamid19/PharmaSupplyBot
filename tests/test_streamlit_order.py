@@ -7,14 +7,16 @@ from unittest.mock import patch
 from src.core.prevented_items import PreventedItem, load_prevented_items
 from src.ui import streamlit_order
 from src.ui.streamlit_order import order_command, order_run_summary_csv_path
-from src.ui.streamlit_order_form import (
-    DEFAULT_PREVENTED_ITEMS_PATH,
+from src.ui.streamlit_prevented_items import (
     add_and_save_prevented_item,
-    order_excel_options,
-    order_form_fields,
     persist_existing_prevented_items_file,
     persist_uploaded_prevented_items,
     prevented_excel_options,
+)
+from src.ui.streamlit_order_form import (
+    DEFAULT_PREVENTED_ITEMS_PATH,
+    order_excel_options,
+    order_form_fields,
 )
 
 
@@ -148,7 +150,7 @@ class StreamlitOrderTests(unittest.TestCase):
     def test_order_run_summary_path_uses_match_only_summary(self) -> None:
         with TemporaryDirectory() as temp_dir:
             artifacts = Path(temp_dir) / "artifacts"
-            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
+            with patch("src.ui.streamlit_order_paths.ARTIFACTS_DIR", artifacts):
                 path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, Path("artifacts") / "wardany" / "match_only_summary.csv")
@@ -160,7 +162,7 @@ class StreamlitOrderTests(unittest.TestCase):
             run_dir.mkdir(parents=True)
             summary = run_dir / "match_only_summary_20260513_1900.csv"
             summary.write_text("item_code\n1\n", encoding="utf-8")
-            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
+            with patch("src.ui.streamlit_order_paths.ARTIFACTS_DIR", artifacts):
                 path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, summary)
@@ -265,7 +267,7 @@ class StreamlitOrderTests(unittest.TestCase):
 
     def test_order_excel_options_excludes_default_prevented_items_file(self) -> None:
         with patch(
-            "src.ui.streamlit_order_form.available_excel_options",
+            "src.ui.streamlit_excel_fields.available_excel_options",
             return_value=[
                 "data/input/order_items/shortage_report_total_20260426.xlsx",
             ],
@@ -284,7 +286,7 @@ class StreamlitOrderTests(unittest.TestCase):
             prevented_path.write_bytes(b"")
 
             with patch(
-                "src.ui.streamlit_order_form.PREVENTED_ITEMS_DIR", prevented_dir
+                "src.ui.streamlit_prevented_items.PREVENTED_ITEMS_DIR", prevented_dir
             ):
                 options = prevented_excel_options(prevented_path)
 
