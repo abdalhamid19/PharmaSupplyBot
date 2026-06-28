@@ -12,7 +12,7 @@ def _artifact_details(label: str, error: Exception, **extra: object) -> str:
 def _save_api_contract_capture(captured: list[dict]) -> None:
     """Save API contract capture data."""
     try:
-        from .tawreed_api_discovery import save_api_contract_capture
+        from .tawreed_api_contract import save_api_contract_capture
         save_api_contract_capture(captured)
     except Exception:
         pass

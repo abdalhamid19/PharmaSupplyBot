@@ -11,7 +11,7 @@ from ..core.manual_review_runtime import (
 )
 from ..core.product_matching import _search_queries_for_item, explain_best_product_match
 from ..core.utils.excel import Item
-from .tawreed_api import TawreedApiClient
+from .tawreed_api_client import TawreedApiClient
 from .tawreed_match_logs import write_match_log
 from .tawreed_query_cache import cached_query_result, get_bot_query_cache
 from .tawreed_search_decision import decisive_match

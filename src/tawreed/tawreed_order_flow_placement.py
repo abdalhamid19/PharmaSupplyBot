@@ -9,7 +9,7 @@ from ..core.manual_review_runtime import (
     preload_manual_review_decisions,
 )
 from ..core.utils.excel import Item
-from .tawreed_api_discovery import begin_api_contract_capture
+from .tawreed_api_contract import begin_api_contract_capture
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_checkout import confirm_order
 from .tawreed_order_exceptions import _SkipItem
@@ -41,7 +41,7 @@ class OrderPlacementFlow:
                     self.bot.state_path,
                     debug_browser=self.bot.debug_browser,
                 )
-                from .tawreed_api_discovery_enhanced import (
+                from .tawreed_api_contract import (
                     begin_detailed_api_capture,
                     save_captured_requests,
                 )

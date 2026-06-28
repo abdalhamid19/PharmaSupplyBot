@@ -7,7 +7,7 @@ from typing import Iterable
 from playwright.sync_api import Page, sync_playwright
 
 from ..core.cart_removal_items import CartRemovalItem
-from .tawreed_api_discovery import begin_api_contract_capture, save_api_contract_capture
+from .tawreed_api_contract import begin_api_contract_capture, save_api_contract_capture
 from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
 from .tawreed_navigation import maybe_switch_pharmacy
 from .tawreed_session import close_browser, close_context, ensure_logged_in, open_order_page

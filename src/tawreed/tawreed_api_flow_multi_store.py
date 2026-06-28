@@ -1,11 +1,13 @@
-"""Multi-store API functions for Tawreed."""
+"""Multi-store API functions for Tawreed (deprecated - functionality moved to tawreed_api_flow.py)."""
+
+from __future__ import annotations
 
 import time
 from typing import Iterable
 
 from ..core.utils.excel import Item
-from .tawreed_api import TawreedApiClient
-from .tawreed_api_matching import require_api_match
+from .tawreed_api_client import TawreedApiClient
+from .tawreed_api_flow import require_api_match
 
 
 def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, record_timing) -> None:

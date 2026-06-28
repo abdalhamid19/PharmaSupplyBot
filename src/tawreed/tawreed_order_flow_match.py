@@ -9,7 +9,7 @@ from ..core.manual_review_runtime import (
     preload_manual_review_decisions,
 )
 from ..core.utils.excel import Item
-from .tawreed_api_discovery import begin_api_contract_capture
+from .tawreed_api_contract import begin_api_contract_capture
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_order_exceptions import _SkipItem
 from .tawreed_order_processing import OrderItemProcessor

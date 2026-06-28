@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, TawreedApiContract
-from .tawreed_api_contract_merge import contract_type, save_contract_requests
+from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, TawreedApiContract, contract_type, save_contract_requests
 
 
 def begin_api_contract_capture(page) -> list[dict[str, Any]]:

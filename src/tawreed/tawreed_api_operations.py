@@ -1,15 +1,67 @@
-"""Tawreed API operation implementations."""
+"""Tawreed API operation implementations and request payload helpers."""
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
-from .tawreed_api_defaults import product_search_body, product_search_url
-from .tawreed_api_payloads import body_with_item, body_with_match, body_with_query
+from ..core.candidate_identity import candidate_store_product_id
+from .tawreed_api_contract import product_search_body, product_search_url, TawreedApiUnavailable
 from .tawreed_product_search import _api_candidates
-from .tawreed_api_helpers import _is_trusted_add_to_cart_url, _ensure_cart_item_added
-from .tawreed_api_http import _post_json
+from .tawreed_api_http import _is_trusted_add_to_cart_url, _ensure_cart_item_added, _post_json
 
+
+# ============================================================================
+# Request Payload Helpers
+# ============================================================================
+
+def body_with_query(body: dict[str, Any], query: str) -> dict[str, Any]:
+    """Return a search body with common query fields populated."""
+    payload = _copy_body(body)
+    data = payload.setdefault("data", {})
+    if isinstance(data, dict):
+        data["productName"] = query
+        data.setdefault("globalSearch", query)
+        data.setdefault("search", query)
+    return payload
+
+
+def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str, Any]:
+    """Return an add-to-cart body with product identity and quantity populated."""
+    payload = _copy_body(body)
+    candidate = match if isinstance(match, dict) else (getattr(match, "data", {}) or {})
+    store_product_id = candidate_store_product_id(candidate)
+
+    # The discovered add-to-cart request always uses mode "all" with this data
+    # shape; customerId is injected by TawreedApiClient from the JWT token.
+    payload["mode"] = "all"
+    payload.setdefault("langCode", "ar")
+    payload["data"] = {
+        "customerId": None,
+        "storeProductId": int(store_product_id),
+        "quantity": int(quantity),
+        "typeId": 1,
+    }
+    return payload
+
+
+def body_with_item(body: dict[str, Any], item: Any) -> dict[str, Any]:
+    """Return a cart-removal body with the requested item identity populated."""
+    payload = _copy_body(body)
+    data = payload.setdefault("data", {})
+    if isinstance(data, dict):
+        data["itemCode"] = getattr(item, "code", "")
+        data["itemName"] = getattr(item, "name", "")
+    return payload
+
+
+def _copy_body(body: dict[str, Any]) -> dict[str, Any]:
+    return json.loads(json.dumps(body))
+
+
+# ============================================================================
+# API Operations
+# ============================================================================
 
 def search_products(client, query: str) -> list[dict[str, Any]]:
     """Return product candidates from a discovered API search endpoint."""
@@ -45,7 +97,6 @@ def get_store_details(client, product_id: Any) -> list[dict[str, Any]]:
 
 def add_to_cart(client, match: Any, quantity: int) -> None:
     """Add a matched product to the cart through a discovered API endpoint."""
-    from .tawreed_api import TawreedApiUnavailable
     if not _is_trusted_add_to_cart_url(client.contract.add_to_cart_url):
         raise TawreedApiUnavailable("No trusted Tawreed add-to-cart API contract.")
 
@@ -61,7 +112,6 @@ def add_to_cart(client, match: Any, quantity: int) -> None:
 
 def remove_cart_item(client, item: Any) -> None:
     """Remove one cart item through a discovered API endpoint."""
-    from .tawreed_api import TawreedApiUnavailable
     if not client.contract.remove_cart_url:
         raise TawreedApiUnavailable("No trusted Tawreed cart-removal API contract.")
     _post_json(
@@ -73,13 +123,15 @@ def remove_cart_item(client, item: Any) -> None:
 
 def submit_order(client) -> None:
     """Submit an order through API only when the contract explicitly supports it."""
-    from .tawreed_api import TawreedApiUnavailable
     if not client.contract.submit_order_url:
         raise TawreedApiUnavailable("No trusted Tawreed order-submit API contract.")
     _post_json(client, client.contract.submit_order_url, client.contract.submit_order_body or {})
 
 
 __all__ = [
+    "body_with_query",
+    "body_with_match",
+    "body_with_item",
     "search_products",
     "get_store_details",
     "add_to_cart",

@@ -1,4 +1,4 @@
-"""Main API-backed Tawreed execution flows."""
+"""Main API-backed Tawreed execution flows (deprecated - functionality moved to tawreed_api_flow.py)."""
 
 from __future__ import annotations
 
@@ -6,9 +6,8 @@ import time
 from typing import Iterable
 
 from ..core.utils.excel import Item
-from .tawreed_api import TawreedApiClient
-from .tawreed_api_matching import require_api_match
-from .tawreed_api_flow_utils import _require_contract, _warm_up_api_client
+from .tawreed_api_client import TawreedApiClient
+from .tawreed_api_flow import require_api_match, _require_contract, _warm_up_api_client
 
 
 def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
