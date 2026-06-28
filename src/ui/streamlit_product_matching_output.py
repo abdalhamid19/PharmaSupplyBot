@@ -13,7 +13,7 @@ from .streamlit_shared import ARTIFACTS_DIR, load_csv_rows
 
 def render_running_matching_controls() -> bool:
     """Render a running or completed matching subprocess."""
-    from .streamlit_order import close_order_process_output, order_process_output
+    from .streamlit_order_process import close_order_process_output, order_process_output
     from .streamlit_process import render_command_result
     
     state = st.session_state.get("product_matching_process")

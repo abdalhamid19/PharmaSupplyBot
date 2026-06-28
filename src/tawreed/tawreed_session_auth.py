@@ -10,6 +10,7 @@ from .tawreed_auth_waits import (
     is_logged_in_marker_visible,
     wait_for_login_detection as poll_for_login_detection,
 )
+from .tawreed_session_state import save_session_state
 
 
 class SessionInvalidError(RuntimeError):

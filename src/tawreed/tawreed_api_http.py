@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .tawreed_api import TawreedApiUnavailable
+from .tawreed_api_exceptions import TawreedApiUnavailable
 
 
 def _post_json(client, url: str, body: dict[str, Any]) -> dict[str, Any]:

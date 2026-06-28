@@ -7,7 +7,7 @@ from typing import Iterable
 from ..core.cart_removal_items import CartRemovalItem
 from ..core.utils.excel import Item
 from .tawreed_cart_removal_selectors import CartRemovalTarget
-from .tawreed_products_flow import require_product_match
+from .tawreed_search_logic import require_product_match
 
 
 def resolve_cart_removal_targets(bot, page, items: Iterable[CartRemovalItem]):

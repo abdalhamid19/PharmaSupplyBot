@@ -9,6 +9,7 @@ from playwright.sync_api import sync_playwright
 
 from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, load_api_contract
 from .tawreed_auth_tokens import customer_id_from_state
+from .tawreed_api_exceptions import TawreedApiUnavailable
 from .tawreed_api_operations import (
     search_products,
     get_store_details,
@@ -16,12 +17,7 @@ from .tawreed_api_operations import (
     remove_cart_item,
     submit_order,
 )
-from .tawreed_api_http import _post_json
 from .tawreed_api_helpers import _api_origin, _auth_headers_from_state
-
-
-class TawreedApiUnavailable(RuntimeError):
-    """Raised when the requested Tawreed API operation is not safely available."""
 
 
 class TawreedApiClient:
@@ -107,24 +103,4 @@ class TawreedApiClient:
         return self._request_context
 
 
-def _post_json(client, url: str, body: dict[str, Any]) -> dict[str, Any]:
-    """POST JSON with saved auth state without opening Chromium."""
-    response = client._ensure_request_context().post(url, data=body, timeout=60_000)
-    if not response.ok:
-        raise TawreedApiUnavailable(
-            f"Tawreed API returned HTTP {response.status}: {response.status_text}"
-        )
-    payload = response.json()
-    
-    # Check if response indicates failure
-    if isinstance(payload, dict):
-        status = payload.get("status")
-        if status and status >= 400:
-            raise TawreedApiUnavailable(
-                f"Tawreed API error {status}: {payload.get('message', 'Unknown error')}"
-            )
-    
-    return payload if isinstance(payload, dict) else {"data": payload}
-
-
-__all__ = ["TawreedApiUnavailable", "TawreedApiClient", "_post_json"]
+__all__ = ["TawreedApiUnavailable", "TawreedApiClient"]

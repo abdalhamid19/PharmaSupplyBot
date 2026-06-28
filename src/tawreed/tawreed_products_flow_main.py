@@ -8,7 +8,7 @@ from ..core.matching_models import SearchMatch
 from ..core.utils.excel import Item
 from .tawreed_waits import wait_for_table_overlay_to_clear
 from .tawreed_ui import is_no_results_row, visible_product_rows
-from .tawreed_product_search import require_product_match
+from .tawreed_search_logic import require_product_match
 from .tawreed_products_flow_stores import _open_add_to_cart_for_match
 from .tawreed_products_flow_search import _matched_row_by_sig
 from .tawreed_timing import record_timing

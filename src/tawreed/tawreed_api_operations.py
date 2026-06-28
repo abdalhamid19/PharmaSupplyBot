@@ -8,7 +8,7 @@ from .tawreed_api_defaults import product_search_body, product_search_url
 from .tawreed_api_payloads import body_with_item, body_with_match, body_with_query
 from .tawreed_product_search import _api_candidates
 from .tawreed_api_helpers import _is_trusted_add_to_cart_url, _ensure_cart_item_added
-from .tawreed_api_main import _post_json
+from .tawreed_api_http import _post_json
 
 
 def search_products(client, query: str) -> list[dict[str, Any]]:

@@ -7,7 +7,6 @@ import pandas as pd
 
 from .config import MatchingConfig, Paths
 from .indexer import DrugIndex
-from .pipeline_matching import MatchingEngine
 from .pipeline_io import PipelineIO
 from .pipeline_constants import _RESULT_COLS
 
@@ -53,7 +52,6 @@ class PipelineMatching:
             drugs = drugs.head(limit)
             logger.info(f"Limit applied: processing {len(drugs)} drugs")
         self._drugs_df = drugs
-        self._matching_engine = MatchingEngine(self._cfg, self._index, self._trace)
         logger.info(
             f"Loaded {len(drugs)} drugs, "
             f"{self._index.size} tawreed products",
@@ -65,8 +63,8 @@ class PipelineMatching:
         results = []
         stats = {"brand_index": 0, "fuzzy": 0, "no_match": 0}
         for row_index, row in enumerate(self._drugs_df.itertuples(index=False)):
-            rec, score, method = self._matching_engine.match_one(row, stats, row_index)
-            results.append(self._matching_engine.make_row(row, rec, score, method, stats))
+            rec, score, method = self._match_one(row, stats, row_index)
+            results.append(self._make_row(row, rec, score, method, stats))
         self._results = pd.DataFrame(results, columns=_RESULT_COLS if not results else None)
         # Allow mixed str/float in numeric-optional columns
         for col in ("match_score", "ai_confidence", "ai_review_confidence"):
