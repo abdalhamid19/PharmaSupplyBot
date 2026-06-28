@@ -4,10 +4,7 @@ from rapidfuzz import fuzz
 
 from .config import MatchingConfig
 from .normalizer import DrugComponents
-from .indexer_brand_lookup import BrandLookup
-from .indexer_component_lookup import ComponentLookup
-from .indexer_fuzzy_lookup import FuzzyLookup
-from .indexer_best_match import BestMatchFinder
+from .indexer_lookup import BrandLookup, ComponentLookup, FuzzyLookup, BestMatchFinder
 
 
 class IndexSearcher:

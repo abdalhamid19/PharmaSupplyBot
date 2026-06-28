@@ -11,7 +11,6 @@ import pandas as pd
 from .config import MatchingConfig, APIConfig, Paths, load_env
 from .indexer import DrugIndex
 from .trace_log import MatchTraceLog
-from .pipeline_ai import PipelineAI
 
 logger = logging.getLogger("pharmasupplybot.matching")
 
@@ -241,12 +240,11 @@ class PipelineMatching:
 
     def _match_one(self, row, stats, row_index):
         """Match one drug record."""
-        from .indexer_best_match import find_best_match
-        rec, score, method = find_best_match(row.drug_name, self._index, self._cfg)
+        rec, score, method = self._index.best_match(row.drug_name)
         if rec is not None:
-            if method == "brand_index":
+            if method in ("component_index", "brand_index"):
                 stats["brand_index"] += 1
-            elif method == "fuzzy":
+            else:
                 stats["fuzzy"] += 1
         else:
             stats["no_match"] += 1
@@ -319,7 +317,9 @@ class MatchPipeline:
             self._index = DrugIndex(tawreed, self._cfg)
         self._matching = PipelineMatching(self._cfg, self._index, self._trace, self._io)
         self._matching.load_data(drugs_path, tawreed_path, self._limit, self._start, self._end)
-        self._ai = PipelineAI(self._cfg, self._api_cfg, self._index, self._trace)
+        if self._ai is None:
+            from .pipeline_ai import PipelineAI
+            self._ai = PipelineAI(self._cfg, self._api_cfg, self._index, self._trace)
 
     def run_matching(self) -> pd.DataFrame:
         """Algorithmic matching using brand index + fuzzy search."""
