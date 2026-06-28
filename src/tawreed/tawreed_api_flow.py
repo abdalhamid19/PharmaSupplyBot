@@ -6,6 +6,7 @@ from typing import Iterable
 
 from ..core.utils.excel import Item
 from .tawreed_api_flow_main import match_items_only_with_api
+from .tawreed_api import TawreedApiClient
 from .tawreed_api_flow_add_cart import (
     place_order_with_api,
     _add_api_order_items,
@@ -26,9 +27,11 @@ from .tawreed_api_flow_utils import (
     _require_contract,
     _warm_up_api_client,
 )
+from .tawreed_api_matching import require_api_match
 
 
 __all__ = [
+    "TawreedApiClient",
     "match_items_only_with_api",
     "place_order_with_api",
     "remove_cart_items_with_api",
@@ -44,4 +47,5 @@ __all__ = [
     "_submit_order_if_enabled",
     "_require_contract",
     "_warm_up_api_client",
+    "require_api_match",
 ]

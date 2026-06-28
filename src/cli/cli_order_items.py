@@ -20,8 +20,8 @@ from .cli_order_items_filtering import (
     prepared_order_items,
     limited_order_items,
     order_item_limit,
-    match_only,
     ensure_non_empty_items,
+    match_only,
 )
 from .cli_order_items_summary import (
     summary_label,

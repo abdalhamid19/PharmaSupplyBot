@@ -6,6 +6,7 @@ import itertools
 from typing import Iterable
 
 from ..core.utils.excel import Item
+from .cli_order_items_summary import summary_label, processed_summary_item_keys, item_key
 
 
 def slice_items(items: Iterable[Item], args) -> Iterable[Item]:
@@ -76,3 +77,15 @@ def ensure_non_empty_items(
         print(f"[{profile_key}] No remaining items to process.")
         return None
     return itertools.chain([first_item], probe_iter)
+
+
+__all__ = [
+    "slice_items",
+    "excel_load_limit",
+    "prepared_order_items",
+    "limited_order_items",
+    "order_item_limit",
+    "match_only",
+    "ensure_non_empty_items",
+]
+

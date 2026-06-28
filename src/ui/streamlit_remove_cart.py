@@ -6,7 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from .streamlit_shared import ARTIFACTS_DIR, load_csv_rows
+from .streamlit_shared import ARTIFACTS_DIR, load_csv_rows, REMOVE_ITEMS_DIR
 from .streamlit_state import ensure_default_state_files, missing_state_profiles
 from .streamlit_uploads import resolve_excel_path
 from .streamlit_remove_cart_form import (

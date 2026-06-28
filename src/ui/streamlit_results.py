@@ -32,6 +32,7 @@ from .streamlit_results_tables import (
     render_recent_run_files,
     render_recent_artifact_files,
 )
+from .streamlit_shared import ARTIFACTS_DIR
 
 
 def render_results_tab(default_profile: str | None) -> None:

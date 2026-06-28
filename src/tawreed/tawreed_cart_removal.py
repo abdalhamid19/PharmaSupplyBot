@@ -28,6 +28,8 @@ from .tawreed_cart_removal_helpers import (
     _unique,
     _log,
 )
+from .tawreed_cart_removal_core import append_cart_removal_summary
+from .tawreed_search_logic import require_product_match
 
 
 __all__ = [
@@ -38,4 +40,6 @@ __all__ = [
     "remove_matching_cart_rows",
     "click_cart_delete_button",
     "confirm_delete_if_needed",
+    "append_cart_removal_summary",
+    "require_product_match",
 ]

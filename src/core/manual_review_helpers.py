@@ -3,7 +3,7 @@
 import logging
 import time
 
-from .manual_review_store import ManualReviewDecision
+from .manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
 from .utils.excel import Item
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 def _lookup_with_retry(item: Item, max_attempts: int = 3) -> ManualReviewDecision | None:
     """Lookup decision with retry logic."""
-    from .manual_review_store import DEFAULT_MANUAL_REVIEW_DB
     for attempt in range(max_attempts):
         try:
             result = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup(item.code, item.name)

@@ -12,6 +12,7 @@ from .streamlit_excel_fields import excel_source_fields, order_excel_options
 from .streamlit_prevented_items import (
     render_prevented_items_manager,
     add_and_save_prevented_item,
+    persist_existing_prevented_items_file,
 )
 from .streamlit_profile_fields import profile_run_fields_with_workers, OrderRunFields
 

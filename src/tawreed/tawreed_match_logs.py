@@ -7,6 +7,7 @@ from ..core.utils.excel import Item
 from .tawreed_match_logs_models import OrderResultSummary
 from .tawreed_match_logs_helpers import MAX_DETAILED_MATCH_CANDIDATES
 from .tawreed_match_logs_main import write_match_log, append_order_result_summary
+from .tawreed_artifacts import append_csv_artifact, write_text_artifact
 
 
 # Backward compatibility: redirect to refactored modules
@@ -129,4 +130,6 @@ __all__ = [
     "_candidate_csv_fields",
     "_best_match_csv_fields",
     "_score_csv_fields",
+    "append_csv_artifact",
+    "write_text_artifact",
 ]

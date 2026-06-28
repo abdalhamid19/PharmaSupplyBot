@@ -7,12 +7,11 @@ from pathlib import Path
 
 from ..tawreed.tawreed_match_only_summary import MATCH_ONLY_SUMMARY_LABEL
 from ..core.artifact_run import current_artifact_run
-from .cli_order_items_filtering import match_only
 
 
 def summary_label(args) -> str:
     """Return the canonical summary label for the requested order mode."""
-    if match_only(args):
+    if bool(getattr(args, "match_only", False)):
         return MATCH_ONLY_SUMMARY_LABEL
     return "order_item_summary"
 
@@ -54,3 +53,11 @@ def item_key(code: object, name: object) -> tuple[str, str]:
     if normalized_code in {"", "nan", "none"}:
         normalized_code = ""
     return normalized_code, normalized_name
+
+
+__all__ = [
+    "summary_label",
+    "processed_summary_item_keys",
+    "latest_summary_path",
+    "item_key",
+]
