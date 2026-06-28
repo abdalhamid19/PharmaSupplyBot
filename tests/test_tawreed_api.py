@@ -330,7 +330,7 @@ class TawreedApiTests(unittest.TestCase):
 
         with (
             TemporaryDirectory() as temp_dir,
-            patch("src.tawreed.tawreed_api_main.sync_playwright", return_value=launcher),
+            patch("playwright.sync_api.sync_playwright", return_value=launcher),
         ):
             state_path = Path(temp_dir) / "state.json"
             state_path.write_text("{}", encoding="utf-8")
@@ -357,7 +357,7 @@ class TawreedApiTests(unittest.TestCase):
 
         with (
             TemporaryDirectory() as temp_dir,
-            patch("src.tawreed.tawreed_api_main.sync_playwright", return_value=launcher),
+            patch("playwright.sync_api.sync_playwright", return_value=launcher),
         ):
             state_path = Path(temp_dir) / "state.json"
             state_path.write_text("{}", encoding="utf-8")

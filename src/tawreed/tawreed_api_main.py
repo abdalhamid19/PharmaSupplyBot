@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from playwright.sync_api import sync_playwright
-
 from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, load_api_contract
 from .tawreed_auth_tokens import customer_id_from_state
 from .tawreed_api_exceptions import TawreedApiUnavailable
@@ -94,6 +92,7 @@ class TawreedApiClient:
     def _ensure_request_context(self):
         """Return a reusable Playwright APIRequestContext for this client."""
         if self._request_context is None:
+            from playwright.sync_api import sync_playwright
             self._playwright = sync_playwright().start()
             self._request_context = self._playwright.request.new_context(
                 storage_state=str(self.state_path),

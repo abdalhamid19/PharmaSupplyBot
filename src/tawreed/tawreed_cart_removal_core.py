@@ -5,7 +5,8 @@ from __future__ import annotations
 from playwright.sync_api import Page
 
 from ..core.cart_removal_items import CartRemovalItem
-from ..core.cart_removal_summary import CartRemovalSummary, append_cart_removal_summary
+from ..core.cart_removal_summary import CartRemovalSummary
+from .tawreed_artifacts import append_cart_removal_summary
 from .tawreed_cart_removal_selectors import CartRemovalSelectors, CartRemovalTarget
 from .tawreed_cart_removal_operations import _find_row_idx
 from .tawreed_cart_removal_operations import click_cart_delete_button, confirm_delete_if_needed, _wait_after_cart_delete

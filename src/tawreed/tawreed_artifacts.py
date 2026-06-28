@@ -27,6 +27,8 @@ from .tawreed_artifacts_xlsx import (
     _xlsx_rows,
     _rewrite_xlsx_worksheet_with_fieldnames,
 )
+from ..core.cart_removal_items import CartRemovalItem
+from ..core.cart_removal_summary import CartRemovalSummary
 
 
 def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") -> None:
@@ -134,3 +136,32 @@ def _write_text_artifact(page: Page, text_path: Path, details: str) -> None:
         text_path.write_text(content, encoding="utf-8")
     except Exception:
         pass
+
+
+def append_cart_removal_summary(
+    profile_key: str,
+    item: CartRemovalItem,
+    summary: CartRemovalSummary,
+    label_suffix: str | None = None,
+) -> None:
+    """Append one cart-removal summary row."""
+    row = {
+        "item_code": item.code,
+        "item_name": item.name,
+        "removed_count": summary.removed_count,
+        "status": summary.status,
+        "reason": summary.reason,
+    }
+    append_csv_artifact(
+        profile_key, "cart_removal_summary", [row], label_suffix=label_suffix
+    )
+
+
+__all__ = [
+    "dump_artifacts",
+    "write_text_artifact",
+    "append_text_artifact",
+    "append_csv_artifact",
+    "append_xlsx_artifact",
+    "append_cart_removal_summary",
+]
