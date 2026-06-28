@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
+from ..core.matching_types import CandidateMatchDiagnostic, MatchDecision
 from .tawreed_match_only_constants import MATCH_ONLY_API_KEYS
 
 

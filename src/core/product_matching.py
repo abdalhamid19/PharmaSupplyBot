@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .config.config_models import MatchingConfig
-from .matching_models import MatchDecision, SearchMatch
+from .matching_types import MatchDecision, SearchMatch
 from .utils.excel import Item
 
 # Import from specialized modules

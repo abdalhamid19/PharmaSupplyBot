@@ -1,6 +1,6 @@
 """Configuration constants for AI provider/model rotation."""
 
-from __future__ annotations
+from __future__ import annotations
 
 # Provider order for rotation
 PROVIDER_ORDER = (

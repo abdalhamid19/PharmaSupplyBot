@@ -6,7 +6,7 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-from ..core.matching_models import SearchMatch
+from ..core.matching_types import SearchMatch
 from .tawreed_constants import MAX_DOM_SEARCH_ROWS
 from .tawreed_dom_parsing import dom_search_results
 from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR

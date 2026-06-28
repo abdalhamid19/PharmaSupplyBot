@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.core.matching_models import (
+from src.core.matching_types import (
     CandidateMatchDiagnostic,
     MatchDecision,
     MatchScoreBreakdown,

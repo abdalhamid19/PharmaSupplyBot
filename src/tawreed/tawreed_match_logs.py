@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..core.matching_models import MatchDecision
+from ..core.matching_types import MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_match_logs_models import OrderResultSummary
 from .tawreed_match_logs_helpers import MAX_DETAILED_MATCH_CANDIDATES

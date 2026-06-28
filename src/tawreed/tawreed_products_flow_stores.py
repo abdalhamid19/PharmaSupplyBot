@@ -5,7 +5,7 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-from ..core.matching_models import SearchMatch
+from ..core.matching_types import SearchMatch
 from ..core.utils.excel import Item
 from .tawreed_constants import STORE_DETAILS_ENDPOINT
 from .tawreed_dialogs import close_visible_dialogs

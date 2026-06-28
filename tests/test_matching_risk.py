@@ -1,6 +1,6 @@
 import unittest
 from typing import Any
-from src.core.matching_models import CandidateMatchDiagnostic, MatchScoreBreakdown, MatchDecision
+from src.core.matching_types import CandidateMatchDiagnostic, MatchScoreBreakdown, MatchDecision
 from src.core.matching_risk import aggressive_review_decision
 from src.core.config.config_models import MatchingConfig
 

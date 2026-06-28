@@ -111,7 +111,7 @@ def manual_review_match(
     decision: ManualReviewDecision | None = None,
 ):
     """Return a forced approved match when a saved ID or exact name appears."""
-    from .matching_models import MatchDecision
+    from .matching_types import MatchDecision
     decision = saved_manual_review_decision(item) if decision is None else decision
     if not decision or not decision.approved:
         return None

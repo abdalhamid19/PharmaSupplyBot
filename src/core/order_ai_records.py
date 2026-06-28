@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .candidate_identity import candidate_store_product_id
-from .matching_models import MatchDecision, SearchMatch
+from .matching_types import MatchDecision, SearchMatch
 
 
 def candidate_name(candidate: dict[str, Any]) -> str:

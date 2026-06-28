@@ -1,6 +1,6 @@
 """Core functions and models for AI provider/model rotation."""
 
-from __future__ annotations
+from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field

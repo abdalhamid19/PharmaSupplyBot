@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
+from ..core.matching_types import CandidateMatchDiagnostic, MatchDecision
 
 
 def should_write_detailed_match_log(decision: MatchDecision) -> bool:

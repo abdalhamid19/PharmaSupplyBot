@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from .matching_penalty_tokens import (
+from .matching_types import (
     ALIAS_TO_CANONICAL,
     CONFLICT_GROUPS,
     CRITICAL_TOKENS,

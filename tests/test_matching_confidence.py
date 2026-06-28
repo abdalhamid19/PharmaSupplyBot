@@ -1,7 +1,7 @@
 import unittest
 
 from src.core.matching_confidence import match_confidence
-from src.core.matching_models import MatchDecision, SearchMatch
+from src.core.matching_types import MatchDecision, SearchMatch
 from src.core.utils.excel import Item
 
 

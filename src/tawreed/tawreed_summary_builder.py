@@ -2,7 +2,7 @@
 
 import time
 
-from ..core.matching_models import CandidateMatchDiagnostic
+from ..core.matching_types import CandidateMatchDiagnostic
 from .tawreed_match_logs import OrderResultSummary
 from .tawreed_timing import record_timing
 

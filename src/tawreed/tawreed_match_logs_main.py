@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..core.matching_trace import decision_trace_rows
-from ..core.matching_models import MatchDecision
+from ..core.matching_types import MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_artifacts import (
     append_csv_artifact,

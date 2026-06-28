@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..core.matching_models import CandidateMatchDiagnostic, MatchDecision
+from ..core.matching_types import CandidateMatchDiagnostic, MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_match_logs_helpers import (
     candidate_name_fields,

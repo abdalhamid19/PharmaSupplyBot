@@ -7,7 +7,7 @@ from typing import Any, Iterable
 
 from .candidate_identity import candidate_store_product_id
 from .config.config_models import MatchingConfig
-from .matching_models import MatchScoreBreakdown
+from .matching_types import MatchScoreBreakdown
 from .matching_penalties import penalty_breakdown
 from .product_matching_helpers import (
     _NUMERIC_PART_RE,

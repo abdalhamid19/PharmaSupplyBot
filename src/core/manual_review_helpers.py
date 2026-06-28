@@ -69,7 +69,7 @@ def _manual_review_id_match(
 ):
     """Force a match when a candidate exposes the saved orderable store id."""
     from .candidate_identity import candidate_store_product_id
-    from .matching_models import SearchMatch, MatchDecision
+    from .matching_types import SearchMatch, MatchDecision
 
     for query, candidates in results:
         for index, candidate in enumerate(candidates):
@@ -97,7 +97,7 @@ def _find_name_match_in_candidates(candidates, target_en, target_ar, query):
     """Find name match within candidates list."""
     from .order_ai_records import candidate_name, candidate_ar
     from .candidate_identity import candidate_store_product_id
-    from .matching_models import SearchMatch, MatchDecision
+    from .matching_types import SearchMatch, MatchDecision
     
     for index, candidate in enumerate(candidates):
         if not candidate_store_product_id(candidate):

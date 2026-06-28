@@ -1,7 +1,7 @@
 """Outcome builders for live-order AI flow."""
 from __future__ import annotations
 
-from .matching_models import MatchDecision
+from .matching_types import MatchDecision
 
 
 def low_confidence(decision, result, confidence, verify_result):

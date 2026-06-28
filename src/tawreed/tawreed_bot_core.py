@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..core.config.config_models import AppConfig, ProfileConfig
-from ..core.matching_models import MatchDecision
+from ..core.matching_types import MatchDecision
 from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
 from .selectors import _selectors

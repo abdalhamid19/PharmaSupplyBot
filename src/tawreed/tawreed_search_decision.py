@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 from ..core.matching_confidence import match_confidence
-from ..core.matching_models import MatchDecision
+from ..core.matching_types import MatchDecision
 from ..core.product_matching import is_decisive_product_match
 from ..core.utils.excel import Item
 from .tawreed_match_logs import write_match_log

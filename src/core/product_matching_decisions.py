@@ -6,7 +6,7 @@ from typing import Any
 
 from .candidate_identity import candidate_store_product_id
 from .config.config_models import MatchingConfig
-from .matching_models import CandidateMatchDiagnostic, MatchDecision, SearchMatch
+from .matching_types import CandidateMatchDiagnostic, MatchDecision, SearchMatch
 from .utils.excel import Item
 
 from .product_matching_acceptance import (

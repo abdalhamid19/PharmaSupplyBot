@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from .drug_matching.ai_provider_cooldown import apply_provider_cooldown
-from .matching_models import MatchDecision
+from .matching_types import MatchDecision
 from .order_ai_records import candidate_ar, candidate_name
 
 

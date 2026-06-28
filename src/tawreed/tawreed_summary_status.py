@@ -1,7 +1,7 @@
 """Status determination logic for Tawreed order summaries."""
 
 from ..core.candidate_identity import candidate_has_store_product_id
-from ..core.matching_models import CandidateMatchDiagnostic
+from ..core.matching_types import CandidateMatchDiagnostic
 from ..core.order_blocked_candidate import missing_store_product_id_outcome
 
 

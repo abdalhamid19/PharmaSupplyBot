@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .candidate_identity import candidate_has_store_product_id
-from .matching_models import CandidateMatchDiagnostic, MatchDecision, SearchMatch
+from .matching_types import CandidateMatchDiagnostic, MatchDecision, SearchMatch
 
 AGGRESSIVE_MIN_SCORE = 12.0
 AGGRESSIVE_MIN_OVERLAP = 0.45

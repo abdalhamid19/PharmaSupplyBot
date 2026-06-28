@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from ..core.drug_matching.normalizer import components_match, parse_drug
-from ..core.matching_models import MatchDecision
+from ..core.matching_types import MatchDecision
 from ..core.utils.excel import Item
 
 

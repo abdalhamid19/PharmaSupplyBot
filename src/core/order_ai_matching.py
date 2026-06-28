@@ -9,7 +9,7 @@ from typing import Callable
 
 from .drug_matching.config import APIConfig
 from .drug_matching.verifier import AIVerifier
-from .matching_models import MatchDecision
+from .matching_types import MatchDecision
 from .order_ai_flow import resolve_order_ai
 from .utils.excel import Item
 

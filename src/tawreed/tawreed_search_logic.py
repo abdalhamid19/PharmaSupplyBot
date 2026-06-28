@@ -13,7 +13,7 @@ from ..core.manual_review_runtime import (
     manual_review_queries,
     saved_manual_review_decision,
 )
-from ..core.matching_models import SearchMatch
+from ..core.matching_types import SearchMatch
 from ..core.product_matching import _search_queries_for_item, explain_best_product_match
 from ..core.utils.excel import Item
 from .tawreed_aggressive_matching import aggressive_review_result

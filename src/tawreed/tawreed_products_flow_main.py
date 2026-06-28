@@ -4,7 +4,7 @@ import time
 
 from playwright.sync_api import Page
 
-from ..core.matching_models import SearchMatch
+from ..core.matching_types import SearchMatch
 from ..core.utils.excel import Item
 from .tawreed_waits import wait_for_table_overlay_to_clear
 from .tawreed_ui import is_no_results_row, visible_product_rows
