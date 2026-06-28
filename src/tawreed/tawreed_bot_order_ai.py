@@ -5,7 +5,7 @@ from __future__ import annotations
 from ..core.matching_types import MatchDecision
 from ..core.utils.excel import Item
 from .tawreed_artifacts import append_csv_artifact
-from .tawreed_order_run_artifacts import append_order_ai_trace_artifacts
+from .tawreed_order_summary import append_order_ai_trace_artifacts
 
 
 class TawreedBotOrderAi:

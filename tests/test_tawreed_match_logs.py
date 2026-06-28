@@ -38,8 +38,8 @@ class TawreedMatchLogsTests(unittest.TestCase):
         )
 
         with (
-            patch("src.tawreed.tawreed_match_logs_main.append_csv_artifact") as append_csv,
-            patch("src.tawreed.tawreed_match_logs_main.append_xlsx_artifact") as append_xlsx,
+            patch("src.tawreed.tawreed_match_logs.append_csv_artifact") as append_csv,
+            patch("src.tawreed.tawreed_match_logs.append_xlsx_artifact") as append_xlsx,
         ):
             append_order_result_summary("wardany", item, summary)
 
@@ -164,9 +164,9 @@ class TawreedMatchLogsTests(unittest.TestCase):
         bot = type("Bot", (), {"profile_key": "wardany"})()
 
         with (
-            patch("src.tawreed.tawreed_match_logs_main.write_text_artifact"),
-            patch("src.tawreed.tawreed_match_logs_main.append_text_artifact"),
-            patch("src.tawreed.tawreed_match_logs_main.append_csv_artifact") as append_csv,
+            patch("src.tawreed.tawreed_match_logs.write_text_artifact"),
+            patch("src.tawreed.tawreed_match_logs.append_text_artifact"),
+            patch("src.tawreed.tawreed_match_logs.append_csv_artifact") as append_csv,
         ):
             write_match_log(bot, item, decision)
 

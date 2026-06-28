@@ -132,7 +132,7 @@ class TawreedBotTests(unittest.TestCase):
                     bot.order_flow.summary_recorder, "record_item_summary"
                 ) as record_summary,
                 patch(
-                    "src.tawreed.tawreed_order_summary_failure.dump_artifacts"
+                    "src.tawreed.tawreed_order_summary.dump_artifacts"
                 ) as dump_artifacts,
                 patch(
                     "src.tawreed.tawreed_summary_utils.visible_overlay_diagnostics",
@@ -178,7 +178,7 @@ class TawreedBotTests(unittest.TestCase):
                 "src.tawreed.tawreed_order_processing.require_product_match"
             ) as require_match,
             patch(
-                "src.tawreed.tawreed_order_summary_builders.append_match_only_summary"
+                "src.tawreed.tawreed_order_summary.append_match_only_summary"
             ) as append_summary,
             patch.object(bot, "_add_item") as add_item,
         ):
@@ -230,10 +230,10 @@ class TawreedBotTests(unittest.TestCase):
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
             patch(
-                "src.tawreed.tawreed_order_flow_match.sync_playwright"
+                "src.tawreed.tawreed_order_flow.sync_playwright"
             ) as playwright,
             patch(
-                "src.tawreed.tawreed_order_flow_match.open_order_page"
+                "src.tawreed.tawreed_order_flow.open_order_page"
             ) as open_page,
             patch.object(bot, "_ensure_valid_auth"),
             patch.object(
@@ -256,7 +256,7 @@ class TawreedBotTests(unittest.TestCase):
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
             patch(
-                "src.tawreed.tawreed_order_flow_match.sync_playwright"
+                "src.tawreed.tawreed_order_flow.sync_playwright"
             ) as playwright,
             patch.object(bot, "_ensure_valid_auth"),
         ):

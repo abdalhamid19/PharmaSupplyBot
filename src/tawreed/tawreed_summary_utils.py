@@ -32,3 +32,11 @@ def _artifact_details(label: str, error: Exception, **extra: object) -> str:
 def _console_safe(text: str) -> str:
     """Return text that can be printed on cp1252 Windows consoles without crashing."""
     return text.encode("cp1252", errors="replace").decode("cp1252")
+
+
+__all__ = [
+    "_item_error_label",
+    "_item_error_details",
+    "_artifact_details",
+    "_console_safe",
+]

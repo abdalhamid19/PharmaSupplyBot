@@ -11,7 +11,7 @@ from src.core.matching_types import MatchDecision, SearchMatch
 from src.core.order_ai_matching import OrderAiOutcome
 from src.core.utils.excel import Item
 from src.tawreed.tawreed_match_logs import OrderResultSummary
-from src.tawreed.tawreed_order_run_artifacts import (
+from src.tawreed.tawreed_order_summary import (
     append_order_ai_trace_artifacts,
     append_order_item_artifacts,
 )
@@ -150,7 +150,7 @@ class OrderRunArtifactsTests(unittest.TestCase):
     def test_preserve_existing_decision_blocks_overwrite_of_human_decision(self):
         """Auto-save must never overwrite a human approved/not-matching decision."""
         from src.core.manual_review_store import ManualReviewDecision
-        from src.tawreed.tawreed_order_run_artifacts import _preserve_existing_decision
+        from src.tawreed.tawreed_order_summary import _preserve_existing_decision
 
         approved = ManualReviewDecision("1", "P", True, "s1", manual_decision="approved_match")
         not_matching = ManualReviewDecision("1", "P", False, "s1", manual_decision="not_matching")

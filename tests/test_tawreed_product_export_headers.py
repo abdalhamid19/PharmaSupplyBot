@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from typing import Any
 
-from src.tawreed.tawreed_product_export_headers import capture_product_search_request
+from src.tawreed.tawreed_product_export import capture_product_search_request
 
 
 class TawreedProductExportHeaderTests(unittest.TestCase):

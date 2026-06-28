@@ -5,7 +5,7 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-from ..core.utils.playwright_browser import launch_chromium
+from .tawreed_playwright_browser import launch_chromium
 
 
 def open_auth_page(pw, base_url: str, runtime, headless: bool = False) -> tuple[Any, Any, Page]:
