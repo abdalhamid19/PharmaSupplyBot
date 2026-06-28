@@ -1,7 +1,7 @@
 import sys
 from src.core.utils.excel import Item
-from src.core.matching_models import SearchMatch
-from src.core.order_ai_safety import local_match_rejection
+from src.core.matching_types import SearchMatch
+from src.core.order_ai_flow import local_match_rejection
 
 item1 = Item("74821", "BETADINE ANTISEPTIC 60 ML SOLN. 10%", 1)
 match1 = SearchMatch("q1", 0, 100.0, {"productNameEn": "BETADINE ANTISEPTIC SOLN. 10 % 120 ML", "storeProductId": "123"})

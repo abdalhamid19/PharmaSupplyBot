@@ -8,7 +8,7 @@ from typing import Any
 
 from .candidate_identity import candidate_store_product_id
 from .matching_types import MatchDecision
-from .order_ai_records import candidate_ar, candidate_name, candidate_price
+from .order_ai_matching import candidate_ar, candidate_name, candidate_price
 
 
 @dataclass(frozen=True)

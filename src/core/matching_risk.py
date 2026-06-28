@@ -36,7 +36,7 @@ def _best_aggressive_diagnostic(diagnostics: list[CandidateMatchDiagnostic], cfg
 
 def _share_brand_identity_token(query: str, candidate: dict[str, Any]) -> bool:
     from .drug_matching.normalizer import parse_drug
-    from .order_ai_records import candidate_name
+    from .order_ai_matching import candidate_name
     import re
 
     req = parse_drug(query)

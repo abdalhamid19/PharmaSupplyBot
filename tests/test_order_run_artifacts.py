@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from src.core.artifact_run import artifact_run
-from src.core.matching_models import MatchDecision, SearchMatch
+from src.core.matching_types import MatchDecision, SearchMatch
 from src.core.order_ai_matching import OrderAiOutcome
 from src.core.utils.excel import Item
 from src.tawreed.tawreed_match_logs import OrderResultSummary

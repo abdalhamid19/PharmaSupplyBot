@@ -95,7 +95,7 @@ def _manual_review_name_match(
 
 def _find_name_match_in_candidates(candidates, target_en, target_ar, query):
     """Find name match within candidates list."""
-    from .order_ai_records import candidate_name, candidate_ar
+    from .order_ai_matching import candidate_name, candidate_ar
     from .candidate_identity import candidate_store_product_id
     from .matching_types import SearchMatch, MatchDecision
     

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.core.order_ai_run_summary import summarize_order_ai_rows
+from src.core.order_ai_artifacts import summarize_order_ai_rows
 
 
 class OrderAiRunSummaryTests(unittest.TestCase):

@@ -1,7 +1,7 @@
 """Order run summary, AI trace, and manual-review artifact writers."""
 from __future__ import annotations
 
-from ..core.order_ai_trace_rows import order_ai_trace_rows
+from ..core.order_ai_artifacts import order_ai_trace_rows
 from ..core.order_run_artifact_rows import (
     manual_review_required,
     manual_review_row,
@@ -63,7 +63,7 @@ def _auto_save_verified_match(item: Item, decision) -> None:
 def _create_and_save_decision(item, match, store):
     """Create and save auto-matched decision."""
     from ..core.candidate_identity import candidate_store_product_id
-    from ..core.order_ai_records import candidate_name, candidate_ar
+    from ..core.order_ai_matching import candidate_name, candidate_ar
     from ..core.manual_review_store import ManualReviewDecision
     
     store_id = candidate_store_product_id(match.data)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 
 from src.core.drug_matching.config import APIConfig
-from src.core.matching_models import (
+from src.core.matching_types import (
     CandidateMatchDiagnostic,
     MatchDecision,
     MatchScoreBreakdown,

@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ..core.order_ai_run_summary import summarize_order_ai_rows
+from ..core.order_ai_artifacts import summarize_order_ai_rows
 from .streamlit_shared import (
     ARTIFACTS_DIR,
     load_csv_rows,
