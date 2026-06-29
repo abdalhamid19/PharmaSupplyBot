@@ -3,7 +3,6 @@
 from __future__ import annotations
 import os
 from pathlib import Path
-from playwright.sync_api import sync_playwright
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_session import (
     attempt_env_login, auth_temp_state_path, close_browser, close_context,
@@ -14,10 +13,12 @@ from .tawreed_session import (
 
 
 def run_headless_auth_refresh(
-    base_url, state_path, runtime_config, selectors, 
+    base_url, state_path, runtime_config, selectors,
     profile_key, wait_seconds, headless=True
 ):
     """Re-authenticate headlessly and atomically replace the saved state file."""
+    from playwright.sync_api import sync_playwright
+
     require_env_credentials(profile_key)
     with sync_playwright() as playwright:
         _run_auth_refresh_session(

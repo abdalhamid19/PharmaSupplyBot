@@ -7,10 +7,12 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import TYPE_CHECKING, Any, Iterable, Iterator
 
 from openpyxl import Workbook
-from playwright.sync_api import Page, Response
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Page, Response
 
 from .product_export_deduplicator import (
     count_duplicates_removed,

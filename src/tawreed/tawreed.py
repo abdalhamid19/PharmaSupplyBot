@@ -8,7 +8,12 @@ from .tawreed_bot_order_ai import TawreedBotOrderAi
 from .tawreed_bot_methods import TawreedBotMethods
 from .tawreed_dialogs import close_visible_dialogs
 from .tawreed_search_logic import require_product_match
-from playwright.sync_api import sync_playwright
+
+
+def sync_playwright():
+    """Lazy import of sync_playwright to defer Playwright loading."""
+    from playwright.sync_api import sync_playwright as _sync_playwright
+    return _sync_playwright
 
 
 class TawreedBot(TawreedBotCore, TawreedBotApi, TawreedBotOrderAi, TawreedBotMethods):

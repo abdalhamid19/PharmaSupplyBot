@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from playwright.sync_api import Page
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 from ..core.manual_review_runtime import (
     filter_manual_review_candidates,

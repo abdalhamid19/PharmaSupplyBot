@@ -120,7 +120,7 @@ CRITICAL_TOKENS = frozenset(
     }
 )
 DISTINGUISHING_TOKENS = frozenset(
-    {"ADVANCED", "EXTRA", "FORTE", "MAX", "PLUS", "PRO", "SUPER", "ULTRA"}
+    {"ADVANCED", "EXTRA", "FORTE", "MAX", "PLUS", "PRO", "SUPER", "ULTRA", "2%"}
 )
 CONFLICT_GROUPS = (
     frozenset({"ANISE", "CHAMOMILE", "CINNAMON", "CLOVE", "DETOX", "MINT"}),

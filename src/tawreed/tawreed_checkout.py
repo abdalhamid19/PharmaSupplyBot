@@ -1,7 +1,10 @@
 """Checkout and order confirmation flow for Tawreed."""
 
 from __future__ import annotations
-from playwright.sync_api import Page
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 def confirm_order(page: Page, selectors, timeout_ms: int) -> None:
     """Navigate through the checkout screens and submit the final order."""

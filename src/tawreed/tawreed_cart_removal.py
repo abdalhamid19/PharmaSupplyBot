@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
-from playwright.sync_api import Page
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 from ..core.cart_removal_items import CartRemovalItem, cart_row_matches_names
 from ..core.cart_removal_summary import CartRemovalSummary

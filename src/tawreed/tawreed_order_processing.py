@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from playwright.sync_api import Page
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 from ..core.utils.excel import Item
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE

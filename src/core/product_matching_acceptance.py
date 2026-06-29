@@ -6,8 +6,9 @@ import re
 from difflib import SequenceMatcher
 from typing import Any
 
-from .candidate_identity import candidate_has_store_product_id
+from .candidate_identity import candidate_has_store_product_id, candidate_store_product_id
 from .drug_matching.normalizer import components_match, parse_drug
+from .matching_penalties import compatibility_rejection_reason
 from .product_matching_helpers import (
     _ARABIC_NON_WORD_RE,
     _ARABIC_REQUIRED_TOKEN_ALIASES,
@@ -23,7 +24,6 @@ from .product_matching_helpers import (
 )
 from .product_matching_scoring import (
     _candidate_english_name,
-    _numeric_tokens,
 )
 
 
@@ -172,6 +172,8 @@ def _any_safe_omission(tokens: set[str], requested, offered) -> bool:
         or _safe_omitted_liquid_concentration(tokens, requested, offered)
         or _safe_omitted_pack_count(tokens, requested, offered)
         or _safe_omitted_pen_insulin_details(tokens, requested, offered)
+        or _safe_omitted_baby_food_pack_size(tokens, requested, offered)
+        or _safe_omitted_percentage_concentration(tokens, requested, offered)
     )
 
 
@@ -270,6 +272,40 @@ def _safe_omitted_pen_insulin_details(tokens: set[str], requested, offered) -> b
     return True
 
 
+def _safe_omitted_baby_food_pack_size(tokens: set[str], requested, offered) -> bool:
+    """Allow pack size omission for baby food products like milk powder."""
+    if requested.product_class != "baby_food":
+        return False
+    if not offered.qty:
+        offered_nums = _numeric_tokens(offered.normalized)
+        if offered_nums and offered_nums & tokens:
+            return True
+    if offered.qty and offered.qty in tokens:
+        return True
+    return False
+
+
+def _numeric_tokens(text: str) -> set[str]:
+    """Return tokens that contain at least one digit."""
+    return {
+        numeric_part
+        for token in text.split()
+        for numeric_part in _NUMERIC_PART_RE.findall(token)
+    }
+
+
+def _safe_omitted_percentage_concentration(tokens: set[str], requested, offered) -> bool:
+    """Allow percentage concentration omission for topical/eye drop products."""
+    if not offered.dosage_nums:
+        return False
+    topical_forms = {"CREAM", "GEL", "LOTION", "SOLUTION", "SPRAY", "DROPS", "OINTMENT", "EYE"}
+    if not ({requested.form, offered.form} & topical_forms):
+        return False
+    if "%" in offered.dosage_units:
+        return True
+    return False
+
+
 # ── Main acceptance logic ──
 
 
@@ -284,6 +320,12 @@ def _diagnostic_acceptance(
     variant_rejection = _candidate_variant_rejection(score_query, candidate)
     if variant_rejection:
         return False, "", variant_rejection
+
+    lexical_rejection = compatibility_rejection_reason(
+        score_query, _candidate_english_name(candidate)
+    )
+    if lexical_rejection:
+        return False, "", lexical_rejection
 
     if not skip_components:
         component_rejection = _candidate_component_rejection(score_query, candidate)
@@ -324,10 +366,24 @@ def _extra_numeric_tokens(score_query: str, candidate: dict[str, Any]) -> set[st
 
 
 def _iter_results(search_results_by_query):
-    """Iterate over all search results with their query and row index."""
+    """Yield de-duplicated search results with their first query and row index."""
+    seen: set[tuple[str, str, str]] = set()
     for query, results in search_results_by_query:
         for row_index, result in enumerate(results):
+            key = _candidate_dedupe_key(result)
+            if key in seen:
+                continue
+            seen.add(key)
             yield query, row_index, result
+
+
+def _candidate_dedupe_key(candidate: dict[str, Any]) -> tuple[str, str, str]:
+    """Return a stable key for repeated candidates across query variants."""
+    return (
+        candidate_store_product_id(candidate),
+        _normalize_text(_candidate_english_name(candidate)),
+        _normalize_text(str(candidate.get("productName") or "")),
+    )
 
 
 __all__ = [
@@ -354,8 +410,12 @@ __all__ = [
     "_safe_omitted_pack_count",
     "_dosage_or_shared_strength",
     "_safe_omitted_pen_insulin_details",
+    "_safe_omitted_baby_food_pack_size",
+    "_safe_omitted_percentage_concentration",
+    "_numeric_tokens",
     "_diagnostic_acceptance",
     "_numeric_acceptance",
     "_extra_numeric_tokens",
     "_iter_results",
+    "_candidate_dedupe_key",
 ]
