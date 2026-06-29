@@ -45,7 +45,7 @@ def _execute_api_search(bot, page, query):
 
 
 def _execute_dom_fallback(bot, page, query, api_candidates):
-    from .tawreed_dom_parsing import dom_search_results
+    from .tawreed_dom import dom_search_results
     from .tawreed_ui import is_no_results_row
     from .tawreed_waits import wait_for_table_overlay_to_clear
     

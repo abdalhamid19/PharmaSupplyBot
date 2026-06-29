@@ -17,8 +17,7 @@ from .tawreed_checkout import confirm_order
 from .tawreed_order_processing import OrderItemProcessor
 from .tawreed_order_summary import OrderSummaryRecorder
 from .tawreed_session import close_browser, close_context, open_order_page
-from .tawreed_summary_builder import SummaryBuilder
-from .tawreed_summary_status import SummaryStatus
+from .tawreed_summary import SummaryBuilder, SummaryStatus
 
 
 # ============================================================================

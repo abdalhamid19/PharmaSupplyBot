@@ -9,7 +9,7 @@ from ..core.matching_types import MatchDecision
 from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from ..core.utils.excel import Item
 from .selectors import _selectors
-from .tawreed_auth_flow import TawreedAuthFlow
+from .tawreed_auth import TawreedAuthFlow
 from .tawreed_cart_flow import TawreedCartFlow
 from .tawreed_order_flow import TawreedOrderFlow, _SkipItem, _NoResultsItem
 

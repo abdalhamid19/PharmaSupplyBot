@@ -6,7 +6,7 @@ from pathlib import Path
 
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..tawreed.tawreed import TawreedBot
-from ..tawreed.tawreed_session import SessionInvalidError, open_reauth_in_browser
+from ..tawreed.tawreed_session import SessionInvalidError
 
 
 def build_bot(
@@ -50,7 +50,7 @@ def invalid_session_exit(
 ) -> SystemExit:
     """Return the standard session-expired CLI exit after opening browser reauth."""
     print(f"[{profile_key}] {error}")
-    open_reauth_in_browser(base_url, profile_key)
+    print(f"Run: py run.py auth --profile {profile_key}")
     return SystemExit(
         f"Session for profile '{profile_key}' is not valid. "
         f"Run: py run.py auth --profile {profile_key}"

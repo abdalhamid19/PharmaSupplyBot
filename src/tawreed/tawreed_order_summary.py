@@ -21,11 +21,8 @@ from ..core.candidate_identity import candidate_store_product_id
 from .tawreed_artifacts import dump_artifacts, append_csv_artifact, append_text_artifact
 from .tawreed_dialogs import visible_overlay_diagnostics
 from .tawreed_match_logs import OrderResultSummary, append_order_result_summary
-from .tawreed_match_only_summary import append_match_only_summary
-from .tawreed_summary_builder import SummaryBuilder
-from .tawreed_summary_dialog import SummaryDialogHandler
-from .tawreed_summary_status import SummaryStatus
-from .tawreed_summary_utils import _item_error_label, _item_error_details, _console_safe, _artifact_details
+from .tawreed_match_only import append_match_only_summary
+from .tawreed_summary import SummaryBuilder, SummaryDialogHandler, SummaryStatus, _item_error_label, _item_error_details, _console_safe, _artifact_details
 
 
 # ============================================================================

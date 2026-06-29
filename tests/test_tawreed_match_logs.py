@@ -16,8 +16,7 @@ from src.tawreed.tawreed_match_logs import (
     write_match_log,
     should_write_detailed_match_log,
 )
-from src.tawreed.tawreed_match_only_rows import match_only_summary_rows
-from src.tawreed.tawreed_match_only_summary import append_match_only_summary
+from src.tawreed.tawreed_match_only import match_only_summary_rows, append_match_only_summary
 
 
 class TawreedMatchLogsTests(unittest.TestCase):

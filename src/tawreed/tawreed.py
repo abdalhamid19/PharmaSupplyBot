@@ -19,7 +19,7 @@ class TawreedBot(TawreedBotCore, TawreedBotApi, TawreedBotOrderAi, TawreedBotMet
 # Import for backward compatibility with tests
 from .tawreed_artifacts import dump_artifacts
 from .tawreed_dialogs import visible_overlay_diagnostics
-from .tawreed_match_only_summary import append_match_only_summary
+from .tawreed_match_only import append_match_only_summary
 
 
 __all__ = [

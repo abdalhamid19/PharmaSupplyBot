@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .tawreed_api_contract import DEFAULT_CONTRACT_PATH, load_api_contract, product_search_url, TawreedApiUnavailable
-from .tawreed_auth_tokens import customer_id_from_state
+from .tawreed_auth import customer_id_from_state
 from .tawreed_api_operations import (
     search_products,
     get_store_details,

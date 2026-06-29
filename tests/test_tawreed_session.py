@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from src.tawreed.tawreed_session import (
     SessionInvalidError,
     auth_temp_state_path,
-    ensure_logged_in,
     promote_session_state,
 )
 

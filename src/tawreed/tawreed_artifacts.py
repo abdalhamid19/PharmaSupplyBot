@@ -5,20 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from playwright.sync_api import Page
 
-from .tawreed_artifacts_paths import (
+from .tawreed_artifacts_io import (
     _artifact_path,
     _active_artifact_subdir,
     _artifacts_dir,
-)
-from .tawreed_artifacts_csv import (
     _ensure_csv_schema,
     _csv_artifact_fieldnames,
     _append_csv_rows,
     _csv_header_fieldnames,
     _rewrite_csv_artifact_with_fieldnames,
     _merge_row_fieldnames,
-)
-from .tawreed_artifacts_xlsx import (
     _open_or_create_workbook,
     _xlsx_artifact_fieldnames,
     _ensure_xlsx_header_row,

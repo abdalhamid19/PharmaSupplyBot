@@ -10,7 +10,7 @@ from ..core.matching_types import SearchMatch
 from ..core.utils.excel import Item
 from .tawreed_constants import MAX_DOM_SEARCH_ROWS, STORE_DETAILS_ENDPOINT
 from .tawreed_dialogs import close_visible_dialogs
-from .tawreed_dom_parsing import dom_search_results
+from .tawreed_dom import dom_search_results
 from .tawreed_pricing import discount_value_as_percent, first_discount_value
 from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR
 from .tawreed_selections import stores_from_payload
@@ -117,7 +117,7 @@ def _matched_row_by_sig(rows, match: SearchMatch):
 
 
 def _row_sig(row) -> str:
-    from .tawreed_dom_parsing import _row_name_lines
+    from .tawreed_dom import _row_name_lines
 
     lines = _row_name_lines(row)
     return _normalize_sig(lines[0]) if lines else ""

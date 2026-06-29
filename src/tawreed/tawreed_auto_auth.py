@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .tawreed_auth_tokens import is_token_expired
+from .tawreed_auth import is_token_expired
 from .tawreed_headless_auth_refresh import run_headless_auth_refresh
 
 

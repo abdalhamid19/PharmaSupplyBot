@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .tawreed_auth_tokens import access_token_from_state
+from .tawreed_auth import access_token_from_state
 
 
 # ============================================================================

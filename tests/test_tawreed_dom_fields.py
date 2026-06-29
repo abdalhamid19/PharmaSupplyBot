@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.tawreed.tawreed_dom_fallback import fallback_english_name
+from src.tawreed.tawreed_dom import fallback_english_name
 
 
 class TawreedDomFieldsTests(unittest.TestCase):

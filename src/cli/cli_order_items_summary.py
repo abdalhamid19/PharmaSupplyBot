@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from ..tawreed.tawreed_match_only_summary import MATCH_ONLY_SUMMARY_LABEL
+from ..tawreed.tawreed_match_only import MATCH_ONLY_SUMMARY_LABEL
 from ..core.artifact_run import current_artifact_run
 
 
