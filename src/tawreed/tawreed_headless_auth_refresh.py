@@ -60,8 +60,9 @@ def _capture_and_validate_session(
         page, context, selectors, temp_state_path, wait_seconds
     )
     validate_saved_session(
-        playwright, runtime_config, temp_state_path, 
-        products_page_url(base_url), selectors, 
+        playwright, runtime_config, temp_state_path,
+        products_page_url(base_url), selectors,
+        selectors.logged_in_marker,
         selectors.item_search_input
     )
 
@@ -73,9 +74,9 @@ def capture_headless_state(
     attempt_env_login(page, selectors)
     print_auth_instructions(wait_seconds, headless=True)
     detected = wait_for_login_detection(
-        page, context, wait_seconds, selectors.login_email, 
-        selectors.login_password, selectors.logged_in_marker, 
-        state_path, save_intermediate=False
+        page, context, wait_seconds, selectors.login_email,
+        selectors.login_password, selectors.logged_in_marker,
+        state_path, save_session_state, save_inter=False
     )
     wait_for_network_idle(page)
     print_login_detection_result(detected)

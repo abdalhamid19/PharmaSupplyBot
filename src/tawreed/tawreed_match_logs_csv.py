@@ -9,7 +9,8 @@ from .tawreed_match_logs_helpers import candidate_name_fields
 
 def match_log_csv_rows(item: Item, decision: MatchDecision) -> list[dict[str, object]]:
     """Build CSV rows for all candidates considered during item matching."""
-    from .tawreed_match_logs_helpers import sorted_diagnostics, MAX_DETAILED_MATCH_CANDIDATES
+    from .tawreed_match_logs_helpers import sorted_diagnostics
+    from .tawreed_match_logs import MAX_DETAILED_MATCH_CANDIDATES
     rows: list[dict[str, object]] = []
     for rank, diagnostic in enumerate(
         sorted_diagnostics(decision)[:MAX_DETAILED_MATCH_CANDIDATES], start=1

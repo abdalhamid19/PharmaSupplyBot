@@ -10,7 +10,8 @@ from .tawreed_match_logs_helpers import candidate_name_fields
 def match_log_content(item: Item, decision: MatchDecision) -> str:
     """Build the detailed product-matching log content for one item."""
     lines = _match_log_header_lines(item, decision)
-    from .tawreed_match_logs_helpers import sorted_diagnostics, MAX_DETAILED_MATCH_CANDIDATES
+    from .tawreed_match_logs_helpers import sorted_diagnostics
+    from .tawreed_match_logs import MAX_DETAILED_MATCH_CANDIDATES
     for candidate_index, diagnostic in enumerate(
         sorted_diagnostics(decision)[:MAX_DETAILED_MATCH_CANDIDATES], start=1
     ):
