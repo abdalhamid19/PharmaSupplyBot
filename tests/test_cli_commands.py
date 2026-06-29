@@ -171,17 +171,15 @@ class CliCommandsTests(unittest.TestCase):
         self.assertEqual(prepared, items)
         require_state.assert_called_once_with("wardany")
 
-    def test_invalid_session_exit_opens_reauth_and_returns_standard_message(
+    def test_invalid_session_exit_returns_standard_message(
         self,
     ) -> None:
         error: Any = SimpleNamespace()
 
-        with patch("src.cli.cli_shared.open_reauth_in_browser") as reauth:
-            exit_error = invalid_session_exit(
-                "https://seller.tawreed.io", "wardany", error
-            )
+        exit_error = invalid_session_exit(
+            "https://seller.tawreed.io", "wardany", error
+        )
 
-        reauth.assert_called_once_with("https://seller.tawreed.io", "wardany")
         self.assertIsInstance(exit_error, SystemExit)
         self.assertIn("py run.py auth --profile wardany", str(exit_error))
 

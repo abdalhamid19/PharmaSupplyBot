@@ -15,25 +15,25 @@ from .tawreed_session import (
 
 def run_headless_auth_refresh(
     base_url, state_path, runtime_config, selectors, 
-    profile_key, wait_seconds
+    profile_key, wait_seconds, headless=True
 ):
     """Re-authenticate headlessly and atomically replace the saved state file."""
     require_env_credentials(profile_key)
     with sync_playwright() as playwright:
         _run_auth_refresh_session(
             playwright, base_url, runtime_config, selectors, 
-            state_path, profile_key, wait_seconds
+            state_path, profile_key, wait_seconds, headless
         )
 
 
 def _run_auth_refresh_session(
     playwright, base_url, runtime_config, selectors, 
-    state_path, profile_key, wait_seconds
+    state_path, profile_key, wait_seconds, headless
 ):
     temp_state_path = auth_temp_state_path(state_path)
     discard_session_state(temp_state_path)
     browser, context, page = open_auth_page(
-        playwright, base_url, runtime_config, headless=True
+        playwright, base_url, runtime_config, headless=headless
     )
     try:
         _capture_and_validate_session(

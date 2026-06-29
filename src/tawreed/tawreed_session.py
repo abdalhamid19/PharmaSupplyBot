@@ -14,7 +14,85 @@ from .tawreed_login_detection import (
     login_detected,
 )
 from .tawreed_playwright_browser import launch_chromium
-from .tawreed_auth import headless_auth_failure_message, wait_for_login_detection
+from .tawreed_auth import headless_auth_failure_message
+
+
+# ============================================================================
+# Wait helpers (from tawreed_auth_waits.py)
+# ============================================================================
+
+def _initial_wait_state(wait_seconds: int) -> dict[str, int]:
+    """Return the mutable polling state used while waiting for login detection."""
+    return {
+        "poll_ms": 2000,
+        "save_every_ms": 5000,
+        "total_waited_ms": 0,
+        "since_last_save_ms": 0,
+        "wait_budget_ms": _wait_budget_ms(wait_seconds),
+    }
+
+
+def _advance_wait_state(
+    wait_state: dict[str, int],
+    context,
+    state_path: Path,
+    save_session_state,
+    save_intermediate: bool,
+) -> None:
+    """Advance the polling state and save session state when the interval is due."""
+    poll_ms = wait_state["poll_ms"]
+    wait_state["total_waited_ms"] += poll_ms
+    wait_state["since_last_save_ms"] += poll_ms
+    wait_state["since_last_save_ms"] = _save_state_if_due(
+        context,
+        state_path,
+        wait_state["since_last_save_ms"],
+        wait_state["save_every_ms"],
+        save_session_state,
+        save_intermediate,
+    )
+
+
+def _wait_budget_ms(wait_seconds: int) -> int:
+    """Return the total wait budget in milliseconds."""
+    return max(1, int(wait_seconds)) * 1000
+
+
+def _save_state_if_due(
+    context,
+    state_path: Path,
+    since_last_save_ms: int,
+    save_every_ms: int,
+    save_session_state,
+    save_intermediate: bool,
+) -> int:
+    """Persist intermediate session state when the save interval has elapsed."""
+    if not save_intermediate:
+        return 0 if since_last_save_ms >= save_every_ms else since_last_save_ms
+    if since_last_save_ms < save_every_ms:
+        return since_last_save_ms
+    save_session_state(context, state_path, is_intermediate=True)
+    return 0
+
+
+def wait_for_login_detection(
+    page: Page,
+    context,
+    wait_seconds: int,
+    email_sel: str,
+    pwd_sel: str,
+    marker: str,
+    state_path: Path,
+    save_session_state,
+    save_inter: bool = True,
+) -> bool:
+    """Poll the page until the logged-in marker appears or timeout is reached."""
+    ws = _initial_wait_state(wait_seconds)
+    while ws["total_waited_ms"] < ws["wait_budget_ms"]:
+        if login_detected(page, ws["poll_ms"], email_sel, pwd_sel, marker):
+            return True
+        _advance_wait_state(ws, context, state_path, save_session_state, save_inter)
+    return False
 
 
 # ============================================================================
@@ -156,28 +234,6 @@ def wait_for_network_idle(page) -> None:
         pass
 
 
-def wait_for_login_detection(
-    page: Page,
-    context,
-    wait_seconds: int,
-    login_email_selector: str,
-    login_password_selector: str,
-    logged_in_marker: str,
-    state_path: Path,
-    save_session_state,
-    save_intermediate: bool = True,
-) -> bool:
-    """Poll the page until the logged-in marker appears or timeout is reached."""
-    from .tawreed_auth import _initial_wait_state, _advance_wait_state, _wait_budget_ms, _save_state_if_due
-    
-    ws = _initial_wait_state(wait_seconds)
-    while ws["total_waited_ms"] < ws["wait_budget_ms"]:
-        if login_detected(page, ws["poll_ms"], email_sel=login_email_selector, pwd_sel=login_password_selector, marker=logged_in_marker):
-            return True
-        _advance_wait_state(ws, context, state_path, save_session_state, save_intermediate)
-    return False
-
-
 def perform_tawreed_auth(bot, wait_seconds: int, headless: bool) -> None:
     """Perform the complete Tawreed authentication flow."""
     from .tawreed_headless_auth_refresh import run_headless_auth_refresh
@@ -190,7 +246,6 @@ def perform_tawreed_auth(bot, wait_seconds: int, headless: bool) -> None:
         bot.selectors,
         bot.profile_key,
         wait_seconds=wait_seconds,
-        headless=headless,
     )
 
 

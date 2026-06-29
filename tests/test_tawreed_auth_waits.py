@@ -44,10 +44,11 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             page,
             context=object(),
             wait_seconds=10,
-            login_email_selector="#email",
-            login_password_selector="#password",
-            logged_in_marker="#marker",
+            email_sel="#email",
+            pwd_sel="#password",
+            marker="#marker",
             state_path=Path("state/wardany.json"),
+            save_session_state=lambda *args: None,
         )
         self.assertTrue(detected)
 
@@ -61,10 +62,11 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             page,
             context=object(),
             wait_seconds=10,
-            login_email_selector="#email",
-            login_password_selector="#password",
-            logged_in_marker="#marker",
+            email_sel="#email",
+            pwd_sel="#password",
+            marker="#marker",
             state_path=Path("state/wardany.json"),
+            save_session_state=lambda *args: None,
         )
         self.assertTrue(detected)
 
@@ -76,10 +78,11 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             page,
             context=object(),
             wait_seconds=10,
-            login_email_selector="#email",
-            login_password_selector="#password",
-            logged_in_marker="#marker",
+            email_sel="#email",
+            pwd_sel="#password",
+            marker="#marker",
             state_path=Path("state/wardany.json"),
+            save_session_state=lambda *args: None,
         )
         self.assertTrue(detected)
 
@@ -95,11 +98,12 @@ class TawreedAuthWaitsTests(unittest.TestCase):
             page,
             context=object(),
             wait_seconds=1,
-            login_email_selector="#email",
-            login_password_selector="#password",
-            logged_in_marker="#marker",
+            email_sel="#email",
+            pwd_sel="#password",
+            marker="#marker",
             state_path=Path("state/wardany.json"),
-            save_intermediate=False,
+            save_session_state=lambda *args: None,
+            save_inter=False,
         )
         self.assertFalse(detected)
 
