@@ -4,7 +4,12 @@ from rapidfuzz import fuzz
 
 from .config import MatchingConfig
 from .normalizer import DrugComponents
-from .indexer_lookup import BrandLookup, ComponentLookup, FuzzyLookup, BestMatchFinder
+from .indexer_lookup import (
+    BrandLookup,
+    ComponentLookup,
+    FuzzyLookup,
+    BestMatchFinder,
+)
 
 
 class IndexSearcher:
@@ -30,13 +35,25 @@ class IndexSearcher:
         self._parsed = parsed
         self._prices = prices
         self._cfg = cfg or MatchingConfig()
-        
-        self._brand_lookup = BrandLookup(brand_index, parsed, self._cfg, norms, prices)
-        self._component_lookup = ComponentLookup(component_index, parsed, self._cfg, norms, prices)
-        self._fuzzy_lookup = FuzzyLookup(prefix_index, self._cfg, norms)
+        self._init_lookups(brand_index, component_index, prefix_index)
+
+    def _init_lookups(self, brand_index, component_index, prefix_index):
+        """Initialize lookup objects."""
+        self._brand_lookup = BrandLookup(
+            brand_index, self._parsed, self._cfg, self._norms, self._prices
+        )
+        self._component_lookup = ComponentLookup(
+            component_index, self._parsed, self._cfg, self._norms, self._prices
+        )
+        self._fuzzy_lookup = FuzzyLookup(prefix_index, self._cfg, self._norms)
         self._best_match_finder = BestMatchFinder(
-            self._brand_lookup, self._component_lookup, self._fuzzy_lookup,
-            parsed, self._cfg, norms, self.get_record
+            self._brand_lookup,
+            self._component_lookup,
+            self._fuzzy_lookup,
+            self._parsed,
+            self._cfg,
+            self._norms,
+            self.get_record,
         )
 
     def get_record(self, idx: int) -> dict:

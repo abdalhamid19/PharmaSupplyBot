@@ -2,12 +2,10 @@
 
 This module provides the main MatchTraceLog interface and delegates
 specialized logging to helper modules:
-- trace_log_candidate.py: Candidate generation events
-- trace_log_scoring.py: Scoring and fuzzy matching events
+- trace_log_candidate_scoring.py: Candidate generation and scoring events
 - trace_log_ai.py: AI verification, search, and review events
 - trace_log_summary.py: Summary generation and output writing
-- trace_log_phase1.py: Phase 1 algorithmic steps
-- trace_log_phase2.py: Phase 2 & 3 AI steps
+- trace_log_phases.py: Phase 1, 2 & 3 algorithmic and AI steps
 """
 
 from __future__ import annotations
@@ -16,12 +14,14 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from .trace_log_candidate import CandidateEventLogger
-from .trace_log_scoring import ScoringEventLogger
+from .trace_log_candidate_scoring import (
+    CandidateEventLogger,
+    ScoringEventLogger,
+)
 from .trace_log_ai import AIEventLogger
-from .trace_log_summary import SummaryWriter, TraceOutputWriter
-from .trace_log_phase1 import Phase1Methods
-from .trace_log_phase2 import Phase2Methods
+from .trace_log_summary import SummaryWriter
+from .trace_log_output import TraceOutputWriter
+from .trace_log_phases import Phase1Methods, Phase2Methods
 
 logger = logging.getLogger("pharmasupplybot.matching")
 

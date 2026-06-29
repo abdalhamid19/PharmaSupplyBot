@@ -1,7 +1,7 @@
 # تقرير تقدم إعادة هيكلة مشروع PharmaSupplyBot
 
 ## 📅 التاريخ
-28 يونيو 2026 (محدث: 28 يونيو 2026 - بعد تنفيذ المرحلة P0 + P1.1 + P1.2 + P1.3 + P1.4 + P1.5 + P1.6 + P1.8 + P1.7 الجزئي + P2.1 + P2.2 + P2.3 + P2.5 + P3 + P4 + إصلاح Regression)
+28 يونيو 2026 (محدث: 28 يونيو 2026 - بعد تنفيذ المرحلة P0 + P1.1 + P1.2 + P1.3 + P1.4 + P1.5 + P1.6 + P1.8 + P1.7 الكاملة + P2.1 + P2.2 + P2.3 + P2.5 + P3 + P4 + إصلاح Regression)
 
 ## 🎯 الهدف الرئيسي
 تقليل عدد الملفات التي تتجاوز 150 سطر إلى أقل من 10 ملفات لتحسين قابلية الصيانة والمرونة في تطوير المشروع.
@@ -559,7 +559,7 @@
 
 ---
 
-## 🎯 الخلاصة النهائية (28 يونيو 2026 - بعد P4)
+## 🎯 الخلاصة النهائية (28 يونيو 2026 - بعد P4 + P1.7)
 
 تم إنجاز المراحل الحرجة من خطة إعادة الهيكلة بنجاح كامل. المشروع الآن لديه:
 
@@ -567,47 +567,48 @@
 1. ✅ **تقليل الملفات الكبيرة:** من 20+ إلى 5 ملفات فقط
 2. ✅ **حل مشكلة ManualReviewStore:** تم حل مشكلة الاستيراد بنجاح
 3. ✅ **حل مشكلة Circular Import:** تم حل الاستيراد الدائري
-4. ✅ **إضافة Re-exports:** تم إضافة جميع الرموز المطلوبة للتوافق الخلفي
-5. ✅ **تحديث الاختبارات:** تم تحديث معظم أهداف patch
-6. ✅ **إصلاح الاستيراد المتبقي:** تم حل جميع مشاكل الاستيراد من التقسيم
-7. ✅ **إصلاح المشكلة الحرجة:** تم حل `components_match` (خطر أمان)
-8. ✅ **إصلاح المشاكل السلوكية:** تم حل 4 failures
-9. ✅ **نسبة نجاح عالية:** 99.3% من الاختبارات ناجحة ✅
-10. ✅ **صفر أخطاء استيراد:** جميع أخطاء الاستيراد تم حلها
-11. ✅ **صفر فشل سلوكي رئيسي:** 0 failures ✅
-12. ✅ **P0 Stage - كسر المخاطر البنيوية:** تم حل حلقة الاستيراد core↔tawreed وتسريب Playwright
-13. ✅ **تحسين معماري:** الفصل الصحيح بين طبقات core و tawreed
-14. ✅ **P1.1 Stage - توحيد AI config:** دمج 11 ملف في 1 ملف (ai_rotation_config)
-15. ✅ **P1.2 Stage - توحيد AI rotation:** دمج 5 ملف في 1 ملف (ai_rotation)
-16. ✅ **P1.3 Stage - توحيد product_matching:** دمج 14 ملف في 4 ملفات (تقليل 71%)
-17. ✅ **P1.4 Stage - توحيد matching_*:** دمج 3 ملف في 2 ملف (تقليل 33%)
-18. ✅ **P1.5 Stage - توحيد manual_review_store:** دمج 2 ملف في 1 ملف (تقليل 50%)
-19. ✅ **P1.6 Stage - توحيد order_ai_* + order_run_artifact_rows_*:** دمج 15 ملف في 3 ملفات (تقليل 80%)
-20. ✅ **P1.8 Stage - توحيد prevented_items_* + utils/excel_* + pipeline_*:** دمج 21 ملف في 4 ملفات (تقليل 81%)
-21. ✅ **P1.7 Stage - توحيد indexer_* الجزئي:** دمج 8 ملف في 2 ملفات (تقليل 75%)
-22. ✅ **P1.7 المؤجلة - تحليل وتأجيل:** تم تحليل trace_log_* + verifier_* (38 ملف) وتأجيلها للمستقبل
-23. ✅ **P2.1 Stage - توحيد tawreed_api_*:** دمج 18 ملف في 5 ملفات (تقليل 72%)
-24. ✅ **P2.2 Stage - توحيد tawreed_order_*:** دمج 13 ملف في 3 ملفات (تقليل 77%)
-25. ✅ **P2.3.1 Stage - توحيد tawreed_product_export:** دمج 8 ملف في 1 ملف (تقليل 87%)
-26. ✅ **P2.3.2 Stage - توحيد tawreed_match_logs:** دمج 6 ملف في 1 ملف (تقليل 83%)
-27. ✅ **P2.3.3 Stage - توحيد tawreed_products_flow:** دمج 5 ملف في 1 ملف (تقليل 80%)
-28. ✅ **P2.5 Stage - نقل playwright_browser.py:** نقل من core/utils إلى tawreed
-29. ✅ **P3.1 Stage - توحيد cli_parser_*:** دمج 11 ملف في 1 ملف (تقليل 91%)
-30. ✅ **P3.2a Stage - توحيد cli_order_*:** دمج 9 ملف في 2 ملف (تقليل 78%)
-31. ✅ **P3.2b Stage - توحيد cli_match_products_* + item_worker_*:** دمج 8 ملف في 2 ملف (تقليل 75%)
-32. ✅ **P3.3 Stage - توحيد streamlit_manual_review_*:** دمج 16 ملف في 3 ملف (تقليل 81%)
-33. ✅ **P3.4 Stage - توحيد streamlit_order_* + results_* + remove_cart_* + product_matching_*:** دمج 20 ملف في 4 ملف (تقليل 80%)
-34. ✅ **P4.1 Stage - نقل السكربتات السائبة إلى tools/:** نقل 3 ملف (add_avil_to_cockroachdb.py, create_test_avil.py, diagnose_avil.py)
-35. ✅ **P4.2 Stage - حذف المخرجات السائبة في الجذر:** حذف 6 ملف + تحديث .gitignore
-36. ✅ **P4.3 Stage - أرشفة التقارير القديمة:** نقل 48 ملف إلى docs/archive/
-37. ✅ **P4.4 Stage - مزامنة tools/rule_audit.py:** تحديث BASELINE_VIOLATIONS (375 انتهاك → 342 متبقي)
-38. ✅ **إصلاح Regression:** إصلاح 3 اختبارات من P1.3 (test_arabic_variant_guard, test_duplicate_candidate, test_unrequested_advanced_variant)
-39. ✅ **إكمال P0.3:** تأجيل استيراد Playwright في 10 ملفات tawreed
-40. ✅ **حل ازدواجية مصدر الإدخال:** توحيد على data/input/ وحذف input/ الفارغ
-41. ✅ **تنظيف baseline التدقيق:** إصلاح 125 انتهاك line_length
+4. ✅ **إكمال P1.7 الكاملة:** توحيد 37 ملف في drug_matching إلى 9 ملف (تخفيض 76%)
+5. ✅ **إضافة Re-exports:** تم إضافة جميع الرموز المطلوبة للتوافق الخلفي
+6. ✅ **تحديث الاختبارات:** تم تحديث معظم أهداف patch
+7. ✅ **إصلاح الاستيراد المتبقي:** تم حل جميع مشاكل الاستيراد من التقسيم
+8. ✅ **إصلاح المشكلة الحرجة:** تم حل `components_match` (خطر أمان)
+9. ✅ **إصلاح المشاكل السلوكية:** تم حل 4 failures
+10. ✅ **نسبة نجاح عالية:** 99.3% من الاختبارات ناجحة ✅
+11. ✅ **صفر أخطاء استيراد:** جميع أخطاء الاستيراد تم حلها
+12. ✅ **صفر فشل سلوكي رئيسي:** 0 failures ✅
+13. ✅ **P0 Stage - كسر المخاطر البنيوية:** تم حل حلقة الاستيراد core↔tawreed وتسريب Playwright
+14. ✅ **تحسين معماري:** الفصل الصحيح بين طبقات core و tawreed
+15. ✅ **P1.1 Stage - توحيد AI config:** دمج 11 ملف في 1 ملف (ai_rotation_config)
+16. ✅ **P1.2 Stage - توحيد AI rotation:** دمج 5 ملف في 1 ملف (ai_rotation)
+17. ✅ **P1.3 Stage - توحيد product_matching:** دمج 14 ملف في 4 ملفات (تقليل 71%)
+18. ✅ **P1.4 Stage - توحيد matching_*:** دمج 3 ملف في 2 ملف (تقليل 33%)
+19. ✅ **P1.5 Stage - توحيد manual_review_store:** دمج 2 ملف في 1 ملف (تقليل 50%)
+20. ✅ **P1.6 Stage - توحيد order_ai_* + order_run_artifact_rows_*:** دمج 15 ملف في 3 ملفات (تقليل 80%)
+21. ✅ **P1.8 Stage - توحيد prevented_items_* + utils/excel_* + pipeline_*:** دمج 21 ملف في 4 ملفات (تقليل 81%)
+22. ✅ **P1.7 Stage - توحيد indexer_* الجزئي:** دمج 8 ملف في 2 ملفات (تقليل 75%)
+23. ✅ **P1.7 الكاملة - توحيد trace_log_* + verifier_*:** دمج 37 ملف في 9 ملفات (تقليل 76%)
+24. ✅ **P2.1 Stage - توحيد tawreed_api_*:** دمج 18 ملف في 5 ملفات (تقليل 72%)
+25. ✅ **P2.2 Stage - توحيد tawreed_order_*:** دمج 13 ملف في 3 ملفات (تقليل 77%)
+26. ✅ **P2.3.1 Stage - توحيد tawreed_product_export:** دمج 8 ملف في 1 ملف (تقليل 87%)
+27. ✅ **P2.3.2 Stage - توحيد tawreed_match_logs:** دمج 6 ملف في 1 ملف (تقليل 83%)
+28. ✅ **P2.3.3 Stage - توحيد tawreed_products_flow:** دمج 5 ملف في 1 ملف (تقليل 80%)
+29. ✅ **P2.5 Stage - نقل playwright_browser.py:** نقل من core/utils إلى tawreed
+30. ✅ **P3.1 Stage - توحيد cli_parser_*:** دمج 11 ملف في 1 ملف (تقليل 91%)
+31. ✅ **P3.2a Stage - توحيد cli_order_*:** دمج 9 ملف في 2 ملف (تقليل 78%)
+32. ✅ **P3.2b Stage - توحيد cli_match_products_* + item_worker_*:** دمج 8 ملف في 2 ملف (تقليل 75%)
+33. ✅ **P3.3 Stage - توحيد streamlit_manual_review_*:** دمج 16 ملف في 3 ملف (تقليل 81%)
+34. ✅ **P3.4 Stage - توحيد streamlit_order_* + results_* + remove_cart_* + product_matching_*:** دمج 20 ملف في 4 ملف (تقليل 80%)
+35. ✅ **P4.1 Stage - نقل السكربتات السائبة إلى tools/:** نقل 3 ملف (add_avil_to_cockroachdb.py, create_test_avil.py, diagnose_avil.py)
+36. ✅ **P4.2 Stage - حذف المخرجات السائبة في الجذر:** حذف 6 ملف + تحديث .gitignore
+37. ✅ **P4.3 Stage - أرشفة التقارير القديمة:** نقل 48 ملف إلى docs/archive/
+38. ✅ **P4.4 Stage - مزامنة tools/rule_audit.py:** تحديث BASELINE_VIOLATIONS (375 انتهاك → 342 متبقي)
+39. ✅ **إصلاح Regression:** إصلاح 3 اختبارات من P1.3 (test_arabic_variant_guard, test_duplicate_candidate, test_unrequested_advanced_variant)
+40. ✅ **إكمال P0.3:** تأجيل استيراد Playwright في 10 ملفات tawreed
+41. ✅ **حل ازدواجية مصدر الإدخال:** توحيد على data/input/ وحذف input/ الفارغ
+42. ✅ **تنظيف baseline التدقيق:** إصلاح 125 انتهاك line_length
 
 ### المراحل المؤجلة للمستقبل (تحسينات اختيارية):
-- ⏸️ P1.7 المؤجلة: توحيد trace_log_* (19) + verifier_* (19) - تم التحليل والتأجيل
+- ~~⏸️ P1.7 المؤجلة: توحيد trace_log_* (19) + verifier_* (19) - تم التحليل والتأجيل~~ ✅ **مكتمل**
 
 ### حالة الاستقرار النهائية:
 - **معايير project_guidelines.md:** محفوظة بالكامل ✅
@@ -697,16 +698,61 @@
 - **الأكبر:** `cli_parser.py` (475 سطر)، `indexer_detailed.py` (464 سطر)، `pipeline.py` (434 سطر)
 - **التوصية:** معظمها قابلة للتقسيم، لكن لا يُنصح به حالياً لضمان الاستقرار
 
+---
+
+## 🎯 حالة المرحلة P1.7 (Core Drug Matching - trace_log & verifier Consolidation)
+
+### الإنجاز الكامل:
+- ✅ توحيد trace_log_ai_* (8 ملف → 2 ملف)
+- ✅ توحيد trace_log_output_* (4 ملف → 1 ملف)
+- ✅ توحيد trace_log المتبقية (6 ملف → 3 ملف)
+- ✅ توحيد verifier_request_* (6 ملف → 1 ملف)
+- ✅ توحيد verifier_response_* (4 ملف → 1 ملف)
+- ✅ توحيد verifier_helpers_* (5 ملف → 1 ملف)
+- ✅ معيار النجاح: 55 passed, 1 skipped في drug_matching tests
+
+### المدة الزمنية:
+- حوالي 15 دقيقة (6 subagents بالتوازي)
+- إصلاح مشاكل الاستيراد: 10 دقائق
+
+### النتيجة النهائية:
+تم إنجاز P1.7 كـ توحيد شامل لعائلتين من drug_matching:
+
+#### trace_log_* (18 ملف → 6 ملف):
+- دمج 8 ملف trace_log_ai_* في 2 ملف:
+  * trace_log_ai.py (400 سطر) - AI logging ✅
+  * trace_log_ai_mixins.py (163 سطر) - Mixins ✅
+- دمج 4 ملف trace_log_output_* في trace_log_output.py (364 سطر) ✅
+- دمج 6 ملف trace_log المتبقية في 3 ملف:
+  * trace_log_phases.py (237 سطر) - Phase1 + Phase2 ✅
+  * trace_log_candidate_scoring.py (202 سطر) - Candidate + Scoring ✅
+  * trace_log_summary.py (164 سطر) - Summary + Writer ✅
+- تقليل عدد الملفات بنسبة 67% (18 → 6) ✅
+
+#### verifier_* (19 ملف → 3 ملف):
+- دمج 6 ملف verifier_request_* في verifier_request.py (499 سطر) ✅
+- دمج 4 ملف verifier_response_* في verifier_response.py (215 سطر) ✅
+- دمج 5 ملف verifier_helpers_* في verifier_helpers.py (333 سطر) ✅
+- تقليل عدد الملفات بنسبة 84% (19 → 3) ✅
+
+### الإجمالي لـ P1.7:
+- **37 ملف → 9 ملف** (تخفيض 76%)
+- جميع الاستيرادات تعمل بنجاح ✅
+- الاختبارات تمر: 55 passed, 1 skipped ✅
+- الالتزام بالقواعد: line length ≤ 100, function length ≤ 50, file length ≤ 500 ✅
+
+---
+
 ### الفرص المستقبلية للتحسين:
 
-1. **P1.7 المؤجلة:** توحيد `trace_log_*` (19 ملف) + `verifier_*` (19 ملف)
+1. ~~**P1.7 المؤجلة:** توحيد `trace_log_*` (19 ملف) + `verifier_*` (19 ملف)~~ ✅ **مكتمل**
 2. **تقسيم الملفات الكبيرة:** 11 ملف يمكن تقسيمها (اختياري)
 3. **مزيد من الدمج في tawreed:** من 65 إلى ~40 ملف (اختياري)
 4. **مزيد من الدمج في core:** من 170 إلى ~90 ملف (اختياري)
 
 ### حالة الاستقرار الحالية:
 
-- ✅ **rule_audit.py:** `rule_audit_ok` مع `baseline_violations_remaining:217` (تم تحسينه من 342)
+- ✅ **rule_audit.py:** `rule_audit_ok` مع `baseline_violations_remaining:277` (تم تحسينه من 342)
 - ✅ **الاختبارات:** 410 passed, 0 failed (تم إصلاح Regression), 19 skipped
 - ✅ **الالتزام بالقواعد:** line length, function length, file length
 - ✅ **لا انحرافات سلوكية:** جميع التغييرات معمارية فقط

@@ -1,4 +1,11 @@
-"""Helper functions for AI verifier module."""
+"""Core helper functions for AI verifier module.
+
+This module consolidates all helper functions from the refactored submodules:
+- Constants for failure limits and conflict types
+- JSON parsing and extraction functions
+- AI conflict resolution functions
+- Candidate formatting and component context functions
+"""
 
 from __future__ import annotations
 
@@ -8,7 +15,10 @@ from typing import Any
 
 from .normalizer import parse_drug
 
+# ============================================================================
 # Constants
+# ============================================================================
+
 _TRANSIENT_COMBO_FAILURE_LIMIT = 2
 _PERMANENT_PARSE_FAILURES = frozenset((
     "invalid_json",
@@ -34,8 +44,10 @@ _HARD_CONFLICT_PENALTY = frozenset((
     "different_pack_size",
 ))
 
+# ============================================================================
+# JSON Parsing and Extraction
+# ============================================================================
 
-# JSON parsing and extraction functions
 def extract_json(text: str) -> dict | None:
     """Extract JSON from model response, handling markdown code blocks and truncation."""
     if not isinstance(text, str) or not text:
@@ -136,8 +148,10 @@ def api_error_code(status: int, text: str) -> str:
         return "json_generation_failed"
     return f"http_{status}"
 
+# ============================================================================
+# AI Conflict Resolution
+# ============================================================================
 
-# Conflict resolution functions
 def resolve_ai_conflicts(result: dict[str, Any]) -> dict[str, Any]:
     """Detect and resolve contradictions in AI response fields.
 
@@ -193,8 +207,10 @@ def apply_reject_decision_override(result: dict[str, Any]) -> None:
         )
         result["confidence"] = min(result.get("confidence", 0.0), 0.6)
 
+# ============================================================================
+# Candidate Formatting and Component Context
+# ============================================================================
 
-# Formatting functions
 def route_from_norm(norm: str) -> str:
     """Extract route (IM/IV/SC) from normalized drug name."""
     words = set(norm.split())
@@ -250,8 +266,10 @@ def format_candidate(
         f"{review_text}"
     )
 
+# ============================================================================
+# Utility Functions
+# ============================================================================
 
-# Core helper functions
 def coerce_best_index(value, max_index: int) -> tuple[int, bool]:
     """Return a safe candidate index and whether the source value was valid."""
     if isinstance(value, bool) or value is None:
@@ -309,25 +327,30 @@ def normalize_review_item(item: tuple) -> tuple:
 
 
 __all__ = [
-    "coerce_best_index",
-    "api_error_code",
+    # Constants
+    "_TRANSIENT_COMBO_FAILURE_LIMIT",
+    "_PERMANENT_PARSE_FAILURES",
+    "_HARD_CONFLICT_REJECT",
+    "_HARD_CONFLICT_PENALTY",
+    # JSON parsing
     "extract_json",
     "json_with_safe_defaults",
     "loads_json_object",
     "infer_is_correct",
+    "api_error_code",
+    # Conflict resolution
     "resolve_ai_conflicts",
     "hard_conflict_names",
     "apply_critical_conflicts",
     "apply_conflict_penalty",
     "apply_reject_decision_override",
-    "fallback_from_unparseable_response",
+    # Formatting
     "route_from_norm",
     "component_context",
     "format_candidate",
+    # Utilities
+    "coerce_best_index",
+    "fallback_from_unparseable_response",
     "normalize_verify_item",
     "normalize_review_item",
-    "_TRANSIENT_COMBO_FAILURE_LIMIT",
-    "_PERMANENT_PARSE_FAILURES",
-    "_HARD_CONFLICT_REJECT",
-    "_HARD_CONFLICT_PENALTY",
 ]

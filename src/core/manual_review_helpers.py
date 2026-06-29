@@ -28,12 +28,18 @@ def _lookup_with_retry(item: Item, max_attempts: int = 3) -> ManualReviewDecisio
 
 def _log_retry_warning(item, attempt, e):
     """Log retry warning."""
-    logger.warning(f"Manual review lookup attempt {attempt + 1} failed for {item.code}/{item.name}: {type(e).__name__}: {e}, retrying...")
+    logger.warning(
+        f"Manual review lookup attempt {attempt + 1} failed for {item.code}/{item.name}: "
+        f"{type(e).__name__}: {e}, retrying..."
+    )
 
 
 def _log_retry_failure(item, max_attempts, e):
     """Log retry failure."""
-    logger.error(f"Manual review lookup failed after {max_attempts} attempts for {item.code}/{item.name}: {type(e).__name__}: {e}")
+    logger.error(
+        f"Manual review lookup failed after {max_attempts} attempts for {item.code}/{item.name}: "
+        f"{type(e).__name__}: {e}"
+    )
 
 
 def _blocks_candidate(decision: ManualReviewDecision | None) -> bool:

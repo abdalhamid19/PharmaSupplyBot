@@ -326,10 +326,45 @@ class BestMatchFinder:
         return min(score, 100.0)
 
 
+class LookupEngine:
+    """Wrapper for all lookup engines."""
+
+    def __init__(
+        self,
+        norms,
+        parsed,
+        prices,
+        brand_index,
+        component_index,
+        prefix_index,
+        cfg,
+    ):
+        self._brand_lookup = BrandLookup(
+            brand_index, parsed, cfg, norms, prices
+        )
+        self._component_lookup = ComponentLookup(
+            component_index, parsed, cfg, norms, prices
+        )
+        self._fuzzy_lookup = FuzzyLookup(prefix_index, cfg, norms)
+
+    def component_lookup(self, parsed, query_price):
+        """Component lookup."""
+        return self._component_lookup.lookup(parsed, query_price)
+
+    def brand_lookup(self, parsed, query_price):
+        """Brand lookup."""
+        return self._brand_lookup.lookup(parsed, query_price)
+
+    def fuzzy_choices(self, norm):
+        """Get fuzzy choices."""
+        return self._fuzzy_lookup._fuzzy_choices(norm)
+
+
 __all__ = [
     "BrandLookup",
     "ComponentLookup",
     "FuzzyLookup",
     "BestMatchFinder",
+    "LookupEngine",
     "_FUZZY_SCORERS",
 ]

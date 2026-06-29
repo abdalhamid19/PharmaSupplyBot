@@ -55,21 +55,29 @@ class AIVerifierMethods:
 
         result = await self._planner.call_api(self._session, payload)
         if result is None:
-            return {"is_correct": True, "reason": "all_api_failed", "confidence": 0.0, "api_failed": True}
+            return {
+                "is_correct": True,
+                "reason": "all_api_failed",
+                "confidence": 0.0,
+                "api_failed": True,
+            }
         result.pop("agree", None)
         return process_api_response(result)
 
     async def verify_batch(self, matches: list[tuple]) -> list[dict[str, Any]]:
         """Verify a batch of matches. Each item is (drug_a, drug_b, drug_b_ar, row_index)."""
         normalized = [normalize_verify_item(item) for item in matches]
-        tasks = [
-            self.verify_one(a, b, ar, score, method, inv_price, cand_price)
-            for (
-                a, b, ar, _, score, method, inv_price, cand_price
-            ) in normalized
-        ]
+        tasks = [self._verify_task(item) for item in normalized]
         results = await asyncio.gather(*tasks, return_exceptions=True)
+        return self._process_batch_results(results, normalized)
 
+    async def _verify_task(self, item: tuple) -> dict[str, Any]:
+        """Verify a single normalized item."""
+        a, b, ar, _, score, method, inv_price, cand_price = item
+        return await self.verify_one(a, b, ar, score, method, inv_price, cand_price)
+
+    def _process_batch_results(self, results, normalized) -> list[dict[str, Any]]:
+        """Process batch verification results."""
         out = []
         for i, r in enumerate(results):
             if isinstance(r, Exception):

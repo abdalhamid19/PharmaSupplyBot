@@ -40,13 +40,15 @@ class IndexBuilder:
         self._names_en = df["product_name_en"].tolist()
         self._names_ar = df["product_name_ar"].tolist()
         self._ids = df["store_product_id"].astype(str).tolist()
-        self._prices = (
-            [self._parse_price(v) for v in df[price_col].tolist()]
-            if price_col
-            else [None] * len(df)
-        )
+        self._prices = self._extract_prices(df, price_col)
         self._norms = [normalize(n) for n in self._names_en]
         self._parsed = [parse_drug(n) for n in self._names_en]
+
+    def _extract_prices(self, df: pd.DataFrame, price_col: str | None) -> list[float | None]:
+        """Extract prices from DataFrame column."""
+        if not price_col:
+            return [None] * len(df)
+        return [self._parse_price(v) for v in df[price_col].tolist()]
 
     def _build_indexes(self) -> None:
         """Build all inverted indexes."""

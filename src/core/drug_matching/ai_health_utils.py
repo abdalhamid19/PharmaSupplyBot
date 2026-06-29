@@ -57,13 +57,8 @@ def reset_in_text(value: Any, now: float | None = None) -> str:
     now = time.time() if now is None else now
     if raw.isdigit():
         number = float(raw)
-        # Small values are usually delta seconds, large values are Unix time.
         seconds = number - now if number > 1_000_000_000 else number
         return _duration_from_seconds(seconds)
-    try:
-        return _duration_from_seconds(float(raw))
-    except ValueError:
-        pass
     try:
         reset_at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         if reset_at.tzinfo is None:
