@@ -96,6 +96,7 @@ def infer_is_correct(text: str) -> bool:
 
 
 def api_error_code(status: int, text: str) -> str:
+    """Extract API error code from HTTP status and response text."""
     lowered = text.lower()
     if status == 400 and (
         "failed_generation" in lowered

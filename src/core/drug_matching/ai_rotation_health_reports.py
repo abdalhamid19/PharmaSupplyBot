@@ -10,6 +10,7 @@ from .ai_health import OUT_DIR
 
 
 def write_rotation_reports(rows: list[dict]) -> tuple[Path, Path]:
+    """Write rotation health test results to CSV and JSON files."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_path = OUT_DIR / f"ai_rotation_test_{stamp}.csv"
@@ -28,6 +29,7 @@ def write_rotation_reports(rows: list[dict]) -> tuple[Path, Path]:
 
 
 def load_latest_rotation_health(max_age_s: float) -> list[dict]:
+    """Load the most recent rotation health report within max_age_s seconds."""
     if max_age_s <= 0 or not OUT_DIR.exists():
         return []
     paths = sorted(OUT_DIR.glob("ai_rotation_test_*.json"), reverse=True)

@@ -26,21 +26,48 @@ def components_match(d: DrugComponents, m: DrugComponents, brand_prefix_min: int
     
     if _has_reliable_english_name(d) and _has_reliable_english_name(m):
         # Check for unsafe modifiers first (PLUS, EXTRA, FORTE, etc.)
-        critical_modifiers = {'PLUS', 'EXTRA', 'FORTE', 'MAX', 'SUPER', 'ADVANCE'}
+        critical_modifiers = {
+            "PLUS",
+            "EXTRA",
+            "FORTE",
+            "MAX",
+            "SUPER",
+            "ADVANCE",
+        }
         d_critical = d_words & critical_modifiers
         m_critical = m_words & critical_modifiers
         if d_critical != m_critical:
             return False, "different_modifier"
-        
+
         # Check for age group differences (ADULT vs KIDS, etc.)
-        age_keywords = {'ADULT', 'ADULTS', 'KID', 'KIDS', 'CHILDREN', 'BABY', 'INFANT', 'INFANTS', 'PEDIATRIC', 'PAEDIATRIC'}
+        age_keywords = {
+            "ADULT",
+            "ADULTS",
+            "KID",
+            "KIDS",
+            "CHILDREN",
+            "BABY",
+            "INFANT",
+            "INFANTS",
+            "PEDIATRIC",
+            "PAEDIATRIC",
+        }
         d_age = d_words & age_keywords
         m_age = m_words & age_keywords
         if d_age != m_age:
             return False, "different_age_group"
-        
+
         # Check for flavor differences (MINT vs GREEN, etc.)
-        flavor_keywords = {'MINT', 'GREEN', 'CHOCOLATE', 'VANILLA', 'STRAWBERRY', 'ORANGE', 'LEMON', 'BERRY'}
+        flavor_keywords = {
+            "MINT",
+            "GREEN",
+            "CHOCOLATE",
+            "VANILLA",
+            "STRAWBERRY",
+            "ORANGE",
+            "LEMON",
+            "BERRY",
+        }
         d_flavor = d_words & flavor_keywords
         m_flavor = m_words & flavor_keywords
         if d_flavor != m_flavor:
@@ -70,7 +97,14 @@ def components_match(d: DrugComponents, m: DrugComponents, brand_prefix_min: int
     
     # Additional modifier check (non-critical modifiers)
     if _has_reliable_english_name(d) and _has_reliable_english_name(m):
-        modifiers_to_check = (CRITICAL_MODIFIERS | VITAMIN_MODIFIERS) - {'PLUS', 'EXTRA', 'FORTE', 'MAX', 'SUPER', 'ADVANCE'}
+        modifiers_to_check = (CRITICAL_MODIFIERS | VITAMIN_MODIFIERS) - {
+            "PLUS",
+            "EXTRA",
+            "FORTE",
+            "MAX",
+            "SUPER",
+            "ADVANCE",
+        }
         if d.product_class == "baby_food" or m.product_class == "baby_food":
             modifiers_to_check |= BABY_FORMULA_MODIFIERS
         

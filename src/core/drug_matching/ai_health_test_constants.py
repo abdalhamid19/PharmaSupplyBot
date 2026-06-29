@@ -29,6 +29,8 @@ TEST_MESSAGES = [
 
 @dataclass(frozen=True, slots=True)
 class AIKey:
+    """API key credentials for AI provider authentication."""
+
     name: str
     value: str
 

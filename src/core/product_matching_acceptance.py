@@ -309,6 +309,25 @@ def _safe_omitted_percentage_concentration(tokens: set[str], requested, offered)
 # ── Main acceptance logic ──
 
 
+def _check_rejections(
+    score_query: str,
+    candidate: dict[str, Any],
+    skip_components: bool = False,
+) -> tuple[bool, str]:
+    """Check all rejection criteria and return (is_rejected, reason)."""
+    checks = [
+        _candidate_variant_rejection(score_query, candidate),
+        compatibility_rejection_reason(score_query, _candidate_english_name(candidate)),
+    ]
+    if not skip_components:
+        checks.append(_candidate_component_rejection(score_query, candidate))
+
+    for reason in checks:
+        if reason:
+            return True, reason
+    return False, ""
+
+
 def _diagnostic_acceptance(
     score_query: str,
     candidate: dict[str, Any],
@@ -317,20 +336,11 @@ def _diagnostic_acceptance(
     skip_components: bool = False,
 ) -> tuple[bool, str, str]:
     """Return acceptance status and reason text for a candidate."""
-    variant_rejection = _candidate_variant_rejection(score_query, candidate)
-    if variant_rejection:
-        return False, "", variant_rejection
-
-    lexical_rejection = compatibility_rejection_reason(
-        score_query, _candidate_english_name(candidate)
+    is_rejected, rejection_reason = _check_rejections(
+        score_query, candidate, skip_components
     )
-    if lexical_rejection:
-        return False, "", lexical_rejection
-
-    if not skip_components:
-        component_rejection = _candidate_component_rejection(score_query, candidate)
-        if component_rejection:
-            return False, "", component_rejection
+    if is_rejected:
+        return False, "", rejection_reason
 
     acceptance = _numeric_acceptance(score_query, candidate, breakdown, matching_config)
     acceptance = _orderable_acceptance(candidate, acceptance)

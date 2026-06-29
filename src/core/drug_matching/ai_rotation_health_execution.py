@@ -16,6 +16,7 @@ async def run_rotation_health(
     max_tokens: int,
     concurrency: int,
 ) -> list[dict]:
+    """Execute health checks for all rotation attempts and return ranked results."""
     connector = aiohttp.TCPConnector(limit=concurrency)
     async with aiohttp.ClientSession(connector=connector) as session:
         sem = asyncio.Semaphore(concurrency)

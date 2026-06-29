@@ -47,6 +47,7 @@ def coerce_best_index(value, max_index: int) -> tuple[int, bool]:
 
 
 def fallback_from_unparseable_response(text: str, model: str) -> dict[str, Any]:
+    """Return a fallback verification result when AI response cannot be parsed."""
     return {
         "is_correct": False,
         "agree": False,

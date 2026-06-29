@@ -69,6 +69,7 @@ def _capture_and_validate_session(
 def capture_headless_state(
     page, context, selectors, state_path: Path, wait_seconds: int
 ):
+    """Capture browser state during headless authentication refresh."""
     attempt_env_login(page, selectors)
     print_auth_instructions(wait_seconds, headless=True)
     detected = wait_for_login_detection(
@@ -84,6 +85,7 @@ def capture_headless_state(
 
 
 def require_env_credentials(profile_key: str) -> None:
+    """Require TAWREED_EMAIL and TAWREED_PASSWORD environment variables to be set."""
     email = os.getenv("TAWREED_EMAIL", "").strip()
     password = os.getenv("TAWREED_PASSWORD", "").strip()
     if email and password:
@@ -96,6 +98,7 @@ def require_env_credentials(profile_key: str) -> None:
 
 
 def products_page_url(base_url: str) -> str:
+    """Construct the products page URL from the base URL."""
     if "#/" in base_url:
         origin, _ = base_url.split("#/", 1)
         return f"{origin}{PRODUCTS_PAGE_ROUTE}"

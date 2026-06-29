@@ -88,6 +88,7 @@ def _load(name: str, fallback: str) -> str:
 
 
 def render_prompt(template: str, **values) -> str:
+    """Render a prompt template with the provided values using safe substitution."""
     clean = {k: "" if v is None else str(v) for k, v in values.items()}
     return Template(template).safe_substitute(clean)
 

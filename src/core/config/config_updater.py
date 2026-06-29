@@ -24,7 +24,9 @@ def _process_config_lines(lines: list[str], new_flags: dict[str, bool]):
             in_matching_section = True
             new_lines.append(line)
         elif in_matching_section:
-            in_matching_section, matching_indent = _process_matching_section(line, new_flags, updated_keys, new_lines, matching_indent)
+            in_matching_section, matching_indent = _process_matching_section(
+                line, new_flags, updated_keys, new_lines, matching_indent
+            )
         else:
             new_lines.append(line)
     

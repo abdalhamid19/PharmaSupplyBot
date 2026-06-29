@@ -22,6 +22,7 @@ def resolve_ai_conflicts(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def hard_conflict_names(result: dict[str, Any]) -> set[str]:
+    """Extract and normalize hard conflict names from AI result."""
     hard = result.get("hard_conflicts") or []
     if isinstance(hard, str):
         hard = [h.strip() for h in hard.split(",") if h.strip()]
@@ -29,6 +30,7 @@ def hard_conflict_names(result: dict[str, Any]) -> set[str]:
 
 
 def apply_critical_conflicts(result: dict[str, Any], hard_lower: set[str]) -> None:
+    """Apply critical conflict overrides that force is_correct=False."""
     critical = hard_lower & _HARD_CONFLICT_REJECT
     if critical and result.get("is_correct"):
         result["is_correct"] = False
@@ -42,12 +44,14 @@ def apply_critical_conflicts(result: dict[str, Any], hard_lower: set[str]) -> No
 
 
 def apply_conflict_penalty(result: dict[str, Any], hard_lower: set[str]) -> None:
+    """Apply confidence penalty for non-critical hard conflicts."""
     penalty = hard_lower & _HARD_CONFLICT_PENALTY
     if penalty and result.get("is_correct"):
         result["confidence"] = min(result.get("confidence", 0.0), 0.72)
 
 
 def apply_reject_decision_override(result: dict[str, Any]) -> None:
+    """Override is_correct to False when AI decision is 'reject'."""
     decision = str(result.get("decision", "")).lower().strip()
     if decision == "reject" and result.get("is_correct"):
         result["is_correct"] = False

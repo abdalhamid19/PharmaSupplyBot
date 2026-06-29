@@ -13,6 +13,7 @@ from .normalizer_parsing_inference import _is_pediatric_inf
 
 
 def classify_product(norm):
+    """Classify a normalized product as medicine, device, baby_food, cosmetic, or supplement."""
     words = set(norm.split())
     if {"PRE", "FILLED"} <= words and "SYRINGE" in words:
         return "medicine"
@@ -28,6 +29,7 @@ def classify_product(norm):
 
 
 def brand_variants_from_words(words, primary_brand):
+    """Extract brand variants from a list of words, building prefixes incrementally."""
     variants = []
     def add(value):
         cleaned = re.sub(r"[^A-Z0-9]", "", value)

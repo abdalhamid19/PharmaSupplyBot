@@ -26,6 +26,7 @@ def aggressive_review_decision(
 
 
 def is_aggressive_flagged_decision(decision: MatchDecision | None) -> bool:
+    """Check if a decision was flagged by aggressive matching policy."""
     return bool(decision and decision.final_reason.startswith("Aggressive flagged"))
 
 

@@ -26,7 +26,9 @@ class AIReviewLogger:
         row["step"] = "ai_review_sent"
         row["ai_phase"] = "review"
         row["ai_result"] = first_decision
-        row["ai_confidence"] = round(float(first_confidence), 2) if first_confidence not in (None, "") else ""
+        row["ai_confidence"] = (
+            round(float(first_confidence), 2) if first_confidence not in (None, "") else ""
+        )
         row["candidate_name"] = matched_name or ""
         row["ai_model"] = first_model
         row["ai_review_model"] = review_model
@@ -36,9 +38,14 @@ class AIReviewLogger:
                 f" -> sent to review model={review_model} for FRESH verification"
             )
         else:
+            conf_str = (
+                round(float(first_confidence), 2)
+                if first_confidence not in (None, "")
+                else "N/A"
+            )
             row["selection_reason"] = (
                 f"first_AI={first_decision} model={first_model}"
-                f" confidence={round(float(first_confidence), 2) if first_confidence not in (None, '') else 'N/A'}"
+                f" confidence={conf_str}"
                 f" < review_threshold -> sent to review model={review_model}"
             )
         if price_context:
@@ -66,13 +73,20 @@ class AIReviewLogger:
         row["step"] = "ai_review_result"
         row["ai_phase"] = "review"
         row["ai_result"] = final_action
-        row["ai_confidence"] = round(float(review_confidence), 2) if review_confidence not in (None, "") else ""
+        row["ai_confidence"] = (
+            round(float(review_confidence), 2) if review_confidence not in (None, "") else ""
+        )
         row["ai_review_model"] = review_model
         row["api_failures"] = api_failures
+        conf_str = (
+            round(float(review_confidence), 2)
+            if review_confidence not in (None, "")
+            else "N/A"
+        )
         row["selection_reason"] = (
             f"second_AI={'agrees' if agree else 'disagrees'}"
             f" model={review_model}"
-            f" confidence={round(float(review_confidence), 2) if review_confidence not in (None, '') else 'N/A'}"
+            f" confidence={conf_str}"
             f" reason='{review_reason}'"
             f" action={final_action}"
         )

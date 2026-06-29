@@ -45,7 +45,10 @@ def _build_review_items(to_review):
         # Mark items where first AI had API failure (confidence=0 from fallback)
         is_api_failed = first_confidence == 0.0
         component_reason = str(row.get("_ai_component_reason", ""))
-        first_reason = "API unavailable - no first AI decision was made" if is_api_failed else component_reason
+        if is_api_failed:
+            first_reason = "API unavailable - no first AI decision was made"
+        else:
+            first_reason = component_reason
         items.append((
             drug_a, drug_b or "", drug_b_ar or "", first_decision,
             first_confidence, first_reason, idx, is_api_failed,

@@ -19,23 +19,21 @@ def _has_reliable_english_name(c: DrugComponents) -> bool:
 
 def _modifier_is_optional(modifier, d_words, m_words):
     """Check if modifier is optional based on context."""
-    if modifier == "ADVANCE" and "MILK" in d_words and "MILK" in m_words:
-        return True
-    if modifier == "EXTRA" and ("EMOLLIENT" in d_words or "EMOLLIENT" in m_words):
-        return True
-    if modifier == "NASAL" and ({"SPRAY", "SPRAYS", "DOSES"} & d_words) and ({"SPRAY", "SPRAYS", "DOSES"} & m_words):
-        return True
-    if modifier == "NASAL" and ({"DROPS", "DROP", "EYE"} & d_words) and ({"DROPS", "DROP", "EYE"} & m_words):
-        return True
-    if modifier == "VAGINAL" and ({"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"} & d_words) and ({"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"} & m_words):
-        return True
-    if modifier == "R" and "PROLONGED" in (d_words | m_words):
-        return True
-    if modifier == "SR" and "RETARD" in (d_words | m_words):
-        return True
-    if modifier == "MOUTH" and ("MOUTHWASH" in d_words or "MOUTHWASH" in m_words) and ("WASH" in d_words or "WASH" in m_words):
-        return True
-    return False
+    combined = d_words | m_words
+    nasal = {"SPRAY", "SPRAYS", "DOSES", "DROPS", "DROP", "EYE"}
+    vaginal = {"SUPP", "SUPPS", "CAP", "CAPS", "CAPSULE", "CAPSULES"}
+
+    optional_rules = {
+        "ADVANCE": "MILK" in d_words and "MILK" in m_words,
+        "EXTRA": "EMOLLIENT" in d_words or "EMOLLIENT" in m_words,
+        "NASAL": nasal & d_words and nasal & m_words,
+        "VAGINAL": vaginal & d_words and vaginal & m_words,
+        "R": "PROLONGED" in combined,
+        "SR": "RETARD" in combined,
+        "MOUTH": ("MOUTHWASH" in d_words or "MOUTHWASH" in m_words)
+        and ("WASH" in d_words or "WASH" in m_words),
+    }
+    return optional_rules.get(modifier, False)
 
 
 def _insulin_variant_signature(c: DrugComponents) -> frozenset:

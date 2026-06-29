@@ -11,16 +11,17 @@ state/
 data/manual_review/*.sqlite3
 data/manual_review/*.sqlite3-*
 
-input/*
-!input/order_items/
-input/order_items/*
-!input/order_items/.gitkeep
-!input/prevented_items/
-input/prevented_items/*
-!input/prevented_items/.gitkeep
-!input/remove_items/
-input/remove_items/*
-!input/remove_items/.gitkeep
+# Input directory
+data/input/*
+!data/input/order_items/
+data/input/order_items/*
+!data/input/order_items/.gitkeep
+!data/input/prevented_items/
+data/input/prevented_items/*
+!data/input/prevented_items/.gitkeep
+!data/input/remove_items/
+data/input/remove_items/*
+!data/input/remove_items/.gitkeep
 
 .DS_Store
 Thumbs.db

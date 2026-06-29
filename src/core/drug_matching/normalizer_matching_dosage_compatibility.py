@@ -115,7 +115,9 @@ def _liquid_primary_strength_matches(d_parts, m_parts, d: DrugComponents, m: Dru
     """Check if liquid primary strength matches."""
     if not ({d.form, m.form} & LIQUID_DOSE_FORMS):
         return False
-    return (len(d_parts) == 1 and len(m_parts) > 1 and d_parts[0] == m_parts[0]) or (len(m_parts) == 1 and len(d_parts) > 1 and m_parts[0] == d_parts[0])
+    single_to_multi = len(d_parts) == 1 and len(m_parts) > 1 and d_parts[0] == m_parts[0]
+    multi_to_single = len(m_parts) == 1 and len(d_parts) > 1 and m_parts[0] == d_parts[0]
+    return single_to_multi or multi_to_single
 
 
 __all__ = [

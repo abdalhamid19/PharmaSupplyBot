@@ -9,6 +9,7 @@ def select_preflight_attempts(
     budget: int,
     tier_limit: int = 3,
 ) -> tuple[AIModelAttempt, ...]:
+    """Select attempts for preflight health checks within budget and tier limit."""
     if budget <= 0:
         return ()
     eligible = [
@@ -31,6 +32,7 @@ def attempts_from_partial_health(
     attempts: tuple[AIModelAttempt, ...],
     rows: list[dict],
 ) -> tuple[AIModelAttempt, ...]:
+    """Select attempts based on partial health data, prioritizing healthy ones."""
     by_key = {attempt.safe_tuple(): attempt for attempt in attempts}
     row_keys = {
         _row_key(row) for row in rows if row.get("mode") == "json"
@@ -61,6 +63,7 @@ def cached_working_attempts(
     rows: list[dict],
     limit: int,
 ) -> tuple[AIModelAttempt, ...]:
+    """Return cached working attempts from health data up to the limit."""
     if limit <= 0:
         return ()
     by_key = {attempt.safe_tuple(): attempt for attempt in attempts}
@@ -86,6 +89,7 @@ def attempts_from_health(
     attempts: tuple[AIModelAttempt, ...],
     rows: list[dict],
 ) -> tuple[AIModelAttempt, ...]:
+    """Select attempts based on full health data, returning healthy or fallback attempts."""
     by_key = {attempt.safe_tuple(): attempt for attempt in attempts}
     healthy = []
     fallback = []

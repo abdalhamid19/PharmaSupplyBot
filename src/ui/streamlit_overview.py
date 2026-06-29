@@ -106,19 +106,19 @@ def render_input_files_table(input_files, prevented_files, remove_files) -> None
     if rows:
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     else:
-        st.info("No order Excel files found under `input/order_items/`.")
+        st.info("No order Excel files found under `data/input/order_items/`.")
     st.subheader("Available Prevented Excel Files")
     prevented_rows = file_table_rows(prevented_files, "prevented_items")
     if prevented_rows:
         st.dataframe(pd.DataFrame(prevented_rows), use_container_width=True, hide_index=True)
     else:
-        st.info("No prevented-items Excel files found under `input/prevented_items/`.")
+        st.info("No prevented-items Excel files found under `data/input/prevented_items/`.")
     st.subheader("Available Remove-Cart Excel Files")
     remove_rows = file_table_rows(remove_files, "remove_items")
     if remove_rows:
         st.dataframe(pd.DataFrame(remove_rows), use_container_width=True, hide_index=True)
     else:
-        st.info("No remove-cart Excel files found under `input/remove_items/`.")
+        st.info("No remove-cart Excel files found under `data/input/remove_items/`.")
 
 
 def file_table_rows(files, category) -> list:

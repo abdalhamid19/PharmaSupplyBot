@@ -32,11 +32,24 @@ def _infer_missing_dosage(norm, qty, volume, weight, form):
 
 
 def _is_brand_boundary(words, idx):
-    from .normalizer_parsing_constants import FORM_PREFIXES, FORM_WORDS, NOISE_WORDS, BRAND_QUALIFIERS, SOFT_BRAND_DESCRIPTORS, CONNECTOR_WORDS, FLAVOR_WORDS, SUPPLEMENT_WORDS
+    from .normalizer_parsing_constants import (
+        FORM_PREFIXES,
+        FORM_WORDS,
+        NOISE_WORDS,
+        BRAND_QUALIFIERS,
+        SOFT_BRAND_DESCRIPTORS,
+        CONNECTOR_WORDS,
+        FLAVOR_WORDS,
+        SUPPLEMENT_WORDS,
+    )
     word = words[idx]
-    if word in FORM_PREFIXES or word in FORM_WORDS or word in NOISE_WORDS or word in BRAND_QUALIFIERS or _is_pediatric_inf(words, idx) or _is_descriptive_brand_word(word):
+    hard = {FORM_PREFIXES, FORM_WORDS, NOISE_WORDS, BRAND_QUALIFIERS}
+    soft = {SOFT_BRAND_DESCRIPTORS, CONNECTOR_WORDS, FLAVOR_WORDS, SUPPLEMENT_WORDS}
+    if word in set().union(*hard):
         return True
-    return idx > 0 and (word in SOFT_BRAND_DESCRIPTORS or word in CONNECTOR_WORDS or word in FLAVOR_WORDS or word in SUPPLEMENT_WORDS)
+    if _is_pediatric_inf(words, idx) or _is_descriptive_brand_word(word):
+        return True
+    return idx > 0 and word in set().union(*soft)
 
 
 def _canonical_number(value):

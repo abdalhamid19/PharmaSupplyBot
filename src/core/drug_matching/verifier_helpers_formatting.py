@@ -6,6 +6,7 @@ from .normalizer import parse_drug
 
 
 def route_from_norm(norm: str) -> str:
+    """Extract route (IM/IV/SC) from normalized drug name."""
     words = set(norm.split())
     routes = set(words & {"IM", "IV", "SC"})
     if {"I", "M"} <= words:
@@ -18,6 +19,7 @@ def route_from_norm(norm: str) -> str:
 
 
 def component_context(name: str) -> str:
+    """Return formatted component context string for a drug name."""
     c = parse_drug(name)
     return (
         f"normalized='{c.normalized}', brand='{c.brand}', "
@@ -34,13 +36,17 @@ def format_candidate(
     position: int, candidate: tuple[dict, float, int],
     inventory_price=None,
 ) -> str:
+    """Format a candidate with position, score, price, and component context."""
     from .pricing import format_price, price_delta_text
     rec, score, _ = candidate[:3]
     review_reason = candidate[3] if len(candidate) > 3 else "ok"
-    review_text = (
-        "" if review_reason == "ok"
-        else f"\n   rule_review: candidate entered AI review despite {review_reason}; accept only if the products are truly equivalent"
-    )
+    if review_reason == "ok":
+        review_text = ""
+    else:
+        review_text = (
+            f"\n   rule_review: candidate entered AI review despite {review_reason}; "
+            "accept only if the products are truly equivalent"
+        )
     candidate_price = rec.get("price")
     price_text = (
         f", candidate_price={format_price(candidate_price)}, "

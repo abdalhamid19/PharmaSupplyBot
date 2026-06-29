@@ -101,7 +101,14 @@ def parse_drug(name: str) -> DrugComponents:
             break
     if form == "SUSP" and ({"EYE", "DROPS"} & norm_words):
         form = "EYE"
-    if not dosage_nums and qty and qty.isdigit() and int(qty) >= 100 and "VAGINAL" in norm_words and form in {"CAP", "SUPP"}:
+    if (
+        not dosage_nums
+        and qty
+        and qty.isdigit()
+        and int(qty) >= 100
+        and "VAGINAL" in norm_words
+        and form in {"CAP", "SUPP"}
+    ):
         qty = ""
     if not dosage_nums:
         dosage_nums, dosage_units = _infer_missing_dosage(norm, qty, volume, weight, form)
@@ -115,7 +122,20 @@ def parse_drug(name: str) -> DrugComponents:
 
     product_class = classify_product(norm)
     variants = brand_variants_from_words(words, brand)
-    return DrugComponents(brand, dosage_nums, dosage_units, qty, volume, weight, form, flavor, imported, norm, variants, product_class)
+    return DrugComponents(
+        brand,
+        dosage_nums,
+        dosage_units,
+        qty,
+        volume,
+        weight,
+        form,
+        flavor,
+        imported,
+        norm,
+        variants,
+        product_class,
+    )
 
 
 def _canonical_form(word: str) -> str:

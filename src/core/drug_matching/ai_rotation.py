@@ -12,6 +12,8 @@ from .config import PROVIDERS, cloudflare_base_url, provider_base_url
 
 @dataclass(frozen=True, slots=True)
 class AIModelAttempt:
+    """Single AI provider/model attempt configuration for rotation."""
+
     provider: str
     base_url: str
     key_name: str
@@ -115,6 +117,7 @@ def _provider_attempts(provider: str) -> list[AIModelAttempt]:
 
 
 def configured_attempts(providers: str = "auto") -> tuple[AIModelAttempt, ...]:
+    """Return configured AI attempts for specified providers or all by default."""
     selected = _selected_providers(providers)
     attempts: list[AIModelAttempt] = []
     for provider in selected:
@@ -123,6 +126,7 @@ def configured_attempts(providers: str = "auto") -> tuple[AIModelAttempt, ...]:
 
 
 def rank_attempts(attempts) -> list[AIModelAttempt]:
+    """Rank AI attempts by balanced sorting key for optimal rotation order."""
     return sorted(attempts, key=_balanced_sort_key)
 
 

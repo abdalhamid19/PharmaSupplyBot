@@ -7,6 +7,7 @@ _PERMANENT_FAILURES = {
 
 
 def health_status(row: dict) -> str:
+    """Classify the health status of an AI attempt based on test results."""
     if row.get("ok"):
         return "working"
     error_type = str(row.get("error_type", ""))
@@ -36,6 +37,7 @@ def health_status(row: dict) -> str:
 
 
 def fallback_tier(row: dict) -> int:
+    """Return the fallback tier (0=best, 5=worst) for an AI attempt."""
     return {
         "working": 0,
         "degraded": 1,
@@ -47,6 +49,7 @@ def fallback_tier(row: dict) -> int:
 
 
 def rotation_recommendation(row: dict) -> str:
+    """Return rotation strategy recommendation based on health status."""
     return {
         "working": "use-first",
         "degraded": "late-retry",

@@ -2,7 +2,13 @@
 
 
 def rank_health_rows(rows: list[dict]) -> list[dict]:
-    from .ai_rotation_health_status import health_status, fallback_tier, rotation_recommendation, _quota_remaining
+    """Rank health check rows by performance metrics and add status fields."""
+    from .ai_rotation_health_status import (
+        health_status,
+        fallback_tier,
+        rotation_recommendation,
+        _quota_remaining,
+    )
     
     ranked = sorted(rows, key=lambda r: _health_sort_key(r, fallback_tier, _quota_remaining))
     for idx, row in enumerate(ranked, start=1):
