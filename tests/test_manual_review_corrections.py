@@ -11,7 +11,7 @@ from src.core.manual_review_corrections import (
     corrected_items_from_manual_review_rows,
     write_corrected_review_csv,
 )
-from src.ui.streamlit_manual_review_search import corrected_review_search_command
+from src.ui.streamlit_manual_review_cli import corrected_review_search_command
 
 
 class ManualReviewCorrectionsTests(unittest.TestCase):

@@ -13,11 +13,11 @@ from src.ui.streamlit_prevented_items import (
     persist_uploaded_prevented_items,
     prevented_excel_options,
 )
-from src.ui.streamlit_order_form import (
+from src.ui.streamlit_order import (
     DEFAULT_PREVENTED_ITEMS_PATH,
-    order_excel_options,
     order_form_fields,
 )
+from src.ui.streamlit_excel_fields import order_excel_options
 
 
 class _FakeUpload:
@@ -150,7 +150,7 @@ class StreamlitOrderTests(unittest.TestCase):
     def test_order_run_summary_path_uses_match_only_summary(self) -> None:
         with TemporaryDirectory() as temp_dir:
             artifacts = Path(temp_dir) / "artifacts"
-            with patch("src.ui.streamlit_order_paths.ARTIFACTS_DIR", artifacts):
+            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
                 path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, Path("artifacts") / "wardany" / "match_only_summary.csv")
@@ -162,7 +162,7 @@ class StreamlitOrderTests(unittest.TestCase):
             run_dir.mkdir(parents=True)
             summary = run_dir / "match_only_summary_20260513_1900.csv"
             summary.write_text("item_code\n1\n", encoding="utf-8")
-            with patch("src.ui.streamlit_order_paths.ARTIFACTS_DIR", artifacts):
+            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
                 path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, summary)
@@ -295,7 +295,7 @@ class StreamlitOrderTests(unittest.TestCase):
     def test_order_form_fields_uses_default_prevented_items_path(self) -> None:
         with (
             patch(
-                "src.ui.streamlit_order_form.excel_source_fields",
+                "src.ui.streamlit_order.excel_source_fields",
                 return_value=(
                     "Existing file",
                     "data/input/order_items/orders.xlsx",
@@ -303,7 +303,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "src.ui.streamlit_order_form.profile_run_fields_with_workers",
+                "src.ui.streamlit_order.profile_run_fields_with_workers",
                 return_value=(
                     (
                         "Single profile",

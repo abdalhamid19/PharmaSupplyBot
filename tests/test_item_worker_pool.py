@@ -79,7 +79,7 @@ class ItemWorkerPoolTests(unittest.TestCase):
                 "src.cli.cli_cart_removal.multiprocessing.get_context", self._context
             ),
             patch(
-                "src.cli.item_worker_runner.run_cart_removal_chunk", self._fake_worker
+                "src.cli.item_worker.run_cart_removal_chunk", self._fake_worker
             ),
         ):
             return run_remove_cart_command(

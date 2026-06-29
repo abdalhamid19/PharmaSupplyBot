@@ -14,7 +14,7 @@ from ..tawreed.tawreed import TawreedBot
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import build_bot, invalid_session_exit, require_state_file
 from .cli_cart_removal_source import cart_removal_items
-from .item_worker_pool import build_cart_payloads, report_worker_results, resolve_item_workers
+from .item_worker import build_cart_payloads, report_worker_results, resolve_item_workers
 
 
 def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> int:
@@ -78,7 +78,7 @@ def _run_parallel_cart_removal(
 ) -> None:
     """Split cart-removal items across multiprocessing workers and merge."""
     from multiprocessing import Manager
-    from .item_worker_runner import run_cart_removal_chunk
+    from .item_worker import run_cart_removal_chunk
 
     chunks = split_into_chunks(items, item_workers)
     manager = Manager()
@@ -92,7 +92,7 @@ def _run_parallel_cart_removal(
 
 def _execute_cart_workers(profile_key, chunks, payloads):
     """Execute cart removal workers in parallel."""
-    from .item_worker_runner import run_cart_removal_chunk
+    from .item_worker import run_cart_removal_chunk
     print(f"[{profile_key}] Launching {len(chunks)} parallel cart-removal workers...")
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:

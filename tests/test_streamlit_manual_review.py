@@ -12,10 +12,13 @@ from src.ui.streamlit_manual_review import (
     manual_review_decisions_from_rows,
     save_manual_review_rows,
 )
-from src.ui.streamlit_manual_review_page_saved import _decision_row
-from src.ui.streamlit_manual_review_remove import (
+from src.ui.streamlit_manual_review_cli import (
     manual_review_remove_command,
     write_not_matching_review_csv,
+)
+from src.ui.streamlit_manual_review_page_saved import (
+    _decision_row,
+    deleted_identity_pairs,
 )
 
 
@@ -149,8 +152,6 @@ class StreamlitManualReviewTests(unittest.TestCase):
     def test_deleted_identity_pairs_targets_exact_row_not_shared_code(self) -> None:
         """Deletion must remove only the exact (code, name) row, not its twin."""
         import pandas as pd
-
-        from src.ui.streamlit_manual_review_page_saved import deleted_identity_pairs
 
         original = pd.DataFrame(
             [
