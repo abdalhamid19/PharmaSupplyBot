@@ -9,6 +9,7 @@ from ..core.matching_types import MatchDecision
 from ..core.product_matching import is_decisive_product_match
 from ..core.utils.excel import Item
 from .tawreed_match_logs import write_match_log
+from .tawreed_aggressive_matching import available_quantity
 
 MIN_SEARCH_QUERIES_PER_ITEM = 3
 
@@ -78,9 +79,4 @@ def _record_final_match(
 
 def _available_quantity(decision: MatchDecision) -> int:
     """Return the matched product availability as an integer quantity."""
-    if not decision.best_match:
-        return 0
-    try:
-        return int(decision.best_match.data.get("availableQuantity") or 0)
-    except (TypeError, ValueError):
-        return 0
+    return available_quantity(decision.best_match.data if decision.best_match else {})

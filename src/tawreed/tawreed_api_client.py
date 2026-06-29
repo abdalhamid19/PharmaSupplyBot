@@ -18,6 +18,13 @@ from .tawreed_api_http import _api_origin, _auth_headers_from_state, _is_trusted
 
 
 # ============================================================================
+# Exception (re-exported from tawreed_api_contract for convenience)
+# ============================================================================
+
+# TawreedApiUnavailable is imported from tawreed_api_contract above
+
+
+# ============================================================================
 # Main API Client
 # ============================================================================
 
@@ -103,4 +110,4 @@ class TawreedApiClient:
         return self._request_context
 
 
-__all__ = ["TawreedApiUnavailable", "TawreedApiClient"]
+__all__ = ["TawreedApiUnavailable", "TawreedApiClient", "_auth_headers_from_state"]

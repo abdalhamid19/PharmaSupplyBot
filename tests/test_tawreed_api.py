@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from src.tawreed.tawreed_api import (
+from src.tawreed.tawreed_api_client import (
     TawreedApiClient,
     TawreedApiUnavailable,
     _auth_headers_from_state,

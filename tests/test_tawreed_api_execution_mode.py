@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch, Mock
 
-from src.tawreed.tawreed_api import TawreedApiClient
+from src.tawreed.tawreed_api_client import TawreedApiClient
 from src.tawreed.tawreed_api_contract import save_api_contract_capture
 from src.tawreed.tawreed_api_flow import match_items_only_with_api
 from src.tawreed.tawreed_api_matching import require_api_match

@@ -5,7 +5,14 @@ from __future__ import annotations
 from ..core.matching_risk import aggressive_review_decision
 from ..core.order_ai_matching import OrderAiOutcome
 from ..core.utils.excel import Item
-from .tawreed_match_acceptance import available_quantity
+
+
+def available_quantity(candidate: dict) -> int:
+    """Return available quantity from a Tawreed candidate."""
+    try:
+        return int(candidate.get("availableQuantity") or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def aggressive_review_result(bot, item: Item, decision, require_available: bool):

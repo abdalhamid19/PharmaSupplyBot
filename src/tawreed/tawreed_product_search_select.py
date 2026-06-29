@@ -21,3 +21,6 @@ def select_search_candidates(
 def has_orderable_candidate(candidates: list[dict[str, Any]]) -> bool:
     """Return whether any candidate can be used for ordering."""
     return any(candidate_has_store_product_id(candidate) for candidate in candidates)
+
+
+__all__ = ["select_search_candidates", "has_orderable_candidate"]

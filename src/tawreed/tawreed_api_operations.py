@@ -81,7 +81,7 @@ def get_store_details(client, product_id: Any) -> list[dict[str, Any]]:
         return []
 
     from .tawreed_constants import STORE_DETAILS_ENDPOINT
-    from .tawreed_selections import stores_from_payload
+    from .tawreed_api_payloads import stores_from_payload
     url = f"/rest/v2/{STORE_DETAILS_ENDPOINT}?productId={pid}"
     payload = _post_json(
         client,

@@ -28,7 +28,7 @@ from src.cli.cli_order import (
 )
 from src.cli.cli_shared import invalid_session_exit
 from src.core.utils.excel import Item
-from src.tawreed.tawreed_api import TawreedApiUnavailable
+from src.tawreed.tawreed_api_client import TawreedApiUnavailable
 
 
 class CliCommandsTests(unittest.TestCase):

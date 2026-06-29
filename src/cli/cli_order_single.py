@@ -9,7 +9,7 @@ from ..core.artifact_run import artifact_run
 from ..core.config.config_models import AppConfig, ProfileConfig
 from ..core.utils.excel import Item
 from ..tawreed.tawreed import TawreedBot
-from ..tawreed.tawreed_api import TawreedApiUnavailable
+from ..tawreed.tawreed_api_client import TawreedApiUnavailable
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_shared import api_unavailable_exit, invalid_session_exit
 from .cli_order_items_run import run_profile_items

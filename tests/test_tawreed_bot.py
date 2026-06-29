@@ -19,7 +19,7 @@ from src.core.matching_types import (
 )
 from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
-from src.tawreed.tawreed_api import TawreedApiUnavailable
+from src.tawreed.tawreed_api_client import TawreedApiUnavailable
 from src.tawreed.tawreed_session import SessionInvalidError
 
 

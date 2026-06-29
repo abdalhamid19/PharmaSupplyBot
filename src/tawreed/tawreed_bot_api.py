@@ -6,7 +6,7 @@ from typing import Iterable
 
 from ..core.cart_removal_items import CartRemovalItem
 from ..core.utils.excel import Item
-from .tawreed_api import TawreedApiUnavailable
+from .tawreed_api_client import TawreedApiUnavailable
 
 
 class TawreedBotApi:

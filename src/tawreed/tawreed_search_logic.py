@@ -16,11 +16,8 @@ from ..core.manual_review_runtime import (
 from ..core.matching_types import SearchMatch
 from ..core.product_matching import _search_queries_for_item, explain_best_product_match
 from ..core.utils.excel import Item
-from .tawreed_aggressive_matching import aggressive_review_result
-from .tawreed_manual_review_flow import manual_review_result
-from .tawreed_match_acceptance import accepted_no_match_result
+from .tawreed_aggressive_matching import aggressive_review_result, available_quantity
 from .tawreed_match_logs import write_match_log
-from .tawreed_product_search import search_products
 from .tawreed_query_cache import cached_query_result, get_bot_query_cache
 from .tawreed_search_decision import decisive_match
 from .tawreed_timing import record_timing
@@ -60,6 +57,8 @@ def _search_one_query(bot, page, item, query, started_at, queries, results, quer
 
 def _append_search_result(bot, page, query, queries, results, query_cache) -> None:
     """Search once per query and append the cached result to this item's history."""
+    from .tawreed_product_search import search_products
+    
     queries.append(query)
     found = cached_query_result(query_cache, query, lambda: search_products(bot, page, query))
     results.append((query, found))
@@ -104,3 +103,39 @@ def _match_decision(bot, item: Item, results: list[tuple[str, list]], review_dec
         record_timing(
             bot, "match_decision_seconds", time.perf_counter() - started_at
         )
+
+
+# ============================================================================
+# Match acceptance helpers (from tawreed_match_acceptance.py)
+# ============================================================================
+
+def accepted_no_match_result(bot, item: Item, decision, require_available: bool):
+    """Return an AI-selected match from the no-match path after stock checks."""
+    match = decision.best_match
+    if require_available and available_quantity(match.data) <= 0:
+        raise bot.skip_item_exception(
+            f"Matched product is out of stock for '{item.name}'."
+        )
+    return match, match.query
+
+
+# ============================================================================
+# Manual review flow helpers (from tawreed_manual_review_flow.py)
+# ============================================================================
+
+def manual_review_result(bot, item, started_at, queries, results, review_decision=None):
+    """Return a saved manual-review match from current candidates when available."""
+    decision = manual_review_match(item, results, review_decision)
+    if not decision:
+        return None
+    bot.last_match_decision, bot.last_searched_queries = decision, queries
+    bot.last_match_elapsed_seconds = time.perf_counter() - started_at
+    write_match_log(bot, item, decision)
+    return decision.best_match
+
+
+__all__ = [
+    "require_product_match",
+    "accepted_no_match_result",
+    "manual_review_result",
+]

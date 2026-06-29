@@ -13,7 +13,7 @@ from .tawreed_dialogs import close_visible_dialogs
 from .tawreed_dom import dom_search_results
 from .tawreed_pricing import discount_value_as_percent, first_discount_value
 from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR
-from .tawreed_selections import stores_from_payload
+from .tawreed_api_payloads import stores_from_payload
 from .tawreed_store_selection import choose_next_store_for_remaining_quantity
 from .tawreed_store_summary import record_single_store, record_selected_stores
 from .tawreed_ui import (
@@ -25,8 +25,7 @@ from .tawreed_ui import (
     visible_dialog,
     visible_product_rows,
 )
-from .tawreed_waits import wait_for_row_to_settle, wait_for_table_overlay_to_clear
-from .tawreed_timing import record_timing
+from .tawreed_timing import wait_for_row_to_settle, wait_for_table_overlay_to_clear, record_timing
 
 # ============================================================================
 # Discount and warehouse strategy helpers
