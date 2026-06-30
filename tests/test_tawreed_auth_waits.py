@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from src.tawreed.tawreed_session import wait_for_login_detection
+from src.tawreed.auth.tawreed_session import wait_for_login_detection
 
 
 class _FakePage:

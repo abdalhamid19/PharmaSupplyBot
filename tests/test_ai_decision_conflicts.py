@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.core.drug_matching.verifier import _resolve_ai_conflicts
+from src.core.drug_matching.verification.verifier import _resolve_ai_conflicts
 
 
 class AiDecisionConflictTests(unittest.TestCase):

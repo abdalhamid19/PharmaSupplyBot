@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from .candidate_identity import candidate_store_product_id
 from .drug_matching.config import APIConfig
-from .drug_matching.verifier import AIVerifier
+from .drug_matching.verification.verifier import AIVerifier
 from .matching_types import MatchDecision, SearchMatch
 from .utils.excel import Item
 

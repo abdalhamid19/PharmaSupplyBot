@@ -9,17 +9,17 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from ..core.matching_types import SearchMatch
-from ..core.utils.excel import Item
-from .tawreed_constants import MAX_DOM_SEARCH_ROWS, STORE_DETAILS_ENDPOINT
-from .tawreed_dialogs import close_visible_dialogs
-from .tawreed_dom import dom_search_results
-from .tawreed_pricing import discount_value_as_percent, first_discount_value
+from ...core.matching_types import SearchMatch
+from ...core.utils.excel import Item
+from ..tawreed_constants import MAX_DOM_SEARCH_ROWS, STORE_DETAILS_ENDPOINT
+from ..tawreed_dialogs import close_visible_dialogs
+from ..tawreed_dom import dom_search_results
+from ..tawreed_pricing import discount_value_as_percent, first_discount_value
 from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR
-from .tawreed_api_payloads import stores_from_payload
-from .tawreed_store_selection import choose_next_store_for_remaining_quantity
-from .tawreed_store_summary import record_single_store, record_selected_stores
-from .tawreed_ui import (
+from ..api.tawreed_api_payloads import stores_from_payload
+from ..tawreed_store_selection import choose_next_store_for_remaining_quantity
+from ..tawreed_store_summary import record_single_store, record_selected_stores
+from ..tawreed_ui import (
     cart_button,
     fill_quantity_input,
     is_no_results_row,
@@ -28,7 +28,7 @@ from .tawreed_ui import (
     visible_dialog,
     visible_product_rows,
 )
-from .tawreed_timing import wait_for_row_to_settle, wait_for_table_overlay_to_clear, record_timing
+from ..tawreed_timing import wait_for_row_to_settle, wait_for_table_overlay_to_clear, record_timing
 
 # ============================================================================
 # Discount and warehouse strategy helpers
@@ -119,7 +119,7 @@ def _matched_row_by_sig(rows, match: SearchMatch):
 
 
 def _row_sig(row) -> str:
-    from .tawreed_dom import _row_name_lines
+    from ..tawreed_dom import _row_name_lines
 
     lines = _row_name_lines(row)
     return _normalize_sig(lines[0]) if lines else ""
@@ -269,8 +269,8 @@ def _record_stores(bot, sels):
 
 def add_item_from_products_page(bot, page: Page, item: Item) -> None:
     """Add one item using the Tawreed products page search-and-store selection flow."""
-    from .tawreed_search_logic import require_product_match
-    
+    from ..tawreed_search_logic import require_product_match
+
     match, active_query = require_product_match(bot, page, item)
     row = matched_product_row(bot, page, match, active_query)
     open_add_to_cart_for_match(bot, page, row, item, match)

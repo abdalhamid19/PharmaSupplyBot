@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from ..core.artifact_run import current_artifact_run
-from ..core.manual_review_candidate_store import append_review_candidates
-from ..core.manual_review_candidates import review_candidate_options
-from ..core.manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
-from ..core.order_ai_artifacts import order_ai_trace_rows
-from ..core.order_ai_matching import candidate_ar, candidate_name
-from ..core.order_run_artifact_rows import manual_review_required, manual_review_row, order_item_summary_row
-from ..core.utils.excel import Item
-from ..core.candidate_identity import candidate_store_product_id
-from .tawreed_artifacts import append_csv_artifact, append_text_artifact
-from .tawreed_match_logs import OrderResultSummary
+from ...core.artifact_run import current_artifact_run
+from ...core.manual_review_candidate_store import append_review_candidates
+from ...core.manual_review_candidates import review_candidate_options
+from ...core.manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
+from ...core.order_ai_artifacts import order_ai_trace_rows
+from ...core.order_ai_matching import candidate_ar, candidate_name
+from ...core.order_run_artifact_rows import manual_review_required, manual_review_row, order_item_summary_row
+from ...core.utils.excel import Item
+from ...core.candidate_identity import candidate_store_product_id
+from ..tawreed_artifacts import append_csv_artifact, append_text_artifact
+from ..tawreed_match_logs import OrderResultSummary
 
 
 def append_order_ai_trace_artifacts(
@@ -102,7 +102,7 @@ def append_manual_review_artifacts(
     label_suffix: str | None = None, matching_config=None
 ) -> None:
     """Append one manual-review row to CSV and TXT artifacts, and candidates to JSONL."""
-    from ..core.order_run_artifact_rows import text_block
+    from ...core.order_run_artifact_rows import text_block
 
     row = manual_review_row(item, summary, decision, outcome, matching_config)
     append_csv_artifact(profile_key, "manual_review", [row], label_suffix)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from src.tawreed.tawreed_product_export import post_product_export_json
+from src.tawreed.products.tawreed_product_export import post_product_export_json
 
 
 class TawreedProductExportRetryTests(unittest.TestCase):

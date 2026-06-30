@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from .tawreed_login_detection import (
+from ..tawreed_login_detection import (
     is_logged_in_marker_visible as marker_visible,
     login_detected,
 )
@@ -136,7 +136,7 @@ class TawreedAuthFlow:
 
     def _auth(self, wait_seconds: int, headless: bool) -> None:
         """Authenticate in either interactive or headless mode and save session state."""
-        from .tawreed_session import perform_tawreed_auth
+        from .tawreed_session_auth import perform_tawreed_auth
         perform_tawreed_auth(self.bot, wait_seconds, headless)
 
     def _headless_auth_error(self) -> Exception:
@@ -145,7 +145,7 @@ class TawreedAuthFlow:
 
     def ensure_valid_auth(self) -> None:
         """Verify token is valid or refresh authentication automatically."""
-        from .tawreed_auto_auth import auto_refresh_auth_if_needed
+        from ..tawreed_auto_auth import auto_refresh_auth_if_needed
 
         auto_refresh_auth_if_needed(
             self.bot.config.base_url,

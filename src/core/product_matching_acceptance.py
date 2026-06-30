@@ -7,7 +7,7 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from .candidate_identity import candidate_has_store_product_id, candidate_store_product_id
-from .drug_matching.normalizer import components_match, parse_drug
+from .drug_matching.normalization.normalizer import components_match, parse_drug
 from .matching_penalties import compatibility_rejection_reason
 from .product_matching_helpers import (
     _ARABIC_NON_WORD_RE,

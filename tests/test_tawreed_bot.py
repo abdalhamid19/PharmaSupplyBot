@@ -19,8 +19,8 @@ from src.core.matching_types import (
 )
 from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
-from src.tawreed.tawreed_api_client import TawreedApiUnavailable
-from src.tawreed.tawreed_session import SessionInvalidError
+from src.tawreed.api.tawreed_api_client import TawreedApiUnavailable
+from src.tawreed.auth.tawreed_session import SessionInvalidError
 
 
 class _FakePage:
@@ -226,7 +226,7 @@ class TawreedBotTests(unittest.TestCase):
 
         with (
             patch(
-                "src.tawreed.tawreed_api_flow.match_items_only_with_api",
+                "src.tawreed.api.tawreed_api_flow.match_items_only_with_api",
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
             patch.object(
@@ -244,7 +244,7 @@ class TawreedBotTests(unittest.TestCase):
 
         with (
             patch(
-                "src.tawreed.tawreed_api_flow.match_items_only_with_api",
+                "src.tawreed.api.tawreed_api_flow.match_items_only_with_api",
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
             patch.object(

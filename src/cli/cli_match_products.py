@@ -11,7 +11,7 @@ from ..core.artifact_run import (
     artifact_filename,
     current_artifact_run,
 )
-from ..core.drug_matching.ai_rotation import configured_attempts
+from ..core.drug_matching.ai.ai_rotation import configured_attempts
 from ..core.drug_matching.config import (
     APIConfig,
     MatchingConfig,
@@ -20,7 +20,7 @@ from ..core.drug_matching.config import (
     setup_logging,
 )
 from ..core.drug_matching.pipeline import MatchPipeline
-from ..core.drug_matching.trace_log import MatchTraceLog
+from ..core.drug_matching.tracing import MatchTraceLog
 from ..core.matching_trace import configure_async_logging
 
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .tawreed_auth import is_token_expired
-from .tawreed_headless_auth_refresh import run_headless_auth_refresh
+from .auth.tawreed_auth import is_token_expired
+from .auth.tawreed_headless_auth_refresh import run_headless_auth_refresh
 
 
 DEFAULT_AUTO_AUTH_WAIT_SECONDS = 120

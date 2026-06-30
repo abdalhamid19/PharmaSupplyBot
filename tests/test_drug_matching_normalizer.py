@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.core.drug_matching.normalizer import (
+from src.core.drug_matching.normalization.normalizer import (
     components_match, normalize, normalize_arabic, parse_drug,
 )
 

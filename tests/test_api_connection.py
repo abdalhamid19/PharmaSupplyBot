@@ -8,7 +8,7 @@ from pathlib import Path
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
-from src.tawreed.tawreed_api_client import TawreedApiClient
+from src.tawreed.api.tawreed_api_client import TawreedApiClient
 from src.core.utils.excel import Item
 
 def test_api_search():

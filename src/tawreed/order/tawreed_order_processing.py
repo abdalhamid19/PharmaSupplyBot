@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from ..core.utils.excel import Item
-from .tawreed_constants import PRODUCTS_PAGE_ROUTE
-from .tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
-from .tawreed_products_flow import add_item_from_products_page
-from .tawreed_search_logic import require_product_match
-from .tawreed_session import close_browser, close_context, open_order_page
-from .tawreed_strategy import max_available_warehouse_row
+from ...core.utils.excel import Item
+from ..tawreed_constants import PRODUCTS_PAGE_ROUTE
+from ..tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
+from ..tawreed_products_flow import add_item_from_products_page
+from ..tawreed_search_logic import require_product_match
+from ..tawreed_session import close_browser, close_context, open_order_page
+from ..tawreed_strategy import max_available_warehouse_row
 
 
 class OrderItemProcessor:
@@ -154,6 +154,7 @@ class OrderItemProcessor:
 
     def ensure_logged_in(self, page: Page) -> None:
         """Verify that the saved session is still authenticated before ordering begins."""
+        from ..auth.tawreed_auth import ensure_logged_in
         ensure_logged_in(
             page,
             self.bot.selectors,

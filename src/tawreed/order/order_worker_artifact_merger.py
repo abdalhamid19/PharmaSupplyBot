@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..core.artifact_run import artifact_filename, current_artifact_run
+from ...core.artifact_run import artifact_filename, current_artifact_run
 from .order_result_merger import merge_worker_summaries
 
 

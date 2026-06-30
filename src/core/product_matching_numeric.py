@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .drug_matching.normalizer import components_match, parse_drug
+from .drug_matching.normalization.normalizer import components_match, parse_drug
 from .product_matching_safe_omission import _any_safe_omission
 
 

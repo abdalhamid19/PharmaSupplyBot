@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from .candidate_identity import candidate_has_store_product_id
-from .drug_matching.ai_provider_cooldown import apply_provider_cooldown
-from .drug_matching.normalizer import components_match, parse_drug
+from .drug_matching.ai.ai_provider_cooldown import apply_provider_cooldown
+from .drug_matching.normalization.normalizer import components_match, parse_drug
 from .matching_types import MatchDecision, SearchMatch
 from .order_ai_matching import (
     OrderAiOutcome,

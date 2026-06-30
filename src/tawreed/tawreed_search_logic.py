@@ -58,8 +58,8 @@ def _search_one_query(bot, page, item, query, started_at, queries, results, quer
 
 def _append_search_result(bot, page, query, queries, results, query_cache) -> None:
     """Search once per query and append the cached result to this item's history."""
-    from .tawreed_product_search import search_products
-    
+    from .products.tawreed_product_search import search_products
+
     queries.append(query)
     found = cached_query_result(query_cache, query, lambda: search_products(bot, page, query))
     results.append((query, found))

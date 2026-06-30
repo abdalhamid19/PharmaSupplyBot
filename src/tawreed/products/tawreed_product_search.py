@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from .tawreed_constants import (
+from ..tawreed_constants import (
     NESTED_NAME_KEYS,
     NESTED_STORE_KEYS,
     PRODUCT_SEARCH_ENDPOINT,
     STORE_NAME_KEYS,
 )
 from .tawreed_product_search_select import has_orderable_candidate, select_search_candidates
-from .tawreed_timing import record_timing
+from ..tawreed_timing import record_timing
 
 PRODUCT_SEARCH_INPUT_SELECTOR = (
     "#tawreedTableGlobalSearch, "
@@ -40,7 +40,7 @@ def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
 
 
 def _execute_api_search(bot, page, query):
-    from .tawreed_dialogs import close_visible_dialogs
+    from ..tawreed_dialogs import close_visible_dialogs
     started_at = time.perf_counter()
     close_visible_dialogs(page)
     record_timing(bot, "dialog_close_seconds", time.perf_counter() - started_at)
@@ -51,10 +51,10 @@ def _execute_api_search(bot, page, query):
 
 
 def _execute_dom_fallback(bot, page, query, api_candidates):
-    from .tawreed_dom import dom_search_results
-    from .tawreed_ui import is_no_results_row
-    from .tawreed_timing import wait_for_table_overlay_to_clear
-    
+    from ..tawreed_dom import dom_search_results
+    from ..tawreed_ui import is_no_results_row
+    from ..tawreed_timing import wait_for_table_overlay_to_clear
+
     started_at = time.perf_counter()
     wait_for_table_overlay_to_clear(page)
     rows = _ready_product_rows(page)
@@ -138,7 +138,7 @@ def _submit_product_search(page: Page, query: str) -> None:
 
 
 def _ready_product_rows(page: Page):
-    from .tawreed_ui import visible_product_rows
+    from ..tawreed_ui import visible_product_rows
     rows = visible_product_rows(page)
     try:
         rows.first.wait_for(timeout=1500)

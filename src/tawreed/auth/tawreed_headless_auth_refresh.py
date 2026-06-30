@@ -3,7 +3,7 @@
 from __future__ import annotations
 import os
 from pathlib import Path
-from .tawreed_constants import PRODUCTS_PAGE_ROUTE
+from ..tawreed_constants import PRODUCTS_PAGE_ROUTE
 from .tawreed_session import (
     attempt_env_login, auth_temp_state_path, close_browser, close_context,
     discard_session_state, headless_auth_failure_message, open_auth_page,

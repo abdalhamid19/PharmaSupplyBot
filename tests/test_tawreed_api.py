@@ -8,16 +8,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from src.tawreed.tawreed_api_client import (
+from src.tawreed.api.tawreed_api_client import (
     TawreedApiClient,
     TawreedApiUnavailable,
     _auth_headers_from_state,
 )
-from src.tawreed.tawreed_api_contract import (
+from src.tawreed.api.tawreed_api_contract import (
     load_api_contract,
     save_discovered_api_contract,
 )
-from src.tawreed.tawreed_api_flow import _submit_order_if_enabled
+from src.tawreed.api.tawreed_api_flow import _submit_order_if_enabled
 
 
 class _FakeSubmitApi:
@@ -161,7 +161,7 @@ class TawreedApiTests(unittest.TestCase):
     def test_body_with_match_builds_discovered_add_payload(self) -> None:
         from types import SimpleNamespace
 
-        from src.tawreed.tawreed_api_payloads import body_with_match
+        from src.tawreed.api.tawreed_api_payloads import body_with_match
 
         match = SimpleNamespace(data={"storeProductId": 2066374})
         payload = body_with_match(

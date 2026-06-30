@@ -5,7 +5,7 @@ import unittest
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from src.core.drug_matching.ai_provider_cooldown import apply_provider_cooldown
+from src.core.drug_matching.ai.ai_provider_cooldown import apply_provider_cooldown
 
 
 @dataclass(frozen=True)

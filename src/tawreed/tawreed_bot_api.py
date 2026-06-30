@@ -6,7 +6,7 @@ from typing import Iterable
 
 from ..core.cart_removal_items import CartRemovalItem
 from ..core.utils.excel import Item
-from .tawreed_api_client import TawreedApiUnavailable
+from .api.tawreed_api_client import TawreedApiUnavailable
 
 
 class TawreedBotApi:
@@ -16,7 +16,7 @@ class TawreedBotApi:
         """Run API order flow or return False when browser fallback should handle it."""
         if not self._api_enabled():
             return False
-        from .tawreed_api_flow import place_order_with_api
+        from .api.tawreed_api_flow import place_order_with_api
 
         return self._run_api_or_fallback("order", lambda: place_order_with_api(self, items))
 
@@ -24,7 +24,7 @@ class TawreedBotApi:
         """Run API match-only flow or return False when browser fallback should handle it."""
         if not self._api_enabled():
             return False
-        from .tawreed_api_flow import match_items_only_with_api
+        from .api.tawreed_api_flow import match_items_only_with_api
 
         return self._run_api_or_fallback(
             "match-only", lambda: match_items_only_with_api(self, items)
@@ -34,7 +34,7 @@ class TawreedBotApi:
         """Run API cart removal or return False when browser fallback should handle it."""
         if not self._api_enabled():
             return False
-        from .tawreed_api_flow import remove_cart_items_with_api
+        from .api.tawreed_api_flow import remove_cart_items_with_api
 
         return self._run_api_or_fallback(
             "cart-removal", lambda: remove_cart_items_with_api(self, items)

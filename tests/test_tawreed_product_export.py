@@ -10,7 +10,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
-from src.tawreed.tawreed_product_export import (
+from src.tawreed.products.tawreed_product_export import (
     ARABIC_EXPORT_SEARCH_TERMS,
     ENGLISH_EXPORT_SEARCH_TERMS,
     EXPORT_FIELDNAMES,

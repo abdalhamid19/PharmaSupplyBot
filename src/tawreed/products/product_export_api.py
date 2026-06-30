@@ -96,7 +96,7 @@ def _iter_product_page_payloads(
 def product_export_url(page: Page, page_number: int, page_size: int) -> str:
     """Return the absolute Tawreed product-search API URL for one page."""
     origin = _api_origin(page)
-    from .tawreed_constants import PRODUCT_SEARCH_ENDPOINT
+    from ..tawreed_constants import PRODUCT_SEARCH_ENDPOINT
     return (
         f"{origin}/rest/v2/{PRODUCT_SEARCH_ENDPOINT}"
         f"?sort=productName,asc&page={page_number}&size={page_size}"

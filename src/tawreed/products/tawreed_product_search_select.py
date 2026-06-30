@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..core.candidate_identity import candidate_has_store_product_id
+from ...core.candidate_identity import candidate_has_store_product_id
 
 
 def select_search_candidates(

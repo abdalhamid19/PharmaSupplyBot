@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import unittest
 
-from src.tawreed.tawreed_product_search import (
+from src.tawreed.products.tawreed_product_search import (
     _api_candidates,
     _search_response_pattern,
 )
-from src.tawreed.tawreed_product_search_select import select_search_candidates
+from src.tawreed.products.tawreed_product_search_select import select_search_candidates
 
 
 class TawreedProductSearchTests(unittest.TestCase):

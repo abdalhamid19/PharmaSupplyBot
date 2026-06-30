@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .tawreed_summary import SummaryBuilder, SummaryStatus
+from ..tawreed_summary import SummaryBuilder, SummaryStatus
 
 
 # ============================================================================

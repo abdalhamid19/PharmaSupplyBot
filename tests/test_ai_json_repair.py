@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.core.drug_matching.verifier import _extract_json
+from src.core.drug_matching.verification.verifier import _extract_json
 
 
 class AiJsonRepairTests(unittest.TestCase):

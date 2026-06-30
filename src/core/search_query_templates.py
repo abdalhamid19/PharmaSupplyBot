@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..core.drug_matching.normalizer import parse_drug
+from ..core.drug_matching.normalization.normalizer import parse_drug
 
 
 def category_queries(name: str) -> list[str]:

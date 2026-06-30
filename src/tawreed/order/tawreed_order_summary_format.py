@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ..core.order_run_artifact_rows import text_block
-from .tawreed_artifacts import append_csv_artifact, append_text_artifact
+from ...core.order_run_artifact_rows import text_block
+from ..tawreed_artifacts import append_csv_artifact, append_text_artifact
 
 
 def _final_trace_row(row: dict[str, object]) -> dict[str, object]:

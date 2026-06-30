@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from .tawreed_login_detection import login_detected
+from ..tawreed_login_detection import login_detected
 
 
 def _initial_wait_state(wait_seconds: int) -> dict[str, int]:

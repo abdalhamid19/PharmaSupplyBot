@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from .tawreed_login_detection import is_logged_in_marker_visible
-from .tawreed_playwright_browser import launch_chromium
+from ..tawreed_login_detection import is_logged_in_marker_visible
+from ..tawreed_playwright_browser import launch_chromium
 from .tawreed_auth import headless_auth_failure_message
 from .tawreed_session_state import (
     auth_temp_state_path,

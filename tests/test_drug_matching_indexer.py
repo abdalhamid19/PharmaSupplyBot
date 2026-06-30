@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 from src.core.drug_matching.config import MatchingConfig
-from src.core.drug_matching.indexer import DrugIndex
+from src.core.drug_matching.indexing.indexer import DrugIndex
 
 
 def make_index(threshold: int = 70) -> DrugIndex:

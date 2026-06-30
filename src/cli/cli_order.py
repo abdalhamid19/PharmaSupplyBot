@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ..core.artifact_run import artifact_run
 from ..core.config.config_models import AppConfig, ProfileConfig
-from ..core.drug_matching.ai_rotation import configured_attempts
+from ..core.drug_matching.ai.ai_rotation import configured_attempts
 from ..core.drug_matching.config import APIConfig, load_env, resolve_api_config
 from ..core.order_ai_matching import OrderAiSettings
 from ..tawreed.tawreed import TawreedBot

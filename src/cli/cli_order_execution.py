@@ -12,7 +12,7 @@ from ..core.utils.excel import Item
 from ..tawreed.order_result_merger import merge_worker_summaries
 from ..tawreed.order_worker_artifact_merger import merge_order_worker_artifacts
 from ..tawreed.tawreed import TawreedBot
-from ..tawreed.tawreed_api_client import TawreedApiUnavailable
+from ..tawreed.api.tawreed_api_client import TawreedApiUnavailable
 from ..tawreed.tawreed_session import SessionInvalidError
 from .cli_order import order_ai_settings, order_bot
 from .cli_order_items import match_only, summary_label

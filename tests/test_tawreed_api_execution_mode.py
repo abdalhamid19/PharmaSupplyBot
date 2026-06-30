@@ -9,11 +9,11 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch, Mock
 
-from src.tawreed.tawreed_api_client import TawreedApiClient
-from src.tawreed.tawreed_api_contract import save_api_contract_capture
-from src.tawreed.tawreed_api_flow import match_items_only_with_api
-from src.tawreed.tawreed_api_matching import require_api_match
-from src.tawreed.tawreed_api_matching import _has_only_non_orderable_candidates
+from src.tawreed.api.tawreed_api_client import TawreedApiClient
+from src.tawreed.api.tawreed_api_contract import save_api_contract_capture
+from src.tawreed.api.tawreed_api_flow import match_items_only_with_api
+from src.tawreed.api.tawreed_api_matching import require_api_match
+from src.tawreed.api.tawreed_api_matching import _has_only_non_orderable_candidates
 from src.core.matching_types import MatchDecision, SearchMatch
 from src.core.utils.excel import Item
 
@@ -97,9 +97,9 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
             "Approved by saved manual review (ID match).",
         )
         with (
-            patch("src.tawreed.tawreed_api_matching.manual_review_queries", return_value=["PANADOL"]),
-            patch("src.tawreed.tawreed_api_matching.saved_manual_review_decision", return_value=object()),
-            patch("src.tawreed.tawreed_api_matching.manual_review_match", return_value=decision),
+            patch("src.tawreed.api.tawreed_api_matching.manual_review_queries", return_value=["PANADOL"]),
+            patch("src.tawreed.api.tawreed_api_matching.saved_manual_review_decision", return_value=object()),
+            patch("src.tawreed.api.tawreed_api_matching.manual_review_match", return_value=decision),
         ):
             match = require_api_match(bot, _ApiSearchClient(candidate), item, False)
 
