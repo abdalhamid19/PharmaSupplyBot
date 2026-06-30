@@ -161,6 +161,50 @@ class OrderRunArtifactsTests(unittest.TestCase):
         self.assertFalse(_preserve_existing_decision(auto))
         self.assertFalse(_preserve_existing_decision(None))
 
+    def test_manufacturer_diagnostic_fields_in_summary_row(self):
+        """Manufacturer diagnostic fields are added to artifact rows."""
+        from src.core.order_run_artifact_rows import order_item_summary_row
+
+        candidate = {
+            "productNameEn": "Panadol",
+            "productName": "بنادول",
+            "storeProductId": "s1",
+            "companyName": "GSK",
+        }
+        match = SearchMatch("Panadol GSK", 0, 95.0, candidate)
+        decision = MatchDecision(match, [], "accepted")
+
+        row = order_item_summary_row(
+            self._item(), self._summary(), decision, None, None
+        )
+
+        self.assertEqual(row["query_manufacturer"], "GSK")
+        self.assertEqual(row["candidate_manufacturer"], "GSK")
+        self.assertEqual(row["manufacturer_check_decision"], "match")
+
+    def test_manufacturer_conflict_detected_in_diagnostic_fields(self):
+        """Manufacturer conflict is reflected in diagnostic fields."""
+        from src.core.order_run_artifact_rows import order_item_summary_row
+        from types import SimpleNamespace
+
+        candidate = {
+            "productNameEn": "Advil",
+            "productName": "أدفيل",
+            "storeProductId": "s2",
+            "companyName": "Pfizer",
+        }
+        match = SearchMatch("Panadol GSK", 0, 95.0, candidate)
+        decision = MatchDecision(match, [], "accepted")
+        config = SimpleNamespace(manufacturer_match_threshold=0.85)
+
+        row = order_item_summary_row(
+            self._item(), self._summary(), decision, None, config
+        )
+
+        self.assertEqual(row["query_manufacturer"], "GSK")
+        self.assertEqual(row["candidate_manufacturer"], "PFIZER")
+        self.assertEqual(row["manufacturer_check_decision"], "conflict")
+
     @staticmethod
     def _item() -> Item:
         return Item("1", "Panadol", 1)

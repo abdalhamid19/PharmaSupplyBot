@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from .manufacturer_identity import (
+    extract_manufacturer_from_candidate,
+    extract_manufacturer_from_name,
+    manufacturer_conflict,
+)
+
 # Constants
 REVIEWABLE_STATUSES = {
     "no-results", "matched-but-unavailable", "not-orderable", "manual-review-required",
+    "manufacturer-mismatch",
 }
 SUMMARY_TIMING_KEYS = (
     "api_context_init_seconds",
@@ -115,6 +122,53 @@ def _summary_timing_fields(summary) -> dict[str, float]:
     }
 
 
+def _manufacturer_diagnostic_fields(
+    matched_query: str, match_source: dict, decision, config=None
+) -> dict[str, object]:
+    """Extract manufacturer diagnostic fields for artifacts."""
+    query_company = _extract_query_manufacturer(matched_query)
+    candidate_company = _extract_candidate_manufacturer(match_source)
+    check_decision = _compute_manufacturer_decision(
+        query_company, candidate_company, config
+    )
+    
+    return {
+        "query_manufacturer": query_company or "",
+        "candidate_manufacturer": candidate_company or "",
+        "manufacturer_check_decision": check_decision,
+    }
+
+
+def _extract_query_manufacturer(matched_query: str) -> str | None:
+    """Extract manufacturer from the matched query string."""
+    return extract_manufacturer_from_name(matched_query) if matched_query else ""
+
+
+def _extract_candidate_manufacturer(match_source: dict) -> str | None:
+    """Extract manufacturer from the candidate source."""
+    if not match_source:
+        return ""
+    candidate_name = match_source.get("productNameEn", "")
+    return extract_manufacturer_from_candidate(
+        candidate_name,
+        match_source.get("companyName"),
+        match_source.get("supplierName"),
+    ) or ""
+
+
+def _compute_manufacturer_decision(
+    query_company: str, candidate_company: str, config
+) -> str:
+    """Compute manufacturer check decision (match/conflict/unknown)."""
+    if not query_company or not candidate_company:
+        return "unknown"
+    
+    threshold = getattr(config, "manufacturer_match_threshold", 0.85) if config else 0.85
+    if manufacturer_conflict(query_company, candidate_company, threshold):
+        return "conflict"
+    return "match"
+
+
 def _manual_review_reason_code(summary_status: str, outcome) -> str:
     status = getattr(outcome, "status", "") if outcome is not None else ""
     return status or summary_status
@@ -182,6 +236,7 @@ def _build_summary_row(
         **blocked_candidate_fields(blocked_candidate),
         **summary_ai_fields(outcome, manual_review, _final_action(status, manual_review)),
         **manual_review_reason_fields(status, summary.reason, outcome),
+        **_manufacturer_diagnostic_fields(matched_query, match_source, decision, config),
         **_timing_fields(summary),
     }
 

@@ -27,6 +27,8 @@ def _manual_review_category(summary_status: str, outcome) -> str:
         return "matched_but_not_available"
     if summary_status == "not-orderable":
         return "candidate_not_orderable"
+    if summary_status == "manufacturer-mismatch":
+        return "manufacturer_mismatch"
     if status == "ai_review_rejected":
         return "ai_review_rejected"
     if status == "ai_low_confidence":
@@ -83,6 +85,8 @@ def _blocking_phase(outcome, summary_status: str) -> str:
         search = getattr(outcome, "search_result", {}) or {}
         verify = getattr(outcome, "verify_result", {}) or {}
         return "ai_search" if search else "ai_verify" if verify else "ai_final"
+    if summary_status == "manufacturer-mismatch":
+        return "deterministic_match"
     if summary_status in {"matched-but-unavailable", "not-orderable"}:
         return "deterministic_match"
     return "summary_status"

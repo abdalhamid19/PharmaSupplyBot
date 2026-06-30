@@ -46,6 +46,7 @@ def normalize_fallback_query(query: str) -> str:
 def _dom_candidate(
     lines, query: str, s_count: int, c_count: int, row
 ) -> dict[str, Any]:
+    supplier = _row_supplier_name(lines)
     return {
         "productNameEn": "",
         "productNameEnFallback": fallback_english_name(query, lines[0]),
@@ -54,7 +55,8 @@ def _dom_candidate(
         "productsCount": s_count,
         "availableQuantity": _dom_available_qty(row, s_count, c_count),
         "discountPercent": _row_discount_percent(row),
-        "supplierName": _row_supplier_name(lines),
+        "supplierName": supplier,
+        "companyName": supplier,
         "storeProductId": f"dom-row-{_normalized_dom_id(lines[0])}",
     }
 

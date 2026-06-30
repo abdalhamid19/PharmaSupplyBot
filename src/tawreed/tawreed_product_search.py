@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from .tawreed_constants import PRODUCT_SEARCH_ENDPOINT
+from .tawreed_constants import (
+    NESTED_NAME_KEYS,
+    NESTED_STORE_KEYS,
+    PRODUCT_SEARCH_ENDPOINT,
+    STORE_NAME_KEYS,
+)
 from .tawreed_product_search_select import has_orderable_candidate, select_search_candidates
 from .tawreed_timing import record_timing
 
@@ -72,7 +77,8 @@ def _search_response_pattern():
     return re.compile(f".*{PRODUCT_SEARCH_ENDPOINT}.*")
 
 def _api_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    return _product_dicts(payload)
+    candidates = _product_dicts(payload)
+    return [_enrich_candidate_with_company(c) for c in candidates]
 
 
 def _product_dicts(value: Any) -> list[dict[str, Any]]:
@@ -95,6 +101,32 @@ def _first_nested_product_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _is_product_dict(value: Any) -> bool:
     return isinstance(value, dict) and bool(value.get("productName") or value.get("productNameEn"))
+
+
+def _enrich_candidate_with_company(candidate: dict[str, Any]) -> dict[str, Any]:
+    """Add companyName field from nested store/supplier objects if missing."""
+    if candidate.get("companyName"):
+        return candidate
+    company = _extract_company_name(candidate)
+    if company:
+        candidate["companyName"] = company
+    return candidate
+
+
+def _extract_company_name(source: dict[str, Any]) -> str:
+    """Extract company name using STORE_NAME_KEYS and nested objects."""
+    for key in STORE_NAME_KEYS:
+        value = str(source.get(key) or "").strip()
+        if value:
+            return value
+    for obj_key in NESTED_STORE_KEYS:
+        nested = source.get(obj_key)
+        if isinstance(nested, dict):
+            for name_key in NESTED_NAME_KEYS:
+                value = str(nested.get(name_key) or "").strip()
+                if value:
+                    return value
+    return ""
 
 
 def _submit_product_search(page: Page, query: str) -> None:

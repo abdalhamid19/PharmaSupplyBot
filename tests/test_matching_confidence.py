@@ -52,3 +52,22 @@ class MatchingConfidenceTests(unittest.TestCase):
         )
         score = match_confidence(decision, item, "PANADOL")
         self.assertLess(score, 0.80)
+
+    def test_manufacturer_conflict_reduces_confidence(self) -> None:
+        """Check that manufacturer conflict significantly reduces confidence."""
+        item = Item(code="123", name="METHYL FOLATE 30 CAP ORCHIDIA", qty=1)
+        match = SearchMatch(
+            query="METHYL FOLATE",
+            row_index=0,
+            score=15.0,
+            data={
+                "productNameEn": "METHYL FOLATE ORA 30 CAPS",
+                "availableQuantity": 100,
+                "companyName": "ORA PHARMA",
+            },
+        )
+        decision = MatchDecision(
+            best_match=match, diagnostics=[], final_reason="Accepted"
+        )
+        score = match_confidence(decision, item, "METHYL FOLATE")
+        self.assertLess(score, 0.75)

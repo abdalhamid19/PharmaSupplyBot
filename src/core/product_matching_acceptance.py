@@ -22,6 +22,12 @@ from .product_matching_helpers import (
     _normalize_text,
     _normalized_tokens,
 )
+from .config.config_models import MatchingConfig
+from .manufacturer_identity import (
+    extract_manufacturer_from_candidate,
+    extract_manufacturer_from_name,
+    manufacturer_conflict,
+)
 from .product_matching_scoring import (
     _candidate_english_name,
 )
@@ -306,21 +312,72 @@ def _safe_omitted_percentage_concentration(tokens: set[str], requested, offered)
     return False
 
 
+# ── Manufacturer mismatch check ──
+
+
+def _candidate_manufacturer_rejection(
+    query: str,
+    candidate: dict[str, Any],
+    config: dict[str, Any] | MatchingConfig,
+) -> tuple[bool, str | None]:
+    """Check for manufacturer conflict between query and candidate."""
+    enable_check = (
+        config.enable_manufacturer_check
+        if hasattr(config, "enable_manufacturer_check")
+        else config.get("enable_manufacturer_check", False)
+    )
+    if not enable_check:
+        return True, None
+
+    query_company = extract_manufacturer_from_name(query)
+    candidate_name = _candidate_english_name(candidate)
+    candidate_company = extract_manufacturer_from_candidate(
+        candidate_name,
+        candidate.get("companyName"),
+        candidate.get("supplierName"),
+    )
+
+    threshold = (
+        config.manufacturer_match_threshold
+        if hasattr(config, "manufacturer_match_threshold")
+        else config.get("manufacturer_match_threshold", 0.85)
+    )
+    if manufacturer_conflict(query_company, candidate_company, threshold):
+        msg = f"Manufacturer conflict: {query_company} vs {candidate_company}"
+        return False, msg
+    return True, None
+
+
 # ── Main acceptance logic ──
 
 
 def _check_rejections(
     score_query: str,
     candidate: dict[str, Any],
+    config: dict[str, Any] | MatchingConfig | None = None,
     skip_components: bool = False,
 ) -> tuple[bool, str]:
     """Check all rejection criteria and return (is_rejected, reason)."""
+    config = config or {}
     checks = [
         _candidate_variant_rejection(score_query, candidate),
         compatibility_rejection_reason(score_query, _candidate_english_name(candidate)),
     ]
     if not skip_components:
         checks.append(_candidate_component_rejection(score_query, candidate))
+
+    # Check manufacturer mismatch if enabled
+    enable_check = (
+        config.enable_manufacturer_check
+        if hasattr(config, "enable_manufacturer_check")
+        else config.get("enable_manufacturer_check", False)
+    )
+    if enable_check:
+        is_ok, reason = _candidate_manufacturer_rejection(
+            score_query, candidate, config
+        )
+        if not is_ok:
+            return True, reason or "Manufacturer conflict"
 
     for reason in checks:
         if reason:
@@ -337,7 +394,7 @@ def _diagnostic_acceptance(
 ) -> tuple[bool, str, str]:
     """Return acceptance status and reason text for a candidate."""
     is_rejected, rejection_reason = _check_rejections(
-        score_query, candidate, skip_components
+        score_query, candidate, matching_config, skip_components
     )
     if is_rejected:
         return False, "", rejection_reason
@@ -409,6 +466,7 @@ __all__ = [
     "_identity_tokens",
     "_missing_arabic_token_reasons",
     "_vitacid_c_calcium_conflict",
+    "_candidate_manufacturer_rejection",
     "_orderable_acceptance",
     "_any_safe_omission",
     "_safe_omitted_combo_strength",

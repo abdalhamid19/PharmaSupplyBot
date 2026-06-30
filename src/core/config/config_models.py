@@ -59,6 +59,8 @@ class MatchingConfig:
     enable_auto_save_verified_match: bool = True
     enable_auto_match_re_review_on_fail: bool = False
     enable_approved_match_re_review_on_fail: bool = False
+    enable_manufacturer_check: bool = False
+    manufacturer_match_threshold: float = 0.85
 
 
 @dataclass(frozen=True)

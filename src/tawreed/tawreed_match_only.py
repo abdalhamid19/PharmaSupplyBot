@@ -23,6 +23,7 @@ MATCH_ONLY_API_KEYS = (
     "productsCount",
     "storeName",
     "supplierName",
+    "companyName",
     "discountPercent",
     "retailPrice",
     "salePrice",
@@ -157,7 +158,9 @@ def _candidate_row(item, summary, decision, diagnostic, rank) -> dict[str, objec
     return row
 
 
-def _base_row(item: Item, summary: OrderResultSummary, decision: MatchDecision | None) -> dict[str, object]:
+def _base_row(
+    item: Item, summary: OrderResultSummary, decision: MatchDecision | None
+) -> dict[str, object]:
     """Return item-level match-only fields shared by every row."""
     return {
         "item_code": item.code, "item_name": item.name, "item_qty": item.qty,
