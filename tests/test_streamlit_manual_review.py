@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from src.core.manual_review_store import ManualReviewDecision, ManualReviewStore
-from src.ui.streamlit_manual_review import (
+from src.ui.streamlit_manual_review_input import (
     editable_manual_review_rows,
     manual_review_decisions_from_rows,
     save_manual_review_rows,

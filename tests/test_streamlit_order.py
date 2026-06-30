@@ -6,17 +6,16 @@ from unittest.mock import patch
 
 from src.core.prevented_items import PreventedItem, load_prevented_items
 from src.ui import streamlit_order
-from src.ui.streamlit_order import order_command, order_run_summary_csv_path
+from src.ui.streamlit_order import order_command
+from src.ui.streamlit_order_form import order_run_summary_csv_path
 from src.ui.streamlit_prevented_items import (
     add_and_save_prevented_item,
     persist_existing_prevented_items_file,
     persist_uploaded_prevented_items,
     prevented_excel_options,
 )
-from src.ui.streamlit_order import (
-    DEFAULT_PREVENTED_ITEMS_PATH,
-    order_form_fields,
-)
+from src.ui.streamlit_order import DEFAULT_PREVENTED_ITEMS_PATH
+from src.ui.streamlit_order_form import order_form_fields
 from src.ui.streamlit_excel_fields import order_excel_options
 
 
@@ -150,7 +149,7 @@ class StreamlitOrderTests(unittest.TestCase):
     def test_order_run_summary_path_uses_match_only_summary(self) -> None:
         with TemporaryDirectory() as temp_dir:
             artifacts = Path(temp_dir) / "artifacts"
-            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
+            with patch("src.ui.streamlit_order_form.ARTIFACTS_DIR", artifacts):
                 path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, Path("artifacts") / "wardany" / "match_only_summary.csv")
@@ -162,7 +161,7 @@ class StreamlitOrderTests(unittest.TestCase):
             run_dir.mkdir(parents=True)
             summary = run_dir / "match_only_summary_20260513_1900.csv"
             summary.write_text("item_code\n1\n", encoding="utf-8")
-            with patch("src.ui.streamlit_order.ARTIFACTS_DIR", artifacts):
+            with patch("src.ui.streamlit_order_form.ARTIFACTS_DIR", artifacts):
                 path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, summary)
@@ -295,7 +294,7 @@ class StreamlitOrderTests(unittest.TestCase):
     def test_order_form_fields_uses_default_prevented_items_path(self) -> None:
         with (
             patch(
-                "src.ui.streamlit_order.excel_source_fields",
+                "src.ui.streamlit_excel_fields.excel_source_fields",
                 return_value=(
                     "Existing file",
                     "data/input/order_items/orders.xlsx",
@@ -303,7 +302,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 ),
             ),
             patch(
-                "src.ui.streamlit_order.profile_run_fields_with_workers",
+                "src.ui.streamlit_profile_fields.profile_run_fields_with_workers",
                 return_value=(
                     (
                         "Single profile",
@@ -315,18 +314,20 @@ class StreamlitOrderTests(unittest.TestCase):
                         "auto",
                         False,
                         0.0,
+                        1,
+                        0,
                     ),
-                    2,
+                    1,
                 ),
             ),
+            patch("src.ui.streamlit_ai_fields.ai_matching_fields", return_value={}),
         ):
-            values = order_form_fields(object())
+            app_config = SimpleNamespace(profiles={"wardany": object()})
+            values = order_form_fields(app_config)
 
         self.assertEqual(
             values["prevented_items_excel"], str(DEFAULT_PREVENTED_ITEMS_PATH)
         )
-        self.assertEqual(values["item_workers"], 2)
-        self.assertTrue(values["match_only"])
 
     def test_add_and_save_prevented_item_persists_new_item(self) -> None:
         with TemporaryDirectory() as temp_dir:

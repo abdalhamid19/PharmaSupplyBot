@@ -1,4 +1,7 @@
-"""Tawreed API endpoint contract persistence, discovery, and defaults - re-exports from split modules."""
+"""Tawreed API endpoint contract persistence, discovery, and defaults.
+
+Re-exports from split modules.
+"""
 
 from __future__ import annotations
 

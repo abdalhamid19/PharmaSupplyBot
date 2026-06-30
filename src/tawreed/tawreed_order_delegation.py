@@ -78,13 +78,21 @@ class OrderFlowDelegation:
         """Open the site and navigate to the ordering surface for item processing."""
         return self.item_processor.prepare_order_page(page)
 
-    def _record_item_summary(self, item, status, reason, elapsed_seconds, match_elapsed_seconds):
+    def _record_item_summary(
+        self, item, status, reason, elapsed_seconds, match_elapsed_seconds
+    ):
         """Append one execution-summary row for the processed item."""
-        return self.summary_recorder.record_item_summary(item, status, reason, elapsed_seconds, match_elapsed_seconds)
+        return self.summary_recorder.record_item_summary(
+            item, status, reason, elapsed_seconds, match_elapsed_seconds
+        )
 
-    def _record_match_only_summary(self, item, status, reason, elapsed_seconds, match_elapsed_seconds):
+    def _record_match_only_summary(
+        self, item, status, reason, elapsed_seconds, match_elapsed_seconds
+    ):
         """Append one detailed match-only summary for the processed item."""
-        return self.summary_recorder.record_match_only_summary(item, status, reason, elapsed_seconds, match_elapsed_seconds)
+        return self.summary_recorder.record_match_only_summary(
+            item, status, reason, elapsed_seconds, match_elapsed_seconds
+        )
 
     def _build_item_summary(self, status, reason, elapsed, match_elapsed):
         """Build a compact summary object from the current bot state."""

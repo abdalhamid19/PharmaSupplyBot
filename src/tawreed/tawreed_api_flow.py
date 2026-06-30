@@ -1,4 +1,7 @@
-"""API-backed Tawreed execution flows with browser-compatible summaries - re-exports from split modules."""
+"""API-backed Tawreed execution flows with browser-compatible summaries.
+
+Re-exports from split modules.
+"""
 
 from __future__ import annotations
 

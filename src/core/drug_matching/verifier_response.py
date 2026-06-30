@@ -16,8 +16,8 @@ from .verifier_helpers import (
 )
 
 if TYPE_CHECKING:
-    from .verifier_request_failure import FailureTracker
-    from .verifier_request_planning import RequestPlanner
+    from .verifier_request_validate import FailureTracker
+    from .verifier_request_build import RequestPlanner
 
 logger = logging.getLogger("pharmasupplybot.matching")
 

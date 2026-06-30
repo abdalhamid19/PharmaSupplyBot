@@ -2,134 +2,34 @@
 
 from __future__ import annotations
 
-import os
-import webbrowser
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from playwright.sync_api import Page
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
-from .tawreed_login_detection import (
-    is_logged_in_marker_visible,
-    login_detected,
-)
+from .tawreed_login_detection import is_logged_in_marker_visible
 from .tawreed_playwright_browser import launch_chromium
 from .tawreed_auth import headless_auth_failure_message
-
-
-# ============================================================================
-# Wait helpers (from tawreed_auth_waits.py)
-# ============================================================================
-
-def _initial_wait_state(wait_seconds: int) -> dict[str, int]:
-    """Return the mutable polling state used while waiting for login detection."""
-    return {
-        "poll_ms": 2000,
-        "save_every_ms": 5000,
-        "total_waited_ms": 0,
-        "since_last_save_ms": 0,
-        "wait_budget_ms": _wait_budget_ms(wait_seconds),
-    }
-
-
-def _advance_wait_state(
-    wait_state: dict[str, int],
-    context,
-    state_path: Path,
+from .tawreed_session_state import (
+    auth_temp_state_path,
     save_session_state,
-    save_intermediate: bool,
-) -> None:
-    """Advance the polling state and save session state when the interval is due."""
-    poll_ms = wait_state["poll_ms"]
-    wait_state["total_waited_ms"] += poll_ms
-    wait_state["since_last_save_ms"] += poll_ms
-    wait_state["since_last_save_ms"] = _save_state_if_due(
-        context,
-        state_path,
-        wait_state["since_last_save_ms"],
-        wait_state["save_every_ms"],
-        save_session_state,
-        save_intermediate,
-    )
-
-
-def _wait_budget_ms(wait_seconds: int) -> int:
-    """Return the total wait budget in milliseconds."""
-    return max(1, int(wait_seconds)) * 1000
-
-
-def _save_state_if_due(
-    context,
-    state_path: Path,
-    since_last_save_ms: int,
-    save_every_ms: int,
-    save_session_state,
-    save_intermediate: bool,
-) -> int:
-    """Persist intermediate session state when the save interval has elapsed."""
-    if not save_intermediate:
-        return 0 if since_last_save_ms >= save_every_ms else since_last_save_ms
-    if since_last_save_ms < save_every_ms:
-        return since_last_save_ms
-    save_session_state(context, state_path, is_intermediate=True)
-    return 0
-
-
-def wait_for_login_detection(
-    page: Page,
-    context,
-    wait_seconds: int,
-    email_sel: str,
-    pwd_sel: str,
-    marker: str,
-    state_path: Path,
-    save_session_state,
-    save_inter: bool = True,
-) -> bool:
-    """Poll the page until the logged-in marker appears or timeout is reached."""
-    ws = _initial_wait_state(wait_seconds)
-    while ws["total_waited_ms"] < ws["wait_budget_ms"]:
-        if login_detected(page, ws["poll_ms"], email_sel, pwd_sel, marker):
-            return True
-        _advance_wait_state(ws, context, state_path, save_session_state, save_inter)
-    return False
+    promote_session_state,
+    discard_session_state,
+    wait_for_login_detection,
+)
+from .tawreed_session_auth import (
+    SessionInvalidError,
+    attempt_env_login,
+    print_auth_instructions,
+    print_login_detection_result,
+    wait_for_network_idle,
+    perform_tawreed_auth,
+)
 
 
 # ============================================================================
-# Session state management (from tawreed_session_state.py)
-# ============================================================================
-
-def auth_temp_state_path(state_path: Path) -> Path:
-    """Return the temporary path used while validating a newly captured auth session."""
-    return state_path.with_name(f"{state_path.stem}.tmp{state_path.suffix}")
-
-
-def save_session_state(context, state_path: Path, is_intermediate: bool) -> None:
-    """Persist the current browser storage state to disk."""
-    try:
-        context.storage_state(path=str(state_path))
-        if is_intermediate:
-            print(f"Saved intermediate session state: {state_path}")
-    except Exception:
-        pass
-
-
-def promote_session_state(temp_state_path: Path, final_state_path: Path) -> None:
-    """Replace the final saved session state with a validated temporary capture."""
-    final_state_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_state_path.replace(final_state_path)
-
-
-def discard_session_state(state_path: Path) -> None:
-    """Delete one temporary or invalid saved session state without surfacing cleanup errors."""
-    try:
-        state_path.unlink(missing_ok=True)
-    except Exception:
-        pass
-
-
-# ============================================================================
-# Browser operations (from tawreed_session_browser.py)
+# Browser operations
 # ============================================================================
 
 def open_auth_page(pw, base_url: str, runtime, headless: bool = False) -> tuple[Any, Any, Page]:
@@ -177,80 +77,7 @@ def close_browser(browser) -> None:
 
 
 # ============================================================================
-# Authentication logic (from tawreed_session_auth.py)
-# ============================================================================
-
-class SessionInvalidError(RuntimeError):
-    """Raised when the saved login session is not valid for order placement."""
-
-
-def attempt_env_login(page: Page, selectors) -> None:
-    """Try to prefill and submit login credentials from environment variables."""
-    email = os.getenv("TAWREED_EMAIL", "").strip()
-    password = os.getenv("TAWREED_PASSWORD", "").strip()
-    if not email or not password:
-        return
-    try:
-        page.locator(selectors.login_email).first.fill(email)
-        page.locator(selectors.login_password).first.fill(password)
-        page.locator(selectors.login_submit).first.click()
-    except Exception as error:
-        raise RuntimeError(
-            "Could not submit Tawreed login credentials. "
-            "Check selectors.login.email_input, password_input, and submit_button."
-        ) from error
-
-
-def print_auth_instructions(wait_seconds: int, headless: bool = False) -> None:
-    """Explain the authentication behavior to the operator."""
-    if headless:
-        print(
-            "Headless browser opened for credential-based login.\n"
-            f"- I will wait up to {wait_seconds} seconds for Tawreed to authenticate.\n"
-            "- If the site requires CAPTCHA/OTP or extra human verification, this mode will fail.\n"
-        )
-        return
-    print(
-        "Browser opened. Please complete login manually.\n"
-        "- I will keep the browser open for up to "
-        f"{wait_seconds} seconds waiting for login detection.\n"
-        "- If the site requires OTP/CAPTCHA, finish it in the browser.\n"
-    )
-
-
-def print_login_detection_result(detected: bool) -> None:
-    """Print the result of login detection."""
-    if detected:
-        print("Login detected.")
-    else:
-        print("Login not detected within timeout.")
-
-
-def wait_for_network_idle(page) -> None:
-    """Wait for network activity to settle after login."""
-    try:
-        page.wait_for_load_state("networkidle", timeout=5000)
-    except Exception:
-        pass
-
-
-def perform_tawreed_auth(bot, wait_seconds: int, headless: bool) -> None:
-    """Perform the complete Tawreed authentication flow."""
-    from .tawreed_headless_auth_refresh import run_headless_auth_refresh
-    
-    print_auth_instructions(wait_seconds, headless)
-    run_headless_auth_refresh(
-        bot.config.base_url,
-        bot.state_path,
-        bot.config.runtime,
-        bot.selectors,
-        bot.profile_key,
-        wait_seconds=wait_seconds,
-    )
-
-
-# ============================================================================
-# Session validation (from tawreed_session_validation.py)
+# Session validation
 # ============================================================================
 
 def _is_logged_in_marker_visible(page: Page, logged_in_marker: str, timeout_ms: int) -> bool:

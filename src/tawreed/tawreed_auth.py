@@ -6,8 +6,10 @@ import base64
 import json
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from playwright.sync_api import Page
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 from .tawreed_login_detection import (
     is_logged_in_marker_visible as marker_visible,

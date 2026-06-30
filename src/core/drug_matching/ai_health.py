@@ -10,7 +10,7 @@ from .ai_health_test import (
     AIKey,
     build_payload,
     empty_result,
-    test_one,
+    execute_one,
     run_health_checks,
 )
 from .ai_health_validation import (
@@ -33,7 +33,7 @@ __all__ = [
     "AIKey",
     "build_payload",
     "empty_result",
-    "test_one",
+    "execute_one",
     "run_health_checks",
     # Validation
     "content_from_response",

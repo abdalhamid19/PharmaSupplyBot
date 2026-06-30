@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from playwright.sync_api import Page, sync_playwright
-
 from ..core.manual_review_runtime import (
     manual_review_cache_context,
     preload_manual_review_decisions,
@@ -43,9 +41,14 @@ class MatchOnlyFlow:
 
     def _match_items_browser_mode(self, items: list[Item]) -> None:
         """Match items using browser mode."""
+        from playwright.sync_api import Page, sync_playwright
+        
         with sync_playwright() as p:
             browser, context, page = open_order_page(
-                p, self.bot.config.runtime, self.bot.state_path, debug_browser=self.bot.debug_browser
+                p,
+                self.bot.config.runtime,
+                self.bot.state_path,
+                debug_browser=self.bot.debug_browser
             )
             api_capture = begin_api_contract_capture(page)
             try:
@@ -70,7 +73,7 @@ class MatchOnlyFlow:
         )
         return context
 
-    def _run_match_only_with_artifacts(self, page: Page, items: Iterable[Item]) -> None:
+    def _run_match_only_with_artifacts(self, page, items: Iterable[Item]) -> None:
         """Run match-only browser flow and capture diagnostics on failure."""
         try:
             self._run_match_only_session(page, items)
@@ -83,7 +86,7 @@ class MatchOnlyFlow:
             )
             raise
 
-    def _run_match_only_session(self, page: Page, items: Iterable[Item]) -> None:
+    def _run_match_only_session(self, page, items: Iterable[Item]) -> None:
         """Prepare Tawreed and process item matching without cart actions."""
         self.item_processor.prepare_order_page(page)
         completed = self._process_match_only_items(page, items)
@@ -94,7 +97,7 @@ class MatchOnlyFlow:
                 f"[{self.bot.profile_key}] Stop requested or incomplete. Matching stopped."
             )
 
-    def _process_match_only_items(self, page: Page, items: Iterable[Item]) -> bool:
+    def _process_match_only_items(self, page, items: Iterable[Item]) -> bool:
         """Run matching only for each requested Excel item."""
         matched_any = False
         for item in items:
@@ -105,7 +108,7 @@ class MatchOnlyFlow:
             )
         return matched_any
 
-    def _process_single_match_only_item(self, page: Page, item: Item) -> bool:
+    def _process_single_match_only_item(self, page, item: Item) -> bool:
         """Match one item without running any add-to-cart action."""
         import time
         started_at = time.perf_counter()

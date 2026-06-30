@@ -1,6 +1,10 @@
 """UI locator and dialog helpers for Tawreed Playwright automation."""
 from __future__ import annotations
-from playwright.sync_api import Page
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
+
 from .tawreed_constants import (
     CART_BUTTON_SELECTOR,
     CHECKOUT_CONFIRMATION_LABELS,

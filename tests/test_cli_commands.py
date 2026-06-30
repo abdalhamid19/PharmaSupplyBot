@@ -12,7 +12,7 @@ from src.cli.cli_order_items import (
     load_order_items,
     prepared_order_items,
 )
-from src.cli.cli_order import (
+from src.cli.cli_order_execution import (
     run_parallel_order,
     run_profile_match_only,
     run_profile_order,
@@ -137,7 +137,7 @@ class CliCommandsTests(unittest.TestCase):
             patch("pathlib.Path.is_file", return_value=False),
             patch("src.cli.cli_shared.require_state_file"),
             patch("src.cli.cli_shared.build_bot", return_value=object()),
-            patch("src.cli.cli_order_single.run_profile_order") as run_order,
+            patch("src.cli.cli_order_execution.run_profile_order") as run_order,
         ):
             run_order.side_effect = lambda _base, _key, _bot, order_items: (
                 captured_items.extend(list(order_items))

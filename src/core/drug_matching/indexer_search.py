@@ -53,6 +53,7 @@ class IndexSearcher:
             self._parsed,
             self._cfg,
             self._norms,
+            self._prices,
             self.get_record,
         )
 
@@ -81,7 +82,9 @@ class IndexSearcher:
         price=None,
     ) -> list[tuple[int, float]]:
         """Return (idx, score) pairs for brand + fuzzy candidates."""
-        query_price = self._brand_lookup._parse_price(price)
+        from .indexer_detailed_lookup import _parse_price
+
+        query_price = _parse_price(price)
         brand_hits = self._brand_lookup.lookup(parsed, query_price)
         component_hits = self._component_lookup.lookup(parsed, query_price)
         fuzzy_hits = self._fuzzy_lookup.lookup(parsed.normalized, limit)

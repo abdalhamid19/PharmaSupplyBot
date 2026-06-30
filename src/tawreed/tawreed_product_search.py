@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from playwright.sync_api import Page
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 from .tawreed_constants import PRODUCT_SEARCH_ENDPOINT
 from .tawreed_product_search_select import has_orderable_candidate, select_search_candidates

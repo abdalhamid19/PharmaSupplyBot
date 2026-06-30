@@ -28,11 +28,18 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
     query_cache = get_bot_query_cache(bot)
     review_decision = _manual_review_decision_timed(bot, item)
     
-    for query in manual_review_queries(item, _search_queries_for_item(item), review_decision):
+    for query in manual_review_queries(
+        item, _search_queries_for_item(item), review_decision
+    ):
         queries.append(query)
-        found = cached_query_result(query_cache, query, lambda: _search_products_timed(bot, api, query))
+        found = cached_query_result(
+            query_cache, query, lambda: _search_products_timed(bot, api, query)
+        )
         results.append((query, found))
-        match = _check_api_match(bot, item, started_at, queries, results, require_available, review_decision)
+        match = _check_api_match(
+            bot, item, started_at, queries, results, require_available,
+            review_decision
+        )
         if match:
             return match
     
@@ -131,13 +138,28 @@ def _raise_non_orderable_exception(bot, item, results):
     if candidates:
         query, candidate = candidates[0]
         diagnostics.append(CandidateMatchDiagnostic(
-            query=query, row_index=0, score=999.0, sort_key=(999.0, 0, 0.0, 0, 0, 0),
-            accepted=False, accepted_reason="", rejection_reason="Candidate missing orderable storeProductId",
-            breakdown=MatchScoreBreakdown(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.0), candidate=candidate
+            query=query,
+            row_index=0,
+            score=999.0,
+            sort_key=(999.0, 0, 0.0, 0, 0, 0),
+            accepted=False,
+            accepted_reason="",
+            rejection_reason="Candidate missing orderable storeProductId",
+            breakdown=MatchScoreBreakdown(
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.0
+            ),
+            candidate=candidate
         ))
-    
-    bot.last_match_decision = MatchDecision(best_match=None, diagnostics=diagnostics, final_reason="All API candidates missing orderable storeProductId")
-    raise bot.no_results_exception(f"No decisive match found for '{item.name}'. API candidates found but none has an orderable storeProductId.")
+
+    bot.last_match_decision = MatchDecision(
+        best_match=None,
+        diagnostics=diagnostics,
+        final_reason="All API candidates missing orderable storeProductId"
+    )
+    raise bot.no_results_exception(
+        f"No decisive match found for '{item.name}'. "
+        "API candidates found but none has an orderable storeProductId."
+    )
 
 
 def _has_only_non_orderable_candidates(results) -> bool:

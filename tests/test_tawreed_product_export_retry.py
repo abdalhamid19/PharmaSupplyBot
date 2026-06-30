@@ -14,7 +14,7 @@ class TawreedProductExportRetryTests(unittest.TestCase):
     def test_post_product_export_json_retries_timeout_then_succeeds(self) -> None:
         request = _FlakyRequest([TimeoutError("read ETIMEDOUT"), _response("1")])
 
-        with patch("src.tawreed.tawreed_product_export.time.sleep"):
+        with patch("time.sleep"):
             payload = post_product_export_json(request, "https://api.test", {}, {})
 
         self.assertEqual(payload["data"]["content"][0]["storeProductId"], "1")
@@ -28,7 +28,7 @@ class TawreedProductExportRetryTests(unittest.TestCase):
             TimeoutError("read ETIMEDOUT"),
         ])
 
-        with patch("src.tawreed.tawreed_product_export.time.sleep"):
+        with patch("time.sleep"):
             with self.assertRaisesRegex(RuntimeError, "read ETIMEDOUT"):
                 post_product_export_json(request, "https://api.test", {}, {})
 

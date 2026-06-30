@@ -8,10 +8,8 @@ import pandas as pd
 import streamlit as st
 
 from ..core.manual_review_corrections import _has_correction
-from ..core.manual_review_hints import hint_key
 from ..core.manual_review_store import (
     DEFAULT_MANUAL_REVIEW_DB,
-    ManualReviewDecision,
     ManualReviewStore,
 )
 from .streamlit_manual_review_cli import (
@@ -19,9 +17,23 @@ from .streamlit_manual_review_cli import (
     start_corrected_item_search,
     render_running_search_controls,
 )
+from .streamlit_manual_review_display import (
+    _default_manual_review_columns,
+    _paginate_multi_page,
+    _paginate_rows,
+    _select_columns,
+    _show_stats,
+    _sorted_column_options,
+)
+from .streamlit_manual_review_input import (
+    editable_manual_review_rows,
+    manual_review_decisions_from_rows,
+    save_manual_review_rows,
+)
 
 
 # ============ Database Helpers ============
+
 
 def manual_review_store_or_stop() -> ManualReviewStore:
     """Return the CockroachDB manual-review store or stop the Streamlit page."""
@@ -31,194 +43,6 @@ def manual_review_store_or_stop() -> ManualReviewStore:
         st.error(f"Manual review database is not available: {error}")
         st.info("Set DB_PASSWORD and DB_SSLMODE=require in .env, then restart Streamlit.")
         st.stop()
-
-
-# ============ Data Conversion Functions ============
-
-def save_manual_review_rows(
-    rows: list[dict], run_id: str, store_path: Path = DEFAULT_MANUAL_REVIEW_DB
-) -> int:
-    """Persist edited manual-review rows and return the saved count."""
-    store = ManualReviewStore(store_path)
-    decisions = manual_review_decisions_from_rows(rows, run_id)
-    store.upsert_batch(decisions)
-    return len(decisions)
-
-
-def manual_review_decisions_from_rows(
-    rows: list[dict], run_id: str
-) -> list[ManualReviewDecision]:
-    """Return saved decisions represented by edited Streamlit rows."""
-    decisions = []
-    for row in rows:
-        decision = _decision_from_row(row, run_id)
-        if decision:
-            decisions.append(decision)
-    return decisions
-
-
-def _decision_from_row(row: dict, run_id: str) -> ManualReviewDecision | None:
-    approved = bool(row.get("approved_match"))
-    not_matching = bool(row.get("not_matching"))
-    correction = _correction_fields(row)
-    if not approved and not not_matching and not any(correction):
-        return None
-    manual_decision = _manual_decision(approved, not_matching)
-    return ManualReviewDecision(
-        item_code=_clean(row.get("item_code")),
-        item_name=_clean(row.get("item_name")),
-        approved=approved,
-        correct_store_product_id=correction[0],
-        correct_product_name=correction[1],
-        correct_query=correction[2],
-        run_id=run_id,
-        manual_decision=manual_decision,
-    )
-
-
-def _correction_fields(row: dict) -> tuple[str, str, str]:
-    return (
-        _clean(row.get("correct_store_product_id")),
-        _clean(row.get("correct_product_name")),
-        _clean(row.get("correct_query")),
-    )
-
-
-def _manual_decision(approved: bool, not_matching: bool) -> str:
-    if not_matching:
-        return "not_matching"
-    return "approved_match" if approved else "needs_correction"
-
-
-def _clean(value: object) -> str:
-    text = str(value or "").strip()
-    return "" if text.lower() in {"nan", "none", "null"} else text
-
-
-# ============ Row Helpers ============
-
-def editable_manual_review_rows(
-    rows: list[dict[str, str]], store: ManualReviewStore | None = None
-) -> list[dict[str, object]]:
-    """Return UI rows with saved manual decisions and their source displayed."""
-    saved_decisions_map = _load_saved_decisions_batch(rows, store) if store else {}
-    editable = []
-    for row in rows:
-        item = _editable_row(row)
-        key = hint_key(_clean(item.get("item_code")), _clean(item.get("item_name")))
-        saved = saved_decisions_map.get(key)
-        _apply_saved_decision(item, saved)
-        editable.append(item)
-    return editable
-
-
-def _load_saved_decisions_batch(
-    rows: list[dict[str, str]], store: ManualReviewStore
-) -> dict[tuple[str, str], ManualReviewDecision]:
-    """Load all saved decisions for rows in one database query."""
-    items = [{"code": _clean(r.get("item_code")), "name": _clean(r.get("item_name"))} for r in rows]
-    return store.lookup_many(items)
-
-
-def _editable_row(row: dict[str, str]) -> dict[str, object]:
-    item = dict(row)
-    item.setdefault("approved_match", False)
-    item.setdefault("not_matching", False)
-    item.setdefault("correct_store_product_id", "")
-    item.setdefault("correct_product_name", "")
-    item.setdefault("correct_query", item.get("matched_query", ""))
-    item.setdefault("decision_source", "run_artifact")
-    return item
-
-
-def _apply_saved_decision(
-    item: dict[str, object], saved: ManualReviewDecision | None
-) -> None:
-    if not saved:
-        return
-    item["approved_match"] = saved.approved
-    item["not_matching"] = saved.manual_decision == "not_matching"
-    item["correct_store_product_id"] = saved.correct_store_product_id
-    item["correct_product_name"] = saved.correct_product_name
-    item["correct_query"] = saved.correct_query
-    item["decision_source"] = "saved_manual_review"
-
-
-# ============ Pagination ============
-
-def _show_stats(editable_rows):
-    """Show item statistics."""
-    remaining_count = sum(
-        1 for row in editable_rows
-        if not row.get("approved_match") and not row.get("not_matching")
-    )
-    total_count = len(editable_rows)
-    corrected_count = total_count - remaining_count
-    st.caption(
-        f"📊 Total: {total_count} items | ✅ Corrected: {corrected_count} | "
-        f"⏳ Remaining: {remaining_count}"
-    )
-
-
-def _paginate_rows(editable_rows):
-    """Paginate rows and return visible subset."""
-    items_per_page = 50
-    total_pages = max(1, (len(editable_rows) + items_per_page - 1) // items_per_page)
-    if total_pages > 1:
-        return _paginate_multi_page(editable_rows, total_pages, items_per_page)
-    return editable_rows
-
-
-def _paginate_multi_page(editable_rows, total_pages, items_per_page):
-    """Handle multi-page pagination."""
-    page = st.number_input(
-        f"Page (1-{total_pages})",
-        min_value=1,
-        max_value=total_pages,
-        value=st.session_state.get("manual_review_page", 1),
-        key="manual_review_page_input"
-    )
-    st.session_state["manual_review_page"] = page
-    start_idx = (page - 1) * items_per_page
-    end_idx = min(start_idx + items_per_page, len(editable_rows))
-    visible_rows = editable_rows[start_idx:end_idx]
-    st.caption(f"Showing {start_idx + 1}-{end_idx} of {len(editable_rows)}")
-    return visible_rows
-
-
-def _select_columns(visible_rows):
-    """Allow column selection for display."""
-    if not visible_rows:
-        return None
-    all_cols = list(visible_rows[0].keys())
-    default_cols = _default_manual_review_columns()
-    default_cols = [c for c in default_cols if c in all_cols]
-    sorted_options = _sorted_column_options(default_cols, all_cols)
-    return st.multiselect(
-        "اختر الأعمدة المراد عرضها (Select Columns to Display):",
-        options=sorted_options,
-        default=default_cols,
-        key="manual_review_columns_multiselect"
-    )
-
-
-def _default_manual_review_columns():
-    """Return default columns for manual review display."""
-    return [
-        "item_code", "item_name", "matched_product_name_en", "item_qty", "status",
-        "approved_match", "not_matching",
-        "correct_store_product_id", "correct_product_name", "correct_query",
-        "reason", "matched_query"
-    ]
-
-
-def _sorted_column_options(default_cols, all_cols):
-    """Sort column options with defaults first."""
-    sorted_options = list(default_cols)
-    for c in all_cols:
-        if c not in sorted_options:
-            sorted_options.append(c)
-    return sorted_options
 
 
 # ============ Editor UI ============
@@ -288,8 +112,9 @@ def _render_save_section(edited_records, run_dir):
     decisions = manual_review_decisions_from_rows(edited_records, run_dir.name)
     st.markdown("### 1. 💾 Save Manual Review Decisions")
     st.caption(
-        "يحفظ هذه التعديلات في قاعدة البيانات كقواعد ثابتة حتى يتعلمها "
-        "الذكاء الاصطناعي ويطبقها في الطلبيات القادمة."
+        "يحفظ هذه التعديلات في قاعدة البيانات كقواعد ثابتة "
+        "حتى يتعلمها الذكاء الاصطناعي ويطبقها في الطلبيات "
+        "القادمة."
     )
     if decisions:
         items_list = "، ".join(d.item_name for d in decisions)
@@ -305,7 +130,10 @@ def _render_remove_not_matching_section(edited_records, run_dir):
     """Render remove not matching items section."""
     not_matching_rows = _get_not_matching_rows(edited_records)
     st.markdown("### 2. 🗑️ Remove Not Matching From Cart")
-    st.caption("يقوم بحذف الأصناف التي حددتها كـ (غير مطابقة) من سلة المشتريات على موقع المورد.")
+    st.caption(
+        "يقوم بحذف الأصناف التي حددتها كـ (غير مطابقة) "
+        "من سلة المشتريات على موقع المورد."
+    )
     _show_not_matching_info(not_matching_rows)
     if st.button("Remove Not Matching From Cart", disabled=not not_matching_rows):
         start_not_matching_removal(edited_records, run_dir, st)
@@ -328,8 +156,7 @@ def _show_not_matching_info(not_matching_rows):
     if not_matching_rows:
         items_list = "، ".join(str(r.get("item_name")) for r in not_matching_rows)
         st.info(
-            f"✨ سيتم إزالة **{len(not_matching_rows)}** أصناف من السلة: "
-            f"{items_list}"
+            f"✨ سيتم إزالة **{len(not_matching_rows)}** أصناف من السلة: {items_list}"
         )
     else:
         st.warning("⚠️ لم تقم بتحديد أي صنف كـ (غير مطابق) لإزالته من السلة.")
@@ -340,8 +167,8 @@ def _render_search_corrected_section(edited_records, run_dir):
     corrected_rows = [r for r in edited_records if _has_correction(r)]
     st.markdown("### 3. 🔍 Search Corrected Items")
     st.caption(
-        "يقوم بالبحث عن الأصناف التي أدخلت لها (اسماً صحيحاً) أو "
-        "(كوداً صحيحاً) ليعيد مطابقتها وإضافتها للسلة."
+        "يقوم بالبحث عن الأصناف التي أدخلت لها (اسماً صحيحاً) "
+        "أو (كوداً صحيحاً) ليعيد مطابقتها وإضافتها للسلة."
     )
     _show_corrected_info(corrected_rows)
     if st.button("Search Corrected Items", disabled=not corrected_rows):
@@ -355,8 +182,7 @@ def _show_corrected_info(corrected_rows):
     if corrected_rows:
         items_str = "، ".join(str(r.get("item_name")) for r in corrected_rows)
         st.info(
-            f"✨ سيتم إعادة البحث عن **{len(corrected_rows)}** "
-            f"أصناف مصححة: {items_str}"
+            f"✨ سيتم إعادة البحث عن **{len(corrected_rows)}** أصناف مصححة: {items_str}"
         )
     else:
         st.warning("⚠️ لم تقم بتصحيح اسم أو كود أي صنف لإعادة البحث عنه.")
@@ -364,9 +190,6 @@ def _show_corrected_info(corrected_rows):
 
 __all__ = [
     "render_manual_review_editor",
-    "editable_manual_review_rows",
-    "save_manual_review_rows",
-    "manual_review_decisions_from_rows",
     "manual_review_store_or_stop",
     "start_not_matching_removal",
     "start_corrected_item_search",

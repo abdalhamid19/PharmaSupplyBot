@@ -18,7 +18,7 @@ from .ai_health_validation import (
 )
 
 
-async def test_one(
+async def execute_one(
     session: aiohttp.ClientSession,
     key: AIKey,
     model: str,
@@ -94,7 +94,7 @@ async def run_health_checks(
 
         async def guarded(key: AIKey, model: str, mode: str):
             async with sem:
-                return await test_one(
+                return await execute_one(
                     session, key, model, mode,
                     timeout_s, max_tokens, base_url,
                 )
@@ -108,4 +108,4 @@ async def run_health_checks(
         return await asyncio.gather(*tasks)
 
 
-__all__ = ["test_one", "run_health_checks"]
+__all__ = ["execute_one", "run_health_checks"]

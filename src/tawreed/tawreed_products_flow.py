@@ -1,10 +1,13 @@
 """Products-page search and add-to-cart flow for Tawreed ordering."""
 
+from __future__ import annotations
+
 import re
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from playwright.sync_api import Page
+if TYPE_CHECKING:
+    from playwright.sync_api import Page
 
 from ..core.matching_types import SearchMatch
 from ..core.utils.excel import Item

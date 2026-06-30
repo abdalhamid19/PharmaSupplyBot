@@ -47,34 +47,11 @@ class SummaryWriter:
             r for r in rows
             if r.get("decision") == "rejected" or r.get("reject_rule")
         ]
-        if last_ai and self._ai_summary_status(last_ai) == "rejected":
-            status = "no_match"
-            final_match = "NONE"
-        elif last_ai and self._ai_summary_status(last_ai) == "matched":
-            status = "matched"
-            final_match = (
-                last_ai.get("candidate_name", "")
-                or self._last_candidate_name(rows)
-            )
-        elif final:
-            status = (
-                "matched"
-                if final.get("final_match") != "NONE"
-                else "no_match"
-            )
-            final_match = final.get("final_match", "")
-        else:
-            status = "unknown"
-            final_match = ""
-        primary = (rejected[-1] if rejected else final) or rows[-1]
-        failure_stage = primary.get("error_stage")
-        if not failure_stage and status == "no_match":
-            failure_stage = "matching"
-        reason = (
-            primary.get("error_code")
-            or primary.get("reject_rule")
-            or primary.get("selection_reason")
-            or ""
+        status, final_match = self._determine_status_and_match(
+            last_ai, final, rows
+        )
+        failure_stage, reason = self._determine_failure_info(
+            rejected, final, rows, status
         )
         best_rejected = (
             rejected[-1].get("candidate_name", "")
@@ -96,6 +73,39 @@ class SummaryWriter:
             ),
             "ai_provider_model": self._provider_model(rows),
         }
+
+    def _determine_status_and_match(self, last_ai, final, rows):
+        """Determine final status and match from AI and final results."""
+        if last_ai and self._ai_summary_status(last_ai) == "rejected":
+            return "no_match", "NONE"
+        elif last_ai and self._ai_summary_status(last_ai) == "matched":
+            return (
+                "matched",
+                last_ai.get("candidate_name", "")
+                or self._last_candidate_name(rows)
+            )
+        elif final:
+            status = (
+                "matched"
+                if final.get("final_match") != "NONE"
+                else "no_match"
+            )
+            return status, final.get("final_match", "")
+        return "unknown", ""
+
+    def _determine_failure_info(self, rejected, final, rows, status):
+        """Determine failure stage and reason from rows."""
+        primary = (rejected[-1] if rejected else final) or rows[-1]
+        failure_stage = primary.get("error_stage")
+        if not failure_stage and status == "no_match":
+            failure_stage = "matching"
+        reason = (
+            primary.get("error_code")
+            or primary.get("reject_rule")
+            or primary.get("selection_reason")
+            or ""
+        )
+        return failure_stage, reason
 
     @staticmethod
     def _last(rows, step):

@@ -178,7 +178,7 @@ class TawreedBotTests(unittest.TestCase):
                 "src.tawreed.tawreed_order_processing.require_product_match"
             ) as require_match,
             patch(
-                "src.tawreed.tawreed_order_summary.append_match_only_summary"
+                "src.tawreed.tawreed_match_only.append_match_only_summary"
             ) as append_summary,
             patch.object(bot, "_add_item") as add_item,
         ):
@@ -229,21 +229,13 @@ class TawreedBotTests(unittest.TestCase):
                 "src.tawreed.tawreed_api_flow.match_items_only_with_api",
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
-            patch(
-                "src.tawreed.tawreed_order_flow.sync_playwright"
-            ) as playwright,
-            patch(
-                "src.tawreed.tawreed_order_flow.open_order_page"
-            ) as open_page,
-            patch.object(bot, "_ensure_valid_auth"),
             patch.object(
-                bot.order_flow._match_flow, "_run_match_only_session"
+                bot.order_flow._match_flow, "_match_items_browser_mode"
             ) as run_browser,
+            patch.object(bot, "_ensure_valid_auth"),
         ):
-            open_page.return_value = (object(), object(), object())
             bot.match_items_only([Item(code="1", name="Panadol", qty=1)])
 
-        playwright.assert_called_once()
         run_browser.assert_called_once()
 
     def test_api_execution_mode_does_not_fallback_to_browser(self) -> None:
@@ -255,15 +247,15 @@ class TawreedBotTests(unittest.TestCase):
                 "src.tawreed.tawreed_api_flow.match_items_only_with_api",
                 side_effect=TawreedApiUnavailable("missing contract"),
             ),
-            patch(
-                "src.tawreed.tawreed_order_flow.sync_playwright"
-            ) as playwright,
+            patch.object(
+                bot.order_flow._match_flow, "_match_items_browser_mode"
+            ) as run_browser,
             patch.object(bot, "_ensure_valid_auth"),
         ):
             with self.assertRaises(TawreedApiUnavailable):
                 bot.match_items_only([Item(code="1", name="Panadol", qty=1)])
 
-        playwright.assert_not_called()
+        run_browser.assert_not_called()
 
     def test_build_item_summary_populates_matched_names_by_language(self) -> None:
         bot = self._bot()

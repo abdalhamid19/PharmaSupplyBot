@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 from contextlib import suppress
-from playwright.sync_api import Page, Locator
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playwright.sync_api import Page, Locator
+
 from .tawreed_ui import (
     dialog_close_buttons, visible_dialog, visible_dialog_masks, visible_overlay_panels
 )

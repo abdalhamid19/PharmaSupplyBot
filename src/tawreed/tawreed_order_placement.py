@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from playwright.sync_api import Page, sync_playwright
-
 from ..core.manual_review_runtime import (
     manual_review_cache_context,
     preload_manual_review_decisions,
@@ -69,6 +67,8 @@ class OrderPlacementFlow:
 
     def place_order_from_items(self, items: Iterable[Item]) -> None:
         """Place an order by processing each item from the provided iterable."""
+        from playwright.sync_api import Page, sync_playwright
+        
         self.bot._ensure_valid_auth()
         items = list(items)
         with self._manual_review_cache_for_items(items):
@@ -104,7 +104,7 @@ class OrderPlacementFlow:
                     close_context(context)
                     close_browser(browser)
 
-    def _run_order_session(self, page: Page, items: Iterable[Item]) -> None:
+    def _run_order_session(self, page, items: Iterable[Item]) -> None:
         """Prepare the page and process items within an active order session."""
         self.item_processor.prepare_order_page(page)
         completed = self._process_items(page, items)
@@ -118,10 +118,11 @@ class OrderPlacementFlow:
             confirm_order(page, self.bot.selectors, self.bot.config.runtime.timeout_ms)
         else:
             print(
-                f"[{self.bot.profile_key}] Stop requested or incomplete. Order confirmation skipped."
+                f"[{self.bot.profile_key}] Stop requested or incomplete. "
+                "Order confirmation skipped."
             )
 
-    def _process_items(self, page: Page, items: Iterable[Item]) -> bool:
+    def _process_items(self, page, items: Iterable[Item]) -> bool:
         """Process each requested Excel item on the current order page."""
         added_any = False
         for item in items:
@@ -130,7 +131,7 @@ class OrderPlacementFlow:
             added_any = self._process_single_item(page, item) or added_any
         return added_any
 
-    def _process_single_item(self, page: Page, item: Item) -> bool:
+    def _process_single_item(self, page, item: Item) -> bool:
         """Add one item or save artifacts when a technical failure happens."""
         import time
         started_at = time.perf_counter()

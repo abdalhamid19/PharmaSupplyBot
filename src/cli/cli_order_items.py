@@ -222,25 +222,6 @@ def reject_prevented_excel_as_order_source(
         raise SystemExit("Order Excel cannot be the prevented-items Excel file.")
 
 
-# ============ Running Functions ============
-
-
-def run_profile_items(
-    app_config,
-    profile_key: str,
-    bot,
-    items: Iterable[Item],
-    args,
-) -> None:
-    """Run one profile through the requested order mode."""
-    from .cli_order import run_profile_order, run_profile_match_only
-
-    if match_only(args):
-        run_profile_match_only(app_config.base_url, profile_key, bot, items)
-        return
-    run_profile_order(app_config.base_url, profile_key, bot, items)
-
-
 # ============ Bot Options ============
 
 
@@ -284,8 +265,6 @@ __all__ = [
     "load_items_for_order_mode",
     "prevented_items_path",
     "reject_prevented_excel_as_order_source",
-    # Running
-    "run_profile_items",
     # Options
     "order_bot_options",
 ]

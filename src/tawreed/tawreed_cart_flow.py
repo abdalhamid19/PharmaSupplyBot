@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from playwright.sync_api import Page, sync_playwright
-
 from ..core.cart_removal_items import CartRemovalItem
 from .tawreed_api_contract import begin_api_contract_capture, save_api_contract_capture
 from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
@@ -23,6 +21,8 @@ class TawreedCartFlow:
 
     def remove_cart_items(self, items: Iterable[CartRemovalItem]) -> None:
         """Remove the requested items from Tawreed carts."""
+        from playwright.sync_api import Page, sync_playwright
+        
         self.bot._ensure_valid_auth()
         items = list(items)
         if self.bot._try_api_cart_removal(items):
@@ -48,7 +48,7 @@ class TawreedCartFlow:
                 close_context(context)
                 close_browser(browser)
 
-    def _handle_removal_error(self, page: Page, error: Exception) -> None:
+    def _handle_removal_error(self, page, error: Exception) -> None:
         """Capture diagnostics for cart removal failures."""
         from .tawreed_artifacts import dump_artifacts
         from .tawreed_order_flow import _artifact_details
@@ -60,7 +60,7 @@ class TawreedCartFlow:
             details=_artifact_details("cart_removal_error", error),
         )
 
-    def _prepare_cart_page(self, page: Page) -> None:
+    def _prepare_cart_page(self, page) -> None:
         """Open Tawreed's cart page for cart-removal processing."""
         page.goto(self._cart_page_url(), wait_until="domcontentloaded")
         ensure_logged_in(
@@ -89,7 +89,7 @@ class TawreedCartFlow:
         self._ensure_logged_in(page)
         maybe_switch_pharmacy(page, self.bot.profile.pharmacy_switch or {})
 
-    def _ensure_logged_in(self, page: Page) -> None:
+    def _ensure_logged_in(self, page) -> None:
         """Verify that the saved session is still authenticated before ordering begins."""
         ensure_logged_in(
             page,

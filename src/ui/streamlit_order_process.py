@@ -36,6 +36,14 @@ def render_running_order_controls() -> bool:
 def _render_running_order(state: dict[str, object], output_text: str) -> bool:
     """Render UI when order process is still running."""
     st.warning("Order flow is running.")
+    _render_running_order_controls(state)
+    _render_running_order_output(output_text)
+    _render_running_order_analysis(state)
+    return True
+
+
+def _render_running_order_controls(state: dict[str, object]) -> None:
+    """Render stop and refresh controls for running order."""
     col_stop, col_refresh = st.columns(2)
     with col_stop:
         if st.button("Stop Order", type="primary"):
@@ -46,14 +54,21 @@ def _render_running_order(state: dict[str, object], output_text: str) -> bool:
     with col_refresh:
         if st.button("Refresh Status"):
             st.rerun()
+
+
+def _render_running_order_output(output_text: str) -> None:
+    """Render the output text for running order process."""
     if output_text:
         st.code(output_text[-4000:], language="text")
+
+
+def _render_running_order_analysis(state: dict[str, object]) -> None:
+    """Render fresh run analysis for running order."""
     render_fresh_run_analysis(
         load_new_summary_rows(
             _completed_summary_path(state), _completed_previous_count(state)
         )
     )
-    return True
 
 
 def _render_completed_order(
@@ -61,7 +76,18 @@ def _render_completed_order(
 ) -> bool:
     """Render UI when order process has completed."""
     close_order_process_output(state)
-    result = {
+    result = _build_completed_order_result(state, returncode, output_text)
+    _render_completed_order_result(result)
+    _render_completed_order_analysis(state)
+    st.session_state.pop("order_process", None)
+    return False
+
+
+def _build_completed_order_result(
+    state: dict[str, object], returncode: int, output_text: str
+) -> dict[str, object]:
+    """Build result dictionary for completed order process."""
+    return {
         "ok": returncode == 0,
         "exit_code": returncode,
         "command": " ".join(state["command"]),
@@ -69,15 +95,21 @@ def _render_completed_order(
         "error_type": "ProcessError" if returncode else "",
         "error_message": f"Exited with status code {returncode}." if returncode else "",
     }
+
+
+def _render_completed_order_result(result: dict[str, object]) -> None:
+    """Render the command result for completed order."""
     from .streamlit_process import render_command_result
     render_command_result(result)
+
+
+def _render_completed_order_analysis(state: dict[str, object]) -> None:
+    """Render fresh run analysis for completed order."""
     render_fresh_run_analysis(
         load_new_summary_rows(
             _completed_summary_path(state), _completed_previous_count(state)
         )
     )
-    st.session_state.pop("order_process", None)
-    return False
 
 
 def start_order_process(
@@ -88,14 +120,43 @@ def start_order_process(
     form_values: dict[str, object],
 ) -> None:
     """Start one order command in the background and remember its UI state."""
-    from .streamlit_order_form import _profile_key_for_state
+    _prepare_stop_flag(stop_flag_path)
+    command = _augment_command_with_stop_flag(command, stop_flag_path)
+    output_path = order_output_path()
+    state = _start_subprocess_and_build_state(command, output_path, form_values)
+    _update_state_with_order_info(state, summary_path, previous_row_count, stop_flag_path, form_values)
+    st.session_state["order_process"] = state
+
+
+def _prepare_stop_flag(stop_flag_path: Path) -> None:
+    """Prepare the stop flag file by creating parent directory and removing existing flag."""
     stop_flag_path.parent.mkdir(parents=True, exist_ok=True)
     if stop_flag_path.exists():
         stop_flag_path.unlink()
-    command = [*command, "--stop-flag", str(stop_flag_path)]
-    output_path = order_output_path()
+
+
+def _augment_command_with_stop_flag(command: list[str], stop_flag_path: Path) -> list[str]:
+    """Add stop flag argument to the command."""
+    return [*command, "--stop-flag", str(stop_flag_path)]
+
+
+def _start_subprocess_and_build_state(
+    command: list[str], output_path: Path, form_values: dict[str, object]
+) -> dict[str, object]:
+    """Start the CLI subprocess and return initial state."""
     from .streamlit_process import start_cli_subprocess
-    state = start_cli_subprocess(command, output_path)
+    return start_cli_subprocess(command, output_path)
+
+
+def _update_state_with_order_info(
+    state: dict[str, object],
+    summary_path: Path,
+    previous_row_count: int,
+    stop_flag_path: Path,
+    form_values: dict[str, object],
+) -> None:
+    """Update the state with order-specific information."""
+    from .streamlit_order_form import _profile_key_for_state
     state.update(
         {
             "summary_path": str(summary_path),
@@ -105,7 +166,6 @@ def start_order_process(
             "stop_flag_path": str(stop_flag_path),
         }
     )
-    st.session_state["order_process"] = state
 
 
 def order_process_output(output_path: Path) -> str:
@@ -140,8 +200,18 @@ def render_fresh_run_analysis(rows: list[dict[str, str]]) -> None:
 __all__ = [
     "render_running_order_controls",
     "_render_running_order",
+    "_render_running_order_controls",
+    "_render_running_order_output",
+    "_render_running_order_analysis",
     "_render_completed_order",
+    "_build_completed_order_result",
+    "_render_completed_order_result",
+    "_render_completed_order_analysis",
     "start_order_process",
+    "_prepare_stop_flag",
+    "_augment_command_with_stop_flag",
+    "_start_subprocess_and_build_state",
+    "_update_state_with_order_info",
     "order_process_output",
     "close_order_process_output",
     "render_fresh_run_analysis",
