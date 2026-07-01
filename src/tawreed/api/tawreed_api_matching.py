@@ -12,10 +12,10 @@ from src.core.manual_review.manual_review_runtime import (
 from src.core.matching.product_matching import _search_queries_for_item, explain_best_product_match
 from src.core.utils.excel import Item
 from .tawreed_api_client import TawreedApiClient
-from ...tawreed.matching.tawreed_match_logs import write_match_log
-from ...tawreed.matching.tawreed_query_cache import cached_query_result, get_bot_query_cache
-from ...tawreed.matching.tawreed_search_decision import decisive_match
-from ...tawreed.matching.tawreed_timing import record_timing
+from ..matching.tawreed_match_logs import write_match_log
+from ..matching.tawreed_query_cache import cached_query_result, get_bot_query_cache
+from ..matching.tawreed_search_decision import decisive_match
+from ..matching.tawreed_timing import record_timing
 
 
 def require_api_match(bot, api: TawreedApiClient, item: Item, require_available: bool):

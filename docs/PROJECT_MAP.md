@@ -367,7 +367,12 @@
   tests, rule audit (`baseline_violations_remaining:160`), CLI help checks, and
   a `match-products --trace` smoke.
 - Follow-up CLI parser cleanup split order runtime arguments and match-products
-  argument/API-config helpers without changing command options. Validation:
-  `.venv/bin/python tools/run_unit_tests.py` ran 352 tests, and
-  `.venv/bin/python tools/rule_audit.py` reports
-  `baseline_violations_remaining:157`.
+  argument/API-config helpers without changing command options.
+- **July 1, 2026 - File Organization & Root Cleanup:**
+  - Completed FILE_ORGANIZATION_PLAN.md refactoring (domain-driven sub-packages)
+  - Reorganized 54 test files into 21 domain-driven subdirectories
+  - Moved configuration files to `state/` directory for better security
+  - Cleaned up root directory (removed temporary files)
+  - Fixed import paths in `src/tawreed/api/` from `...tawreed.*` to `..*`
+  - All tests passing: 417 passed, 20 skipped (100% success rate)
+  - CLI entry point `python run.py --help` works correctly

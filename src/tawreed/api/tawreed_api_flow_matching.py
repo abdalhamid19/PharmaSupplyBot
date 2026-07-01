@@ -18,10 +18,10 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
         saved_manual_review_decision,
     )
     from src.core.matching.product_matching import _search_queries_for_item, explain_best_product_match
-    from ...tawreed.matching.tawreed_match_logs import write_match_log
-    from ...tawreed.matching.tawreed_query_cache import cached_query_result, get_bot_query_cache
-    from ...tawreed.matching.tawreed_search_decision import decisive_match
-    from ...tawreed.matching.tawreed_timing import record_timing
+    from ..matching.tawreed_match_logs import write_match_log
+    from ..matching.tawreed_query_cache import cached_query_result, get_bot_query_cache
+    from ..matching.tawreed_search_decision import decisive_match
+    from ..matching.tawreed_timing import record_timing
     
     started_at = time.perf_counter()
     queries, results = [], []
@@ -52,8 +52,8 @@ def _check_api_match(
     """Helper to check manual or automated api match."""
     from src.core.manual_review.manual_review_runtime import saved_manual_review_decision
     from src.core.matching.product_matching import explain_best_product_match
-    from ...tawreed.matching.tawreed_search_decision import decisive_match
-    from ...tawreed.matching.tawreed_timing import record_timing
+    from ..matching.tawreed_search_decision import decisive_match
+    from ..matching.tawreed_timing import record_timing
     
     decision = _api_match_decision(bot, item, results, review_decision)
     if _is_saved_manual_review_match(decision):
@@ -67,7 +67,7 @@ def _check_api_match(
 
 def _search_products_timed(bot, api: TawreedApiClient, query: str):
     """Search through the API and accumulate live network timing."""
-    from ...tawreed.matching.tawreed_timing import record_timing
+    from ..matching.tawreed_timing import record_timing
     
     started_at = time.perf_counter()
     try:
@@ -79,7 +79,7 @@ def _search_products_timed(bot, api: TawreedApiClient, query: str):
 def _manual_review_decision_timed(bot, item: Item):
     """Return one saved manual-review decision and record lookup/cache time."""
     from src.core.manual_review.manual_review_runtime import saved_manual_review_decision
-    from ...tawreed.matching.tawreed_timing import record_timing
+    from ..matching.tawreed_timing import record_timing
     
     started_at = time.perf_counter()
     try:
@@ -94,7 +94,7 @@ def _api_match_decision(bot, item: Item, results, review_decision=None):
     """Return the API match decision and accumulate decision CPU/storage timing."""
     from src.core.manual_review.manual_review_runtime import manual_review_match
     from src.core.matching.product_matching import explain_best_product_match
-    from ...tawreed.matching.tawreed_timing import record_timing
+    from ..matching.tawreed_timing import record_timing
     
     started_at = time.perf_counter()
     try:
@@ -114,7 +114,7 @@ def _handle_api_no_match(
 ):
     from src.core.matching.candidate_identity import candidate_has_store_product_id
     from src.core.matching_types import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown
-    from ...tawreed.matching.tawreed_match_logs import write_match_log
+    from ..matching.tawreed_match_logs import write_match_log
     
     if _has_only_non_orderable_candidates(results):
         _raise_non_orderable_exception(bot, item, results)
