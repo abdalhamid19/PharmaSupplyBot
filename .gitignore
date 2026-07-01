@@ -11,7 +11,7 @@ config.yaml
 
 artifacts/
 # State directory contains sensitive config and API endpoints
-#state/
+# state/
 data/manual_review/*.sqlite3
 data/manual_review/*.sqlite3-*
 
