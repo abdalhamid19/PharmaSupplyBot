@@ -39,7 +39,7 @@ def _load_raw_config(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(
             "Config file not found: "
-            f"{path}. Create it by copying config.example.yaml to config.yaml"
+            f"{path}. Create it by copying config.example.yaml to state/config.yaml"
         )
     raw_values = yaml.safe_load(path.read_text(encoding="utf-8"))
     _require(raw_values, "site")

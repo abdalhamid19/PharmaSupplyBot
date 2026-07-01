@@ -77,7 +77,7 @@ def _cart_payload(
 ) -> dict[str, Any]:
     """Build one serializable cart-removal worker payload."""
     return {
-        "config_path": str(Path(getattr(args, "config", "config.yaml"))),
+        "config_path": str(Path(getattr(args, "config", "state/config.yaml"))),
         "profile_key": profile_key,
         "items": [(item.code, item.name) for item in chunk],
         "worker_id": index,

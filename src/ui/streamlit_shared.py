@@ -17,7 +17,7 @@ def inject_custom_css() -> None:
 
 
 APP_TITLE = "PharmaSupplyBot"
-DEFAULT_CONFIG_PATH = Path("config.yaml")
+DEFAULT_CONFIG_PATH = Path("state/config.yaml")
 FALLBACK_CONFIG_PATH = Path("config.example.yaml")
 INPUT_DIR = Path("data/input")
 ORDER_ITEMS_DIR = INPUT_DIR / "order_items"

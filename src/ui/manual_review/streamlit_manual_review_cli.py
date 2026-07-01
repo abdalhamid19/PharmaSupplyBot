@@ -18,7 +18,7 @@ from ..streamlit_shared import ARTIFACTS_DIR
 def start_not_matching_removal(rows: list[dict], run_dir: Path, st_module) -> None:
     """Write current not-matching rows and start remove-cart for the run profile."""
     path = write_not_matching_review_csv(rows, run_dir)
-    command = manual_review_remove_command(Path("config.yaml"), run_dir, path)
+    command = manual_review_remove_command(Path("state/config.yaml"), run_dir, path)
     state = start_cli_subprocess(command, manual_review_remove_output_path())
     state.update({"command": command, "manual_review_csv": str(path)})
     st_module.session_state["remove_cart_process"] = state
@@ -69,7 +69,7 @@ def _fieldnames(rows: list[dict]) -> set[str]:
 def start_corrected_item_search(rows: list[dict], run_dir: Path, st_module) -> None:
     """Write corrected rows and start order match-only search for them."""
     path = write_corrected_review_csv(rows, _corrected_review_path(run_dir))
-    command = corrected_review_search_command(Path("config.yaml"), run_dir, path)
+    command = corrected_review_search_command(Path("state/config.yaml"), run_dir, path)
     state = start_cli_subprocess(command, corrected_review_search_output_path())
     state.update({"command": command, "manual_review_corrections": str(path)})
     st_module.session_state["manual_review_search_process"] = state

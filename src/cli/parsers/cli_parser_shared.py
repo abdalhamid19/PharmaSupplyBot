@@ -7,7 +7,7 @@ import argparse
 
 def add_common_arguments(argument_parser: argparse.ArgumentParser) -> None:
     """Add CLI arguments shared by the auth and order commands."""
-    argument_parser.add_argument("--config", default="config.yaml", help="Path to config.yaml")
+    argument_parser.add_argument("--config", default="state/config.yaml", help="Path to config.yaml")
     argument_parser.add_argument(
         "--profile",
         default=None,

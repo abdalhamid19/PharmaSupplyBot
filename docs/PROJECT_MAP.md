@@ -13,6 +13,12 @@
 ## [SYSTEM_FLOW]
 
 - **NEW:** Order runs now support precision row selection via `--start-item` and `--end-item` arguments, allowing users to select an exact slice of rows from the uploaded Excel sheet. This is fully integrated into the Streamlit GUI under "Advanced Options".
+- **Configuration Location (July 1, 2026):** All configuration files are now located in `state/` directory:
+  - `state/config.yaml` - Main configuration file (moved from root)
+  - `state/tawreed_api_endpoints.json` - API contract storage
+  - `state/*.json` - Profile-specific configurations
+  - Default CLI argument updated to `--config state/config.yaml`
+  - Default Streamlit config path updated to `state/config.yaml`
 - `run.py order` keeps the live Tawreed search flow: it searches Tawreed per item,
   evaluates candidates through `src/core/product_matching.py`, then can optionally
   run active AI verify/search/review with strict thresholds via `--ai`.

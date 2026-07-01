@@ -57,14 +57,14 @@ def loaded_app_config():
 
 
 def maybe_warn_fallback_config(selected_config_path, loaded_config_path) -> None:
-    """Warn when Streamlit falls back from config.yaml to config.example.yaml."""
+    """Warn when Streamlit falls back from state/config.yaml to config.example.yaml."""
     if selected_config_path == loaded_config_path:
         return
     if loaded_config_path != FALLBACK_CONFIG_PATH:
         return
     st.warning(
-        "Using `config.example.yaml` because `config.yaml` was not found. "
-        "Provide a real `config.yaml` for production settings."
+        "Using `config.example.yaml` because `state/config.yaml` was not found. "
+        "Provide a real `state/config.yaml` for production settings."
     )
 
 

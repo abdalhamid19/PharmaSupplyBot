@@ -6,8 +6,12 @@ __pycache__/
 
 .env
 
+# Configuration files (real config is in state/)
+config.yaml
+
 artifacts/
-state/
+# State directory contains sensitive config and API endpoints
+#state/
 data/manual_review/*.sqlite3
 data/manual_review/*.sqlite3-*
 

@@ -27,16 +27,16 @@ python3 -m playwright install
 
 ## الإعداد
 
-انسخ ملف الإعدادات:
+انسخ ملف الإعدادات إلى مجلد state/:
 
 ### Windows PowerShell
 ```powershell
-Copy-Item config.example.yaml config.yaml
+Copy-Item config.example.yaml state/config.yaml
 ```
 
 ### Linux / macOS (bash)
 ```bash
-cp config.example.yaml config.yaml
+cp config.example.yaml state/config.yaml
 ```
 
 إذا أردت استخدام البريد وكلمة المرور من البيئة:
@@ -330,12 +330,14 @@ py run.py auth --profile wardany
 
 ## ملفات مهمة
 
-- `config.yaml`
-  إعدادات التشغيل الفعلية
+- `state/config.yaml`
+  إعدادات التشغيل الفعلية (معدلات المطابقة، الروابط، الحسابات)
 - `config.example.yaml`
   مثال جاهز لهيكل الإعدادات
 - `state/<profile>.json`
   جلسة Playwright المحفوظة لكل صيدلية
+- `state/tawreed_api_endpoints.json`
+  عقود API المحفوظة لعمليات Tawreed
 - `data/input/order_items/`
   ملفات Excel التي تحتوي الأصناف المطلوب رفعها/طلبها على موقع توريد
 - `data/input/prevented_items/`
@@ -373,26 +375,61 @@ py run.py auth --profile wardany
 
 ## هيكل المشروع (للتحسين والصيانة)
 
-تم تنظيم الكود البرمجي في حزم منفصلة لزيادة الوضوح:
-- `src/tawreed/`: منطق العمل الخاص بموقع توريد (تسجيل الدخول، الطلب، الحذف).
-- `src/ui/`: منطق واجهة Streamlit.
-- `src/cli/`: منطق أوامر الطرفية (CLI).
-- `src/core/`: النماذج (Models) والأدوات الأساسية المشتركة.
-  - `src/core/config/`: معالجة ملفات الإعدادات.
-  - `src/core/utils/`: أدوات معالجة Excel والمتصفح.
+تم تنظيم الكود البرمجي في حزم فرعية دلالية (Domain-Driven Sub-Packages) لزيادة الوضوح وقابلية الصيانة:
+
+### بنية المصدر (`src/`)
+- `src/core/`: المنطق الأساسي المشترك
+  - `src/core/drug_matching/`: المطابقة الذكية للأدوية مع AI (ai, config, indexing, normalization, pipeline_components, tracing, verification)
+  - `src/core/manual_review/`: آلية المراجعة اليدوية
+  - `src/core/matching/`: منطق مطابقة المنتجات
+  - `src/core/ordering/`: معالجة الطلبات
+  - `src/core/database/`: عمليات قاعدة البيانات
+  - `src/core/cart_removal/`: منطق حذف السلة
+  - `src/core/identity/`: التحقق من الهوية
+  - `src/core/quality/`: مقاييس الجودة
+- `src/tawreed/`: التكامل مع موقع توريد
+  - `src/tawreed/api/`: عميل API
+  - `src/tawreed/order/`: معالجة الطلبات
+  - `src/tawreed/auth/`: المصادقة
+  - `src/tawreed/products/`: عمليات المنتجات
+  - `src/tawreed/matching/`: استراتيجيات المطابقة
+  - `src/tawreed/store/`: عمليات المتجر
+  - `src/tawreed/artifacts/`: إدارة الارتيفات
+- `src/ui/`: واجهة Streamlit
+  - `src/ui/manual_review/`: شاشات المراجعة اليدوية
+  - `src/ui/order/`: شاشات الطلبات
+  - `src/ui/auth/`: شاشات المصادقة
+  - `src/ui/views/`: العرض العام (overview, results, process, etc.)
+  - `src/ui/fields/`: مكونات الحقول
+- `src/cli/`: أوامر الطرفية
+  - `src/cli/parsers/`: محلجات الوسائط
+  - `src/cli/commands/`: تنفيذ الأوامر (auth, order, cart_removal, match_products, export_products, item_worker)
+
+### بنية الاختبارات (`tests/`)
+تعكس بنية `src/` بشكل كامل:
+- `tests/core/`: اختبارات المنطق الأساسي
+- `tests/tawreed/`: اختبارات التكامل مع توريد
+- `tests/ui/`: اختبارات واجهة Streamlit
+- `tests/cli/`: اختبارات أوامر الطرفية
 
 ## ملفات مهمة
 
-- `config.yaml`: إعدادات التشغيل الفعلية (معدلات المطابقة، الروابط، الحسابات).
+- `state/config.yaml`: إعدادات التشغيل الفعلية (معدلات المطابقة، الروابط، الحسابات).
 - `config.example.yaml`: مثال مرجعي للإعدادات.
 - `streamlit_app.py`: نقطة انطلاق واجهة الويب.
 - `run.py`: نقطة انطلاق أوامر الطرفية.
 - `data/input/`: المجلد الرئيسي لملفات Excel المدخلة.
 - `state/<profile>.json`: ملفات حفظ الجلسة.
+- `state/tawreed_api_endpoints.json`: عقود API المحفوظة.
 - `artifacts/<profile>/`: نتائج التشغيل (Summaries, Screenshots, Logs).
 
 ## ملاحظات إضافية
 
-- محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
+- محددات العناصر `selectors` قابلة للتعديل من `state/config.yaml` إذا تغيّرت واجهة Tawreed.
 - المطابقة تعتمد على خوارزميات نصية مرنة (Fuzzy matching) يمكن ضبط معاملاتها من الإعدادات.
 - البرنامج يدعم الاستكمال (Resume) حيث يتخطى الأصناف التي تم طلبها بنجاح في نفس اليوم.
+- **التغييرات الأخيرة (يوليو 1، 2026):**
+  - تم إعادة تنظيم الكود في حزم فرعية دلالية لتحسين قابلية الصيانة
+  - تم نقل ملف التكوين الرئيسي إلى `state/config.yaml` (الأوامر تستخدم المسار الجديد تلقائيًا)
+  - جميع الاختبارات تمر بنجاح (417 passed, 20 skipped)
+  - التوثيق المؤرشف في `docs/archive/`

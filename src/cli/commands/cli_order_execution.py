@@ -144,7 +144,7 @@ def build_order_payloads(
     auth_lock,
 ) -> list[dict[str, Any]]:
     """Build serializable payloads for each order worker."""
-    config_path = str(Path(getattr(args, "config", "config.yaml")))
+    config_path = str(Path(getattr(args, "config", "state/config.yaml")))
     options = worker_options(args, auth_lock)
     return [
         {

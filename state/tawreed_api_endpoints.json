@@ -1,0 +1,25 @@
+{
+  "product_search_url": "https://api.tawreed.io/rest/v2/stores/products/search/similar5?sort=productName,asc&page=0&size=10",
+  "product_search_body": {
+    "mode": "error",
+    "langCode": "ar",
+    "data": {
+      "displayType": 1
+    }
+  },
+  "add_to_cart_url": "https://api.tawreed.io/rest/v2/shopping/carts/items/add",
+  "add_to_cart_body": {
+    "mode": "all",
+    "langCode": "ar",
+    "data": {
+      "customerId": 22823,
+      "storeProductId": 1031759,
+      "quantity": 1,
+      "typeId": 1
+    }
+  },
+  "remove_cart_url": "",
+  "remove_cart_body": {},
+  "submit_order_url": "",
+  "submit_order_body": {}
+}
