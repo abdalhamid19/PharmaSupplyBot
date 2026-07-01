@@ -9,7 +9,7 @@ from .indexing.indexer import DrugIndex
 from .tracing.trace_log import MatchTraceLog
 
 # Re-export from split modules
-from .pipeline.pipeline_io import (
+from .pipeline_components.pipeline_io import (
     _manual_review_path,
     _manual_review_reason_column,
     _manual_review_base_reasons,
@@ -17,7 +17,7 @@ from .pipeline.pipeline_io import (
     _append_component_review_reason,
     PipelineIO,
 )
-from .pipeline.pipeline_matching import (
+from .pipeline_components.pipeline_matching import (
     _RESULT_COLS,
     PipelineMatching,
 )
@@ -67,7 +67,7 @@ class MatchPipeline:
         self._matching = PipelineMatching(self._cfg, self._index, self._trace, self._io)
         self._matching.load_data(drugs_path, tawreed_path, self._limit, self._start, self._end)
         if self._ai is None:
-            from .pipeline.pipeline_ai import PipelineAI
+            from .pipeline_components.pipeline_ai import PipelineAI
             self._ai = PipelineAI(self._cfg, self._api_cfg, self._index, self._trace)
 
     def run_matching(self) -> pd.DataFrame:

@@ -552,6 +552,8 @@ src/
 - نقل 22 ملف من tests/core إلى مجلدات فرعية (drug_matching: 2, manual_review: 7, matching: 4, ordering: 6, cart_removal: 1, identity: 1, quality: 1) ✅
 - نقل 19 ملف من tests/tawreed إلى مجلدات فرعية (api: 2, order: 2, auth: 2, products: 5, matching: 2, store: 5, artifacts: 1) ✅
 - نقل 13 ملف من tests/ui و tests/cli إلى مجلدات فرعية (ui: 11, cli: 2) ✅
+- إصلاح تضارب اسم pipeline.py (تغيير مجلد pipeline إلى pipeline_components لتفادي التعارض مع ملف pipeline.py) ✅
+- تحديث run.py لاستخدام المسار الجديد cli_parser ✅
 - جميع الاختبارات تمر بنجاح 100% ✅
 - هيكل الاختبارات يعكس بنية src بشكل دلالي واضح ✅
 
