@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from .tawreed_constants import DIALOG_MASK_SELECTOR
-from .tawreed_ui import cart_button
+from ..tawreed_constants import DIALOG_MASK_SELECTOR
+from ..tawreed_ui import cart_button
 
 
 TIMING_KEYS = (

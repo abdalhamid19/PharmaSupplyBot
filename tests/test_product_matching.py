@@ -1,6 +1,6 @@
 import unittest
 
-from src.core.product_matching import (
+from src.core.matching.product_matching import (
     _search_queries_for_item,
     explain_best_product_match,
 )

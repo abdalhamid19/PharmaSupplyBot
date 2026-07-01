@@ -2,13 +2,13 @@
 
 import time
 
-from ..core.candidate_identity import candidate_has_store_product_id
-from ..core.matching_types import CandidateMatchDiagnostic
-from ..core.order_blocked_candidate import missing_store_product_id_outcome
-from ..core.utils.excel import Item
+from src.core.matching.candidate_identity import candidate_has_store_product_id
+from src.core.matching_types import CandidateMatchDiagnostic
+from src.core.ordering.order_blocked_candidate import missing_store_product_id_outcome
+from src.core.utils.excel import Item
 from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
-from .tawreed_match_logs import OrderResultSummary
-from .tawreed_timing import record_timing
+from .matching.tawreed_match_logs import OrderResultSummary
+from .matching.tawreed_timing import record_timing
 
 
 # ============================================================================

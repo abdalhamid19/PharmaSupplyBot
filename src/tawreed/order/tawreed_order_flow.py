@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ...core.utils.excel import Item
+from src.core.utils.excel import Item
 from .tawreed_order_processing import OrderItemProcessor
 from .tawreed_order_summary import OrderSummaryRecorder
 

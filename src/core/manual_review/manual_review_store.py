@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Any
 
-from .database import get_db_manager
+from ..database import get_db_manager
 from .manual_review_hints import hint_key
 from .manual_review_store_sql import (
     CREATE_DECISIONS_TABLE,

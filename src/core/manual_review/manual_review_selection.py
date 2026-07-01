@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .manual_review_candidates import ReviewCandidateOption
 from .manual_review_store import ManualReviewDecision
-from .utils.excel import Item
+from ..utils.excel import Item
 
 
 def decision_from_selection(

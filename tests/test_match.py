@@ -1,6 +1,6 @@
 import sys
 from src.core.utils.excel import Item
-from src.core.product_matching import explain_best_product_match
+from src.core.matching.product_matching import explain_best_product_match
 
 item = Item("1", "BETADINE ANTISEPTIC 60 ML SOLN. 10%", 1)
 candidates = [

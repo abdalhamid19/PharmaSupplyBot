@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.core.product_matching import explain_best_product_match
+from src.core.matching.product_matching import explain_best_product_match
 from src.core.utils.excel import Item
 
 

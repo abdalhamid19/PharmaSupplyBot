@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...core.utils.excel import Item
+from src.core.utils.excel import Item
 from .tawreed_api_client import TawreedApiClient
 
 

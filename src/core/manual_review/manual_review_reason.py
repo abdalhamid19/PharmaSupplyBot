@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .order_blocked_candidate import candidate_safety_reason
+from ..ordering.order_blocked_candidate import candidate_safety_reason
 
 
 def manual_review_reason_fields(

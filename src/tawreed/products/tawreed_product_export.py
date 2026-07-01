@@ -60,7 +60,7 @@ def export_tawreed_products(
 ) -> dict[str, Path]:
     """Export all visible Tawreed store products for one authenticated profile."""
     from playwright.sync_api import sync_playwright
-    from ..tawreed_artifacts import dump_artifacts
+    from ..artifacts.tawreed_artifacts import dump_artifacts
     from ..auth.tawreed_session import close_browser, close_context, open_order_page
 
     with sync_playwright() as playwright:
@@ -84,7 +84,7 @@ def _open_export_page(playwright, bot):
 def _run_export_session(
     bot, page, context, browser, output_dir, page_size, limit, stem
 ):
-    from ..tawreed_artifacts import dump_artifacts
+    from ..artifacts.tawreed_artifacts import dump_artifacts
     from ..auth.tawreed_session import close_browser, close_context
 
     try:
@@ -122,7 +122,7 @@ def _log_export_paths(bot, paths: dict[str, Path]) -> None:
 
 
 def _dump_export_error(bot, page, error: Exception) -> None:
-    from ..tawreed_artifacts import dump_artifacts
+    from ..artifacts.tawreed_artifacts import dump_artifacts
 
     dump_artifacts(
         page,

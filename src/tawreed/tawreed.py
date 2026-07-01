@@ -7,7 +7,7 @@ from .tawreed_bot_api import TawreedBotApi
 from .tawreed_bot_order_ai import TawreedBotOrderAi
 from .tawreed_bot_methods import TawreedBotMethods
 from .tawreed_dialogs import close_visible_dialogs
-from .tawreed_search_logic import require_product_match
+from .matching.tawreed_search_logic import require_product_match
 
 
 def sync_playwright():
@@ -22,9 +22,9 @@ class TawreedBot(TawreedBotCore, TawreedBotApi, TawreedBotOrderAi, TawreedBotMet
 
 
 # Import for backward compatibility with tests
-from .tawreed_artifacts import dump_artifacts
+from .artifacts.tawreed_artifacts import dump_artifacts
 from .tawreed_dialogs import visible_overlay_diagnostics
-from .tawreed_match_only import append_match_only_summary
+from .matching.tawreed_match_only import append_match_only_summary
 
 
 __all__ = [

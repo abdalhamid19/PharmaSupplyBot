@@ -3,7 +3,7 @@
 from __future__ import annotations
 import re
 from typing import Any
-from .tawreed_constants import DISCOUNT_KEYS, NESTED_STORE_KEYS
+from ..tawreed_constants import DISCOUNT_KEYS, NESTED_STORE_KEYS
 
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
 

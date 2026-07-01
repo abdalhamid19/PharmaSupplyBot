@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import time
-from ...core.candidate_identity import candidate_has_store_product_id
-from ...core.manual_review_runtime import (
+from src.core.matching.candidate_identity import candidate_has_store_product_id
+from src.core.manual_review.manual_review_runtime import (
     manual_review_match,
     manual_review_queries,
     saved_manual_review_decision,
 )
-from ...core.product_matching import _search_queries_for_item, explain_best_product_match
-from ...core.utils.excel import Item
+from src.core.matching.product_matching import _search_queries_for_item, explain_best_product_match
+from src.core.utils.excel import Item
 from .tawreed_api_client import TawreedApiClient
-from ...tawreed.tawreed_match_logs import write_match_log
-from ...tawreed.tawreed_query_cache import cached_query_result, get_bot_query_cache
-from ...tawreed.tawreed_search_decision import decisive_match
-from ...tawreed.tawreed_timing import record_timing
+from ...tawreed.matching.tawreed_match_logs import write_match_log
+from ...tawreed.matching.tawreed_query_cache import cached_query_result, get_bot_query_cache
+from ...tawreed.matching.tawreed_search_decision import decisive_match
+from ...tawreed.matching.tawreed_timing import record_timing
 
 
 def require_api_match(bot, api: TawreedApiClient, item: Item, require_available: bool):
@@ -103,7 +103,7 @@ def _handle_api_no_match(
 
 def _raise_non_orderable_exception(bot, item, results):
     """Raise exception for non-orderable candidates."""
-    from ..core.matching_types import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown
+    from src.core.matching_types import CandidateMatchDiagnostic, MatchDecision, MatchScoreBreakdown
 
     candidates = [(q, c) for q, rows in results for c in rows]
     diagnostics = []
@@ -114,7 +114,7 @@ def _raise_non_orderable_exception(bot, item, results):
             accepted=False, accepted_reason="", rejection_reason="Candidate missing orderable storeProductId",
             breakdown=MatchScoreBreakdown(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 999.0), candidate=candidate
         ))
-    
+
     bot.last_match_decision = MatchDecision(best_match=None, diagnostics=diagnostics, final_reason="All API candidates missing orderable storeProductId")
     raise bot.no_results_exception(f"No decisive match found for '{item.name}'. API candidates found but none has an orderable storeProductId.")
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from ..core.cart_removal_items import DEFAULT_REMOVE_ITEMS_PATH
+from ..core.cart.cart_removal_items import DEFAULT_REMOVE_ITEMS_PATH
 from .streamlit_shared import ARTIFACTS_DIR, load_csv_rows, REMOVE_ITEMS_DIR
 from .streamlit_state import ensure_default_state_files, missing_state_profiles
 from .streamlit_uploads import resolve_excel_path
@@ -172,7 +172,7 @@ def start_remove_cart_process(command: list[str], stop_flag_path: Path) -> None:
         stop_flag_path.unlink()
     command = [*command, "--stop-flag", str(stop_flag_path)]
     output_path = remove_cart_output_path()
-    from .streamlit_process import start_cli_subprocess
+    from .views.streamlit_process import start_cli_subprocess
     state = start_cli_subprocess(command, output_path)
     state.update({"command": command, "stop_flag_path": str(stop_flag_path)})
     st.session_state["remove_cart_process"] = state
@@ -310,7 +310,7 @@ def _render_completed_remove_cart(
 ) -> bool:
     """Render UI when remove-cart process has completed."""
     close_remove_cart_process_output(state)
-    from .streamlit_process import render_command_result
+    from .views.streamlit_process import render_command_result
     render_command_result(
         {
             "ok": returncode == 0,

@@ -6,7 +6,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from src.cli.item_worker import execute_order_worker
+from src.cli.commands.item_worker import execute_order_worker
 
 
 class ItemWorkerExecutionTests(unittest.TestCase):

@@ -7,7 +7,7 @@ auto-matched with METHYL FOLATE ORA 30 CAPS despite different companies.
 import unittest
 
 from src.core.config.config_models import MatchingConfig
-from src.core.product_matching import explain_best_product_match
+from src.core.matching.product_matching import explain_best_product_match
 from src.core.utils.excel import Item
 
 

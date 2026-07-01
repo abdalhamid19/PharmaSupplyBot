@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ...core.candidate_identity import candidate_store_product_id
+from src.core.matching.candidate_identity import candidate_store_product_id
 from .tawreed_api_contract import product_search_body, product_search_url, TawreedApiUnavailable
-from ...tawreed.tawreed_product_search import _api_candidates
+from ..products.tawreed_product_search import _api_candidates
 from .tawreed_api_http import _is_trusted_add_to_cart_url, _ensure_cart_item_added, _post_json
 
 
@@ -80,7 +80,7 @@ def get_store_details(client, product_id: Any) -> list[dict[str, Any]]:
     except (ValueError, TypeError):
         return []
 
-    from ...tawreed.tawreed_constants import STORE_DETAILS_ENDPOINT
+    from ..tawreed_constants import STORE_DETAILS_ENDPOINT
     from .tawreed_api_payloads import stores_from_payload
     url = f"/rest/v2/{STORE_DETAILS_ENDPOINT}?productId={pid}"
     payload = _post_json(

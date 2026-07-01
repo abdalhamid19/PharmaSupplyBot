@@ -6,9 +6,9 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
-from .candidate_identity import candidate_store_product_id
-from .matching_types import MatchDecision
-from .order_ai_matching import candidate_ar, candidate_name, candidate_price
+from ..matching.candidate_identity import candidate_store_product_id
+from ..matching_types import MatchDecision
+from ..ordering.order_ai_matching import candidate_ar, candidate_name, candidate_price
 
 
 @dataclass(frozen=True)

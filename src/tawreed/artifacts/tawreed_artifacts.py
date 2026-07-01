@@ -26,8 +26,8 @@ from .tawreed_artifacts_io import (
     _xlsx_rows,
     _rewrite_xlsx_worksheet_with_fieldnames,
 )
-from ..core.cart_removal_items import CartRemovalItem
-from ..core.cart_removal_summary import CartRemovalSummary
+from src.core.cart.cart_removal_items import CartRemovalItem
+from src.core.cart.cart_removal_summary import CartRemovalSummary
 
 
 def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") -> None:

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from ..core.matching_types import MatchDecision
-from ..core.utils.excel import Item
-from .tawreed_artifacts import append_csv_artifact
-from .tawreed_order_summary import append_order_ai_trace_artifacts
+from src.core.matching_types import MatchDecision
+from src.core.utils.excel import Item
+from .artifacts.tawreed_artifacts import append_csv_artifact
+from .order.tawreed_order_summary import append_order_ai_trace_artifacts
 
 
 class TawreedBotOrderAi:

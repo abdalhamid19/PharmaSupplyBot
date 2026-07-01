@@ -12,7 +12,7 @@ from .manual_review_store import (
     ManualReviewStore,
 )
 from .manual_review_hints import hint_key
-from .utils.excel import Item
+from ..utils.excel import Item
 from .manual_review_helpers import (
     _blocks_candidate,
     _find_manual_review_match,
@@ -91,7 +91,7 @@ def filter_manual_review_candidates(
     decision = saved_manual_review_decision(item) if decision is None else decision
     if not _blocks_candidate(decision):
         return results
-    from .candidate_identity import candidate_store_product_id
+    from ..matching.candidate_identity import candidate_store_product_id
     blocked_id = decision.correct_store_product_id
     return [
         (
@@ -111,7 +111,7 @@ def manual_review_match(
     decision: ManualReviewDecision | None = None,
 ):
     """Return a forced approved match when a saved ID or exact name appears."""
-    from .matching_types import MatchDecision
+    from ..matching_types import MatchDecision
     decision = saved_manual_review_decision(item) if decision is None else decision
     if not decision or not decision.approved:
         return None

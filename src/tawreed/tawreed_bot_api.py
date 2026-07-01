@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ..core.cart_removal_items import CartRemovalItem
-from ..core.utils.excel import Item
+from src.core.cart.cart_removal_items import CartRemovalItem
+from src.core.utils.excel import Item
 from .api.tawreed_api_client import TawreedApiUnavailable
 
 

@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from openpyxl import Workbook
 
-from ...core.artifact_run import artifact_filename, current_artifact_run
+from src.core.artifact_run import artifact_filename, current_artifact_run
 
 _WORKER_RE = re.compile(r"(?:\.|_)worker_(\d+)(?:_|\.)")
 _WORKER_PATTERNS = (

@@ -1,6 +1,6 @@
 """Test warehouse priority system with discount tolerance."""
 import unittest
-from src.tawreed.tawreed_store_selection import (
+from src.tawreed.store.tawreed_store_selection import (
     choose_next_store_for_remaining_quantity,
     _normalize_store_name,
     _stores_match,

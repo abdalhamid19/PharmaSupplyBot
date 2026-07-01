@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..core.config.config_models import AppConfig, ProfileConfig
-from ..tawreed.tawreed import TawreedBot
-from ..tawreed.tawreed_session import SessionInvalidError
+from src.core.config.config_models import AppConfig, ProfileConfig
+from src.tawreed.tawreed import TawreedBot
+from src.tawreed.auth.tawreed_session import SessionInvalidError
 
 
 def build_bot(

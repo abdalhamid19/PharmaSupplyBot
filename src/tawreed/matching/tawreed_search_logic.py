@@ -8,15 +8,15 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from ..core.manual_review_runtime import (
+from src.core.manual_review.manual_review_runtime import (
     filter_manual_review_candidates,
     manual_review_match,
     manual_review_queries,
     saved_manual_review_decision,
 )
-from ..core.matching_types import SearchMatch
-from ..core.product_matching import _search_queries_for_item, explain_best_product_match
-from ..core.utils.excel import Item
+from src.core.matching_types import SearchMatch
+from src.core.matching.product_matching import _search_queries_for_item, explain_best_product_match
+from src.core.utils.excel import Item
 from .tawreed_aggressive_matching import aggressive_review_result, available_quantity
 from .tawreed_match_logs import write_match_log
 from .tawreed_query_cache import cached_query_result, get_bot_query_cache
@@ -58,7 +58,7 @@ def _search_one_query(bot, page, item, query, started_at, queries, results, quer
 
 def _append_search_result(bot, page, query, queries, results, query_cache) -> None:
     """Search once per query and append the cached result to this item's history."""
-    from .products.tawreed_product_search import search_products
+    from ..products.tawreed_product_search import search_products
 
     queries.append(query)
     found = cached_query_result(query_cache, query, lambda: search_products(bot, page, query))

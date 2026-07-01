@@ -2,8 +2,8 @@
 import unittest
 from types import SimpleNamespace
 
-from src.tawreed.tawreed_products_flow import _effective_min_discount, _find_max_discount
-from src.tawreed.tawreed_store_selection import (
+from src.tawreed.products.tawreed_products_flow import _effective_min_discount, _find_max_discount
+from src.tawreed.store.tawreed_store_selection import (
     available_store_choices,
     choose_next_store_for_remaining_quantity,
 )
@@ -140,7 +140,7 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
 
     def test_single_store_rejects_below_min_discount(self):
         """Single-store products should reject if discount < min_discount_percent."""
-        from src.tawreed.tawreed_products_flow import _click_cart
+        from src.tawreed.products.tawreed_products_flow import _click_cart
         
         bot = SimpleNamespace(
             config=SimpleNamespace(

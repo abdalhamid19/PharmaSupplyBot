@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ...core.cart_removal_items import CartRemovalItem
+from src.core.cart.cart_removal_items import CartRemovalItem
 from ..api.tawreed_api_contract import begin_api_contract_capture, save_api_contract_capture
 from .tawreed_cart_removal import remove_items_from_cart, resolve_cart_removal_targets
 from ..tawreed_navigation import maybe_switch_pharmacy
-from ...tawreed_auth import close_browser, close_context, open_order_page
+from ..auth.tawreed_session import close_browser, close_context, open_order_page
 from ..order.tawreed_order_processing import OrderItemProcessor
 
 
@@ -50,7 +50,7 @@ class TawreedCartFlow:
 
     def _handle_removal_error(self, page, error: Exception) -> None:
         """Capture diagnostics for cart removal failures."""
-        from ..tawreed_artifacts import dump_artifacts
+        from ..artifacts.tawreed_artifacts import dump_artifacts
         from ..order.tawreed_order_placement import _artifact_details
 
         dump_artifacts(
@@ -63,7 +63,7 @@ class TawreedCartFlow:
     def _prepare_cart_page(self, page) -> None:
         """Open Tawreed's cart page for cart-removal processing."""
         page.goto(self._cart_page_url(), wait_until="domcontentloaded")
-        from ...tawreed_auth import ensure_logged_in
+        from ..auth.tawreed_auth import ensure_logged_in
         ensure_logged_in(
             page,
             self.bot.selectors,
@@ -92,7 +92,7 @@ class TawreedCartFlow:
 
     def _ensure_logged_in(self, page) -> None:
         """Verify that the saved session is still authenticated before ordering begins."""
-        from ...tawreed_auth import ensure_logged_in
+        from ..auth.tawreed_auth import ensure_logged_in
         ensure_logged_in(
             page,
             self.bot.selectors,

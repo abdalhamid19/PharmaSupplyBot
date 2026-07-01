@@ -7,7 +7,7 @@ from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 
-from ..core.artifact_run import artifact_filename, current_artifact_run
+from src.core.artifact_run import artifact_filename, current_artifact_run
 
 
 # ============================================================================

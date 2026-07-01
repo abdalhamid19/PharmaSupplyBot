@@ -6,13 +6,13 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from ..core.config.config import load_config
-from .streamlit_auth import render_auth_tab
-from .streamlit_order import render_order_tab
-from .streamlit_overview import render_overview
-from .streamlit_prevented_items import render_prevented_items_manager
-from .streamlit_product_matching import render_product_matching_tab
+from .auth.streamlit_auth import render_auth_tab
+from .order.streamlit_order import render_order_tab
+from .views.streamlit_overview import render_overview
+from .views.streamlit_prevented_items import render_prevented_items_manager
+from .views.streamlit_product_matching import render_product_matching_tab
 from .streamlit_remove_cart import render_remove_cart_tab
-from .streamlit_results import render_results_tab
+from .views.streamlit_results import render_results_tab
 from .streamlit_shared import APP_TITLE, FALLBACK_CONFIG_PATH, inject_custom_css, resolved_streamlit_config_path, sidebar_config_path
 
 
@@ -74,7 +74,7 @@ def first_profile_key(app_config) -> str | None:
     return profile_options[0] if profile_options else None
 
 
-from .streamlit_manual_review_page import render_manual_review_tab
+from .manual_review.streamlit_manual_review_page import render_manual_review_tab
 
 def render_main_tabs(app_config, default_profile: str | None, config_path) -> None:
     """Render the main Streamlit tabs."""

@@ -4,21 +4,21 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from ...core.manual_review_runtime import (
+from src.core.manual_review.manual_review_runtime import (
     manual_review_cache_context,
     preload_manual_review_decisions,
 )
-from ...core.utils.excel import Item
+from src.core.utils.excel import Item
 from ..api.tawreed_api_contract import (
     begin_api_contract_capture,
     begin_detailed_api_capture,
     save_captured_requests,
 )
-from ..tawreed_artifacts import dump_artifacts
+from ..artifacts.tawreed_artifacts import dump_artifacts
 from ..tawreed_checkout import confirm_order
 from .tawreed_order_processing import OrderItemProcessor
 from .tawreed_order_summary import OrderSummaryRecorder
-from ..tawreed_session import close_browser, close_context, open_order_page
+from ..auth.tawreed_session import close_browser, close_context, open_order_page
 
 
 # ============================================================================

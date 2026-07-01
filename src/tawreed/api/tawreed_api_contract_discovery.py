@@ -11,7 +11,7 @@ from .tawreed_api_contract_base import DEFAULT_CONTRACT_PATH
 
 def begin_api_contract_capture(page) -> list[dict[str, Any]]:
     """Attach a lightweight request listener and return its capture buffer."""
-    from ..tawreed_product_search import _search_response_pattern
+    from ..products.tawreed_product_search import _search_response_pattern
     captured: list[dict[str, Any]] = []
     if on_event := getattr(page, "on", None):
         on_event("request", lambda request: _capture_request(request, captured))

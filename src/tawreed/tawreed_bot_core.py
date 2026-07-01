@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..core.config.config_models import AppConfig, ProfileConfig
-from ..core.matching_types import MatchDecision
-from ..core.order_ai_matching import OrderAiDecisionService, OrderAiSettings
-from ..core.utils.excel import Item
+from src.core.config.config_models import AppConfig, ProfileConfig
+from src.core.matching_types import MatchDecision
+from src.core.ordering.order_ai_matching import OrderAiDecisionService, OrderAiSettings
+from src.core.utils.excel import Item
 from .selectors import _selectors
 from .auth.tawreed_auth import TawreedAuthFlow
 from .cart.tawreed_cart_flow import TawreedCartFlow

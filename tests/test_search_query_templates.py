@@ -1,6 +1,6 @@
 import unittest
 
-from src.core.search_query_templates import category_queries
+from src.core.matching.search_query_templates import category_queries
 
 
 class SearchQueryTemplatesTests(unittest.TestCase):

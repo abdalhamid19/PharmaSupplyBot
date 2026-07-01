@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from typing import Iterable
 
-from .cart_removal_items import CartRemovalItem
+from ..cart.cart_removal_items import CartRemovalItem
 from .manual_review_store import ManualReviewDecision, ManualReviewStore
 
 

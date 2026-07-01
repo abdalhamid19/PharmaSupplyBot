@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ..core.matching_types import CandidateMatchDiagnostic, MatchDecision
-from ..core.utils.excel import Item
+from src.core.matching_types import CandidateMatchDiagnostic, MatchDecision
+from src.core.utils.excel import Item
 from .tawreed_match_logs_helpers import candidate_name_fields
 
 

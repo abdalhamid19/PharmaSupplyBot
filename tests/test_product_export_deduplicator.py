@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from src.tawreed.product_export_deduplicator import (
+from src.tawreed.products.product_export_deduplicator import (
     ProductIdentity,
     count_duplicates_removed,
     deduplicate_products,

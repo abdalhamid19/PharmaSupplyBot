@@ -6,7 +6,7 @@ import csv
 from pathlib import Path
 from typing import Iterable
 
-from .utils.excel import Item
+from ..utils.excel import Item
 
 
 def corrected_items_from_manual_review_csv(path: Path) -> list[Item]:

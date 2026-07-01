@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from .tawreed_constants import NESTED_NAME_KEYS, NESTED_STORE_KEYS, STORE_NAME_KEYS
+from ..tawreed_constants import NESTED_NAME_KEYS, NESTED_STORE_KEYS, STORE_NAME_KEYS
 from .tawreed_pricing import first_discount_value, format_discount_percent
 
 

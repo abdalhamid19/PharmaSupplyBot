@@ -12,8 +12,8 @@ from types import SimpleNamespace
 from typing import cast
 from unittest.mock import patch
 
-from src.cli.cli_cart_removal import run_remove_cart_command
-from src.core.cart_removal_items import CartRemovalItem
+from src.cli.commands.cli_cart_removal import run_remove_cart_command
+from src.core.cart.cart_removal_items import CartRemovalItem
 from src.core.config.config_models import AppConfig
 
 
@@ -71,15 +71,15 @@ class ItemWorkerPoolTests(unittest.TestCase):
         app_config = self._app_config(workers)
         args = self._args(workers, stop_flag)
         with (
-            patch("src.cli.cli_cart_removal.require_state_file"),
+            patch("src.cli.commands.cli_cart_removal.require_state_file"),
             patch(
-                "src.cli.cli_cart_removal.load_cart_removal_items", return_value=items
+                "src.cli.commands.cli_cart_removal.load_cart_removal_items", return_value=items
             ),
             patch(
-                "src.cli.cli_cart_removal.multiprocessing.get_context", self._context
+                "src.cli.commands.cli_cart_removal.multiprocessing.get_context", self._context
             ),
             patch(
-                "src.cli.item_worker.run_cart_removal_chunk", self._fake_worker
+                "src.cli.commands.item_worker.run_cart_removal_chunk", self._fake_worker
             ),
         ):
             return run_remove_cart_command(

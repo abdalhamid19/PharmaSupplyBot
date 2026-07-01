@@ -4,7 +4,7 @@ import logging
 import time
 
 from .manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
-from .utils.excel import Item
+from ..utils.excel import Item
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +74,8 @@ def _manual_review_id_match(
     target_id: str,
 ):
     """Force a match when a candidate exposes the saved orderable store id."""
-    from .candidate_identity import candidate_store_product_id
-    from .matching_types import SearchMatch, MatchDecision
+    from ..matching.candidate_identity import candidate_store_product_id
+    from ..matching_types import SearchMatch, MatchDecision
 
     for query, candidates in results:
         for index, candidate in enumerate(candidates):
@@ -101,9 +101,9 @@ def _manual_review_name_match(
 
 def _find_name_match_in_candidates(candidates, target_en, target_ar, query):
     """Find name match within candidates list."""
-    from .order_ai_matching import candidate_name, candidate_ar
-    from .candidate_identity import candidate_store_product_id
-    from .matching_types import SearchMatch, MatchDecision
+    from ..ordering.order_ai_matching import candidate_name, candidate_ar
+    from ..matching.candidate_identity import candidate_store_product_id
+    from ..matching_types import SearchMatch, MatchDecision
     
     for index, candidate in enumerate(candidates):
         if not candidate_store_product_id(candidate):

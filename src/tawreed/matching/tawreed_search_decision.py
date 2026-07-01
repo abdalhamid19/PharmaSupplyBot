@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import time
 
-from ..core.matching_confidence import match_confidence
-from ..core.matching_types import MatchDecision
-from ..core.product_matching import is_decisive_product_match
-from ..core.utils.excel import Item
+from src.core.matching.matching_confidence import match_confidence
+from src.core.matching_types import MatchDecision
+from src.core.matching.product_matching import is_decisive_product_match
+from src.core.utils.excel import Item
 from .tawreed_match_logs import write_match_log
 from .tawreed_aggressive_matching import available_quantity
 

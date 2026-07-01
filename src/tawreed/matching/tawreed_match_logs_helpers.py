@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..core.matching_types import CandidateMatchDiagnostic, MatchDecision
-from ..core.utils.excel import Item
+from src.core.matching_types import CandidateMatchDiagnostic, MatchDecision
+from src.core.utils.excel import Item
 
 
 @dataclass(frozen=True)
