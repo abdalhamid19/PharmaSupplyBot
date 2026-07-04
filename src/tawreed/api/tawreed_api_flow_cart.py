@@ -46,7 +46,7 @@ def _add_single_api_item(bot, api, item, record_timing):
 
 def _add_single_item_to_cart(bot, api, match, item, record_timing):
     """Execute add-to-cart API call and record timing."""
-    from ..tawreed_products_flow import _min_disc
+    from ..products.tawreed_products_flow import _min_disc
     from ..store.tawreed_pricing import discount_value_as_percent, first_discount_value
     
     min_discount = _min_disc(bot)

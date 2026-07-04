@@ -143,21 +143,10 @@ class OrderItemProcessor:
     def prepare_order_page(self, page: Page) -> None:
         """Open the site and navigate to the ordering surface for item processing."""
         page.goto(self.bot._products_page_url(), wait_until="domcontentloaded")
-        self.ensure_logged_in(page)
         maybe_switch_pharmacy(page, self.bot.profile.pharmacy_switch or {})
         if self.order_surface_ready(page):
             return
         go_to_orders(page, self.bot.selectors.go_to_orders, self.order_surface_selector())
         start_new_order(
             page, self.bot.selectors.new_order, self.bot.selectors.item_search_input
-        )
-
-    def ensure_logged_in(self, page: Page) -> None:
-        """Verify that the saved session is still authenticated before ordering begins."""
-        from ..auth.tawreed_auth import ensure_logged_in
-        ensure_logged_in(
-            page,
-            self.bot.selectors,
-            self.bot.config.runtime.timeout_ms,
-            ready_selector=self.bot.selectors.item_search_input,
         )
