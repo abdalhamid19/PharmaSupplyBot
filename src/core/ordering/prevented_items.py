@@ -12,6 +12,7 @@ from ..identity.item_text import (
     display_code_text,
     normalize_code,
     normalize_name,
+    normalize_prevented_compare_name,
     normalized_cell_text,
     normalized_key,
 )
@@ -154,7 +155,13 @@ def filter_prevented_order_items(
         for item in prevented_items
         if item.code and not item.name
     }
-    blocked_names = {normalize_name(item.name) for item in prevented_items if item.name}
+    # Apply new normalization to blocked names from prevented file
+    # تطبيع الأسماء المحظورة من ملف المنع
+    blocked_names = {
+        normalize_prevented_compare_name(item.name)
+        for item in prevented_items
+        if item.name
+    }
 
     for item in items:
         if not _is_prevented_order_item(
@@ -171,7 +178,10 @@ def _is_prevented_order_item(
 ) -> bool:
     """Return whether one order item is blocked by the prevented list."""
     item_code, item_name = normalized_key(item.code, item.name)
-    if item_name in blocked_names:
+    # Apply same normalization to order item name for comparison
+    # تطبيع نفس طريقة على اسم الصنف من ملف الطلب للمقارنة
+    normalized_item_name = normalize_prevented_compare_name(item_name)
+    if normalized_item_name in blocked_names:
         return True
     if item_code and item_name:
         return item_code in code_only_blocks
