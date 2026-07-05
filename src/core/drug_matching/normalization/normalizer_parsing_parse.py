@@ -45,7 +45,11 @@ class DrugComponents:
 def parse_drug(name: str) -> DrugComponents:
     """Parse a raw drug/product name into matching components."""
     if not name or not isinstance(name, str):
-        return DrugComponents("", (), (), "", "", "", "", "", "", False, "", is_synthetic=False, manufacturer=None)
+        return DrugComponents(
+            "", (), (), "", "", "", "", "", "", False, "",
+            is_synthetic=False,
+            manufacturer=None,
+        )
 
     # Extract manufacturer first before other processing
     from .normalizer_manufacturer_extraction import extract_manufacturer_from_name
@@ -155,6 +159,8 @@ def _canonical_form(word: str) -> str:
         return "SPRAY"
     if word in {"DROPS", "DROP", "OPHTHALMIC", "EYE"}:
         return "EYE"
+    if word in {"OINT", "OINTMENT"}:
+        return "OINT"
     if word in {"VIAL", "VIALS"}:
         return "VIAL"
     if word in {"AMP", "AMPS", "AMPOULE", "AMPOULES"}:

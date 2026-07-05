@@ -240,6 +240,24 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("storeProductId", decision.final_reason)
 
+    def test_reported_wrong_matches_are_rejected(self) -> None:
+        """Lock down reported unsafe product substitutions from July audit."""
+        cases = [
+            ("92558", "LIMITLESS MILGA MAX 30 TABS", "LIMITLESS MAN MAX 30 TABS"),
+            ("77101", "GARAMYCIN OINT 15GM", "GARAMYCIN 0.1 % CREAM 15 GM"),
+            ("34157", "DIPROSONE OINT", "DIPROSONE 0.05 % CREAM 30 GM"),
+            ("80838", "CO_AVAZIR 5GM EYE OINTMENT", "AVAZIR 0.3 % EYE DROPS 10 ML"),
+            ("79407", "LILI FEMININE WASH 250ML", "LILIOX 10 SACHETS"),
+            ("58580", "ISIS CINNAMON WITH GINGER 20 BAG", "ISIS CINNAMON 20 FILTER BAGS"),
+        ]
+        for code, item_name, candidate_name in cases:
+            with self.subTest(item_name=item_name):
+                decision = explain_best_product_match(
+                    Item(code=code, name=item_name, qty=1),
+                    [(item_name, [_candidate(candidate_name, store_id=f"s-{code}")])],
+                )
+                self.assertIsNone(decision.best_match)
+
 
 def _candidate(english_name: str, store_id: str = "store-1") -> dict[str, object]:
     """Return one Tawreed-style candidate for regression tests."""

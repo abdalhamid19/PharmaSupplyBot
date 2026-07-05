@@ -36,7 +36,7 @@ def _other_match_check(d: DrugComponents, m: DrugComponents) -> tuple[bool, str]
     if d.weight and m.weight and d.weight != m.weight:
         return False, "different_weight"
     
-    if d.flavor and m.flavor and d.flavor != m.flavor:
+    if d.flavor != m.flavor:
         return False, "different_flavor"
     
     return True, "ok"
