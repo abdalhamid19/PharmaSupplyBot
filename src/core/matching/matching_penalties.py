@@ -15,6 +15,15 @@ _TOKEN_BOUNDARY_RE = re.compile(r"(?<=\d)(?=[A-Z])|(?<=[A-Z])(?=\d)")
 _NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
 _SPACE_RE = re.compile(r"\s+")
 
+# Generic tokens that should be excluded from extra token check
+_GENERIC_SAFE_TOKENS = {
+    "TAB", "TABS", "TABLET", "TABLETS",
+    "CAP", "CAPS", "CAPSULE", "CAPSULES",
+    "MG", "GM", "G", "ML", "L", "MCG", "IU",
+    "CREAM", "GEL", "SYRUP", "SUPP", "AMP", "VIAL",
+    "DROPS", "SPRAY", "LOTION", "OINTMENT",
+}
+
 
 def penalty_breakdown(
     query: str,
@@ -33,15 +42,55 @@ def penalty_breakdown(
     }
 
 
-def compatibility_rejection_reason(query: str, candidate: str) -> str:
+def compatibility_rejection_reason(query: str, candidate: str, config=None) -> str:
     """Return a deterministic rejection reason for unsafe lexical variants."""
     details = _token_details(query, candidate)
     if details["conflicts"]:
         return _conflict_reason(details["conflicts"])
+    
+    # Check for extra brand tokens if config enables it
+    if config and hasattr(config, 'reject_extra_brand_token') and config.reject_extra_brand_token:
+        has_extra, extra_tokens = has_extra_brand_token(query, candidate)
+        if has_extra:
+            tokens_str = ", ".join(sorted(extra_tokens))
+            return f"Candidate has unrequested brand token: {tokens_str}"
+    
     if details["extra_distinguishing"]:
         tokens = ", ".join(sorted(details["extra_distinguishing"]))
         return f"Candidate has unrequested distinguishing token: {tokens}"
     return ""
+
+
+def has_extra_brand_token(query: str, candidate: str) -> tuple[bool, list[str]]:
+    """
+    Check if candidate has extra brand-distinguishing tokens not in query.
+    
+    Returns:
+        (has_extra, extra_tokens)
+    
+    Examples:
+        - Query "CAL MAG 30 TAB" → Candidate "CAL MAG JOINT 30 TAB" → (True, ["JOINT"])
+        - Query "METHYL FOLATE ORCHIDIA" → Candidate "METHYL FOLATE ORA" → (True, ["ORA"])
+    """
+    query_tokens = canonical_tokens(query)
+    candidate_tokens = canonical_tokens(candidate)
+    
+    # Find tokens in candidate but not in query
+    extra = candidate_tokens - query_tokens
+    
+    # Filter out safe tokens
+    distinguishing_extra = []
+    for token in extra:
+        # Skip numeric tokens
+        if token.isdigit():
+            continue
+        # Skip generic/form tokens
+        if token in _GENERIC_SAFE_TOKENS:
+            continue
+        # This is a distinguishing extra token
+        distinguishing_extra.append(token)
+    
+    return (len(distinguishing_extra) > 0, distinguishing_extra)
 
 
 def canonical_tokens(value: str) -> set[str]:

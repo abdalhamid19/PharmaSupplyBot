@@ -8,6 +8,15 @@ from .normalizer_constants import CRITICAL_CHEMICALS
 
 def _brand_match_check(d: DrugComponents, m: DrugComponents, brand_prefix_min: int) -> tuple[bool, str]:
     """Check if brands match between two components."""
+    # First check manufacturer compatibility
+    if d.manufacturer and m.manufacturer:
+        # Both have manufacturers - they must match
+        if d.manufacturer != m.manufacturer:
+            from ...identity.manufacturer_identity import manufacturer_conflict
+            if manufacturer_conflict(d.manufacturer, m.manufacturer, threshold=0.85):
+                return False, f"different_manufacturer: {d.manufacturer} vs {m.manufacturer}"
+    
+    # Now check brand (without manufacturer)
     d_clean = re.sub(r"[^A-Z0-9]", "", d.brand)
     m_clean = re.sub(r"[^A-Z0-9]", "", m.brand)
     

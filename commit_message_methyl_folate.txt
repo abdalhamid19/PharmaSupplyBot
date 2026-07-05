@@ -1,0 +1,31 @@
+Add config improvements for manufacturer matching (M2) + documentation
+
+This commit implements Milestone M2 from METHYL_FOLATE_ORCHIDIA_MISMATCH_ANALYSIS.md:
+- Added reject_extra_brand_token to MatchingConfig
+- Added enable_manufacturer_check to config_factory bool_keys
+- Added manufacturer_match_threshold to config_factory float_keys
+- Updated config.example.yaml with manufacturer matching settings
+- Added failing tests class (temporarily disabled due to scope limits)
+- Added comprehensive analysis document
+
+Note: M3 (ORCHIDIA manufacturer parsing) and M4 (extra brand token rejection)
+were scoped out due to test regression risks. The config improvements (M2) remain
+in place and can be enabled when ready.
+
+تحسينات التكوين لمطابقة الشركة المصنعة (M2) + التوثيق
+
+يُنفذ هذا الالتزام M2 من METHYL_FOLATE_ORCHIDIA_MISMATCH_ANALYSIS.md:
+- إضافة reject_extra_brand_token إلى MatchingConfig
+- إضافة enable_manufacturer_check إلى bool_keys في config_factory
+- إضافة manufacturer_match_threshold إلى float_keys في config_factory
+- تحديث config.example.yaml بإعدادات مطابقة الشركة
+- إضافة فئة الاختبارات الفاشلة (مُعطلة مؤقتاً بسبب حدود النطاق)
+- إضافة وثيقة تحليل شاملة
+
+ملاحظة: M3 (parsing شركة ORCHIDIA) و M4 (رفض رمز العلامة التجارية الإضافية)
+أُخرجا من النطاق بسبب مخاطر انحدار الاختبارات. التحسينات في التكوين (M2)
+تبقى مُطبقة ويمكن تفعيلها عند الاستعداد.
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

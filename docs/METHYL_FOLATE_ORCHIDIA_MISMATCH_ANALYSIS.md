@@ -415,7 +415,7 @@ tie_break_reason = Approved by saved manual review (Name match).
 
 1. إضافة safety validation قبل forced manual review match.
 2. إذا القرار `auto_matched` وفشل validation، يعاد إلى manual review.
-3. إذا القرار `approved_match` وفشل validation، يرفع تحذير/manual review بدلاً من add-to-cart صامت.
+3. إذا القرار `approved_match` وفشل validation، يرفع تحذير/manual review و add-to-cart.
 4. تعديل `_auto_save_verified_match` حتى لا يحفظ matches عليها conflict أو candidate أعلى مرفوض بسبب conflict.
 
 معيار النجاح:

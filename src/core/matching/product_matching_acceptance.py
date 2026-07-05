@@ -361,7 +361,7 @@ def _check_rejections(
     config = config or {}
     checks = [
         _candidate_variant_rejection(score_query, candidate),
-        compatibility_rejection_reason(score_query, _candidate_english_name(candidate)),
+        compatibility_rejection_reason(score_query, _candidate_english_name(candidate), config),
     ]
     if not skip_components:
         checks.append(_candidate_component_rejection(score_query, candidate))

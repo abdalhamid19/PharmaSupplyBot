@@ -1,0 +1,29 @@
+Fix prevented item bypass by strengthening name normalization
+
+إصلاح فشل منع الصنف الممنوع بتشديد تطبيع الاسم
+
+المشكلة:
+- دالة normalize_name لا تزيل علامات الترقيم الطرفية
+- BREVY 5 MG 10 F.C. TABS. (منع) لا يمنع BREVY 5 MG 10 F.C. TABS (طلب)
+- 9 أصناف ممنوعة تنتهي بنقطة معرضة لنفس التسرّب
+
+الحل:
+- إضافة دالة normalize_prevented_compare_name في item_text.py
+- تطبيق الدالة على الطرفين (ملف المنع + ملف الطلب)
+- إزالة علامات الترقيم الطرفية مع الحفاظ على النقاط العشرية
+- إضافة 10 اختبارات حماية للتحقق من الوظيفة
+
+الملفات المعدلة:
+- src/core/identity/item_text.py: إضافة الدالة الجديدة
+- src/core/ordering/prevented_items.py: تطبيق الدالة على الطرفين
+- tests/core/ordering/test_prevented_items.py: اختبارات حماية جديدة
+
+النتائج:
+- 427 passed, 20 skipped (زيادة 13 عن الخط الأساس)
+- جميع الأصناف الـ9 المنتهية بنقطة تُمنَع الآن
+- النقاط العشرية محفوظة (لا تشويه للجرعات)
+- لا منع خاطئ لأصناف غير مقصودة
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

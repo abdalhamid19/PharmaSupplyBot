@@ -93,10 +93,23 @@ def _manual_review_id_match(
     for query, candidates in results:
         for index, candidate in enumerate(candidates):
             if candidate_store_product_id(candidate) == target_id:
-                # Skip validation for ID match to preserve backward compatibility
-                # التخطي من التحقق لمطابقة المعرف للحفاظ على التوافق مع الإصدارات السابقة
+                # Validate auto_matched decisions only; approved_match can bypass validation
+                if decision and decision.decision_type == "auto_matched":
+                    validation = _validate_manual_review_match(item, candidate, decision)
+                    if not validation["valid"]:
+                        # Auto-matched decision failed validation - reject it
+                        return None
+                elif decision and decision.decision_type == "approved_match":
+                    # Log warning for approved decisions with validation issues
+                    validation = _validate_manual_review_match(item, candidate, decision)
+                    if not validation["valid"]:
+                        import logging
+                        logging.warning(
+                            f"Manual review decision for item {item.code} has validation issues: {validation['issues']}"
+                        )
+                
                 match = SearchMatch(query, index, 999.0, candidate)
-                return MatchDecision(match, [], "Approved by saved manual review (ID match).")
+                return MatchDecision(match, [], f"Approved by saved manual review (ID match). Decision type: {decision.decision_type if decision else 'unknown'}")
     return None
 
 
@@ -142,10 +155,23 @@ def _find_name_match_in_candidates(
         c_en = candidate_name(candidate).lower()
         c_ar = candidate_ar(candidate).lower()
         if (target_en and c_en == target_en) or (target_ar and c_ar == target_ar):
-            # Skip validation for name match to preserve backward compatibility
-            # التخطي من التحقق لمطابقة الاسم للحفاظ على التوافق مع الإصدارات السابقة
+            # Validate auto_matched decisions only; approved_match can bypass validation
+            if decision and decision.decision_type == "auto_matched" and item:
+                validation = _validate_manual_review_match(item, candidate, decision)
+                if not validation["valid"]:
+                    # Auto-matched decision failed validation - reject it
+                    return None
+            elif decision and decision.decision_type == "approved_match" and item:
+                # Log warning for approved decisions with validation issues
+                validation = _validate_manual_review_match(item, candidate, decision)
+                if not validation["valid"]:
+                    import logging
+                    logging.warning(
+                        f"Manual review decision for item {item.code} has validation issues: {validation['issues']}"
+                    )
+            
             match = SearchMatch(query, index, 999.0, candidate)
-            return MatchDecision(match, [], "Approved by saved manual review (Name match).")
+            return MatchDecision(match, [], f"Approved by saved manual review (Name match). Decision type: {decision.decision_type if decision else 'unknown'}")
     return None
 
 

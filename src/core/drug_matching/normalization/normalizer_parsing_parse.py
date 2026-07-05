@@ -39,17 +39,23 @@ class DrugComponents:
     brand_variants: tuple[str, ...] = ()
     product_class: str = "medicine"
     is_synthetic: bool = False
+    manufacturer: str | None = None
 
 
 def parse_drug(name: str) -> DrugComponents:
     """Parse a raw drug/product name into matching components."""
     if not name or not isinstance(name, str):
-        return DrugComponents("", (), (), "", "", "", "", "", "", False, "", is_synthetic=False)
+        return DrugComponents("", (), (), "", "", "", "", "", "", False, "", is_synthetic=False, manufacturer=None)
 
-    imported = bool(_IMPORT_MARKER_RE.search(name))
-    if any(0x0600 <= ord(ch) <= 0x06FF for ch in name):
-        name = _convert_arabic_to_english_terms(name)
-    norm = normalize(name)
+    # Extract manufacturer first before other processing
+    from .normalizer_manufacturer_extraction import extract_manufacturer_from_name
+    name_without_mfr, manufacturer = extract_manufacturer_from_name(name)
+    
+    # Continue parsing with manufacturer-free name
+    imported = bool(_IMPORT_MARKER_RE.search(name_without_mfr))
+    if any(0x0600 <= ord(ch) <= 0x06FF for ch in name_without_mfr):
+        name_without_mfr = _convert_arabic_to_english_terms(name_without_mfr)
+    norm = normalize(name_without_mfr)
 
     combo_mg_per_ml = _COMBO_MG_PER_ML_RE.search(norm)
     mg_per_ml = _MG_PER_ML_RE.search(norm)
@@ -135,6 +141,8 @@ def parse_drug(name: str) -> DrugComponents:
         norm,
         variants,
         product_class,
+        is_synthetic=False,
+        manufacturer=manufacturer,
     )
 
 

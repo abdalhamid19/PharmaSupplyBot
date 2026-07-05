@@ -67,6 +67,11 @@ def _auto_save_verified_match(item: Item, decision) -> None:
     if match.score == 999.0 and "Approved by saved manual review" in (decision.final_reason or ""):
         return
 
+    # Safety check: skip saving matches that have validation issues
+    from src.core.manual_review.manual_review_runtime import should_skip_auto_save_verified_match
+    if should_skip_auto_save_verified_match(item, match.data, getattr(decision, 'rejection_reason', None)):
+        return
+
     store = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB)
     if _preserve_existing_decision(store.lookup(item.code, item.name)):
         return
