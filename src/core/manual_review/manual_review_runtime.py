@@ -18,6 +18,8 @@ from .manual_review_helpers import (
     _find_manual_review_match,
     _lookup_with_retry,
     _preferred_queries,
+    _validate_manual_review_match,
+    should_skip_auto_save,
 )
 
 _MANUAL_REVIEW_CACHE: ContextVar["ManualReviewDecisionCache | None"] = ContextVar(
@@ -110,7 +112,11 @@ def manual_review_match(
     results: list[tuple[str, list[dict]]],
     decision: ManualReviewDecision | None = None,
 ):
-    """Return a forced approved match when a saved ID or exact name appears."""
+    """
+    Return a forced approved match when a saved ID or exact name appears.
+    
+    # إرجاع تطابق موافق قسرياً عندما يظهر معرف محفوظ أو اسم مطابق تماماً
+    """
     from ..matching_types import MatchDecision
     decision = saved_manual_review_decision(item) if decision is None else decision
     if not decision or not decision.approved:
@@ -123,7 +129,27 @@ def manual_review_match(
     if not target_id and not target_en and not target_ar:
         return None
 
-    return _find_manual_review_match(results, target_id, target_en, target_ar)
+    return _find_manual_review_match(results, target_id, target_en, target_ar, item, decision)
+
+
+def should_skip_auto_save_verified_match(
+    item: Item,
+    candidate: dict,
+    rejection_reason: str | None = None,
+) -> tuple[bool, str]:
+    """
+    Check if auto-save should be skipped due to conflicts or issues.
+    
+    # التحقق من أن الحفظ التلقائي يجب تخطيه بسبب التضاربات أو المشاكل
+    
+    This is a public wrapper for the helper in manual_review_helpers,
+    intended for use in _auto_save_verified_match to prevent saving matches
+    that have conflicts or were rejected due to conflicts.
+    
+    Returns:
+        (should_skip, reason) tuple
+    """
+    return should_skip_auto_save(item, candidate, rejection_reason)
 
 
 __all__ = [
@@ -134,4 +160,5 @@ __all__ = [
     "manual_review_queries",
     "filter_manual_review_candidates",
     "manual_review_match",
+    "should_skip_auto_save_verified_match",
 ]

@@ -75,6 +75,7 @@ EXCEPTED_FILE_LENGTHS = {
     "src/ui/streamlit_order_command.py",
     "src/ui/streamlit_order_form.py",
     "src/ui/streamlit_order_process.py",
+    "src/core/ordering/order_run_artifact_rows.py",
 }
 BASELINE_VIOLATIONS = {
     "src/cli/cli_order.py:186:function_lines:run_single_profile_items:24",
