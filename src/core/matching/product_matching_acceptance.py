@@ -197,7 +197,7 @@ def _safe_omitted_topical_strength(requested, offered) -> bool:
         return False
     if requested.product_class == offered.product_class == "cosmetic":
         return True
-    topical_forms = {"CREAM", "GEL", "LOTION", "SOLUTION", "SPRAY"}
+    topical_forms = {"CREAM", "GEL", "LOTION", "OINT", "SOLUTION", "SPRAY"}
     return bool({requested.form, offered.form} & topical_forms)
 
 

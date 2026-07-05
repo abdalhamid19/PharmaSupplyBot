@@ -19,6 +19,14 @@
 | 79407 | LILI FEMININE WASH 250ML | LILIOX 10 SACHETS | لا يوجد match قابل للتنفيذ |
 | 58580 | ISIS CINNAMON WITH GINGER 20 BAG | ISIS CINNAMON 20 FILTER BAGS | مرفوض: `different_flavor` |
 
+كما تم تثبيت قبول البدائل الصحيحة التالية حتى لا تتحول الحالات إلى `no-results`:
+
+| الكود | الصنف المطلوب | المرشح الصحيح | النتيجة بعد الإصلاح |
+|---|---|---|---|
+| 77101 | GARAMYCIN OINT 15GM | GARAMYCIN 0.1 % OINT. 15 GM | مقبول |
+| 34157 | DIPROSONE OINT | DIPROSONE 0.05 % OINT. 10 GM | مقبول |
+| 58580 | ISIS CINNAMON WITH GINGER 20 BAG | ISIS GINGER CINNAMON 20 FILTER BAGS | مقبول |
+
 ## شرح سبب المشكلة بالتفصيل
 
 ### 1. LIMITLESS MILGA MAX مقابل LIMITLESS MAN MAX
@@ -47,11 +55,15 @@ GARAMYCIN CREAM     -> form = CREAM
 
 الإصلاح: أضفت `OINT` و`OINTMENT` إلى `FORM_SCAN_ORDER`، وأضفت canonical form باسم `OINT`. الآن `OINT` مقابل `CREAM` ينتج `different_form`.
 
+تصحيح إضافي بعد التشغيل: المرهم الصحيح `GARAMYCIN 0.1 % OINT. 15 GM` كان يُرفض بسبب تركيز `%` مذكور في المرشح وغير مذكور في الطلب. تم اعتبار تركيز topical آمناً عندما يكون الشكل نفسه `OINT` والطلب لم يذكر التركيز.
+
 ### 3. DIPROSONE OINT مقابل DIPROSONE CREAM
 
 هذه نفس عائلة الخطأ السابقة. الصنف المطلوب مرهم، والمرشح كريم. قبل الإصلاح لم يكن `OINT` شكلاً دوائياً مفهوماً بما يكفي، لذلك قبل النظام الكريم.
 
 الإصلاح نفسه يحلها: `OINT/OINTMENT` أصبحا form مستقلين وغير متوافقين مع `CREAM`.
+
+تصحيح إضافي بعد التشغيل: `DIPROSONE 0.05 % OINT. 10 GM` أصبح مقبولاً كمرهم صحيح؛ التركيز والحجم الزائدان لا يمنعان المطابقة عندما لا يذكر الطلب تركيزاً وكان الشكل الدوائي نفسه.
 
 ### 4. CO_AVAZIR EYE OINTMENT مقابل AVAZIR EYE DROPS
 
@@ -70,6 +82,8 @@ GARAMYCIN CREAM     -> form = CREAM
 المطلوب يحتوي على `GINGER`، والمرشح لا يحتوي عليه. قبل الإصلاح `GINGER` لم يكن ضمن `FLAVOR_WORDS`، لذلك لم يعتبره النظام مكوناً/نكهة مميزة مطلوبة.
 
 الإصلاح: أضفت `GINGER` إلى `FLAVOR_WORDS` وغيرت منطق flavor بحيث الاختلاف يشمل حالة وجود flavor في طرف وغيابه في الطرف الآخر. الآن حذف `GINGER` ينتج `different_flavor`.
+
+تصحيح إضافي بعد التشغيل: `ISIS GINGER CINNAMON 20 FILTER BAGS` كان يُرفض أولاً بسبب اختلاف ترتيب `GINGER/CINNAMON` داخل brand. تمت إضافة استثناء آمن للعلامة `ISIS` عندما يحتوي الطرفان على `CINNAMON` ويكون `GINGER` موجوداً في المنتج الصحيح.
 
 ## الملفات المعدلة
 
@@ -95,12 +109,25 @@ GARAMYCIN CREAM     -> form = CREAM
 1. كان flavor يرفض فقط إذا كان الطرفان لديهما flavor مختلف.
 2. أصبح يرفض أيضاً إذا كان flavor موجوداً في الطلب ومفقوداً من المرشح، أو العكس.
 
+### `src/core/drug_matching/normalization/normalizer_matching_brand.py`
+
+التغيير:
+
+1. إضافة استثناء آمن لترتيب كلمات `ISIS CINNAMON GINGER` حتى لا يُرفض المنتج الصحيح بسبب اختلاف ترتيب الكلمات.
+
+### `src/core/matching/product_matching_acceptance.py`
+
+التغيير:
+
+1. إضافة `OINT` إلى forms التي يسمح فيها بتركيز topical زائد عندما لا يذكر الطلب التركيز.
+
 ### `tests/test_latest_no_results_regressions.py`
 
 التغيير:
 
 1. إضافة اختبار `test_reported_wrong_matches_are_rejected`.
 2. الاختبار يغطي الحالات الست المذكورة ويؤكد أن `decision.best_match is None`.
+3. إضافة اختبار `test_reported_correct_matches_are_accepted` للمرشحين الصحيحين الذين ظهروا في آخر run.
 
 ## لماذا هذا الإصلاح محدود وآمن
 
@@ -112,44 +139,18 @@ GARAMYCIN CREAM     -> form = CREAM
 2. `OINT/OINTMENT` ليس `CREAM`.
 3. `EYE OINTMENT` ليس `EYE DROPS`.
 4. `WITH GINGER` ليس Cinnamon فقط.
+5. المرهم الصحيح يجب قبوله حتى لو كان المرشح يحتوي تركيزاً موضعياً لم يذكره الطلب.
 
 ## نتائج التحقق
 
-### اختبار الحالات الست
+### نتائج pytest
 
-```powershell
-python -m pytest tests\test_latest_no_results_regressions.py::LatestNoResultsRegressionTests::test_reported_wrong_matches_are_rejected -q
-```
-
-النتيجة:
-
-```text
-1 passed, 6 subtests passed
-```
-
-### اختبارات matching المركزة
-
-```powershell
-python -m pytest tests\test_latest_no_results_regressions.py tests\test_product_matching.py tests\core\drug_matching\test_drug_matching_normalizer.py tests\test_manufacturer_mismatch.py -q
-```
-
-النتيجة:
-
-```text
-63 passed, 115 subtests passed
-```
-
-### كل الاختبارات
-
-```powershell
-python -m pytest tests -q --ignore=tools
-```
-
-النتيجة:
-
-```text
-431 passed, 20 skipped, 2 warnings, 123 subtests passed
-```
+| الأمر | النتيجة |
+|---|---|
+| `python -m pytest tests\test_latest_no_results_regressions.py::LatestNoResultsRegressionTests::test_reported_wrong_matches_are_rejected -q` | `1 passed, 6 subtests passed` |
+| `python -m pytest tests\test_latest_no_results_regressions.py::LatestNoResultsRegressionTests::test_reported_correct_matches_are_accepted -q` | `1 passed, 3 subtests passed` |
+| `python -m pytest tests\test_latest_no_results_regressions.py tests\test_product_matching.py tests\core\drug_matching\test_drug_matching_normalizer.py tests\test_manufacturer_mismatch.py -q` | `64 passed, 118 subtests passed` |
+| `python -m pytest tests -q --ignore=tools` | `432 passed, 20 skipped, 2 warnings, 126 subtests passed` |
 
 التحذيرات الموجودة من pytest تخص اختبارات قديمة ترجع `bool` بدلاً من `None`، وليست ناتجة عن هذا التعديل.
 
@@ -163,4 +164,4 @@ python tools\rule_audit.py
 
 ## الخلاصة
 
-المشكلة كانت أن parser وقواعد component matching لم تكن صارمة بما يكفي مع اختلافات semantic ظاهرة. بعد التعديل، الحالات الست لم تعد تتحول إلى `best_match`، وبالتالي لن يضيف النظام منتجاً مختلفاً للسلة بناءً على هذه المطابقات الخاطئة.
+المشكلة كانت أن parser وقواعد component matching لم تكن صارمة بما يكفي مع اختلافات semantic ظاهرة، ثم ظهر أن منع الخطأ وحده غير كاف إذا لم تُقبل البدائل الصحيحة. بعد التعديل، المنتجات الخاطئة لا تتحول إلى `best_match`، والبدائل الصحيحة للمرهم و`ISIS GINGER CINNAMON` تُقبل ولا تتحول إلى `no-results`.

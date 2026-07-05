@@ -69,6 +69,8 @@ def _known_brand_variant_match(d: DrugComponents, m: DrugComponents, d_clean: st
     if d.product_class == m.product_class == "baby_food":
         if "BEBELAC" in d_words and "BEBELAC" in m_words:
             return ("BEBEJUNIOR" in d_words) == ("BEBEJUNIOR" in m_words)
+    if {"ISIS", "CINNAMON", "GINGER"} <= d_words | m_words:
+        return {"ISIS", "CINNAMON"} <= d_words and {"ISIS", "CINNAMON"} <= m_words
     if "CONCOR" in d_words and "CONCOR" in m_words:
         return "PLUS" in d_words and "PLUS" in m_words
     return False
