@@ -393,6 +393,11 @@ def _diagnostic_acceptance(
     skip_components: bool = False,
 ) -> tuple[bool, str, str]:
     """Return acceptance status and reason text for a candidate."""
+    pre_rejection = _candidate_variant_rejection(score_query, candidate)
+    if not candidate_has_store_product_id(candidate) and not pre_rejection:
+        acceptance = _numeric_acceptance(score_query, candidate, breakdown, matching_config)
+        return _orderable_acceptance(candidate, acceptance)
+
     is_rejected, rejection_reason = _check_rejections(
         score_query, candidate, matching_config, skip_components
     )
