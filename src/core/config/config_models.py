@@ -61,6 +61,7 @@ class MatchingConfig:
     enable_approved_match_re_review_on_fail: bool = False
     enable_manufacturer_check: bool = False
     manufacturer_match_threshold: float = 0.85
+    reject_extra_brand_token: bool = False
 
 
 @dataclass(frozen=True)

@@ -58,7 +58,9 @@ def build_runtime_config(raw_values: dict[str, Any]) -> RuntimeConfig:
 
 
 def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
-    """Build product-matching thresholds from the optional YAML section."""
+    """Build product-matching thresholds from the optional YAML section.
+    بناء عتبات مطابقة المنتجات من قسم YAML الاختياري.
+    """
     matching_values = dict(raw_values.get("matching", {}))
     default_config = MatchingConfig()
     kwargs = _matching_float_values(matching_values, default_config)
@@ -68,6 +70,8 @@ def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
         "enable_auto_save_verified_match",
         "enable_auto_match_re_review_on_fail",
         "enable_approved_match_re_review_on_fail",
+        "enable_manufacturer_check",
+        "reject_extra_brand_token",
     }
     int_keys = {"candidate_top_k", "fuzzy_prefix_len", "query_cache_size"}
     all_keys = bool_keys | int_keys
@@ -79,7 +83,9 @@ def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
 
 
 def _matching_float_values(matching_values: dict[str, Any], default_config: MatchingConfig) -> dict[str, float]:
-    """Return all float matching settings parsed from raw config."""
+    """Return all float matching settings parsed from raw config.
+    إرجاع جميع إعدادات المطابقة العائمة من ملف التكوين الخام.
+    """
     names = (
         "high_overlap_threshold",
         "medium_score_threshold",
@@ -91,10 +97,13 @@ def _matching_float_values(matching_values: dict[str, Any], default_config: Matc
         "distinguishing_token_penalty",
         "semantic_mismatch_penalty",
         "early_stop_confidence",
+        "manufacturer_match_threshold",
     )
     return {n: float(_matching_value(matching_values, default_config, n)) for n in names}
 
 
 def _matching_value(matching_values, default_config: MatchingConfig, name: str) -> Any:
-    """Return one configured matching value with dataclass defaults."""
+    """Return one configured matching value with dataclass defaults.
+    إرجاع قيمة مطابقة واحدة مكوّنة مع الافتراضيات من dataclass.
+    """
     return matching_values.get(name, getattr(default_config, name))
