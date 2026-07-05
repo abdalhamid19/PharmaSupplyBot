@@ -22,6 +22,7 @@ _GENERIC_SAFE_TOKENS = {
     "MG", "GM", "G", "ML", "L", "MCG", "IU",
     "CREAM", "GEL", "SYRUP", "SUPP", "AMP", "VIAL",
     "DROPS", "SPRAY", "LOTION", "OINTMENT",
+    "FILM", "COATED", "MINI", "F", "C",
 }
 
 
