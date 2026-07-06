@@ -56,6 +56,8 @@ def _brand_match_check(d: DrugComponents, m: DrugComponents, brand_prefix_min: i
                 and not brand_exception
             ):
                 return False, "different_brand"
+            if longer - shorter == 2 and fuzz.ratio(d_clean, m_clean) < 82:
+                return False, "different_brand"
     
     return True, "ok"
 

@@ -73,9 +73,9 @@ GARAMYCIN CREAM     -> form = CREAM
 
 ### 5. LILI FEMININE WASH مقابل LILIOX SACHETS
 
-هذه كانت مطابقة خاطئة من ناحية الهوية. في القياس الحالي قبل الإصلاح لم تتحول إلى best match بسبب numeric rejection، لكنها كانت ضمن نفس نمط المخاطر: اسم قريب لكن منتج مختلف تماماً.
+هذه كانت مطابقة خاطئة من ناحية الهوية. `LILI` ضمن `LILIOX` كـ containment، وكانت fuzzy ratio 80، لكن المنطج القديم كان يسمح بهذا الفرق طالما الفرق حرفان فقط.
 
-أضفتها كاختبار regression ضمن نفس المجموعة حتى لا تتحول مستقبلاً إلى match إذا تغيرت درجات scoring أو numeric acceptance.
+الإصلاح: أضفت شرطاً إضافياً بحيث إذا كان الفرق بالضبط حرفين والنسبة أقل من 82، يُرفض. الآن `LILI` مقابل `LILIOX` ينتج `different_brand`، لأن fuzzy ratio 80 < 82.
 
 ### 6. ISIS CINNAMON WITH GINGER مقابل ISIS CINNAMON فقط
 

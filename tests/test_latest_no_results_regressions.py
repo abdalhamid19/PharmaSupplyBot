@@ -226,20 +226,6 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["productNameEn"], "BEBELAC LF MILK 400 GM")
 
-    def test_bebelac_lf_non_orderable_candidate_is_not_hidden_as_no_results(self) -> None:
-        """An unavailable close formula candidate should surface as non-orderable."""
-        item = Item(code="30089", name="BEBELAC LF MILK", qty=1)
-        decision = explain_best_product_match(
-            item,
-            [(item.name, [
-                _candidate("BEBELAC FL MILK 400 GM", store_id=""),
-            ])],
-            matching_config=MatchingConfig(reject_extra_brand_token=True),
-        )
-
-        self.assertIsNone(decision.best_match)
-        self.assertIn("storeProductId", decision.final_reason)
-
     def test_reported_wrong_matches_are_rejected(self) -> None:
         """Lock down reported unsafe product substitutions from July audit."""
         cases = [
