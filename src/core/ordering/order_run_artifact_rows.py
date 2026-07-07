@@ -102,7 +102,8 @@ def _find_orderable_missing_diag(decision):
     Find diagnostic for orderable-missing store product ID.
     العثور على تشخيص لمعرف المنتج المفقود القابل للطلب.
     """
-    return next(
+    # First try exact match for classic missing storeProductId
+    exact_match = next(
         (
             d for d in decision.diagnostics
             if getattr(d, "rejection_reason", "") ==
@@ -110,6 +111,16 @@ def _find_orderable_missing_diag(decision):
         ),
         None
     )
+    if exact_match:
+        return exact_match
+    
+    # If not found, return highest-scoring rejected diagnostic without storeProductId
+    from ..matching.candidate_identity import candidate_has_store_product_id
+    rejected_no_store = [
+        d for d in decision.diagnostics
+        if not getattr(d, "accepted", True) and not candidate_has_store_product_id(d.candidate)
+    ]
+    return max(rejected_no_store, key=lambda d: d.score, default=None)
 
 
 def _extract_query_and_score(match, blocked_candidate, outcome, best_diagnostic):

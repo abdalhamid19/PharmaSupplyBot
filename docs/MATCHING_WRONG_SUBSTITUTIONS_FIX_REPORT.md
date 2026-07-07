@@ -165,3 +165,5 @@ python tools\rule_audit.py
 ## الخلاصة
 
 المشكلة كانت أن parser وقواعد component matching لم تكن صارمة بما يكفي مع اختلافات semantic ظاهرة، ثم ظهر أن منع الخطأ وحده غير كاف إذا لم تُقبل البدائل الصحيحة. بعد التعديل، المنتجات الخاطئة لا تتحول إلى `best_match`، والبدائل الصحيحة للمرهم و`ISIS GINGER CINNAMON` تُقبل ولا تتحول إلى `no-results`.
+
+كما تم إصلاح عرض `matched_product_english_name` في artifact لحالات `not-orderable`: عندما يكون أعلى مرشح مرفوضاً لسبب آخر (مثل `different_form`) ولا يحتوي `storeProductId`، يظهر اسمه الآن في artifact بوضوح بدلاً من ظهور عمود فارغ.
