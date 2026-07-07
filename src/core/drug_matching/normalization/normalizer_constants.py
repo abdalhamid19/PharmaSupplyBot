@@ -67,7 +67,7 @@ CRITICAL_MODIFIERS = frozenset({
 })
 
 BABY_FORMULA_MODIFIERS = frozenset({
-    "LF", "HA", "AR", "PRE", "COMFORT", "SENSITIVE", "DIGEST", "IT", "AC", "EC",
+    "LF", "FL", "HA", "AR", "PRE", "COMFORT", "SENSITIVE", "DIGEST", "IT", "AC", "EC",
     "PRO", "EXPERT", "OPTIPRO"
 })
 
