@@ -212,7 +212,7 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
         )
 
     def test_bebelac_lf_does_not_become_no_results_when_lf_candidate_exists(self) -> None:
-        """LF formula candidate should remain matchable; FL must not win."""
+        """LF formula candidate should remain matchable; FL is an accepted typo of LF."""
         item = Item(code="30089", name="BEBELAC LF MILK", qty=1)
         decision = explain_best_product_match(
             item,
@@ -225,6 +225,18 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
 
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["productNameEn"], "BEBELAC LF MILK 400 GM")
+
+    def test_bebelac_lf_matches_fl_candidate_when_lf_absent(self) -> None:
+        """LF query must match FL-only candidate (LF/FL are interchangeable baby formula typos)."""
+        item = Item(code="30089", name="BEBELAC LF MILK", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [(item.name, [_candidate("BEBELAC FL MILK 400 GM", store_id="fl")])],
+            matching_config=MatchingConfig(reject_extra_brand_token=True),
+        )
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["productNameEn"], "BEBELAC FL MILK 400 GM")
 
     def test_reported_wrong_matches_are_rejected(self) -> None:
         """Lock down reported unsafe product substitutions from July audit."""

@@ -67,6 +67,7 @@ ALIAS_TO_CANONICAL = {
     "DRP": "DROPS",
     "FILT": "FILTER",
     "FILTERS": "FILTER",
+    "FL": "LF",
     "FRUIT": "FRUITS",
     "INJ": "INJECTION",
     "SYP": "SYRUP",

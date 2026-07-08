@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from src.core.ordering.order_run_artifact_rows import text_block
-from ..artifacts.tawreed_artifacts import append_csv_artifact, append_text_artifact
+from ..artifacts.tawreed_artifacts import (
+    append_csv_artifact,
+    append_text_artifact,
+    append_xlsx_artifact,
+)
 
 
 def _final_trace_row(row: dict[str, object]) -> dict[str, object]:
@@ -29,8 +33,9 @@ def _final_trace_row(row: dict[str, object]) -> dict[str, object]:
 def _append_item_summary_row(
     profile_key: str, row: dict[str, object], label_suffix: str | None
 ) -> None:
-    """Append one item summary row to CSV and TXT artifacts."""
+    """Append one item summary row to CSV, XLSX, and TXT artifacts."""
     append_csv_artifact(profile_key, "order_item_summary", [row], label_suffix)
+    append_xlsx_artifact(profile_key, "order_item_summary", [row], label_suffix)
     append_text_artifact(
         profile_key, "order_item_summary", text_block("item", row), label_suffix
     )

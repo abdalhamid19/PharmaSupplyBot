@@ -107,9 +107,14 @@ def components_match(d: DrugComponents, m: DrugComponents, brand_prefix_min: int
         }
         if d.product_class == "baby_food" or m.product_class == "baby_food":
             modifiers_to_check |= BABY_FORMULA_MODIFIERS
+            d_norm = d_words - {"FL"} | ({"LF"} if "FL" in d_words else set())
+            m_norm = m_words - {"FL"} | ({"LF"} if "FL" in m_words else set())
+        else:
+            d_norm = d_words
+            m_norm = m_words
         
         for modifier in modifiers_to_check:
-            if (modifier in d_words) != (modifier in m_words):
+            if (modifier in d_norm) != (modifier in m_norm):
                 if _modifier_is_optional(modifier, d_words, m_words):
                     continue
                 return False, "different_modifier"
