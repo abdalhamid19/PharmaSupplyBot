@@ -11,6 +11,7 @@ from unittest.mock import patch, Mock
 
 from src.tawreed.api.tawreed_api_client import TawreedApiClient
 from src.tawreed.api.tawreed_api_contract import save_api_contract_capture
+from src.tawreed.api.tawreed_api_flow import record_api_match_only_store_metadata
 from src.tawreed.api.tawreed_api_flow import match_items_only_with_api
 from src.tawreed.api.tawreed_api_matching import _has_only_non_orderable_candidates
 
@@ -88,6 +89,25 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
         # Skip this test as it requires complex mocking of bot methods
         self.skipTest("Requires complex mocking of bot methods - skipping for now")
 
+    def test_api_match_only_records_selected_max_discount_store_metadata(self) -> None:
+        """API match-only summaries use the chosen multi-store discount."""
+        bot = _FlowBot()
+        bot.config.warehouse_strategy = {"mode": "max_discount"}
+        api = _FakeStoreDetailsClient()
+        match = SimpleNamespace(
+            data={
+                "productId": "p1",
+                "productsCount": 2,
+                "storeName": "شركه روما فارما (الجيزه)",
+                "discountPercent": "20%",
+            }
+        )
+
+        record_api_match_only_store_metadata(bot, api, match)
+
+        self.assertEqual(bot.last_selected_store_name, "شركه الهادي فارم (الجيزه)")
+        self.assertEqual(bot.last_selected_discount_percent, "32%")
+
 
 class _FakeFlowClient:
     def __init__(self) -> None:
@@ -113,6 +133,22 @@ class _FakeFlowClient:
         return [{"productNameEn": query, "storeProductId": "s1"}]
 
 
+class _FakeStoreDetailsClient:
+    def get_store_details(self, product_id):
+        return [
+            {
+                "availableQuantity": 10,
+                "storeName": "شركه روما فارما (الجيزه)",
+                "discountPercent": "24%",
+            },
+            {
+                "availableQuantity": 32,
+                "storeName": "شركه الهادي فارم (الجيزه)",
+                "discountPercent": "32%",
+            },
+        ]
+
+
 class _FlowBot:
     profile_key = "wardany"
     config = SimpleNamespace(base_url="https://seller.tawreed.io/#/login")
@@ -121,6 +157,8 @@ class _FlowBot:
 
     def __init__(self) -> None:
         self.successes = 0
+        self.last_selected_discount_percent = ""
+        self.last_selected_store_name = ""
         # Add missing order_flow attribute for summary recording
         self.order_flow = Mock()
         self.order_flow.summary_recorder = Mock()

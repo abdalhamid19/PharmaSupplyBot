@@ -22,11 +22,12 @@ def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
             bot._reset_last_item_state()
             try:
                 from .tawreed_api_flow_matching import require_api_match
+                from .tawreed_api_match_only_metadata import (
+                    record_api_match_only_store_metadata,
+                )
                 match = require_api_match(bot, api, item, False)
                 bot.log(f"API match-only accepted {item.code} / {item.name}: {match.query}")
-                
-                from ..store.tawreed_store_summary import record_single_store
-                record_single_store(bot, getattr(match, "data", {}))
+                record_api_match_only_store_metadata(bot, api, match)
                 
                 bot.order_flow.summary_recorder.record_match_only_success(item, started_at)
             except bot.skip_item_exception as error:

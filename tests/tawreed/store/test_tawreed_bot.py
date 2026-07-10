@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -26,6 +27,11 @@ from src.tawreed.auth.tawreed_session import SessionInvalidError
 class _FakePage:
     def __init__(self, url: str):
         self.url = url
+
+
+@dataclass(frozen=True)
+class _StoreChoiceStub:
+    store: dict[str, object]
 
 
 class TawreedBotTests(unittest.TestCase):
@@ -193,6 +199,69 @@ class TawreedBotTests(unittest.TestCase):
         summary = append_summary.call_args.args[2]
         self.assertEqual(summary.status, "matched-only")
         self.assertEqual(summary.ordered_total_qty, 0)
+
+    def test_match_only_records_selected_max_discount_store_metadata(self) -> None:
+        bot = self._bot()
+        bot.config.warehouse_strategy["mode"] = "max_discount"
+        item = Item(code="46883", name="ZINC OLIVE CREAM 75 GM", qty=1)
+        page: Any = _FakePage("https://seller.tawreed.io/#/catalog/store-products/dv/")
+        match = SearchMatch(
+            query="ZINC OLIVE CREAM 75 GM",
+            row_index=0,
+            score=999.0,
+            data={
+                "productNameEn": "ZINC OLIVE CREAM 75 GM",
+                "productName": "زنك اوليف بيبي كريم 75 جم",
+                "productsCount": 2,
+                "storeName": "شركه روما فارما (الجيزه)",
+                "discountPercent": "20%",
+            },
+        )
+
+        with (
+            patch.object(
+                bot.order_flow.item_processor,
+                "order_surface_ready",
+                return_value=True,
+            ),
+            patch(
+                "src.tawreed.order.tawreed_order_processing.require_product_match",
+                return_value=(match, match.query),
+            ),
+            patch(
+                "src.tawreed.products.tawreed_match_only_metadata.match_only_store_choice",
+                return_value=_StoreChoiceStub(
+                    {
+                        "availableQuantity": 32,
+                        "storeName": "شركه الهادي فارم (الجيزه)",
+                        "discountPercent": "32%",
+                    }
+                ),
+            ),
+            patch(
+                "src.tawreed.products.tawreed_products_flow.matched_product_row",
+                return_value=object(),
+            ),
+            patch(
+                "src.tawreed.products.tawreed_products_flow.open_stores_dialog",
+                return_value=[
+                    {
+                        "availableQuantity": 10,
+                        "storeName": "شركه روما فارما (الجيزه)",
+                        "discountPercent": "24%",
+                    },
+                    {
+                        "availableQuantity": 32,
+                        "storeName": "شركه الهادي فارم (الجيزه)",
+                        "discountPercent": "32%",
+                    },
+                ],
+            ),
+        ):
+            bot._match_item_only(page, item)
+
+        self.assertEqual(bot.last_selected_store_name, "شركه الهادي فارم (الجيزه)")
+        self.assertEqual(bot.last_selected_discount_percent, "32%")
 
     def test_match_only_accepts_ready_search_surface_without_products_url(self) -> None:
         bot = self._bot()

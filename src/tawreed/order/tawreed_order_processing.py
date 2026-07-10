@@ -11,6 +11,7 @@ from src.core.utils.excel import Item
 from ..tawreed_constants import PRODUCTS_PAGE_ROUTE
 from ..tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from ..products.tawreed_products_flow import add_item_from_products_page
+from ..products.tawreed_match_only_metadata import record_match_only_store_metadata
 from ..matching.tawreed_search_logic import require_product_match
 from ..auth.tawreed_session import close_browser, close_context, open_order_page
 from ..matching.tawreed_strategy import max_available_warehouse_row
@@ -34,7 +35,10 @@ class OrderItemProcessor:
     def match_item_only(self, page: Page, item: Item) -> None:
         """Run Tawreed matching for one item without opening the cart dialog."""
         self.ensure_match_only_surface(page)
-        match, _ = require_product_match(self.bot, page, item, require_available=False)
+        match, active_query = require_product_match(
+            self.bot, page, item, require_available=False
+        )
+        record_match_only_store_metadata(self.bot, page, match, active_query)
         self.bot.log(f"Match-only accepted {item.code} / {item.name}: {match.query}")
 
     def ensure_match_only_surface(self, page: Page) -> None:
