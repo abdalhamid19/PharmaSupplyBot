@@ -13,7 +13,7 @@ from ..artifacts.tawreed_artifacts import (
     append_xlsx_artifact,
     write_text_artifact,
 )
-from .tawreed_timing import timing_summary_fields
+from .tawreed_order_result_summary_rows import order_result_summary_row
 
 # Constants
 MAX_DETAILED_MATCH_CANDIDATES = 25
@@ -75,27 +75,7 @@ def append_order_result_summary(
     label_suffix: str | None = None,
 ) -> None:
     """Append one compact order-result summary row to the table artifacts."""
-    row = {
-        "item_code": item.code,
-        "item_name": item.name,
-        "item_qty": item.qty,
-        "ordered_total_qty": summary.ordered_total_qty,
-        "status": summary.status,
-        "reason": summary.reason,
-        "matched_product_english_name": summary.matched_product_english_name,
-        "matched_product_english_name_source": (
-            summary.matched_product_english_name_source
-        ),
-        "matched_product_arabic_name": summary.matched_product_arabic_name,
-        "matched_query": summary.matched_query,
-        "selected_discount_percent": summary.selected_discount_percent,
-        "selected_store_name": summary.selected_store_name,
-        "searched_queries_count": summary.searched_queries_count,
-        "searched_queries": summary.searched_queries,
-        "elapsed_seconds": round(summary.elapsed_seconds, 3),
-        "match_elapsed_seconds": round(summary.match_elapsed_seconds, 3),
-        **timing_summary_fields(summary.timing_seconds),
-    }
+    row = order_result_summary_row(item, summary)
     if label_suffix:
         append_csv_artifact(
             profile_key, "order_result_summary", [row], label_suffix=label_suffix

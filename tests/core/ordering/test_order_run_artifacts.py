@@ -205,6 +205,87 @@ class OrderRunArtifactsTests(unittest.TestCase):
         self.assertEqual(row["candidate_manufacturer"], "PFIZER")
         self.assertEqual(row["manufacturer_check_decision"], "conflict")
 
+    def test_winner_sales_price_and_split_selected_stores(self):
+        """Multi-store selections are split from highest discount to lowest."""
+        from src.core.ordering.order_run_artifact_rows import order_item_summary_row
+
+        candidate = {
+            "productNameEn": "Panadol",
+            "productName": "بنادول",
+            "storeProductId": "s1",
+            "salePrice": 18.5,
+            "retailPrice": 25,
+        }
+        summary = OrderResultSummary(
+            status="matched-only",
+            reason="done",
+            selected_store_name="Store Low (qty 1) | Store High (qty 2)",
+            selected_discount_percent="10% (qty 1) | 35% (qty 2)",
+        )
+
+        row = order_item_summary_row(
+            self._item(),
+            summary,
+            MatchDecision(SearchMatch("Panadol", 0, 95.0, candidate), [], "accepted"),
+            None,
+        )
+
+        self.assertEqual(row["winner_sale_price"], 25)
+        self.assertEqual(row["winner_sales_price"], 18.5)
+        self.assertEqual(
+            row["selected_store_name"], "Store Low (qty 1) | Store High (qty 2)"
+        )
+        self.assertEqual(
+            row["selected_discount_percent"], "10% (qty 1) | 35% (qty 2)"
+        )
+        self.assertNotIn("winner_store_name", row)
+        self.assertNotIn("winner_discount", row)
+        self.assertEqual(row["selected_store_name_1"], "Store High")
+        self.assertEqual(row["selected_discount_percent_1"], "35%")
+        self.assertEqual(row["selected_qty_1"], "2")
+        self.assertEqual(row["selected_store_name_2"], "Store Low")
+        self.assertEqual(row["selected_discount_percent_2"], "10%")
+        self.assertEqual(row["selected_qty_2"], "1")
+
+    def test_melo_multi_store_summary_shape(self):
+        """MELO-style quantity split is visible in independent columns."""
+        from src.core.ordering.order_run_artifact_rows import order_item_summary_row
+
+        candidate = {
+            "productNameEn": "MELO 0.25 % OINT . 30 GM",
+            "productName": "ميلو مرهم 30 جم",
+            "storeProductId": "79735",
+            "salePrice": 62.0,
+            "retailPrice": 80.0,
+        }
+        summary = OrderResultSummary(
+            status="matched-only",
+            reason="done",
+            selected_store_name="Warehouse 20 (qty 5) | Warehouse 30 (qty 10)",
+            selected_discount_percent="20% (qty 5) | 30% (qty 10)",
+            ordered_total_qty=15,
+        )
+
+        row = order_item_summary_row(
+            Item("87160", "MELO OINT. 30 GM", 15),
+            summary,
+            MatchDecision(
+                SearchMatch("MELO OINT. 30 GM", 0, 95.0, candidate), [], "accepted"
+            ),
+            None,
+        )
+
+        self.assertEqual(row["item_name"], "MELO OINT. 30 GM")
+        self.assertEqual(row["item_qty"], 15)
+        self.assertEqual(row["ordered_total_qty"], 15)
+        self.assertEqual(row["winner_sales_price"], 62.0)
+        self.assertEqual(row["selected_store_name_1"], "Warehouse 30")
+        self.assertEqual(row["selected_discount_percent_1"], "30%")
+        self.assertEqual(row["selected_qty_1"], "10")
+        self.assertEqual(row["selected_store_name_2"], "Warehouse 20")
+        self.assertEqual(row["selected_discount_percent_2"], "20%")
+        self.assertEqual(row["selected_qty_2"], "5")
+
     @staticmethod
     def _item() -> Item:
         return Item("1", "Panadol", 1)

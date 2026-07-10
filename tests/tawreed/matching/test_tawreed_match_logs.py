@@ -76,6 +76,38 @@ class TawreedMatchLogsTests(unittest.TestCase):
             "wardany", "order_result_summary", [expected_row]
         )
 
+    def test_order_result_summary_splits_selected_stores_and_quantities(self) -> None:
+        item = Item(code="87160", name="MELO OINT. 30 GM", qty=15)
+        summary = OrderResultSummary(
+            status="matched-only",
+            reason="done",
+            ordered_total_qty=15,
+            selected_discount_percent="20% (qty 5) | 30% (qty 10)",
+            selected_store_name="Warehouse 20 (qty 5) | Warehouse 30 (qty 10)",
+        )
+
+        with (
+            patch(
+                "src.tawreed.matching.tawreed_match_logs.append_csv_artifact"
+            ) as append_csv,
+            patch("src.tawreed.matching.tawreed_match_logs.append_xlsx_artifact"),
+        ):
+            append_order_result_summary("wardany", item, summary)
+
+        row = append_csv.call_args.args[2][0]
+        self.assertEqual(
+            row["selected_store_name"], "Warehouse 20 (qty 5) | Warehouse 30 (qty 10)"
+        )
+        self.assertEqual(
+            row["selected_discount_percent"], "20% (qty 5) | 30% (qty 10)"
+        )
+        self.assertEqual(row["selected_store_name_1"], "Warehouse 30")
+        self.assertEqual(row["selected_discount_percent_1"], "30%")
+        self.assertEqual(row["selected_qty_1"], "10")
+        self.assertEqual(row["selected_store_name_2"], "Warehouse 20")
+        self.assertEqual(row["selected_discount_percent_2"], "20%")
+        self.assertEqual(row["selected_qty_2"], "5")
+
     def test_match_only_summary_rows_include_api_payload_and_scores(self) -> None:
         item = Item(code="123", name="Panadol Extra", qty=2)
         candidate = {
