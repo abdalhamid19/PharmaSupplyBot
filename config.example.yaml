@@ -82,6 +82,8 @@ matching:
   critical_token_penalty: 2.0
   distinguishing_token_penalty: 3.0
   semantic_mismatch_penalty: 10.0
+  # Default number of candidate options saved and shown in Manual Review.
+  manual_review_candidate_limit: 10
 
   enable_auto_match_re_review_on_fail: false
   enable_auto_save_verified_match: true
@@ -95,7 +97,7 @@ matching:
 runtime:
   headless: true
   slow_mo_ms: 0
-  timeout_ms: 45000
+  timeout_ms: 15000
   submit_order: false
   # Item-level parallel workers per profile. 1 = sequential (default).
   # Each extra worker spawns its own Chromium process (~150MB RAM each).

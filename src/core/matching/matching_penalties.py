@@ -123,6 +123,8 @@ def _semantic_conflicts(
     for group in CONFLICT_GROUPS:
         query_group = query_tokens & group
         candidate_group = candidate_tokens & group
+        if query_group == candidate_group:
+            continue
         conflicts.update(
             (left, right) for left in query_group for right in candidate_group
         )

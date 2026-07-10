@@ -20,6 +20,7 @@ from src.ui.manual_review.streamlit_manual_review_page_saved import (
     _decision_row,
     deleted_identity_pairs,
 )
+from src.ui.manual_review.streamlit_manual_review_page import _configured_candidate_limit
 
 
 class StreamlitManualReviewTests(unittest.TestCase):
@@ -164,6 +165,18 @@ class StreamlitManualReviewTests(unittest.TestCase):
         self.assertEqual(
             deleted_identity_pairs(original, edited), [("47853", "ZOCOZET 10/10")]
         )
+
+    def test_configured_candidate_limit_defaults_to_five(self) -> None:
+        self.assertEqual(_configured_candidate_limit(None), 5)
+
+    def test_configured_candidate_limit_reads_app_config_matching(self) -> None:
+        from types import SimpleNamespace
+
+        app_config = SimpleNamespace(
+            matching=SimpleNamespace(manual_review_candidate_limit=9)
+        )
+
+        self.assertEqual(_configured_candidate_limit(app_config), 9)
 
 
 if __name__ == "__main__":

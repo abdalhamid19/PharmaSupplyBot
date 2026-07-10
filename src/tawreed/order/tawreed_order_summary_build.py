@@ -111,16 +111,26 @@ def append_manual_review_artifacts(
 
     row = manual_review_row(item, summary, decision, outcome, matching_config)
     append_csv_artifact(profile_key, "manual_review", [row], label_suffix)
-    append_text_artifact(profile_key, "manual_review", text_block("manual_review", row), label_suffix)
-    _save_review_candidates_if_available(decision, item)
+    append_text_artifact(
+        profile_key, "manual_review", text_block("manual_review", row), label_suffix
+    )
+    _save_review_candidates_if_available(decision, item, matching_config)
 
 
-def _save_review_candidates_if_available(decision, item) -> None:
+def _save_review_candidates_if_available(decision, item, matching_config=None) -> None:
     """Save review candidates to JSONL if available."""
     run = current_artifact_run()
     if run and decision:
-        options = review_candidate_options(decision, limit=5)
+        options = review_candidate_options(
+            decision, limit=_review_candidate_limit(matching_config)
+        )
         append_review_candidates(run.directory, item.code, item.name, options)
+
+
+def _review_candidate_limit(matching_config=None) -> int:
+    """Return configured Manual Review candidate limit for this run."""
+    value = getattr(matching_config, "manual_review_candidate_limit", 5)
+    return max(1, int(value))
 
 
 __all__ = [

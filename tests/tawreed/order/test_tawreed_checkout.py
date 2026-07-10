@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from src.core.config.config_factory import build_runtime_config
+from src.core.config.config_factory import build_matching_config, build_runtime_config
 from src.tawreed.tawreed_checkout import confirm_order
 
 
@@ -30,6 +30,16 @@ class TawreedCheckoutTests(unittest.TestCase):
     def test_runtime_submit_order_defaults_to_false(self) -> None:
         runtime = build_runtime_config({})
         self.assertFalse(runtime.submit_order)
+
+    def test_manual_review_candidate_limit_defaults_to_five(self) -> None:
+        matching = build_matching_config({})
+        self.assertEqual(matching.manual_review_candidate_limit, 5)
+
+    def test_manual_review_candidate_limit_can_be_configured(self) -> None:
+        matching = build_matching_config(
+            {"matching": {"manual_review_candidate_limit": 12}}
+        )
+        self.assertEqual(matching.manual_review_candidate_limit, 12)
 
     def test_confirm_order_clicks_checkout_and_final_confirmation(self) -> None:
         selectors = SimpleNamespace(

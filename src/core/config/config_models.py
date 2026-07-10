@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-
 @dataclass(frozen=True)
 class ExcelConfig:
     """Excel column names and quantity bounds used to load shortage items."""
@@ -16,14 +15,12 @@ class ExcelConfig:
     min_qty: int = 1
     max_qty: int = 10**9
 
-
 @dataclass(frozen=True)
 class ProfileConfig:
     """One pharmacy profile plus its optional pharmacy-switch settings."""
 
     display_name: str
     pharmacy_switch: dict[str, Any]
-
 
 @dataclass(frozen=True)
 class RuntimeConfig:
@@ -35,7 +32,6 @@ class RuntimeConfig:
     submit_order: bool = False
     max_workers: int = 1
     item_workers: int = 1
-
 
 @dataclass(frozen=True)
 class MatchingConfig:
@@ -55,6 +51,7 @@ class MatchingConfig:
     candidate_top_k: int = 5
     fuzzy_prefix_len: int = 3
     query_cache_size: int = 256
+    manual_review_candidate_limit: int = 5
     require_identity_token_for_flag: bool = True
     enable_auto_save_verified_match: bool = True
     enable_auto_match_re_review_on_fail: bool = False
@@ -62,7 +59,6 @@ class MatchingConfig:
     enable_manufacturer_check: bool = False
     manufacturer_match_threshold: float = 0.85
     reject_extra_brand_token: bool = False
-
 
 @dataclass(frozen=True)
 class AppConfig:

@@ -100,7 +100,7 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
     with results_tab:
         render_results_tab(default_profile)
     with manual_review_tab:
-        render_manual_review_tab()
+        render_manual_review_tab(app_config)
 
 
 def _main_tab_labels() -> list[str]:

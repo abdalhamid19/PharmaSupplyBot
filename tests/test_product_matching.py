@@ -154,6 +154,39 @@ class ProductMatchingQueryTests(unittest.TestCase):
         self.assertIsNone(decision.best_match)
         self.assertIn("Semantic token conflict", decision.final_reason)
 
+    def test_compound_cream_gel_match_is_not_rejected_as_conflict(self) -> None:
+        item = Item("91167", "U RICHI PANTHENOL ADVANCE CREAM GEL 50M", 1)
+        candidate_name = "U RICHI PANTHENOL ADVANCE CREAM GEL 50 GM"
+
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _candidate(
+                            candidate_name,
+                            "يو ريتشي بانثينول ادفانس كريم جل 50 جم",
+                        )
+                    ],
+                )
+            ],
+        )
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["productNameEn"], candidate_name)
+
+    def test_form_conflict_still_rejects_cream_for_lotion(self) -> None:
+        item = Item("1", "ABC CREAM 50 GM", 1)
+
+        decision = explain_best_product_match(
+            item,
+            [(item.name, [_candidate("ABC LOTION 50 GM", "ايه بي سي لوشن 50 جم")])],
+        )
+
+        self.assertIsNone(decision.best_match)
+        self.assertIn("Semantic token conflict", decision.final_reason)
+
     def test_unrequested_advanced_variant_loses_to_plain_polyfresh(self) -> None:
         item = Item(code="12345", name="POLYFRESH EYE DROPS 10 ML", qty=1)
         decision = explain_best_product_match(

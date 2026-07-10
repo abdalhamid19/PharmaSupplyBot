@@ -10,7 +10,12 @@ DEFAULT_BASE_URL = "https://seller.tawreed.io/#/login"
 DEFAULT_CODE_COLUMN = "كود"
 DEFAULT_NAME_COLUMN = "إسم الصنف"
 DEFAULT_QUANTITY_COLUMN = "كمية النقص"
-
+MATCHING_BOOL_KEYS = {"exact_match_accept", "require_identity_token_for_flag",
+    "enable_auto_save_verified_match", "enable_auto_match_re_review_on_fail",
+    "enable_approved_match_re_review_on_fail", "enable_manufacturer_check",
+    "reject_extra_brand_token"}
+MATCHING_INT_KEYS = {"candidate_top_k", "fuzzy_prefix_len", "query_cache_size",
+    "manual_review_candidate_limit"}
 
 def build_excel_config(excel_values: dict[str, Any]) -> ExcelConfig:
     """Build Excel column settings from the raw YAML dictionary."""
@@ -58,34 +63,22 @@ def build_runtime_config(raw_values: dict[str, Any]) -> RuntimeConfig:
 
 
 def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:
-    """Build product-matching thresholds from the optional YAML section.
-    بناء عتبات مطابقة المنتجات من قسم YAML الاختياري.
-    """
+    """Build product-matching thresholds from the optional YAML section."""
     matching_values = dict(raw_values.get("matching", {}))
     default_config = MatchingConfig()
     kwargs = _matching_float_values(matching_values, default_config)
-    bool_keys = {
-        "exact_match_accept",
-        "require_identity_token_for_flag",
-        "enable_auto_save_verified_match",
-        "enable_auto_match_re_review_on_fail",
-        "enable_approved_match_re_review_on_fail",
-        "enable_manufacturer_check",
-        "reject_extra_brand_token",
-    }
-    int_keys = {"candidate_top_k", "fuzzy_prefix_len", "query_cache_size"}
-    all_keys = bool_keys | int_keys
-    
-    for k in all_keys:
-        val = _matching_value(matching_values, default_config, k)
-        kwargs[k] = bool(val) if k in bool_keys else int(val)
+    _add_matching_typed_values(kwargs, matching_values, default_config)
     return MatchingConfig(**kwargs)
 
+def _add_matching_typed_values(kwargs, matching_values, default_config) -> None:
+    """Add bool and int matching settings to constructor kwargs."""
+    for key in MATCHING_BOOL_KEYS | MATCHING_INT_KEYS:
+        val = _matching_value(matching_values, default_config, key)
+        kwargs[key] = bool(val) if key in MATCHING_BOOL_KEYS else int(val)
 
-def _matching_float_values(matching_values: dict[str, Any], default_config: MatchingConfig) -> dict[str, float]:
-    """Return all float matching settings parsed from raw config.
-    إرجاع جميع إعدادات المطابقة العائمة من ملف التكوين الخام.
-    """
+
+def _matching_float_values(matching_values, default_config) -> dict[str, float]:
+    """Return all float matching settings parsed from raw config."""
     names = (
         "high_overlap_threshold",
         "medium_score_threshold",
@@ -103,7 +96,5 @@ def _matching_float_values(matching_values: dict[str, Any], default_config: Matc
 
 
 def _matching_value(matching_values, default_config: MatchingConfig, name: str) -> Any:
-    """Return one configured matching value with dataclass defaults.
-    إرجاع قيمة مطابقة واحدة مكوّنة مع الافتراضيات من dataclass.
-    """
+    """Return one configured matching value with dataclass defaults."""
     return matching_values.get(name, getattr(default_config, name))

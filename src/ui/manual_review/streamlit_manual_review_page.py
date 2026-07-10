@@ -20,7 +20,7 @@ from ..streamlit_remove_cart import render_running_remove_cart_controls
 from ..streamlit_shared import ARTIFACTS_DIR, load_csv_rows
 
 
-def render_manual_review_tab() -> None:
+def render_manual_review_tab(app_config=None) -> None:
     """Render the full manual review workflow with candidate options."""
     st.title("Manual Review")
     st.markdown("Select an artifact run to evaluate AI matches and correct them.")
@@ -36,11 +36,11 @@ def render_manual_review_tab() -> None:
         format_func=lambda r: f"{r.parent.parent.name} / {r.parent.name} / {r.name}"
     )
     if selected_run:
-        _render_selected_run(selected_run)
+        _render_selected_run(selected_run, app_config)
         render_saved_decisions()
 
 
-def _render_selected_run(selected_run):
+def _render_selected_run(selected_run, app_config=None):
     """Render the selected run's manual review."""
     paths = list(selected_run.glob("manual_review_*.csv"))
     if paths:
@@ -48,7 +48,7 @@ def _render_selected_run(selected_run):
         if rows:
             render_manual_review_editor(rows, selected_run)
             st.divider()
-    render_run_candidates(selected_run)
+    render_run_candidates(selected_run, app_config)
 
 
 def _available_runs_with_candidates() -> list[Path]:
@@ -65,7 +65,7 @@ def _available_runs_with_candidates() -> list[Path]:
 
 # ============ Candidate Rendering ============
 
-def render_run_candidates(run_dir: Path) -> None:
+def render_run_candidates(run_dir: Path, app_config=None) -> None:
     """Render the evaluation cards for the selected run."""
     st.subheader(f"Candidates from run: {run_dir.name}")
     candidates_dict = load_review_candidates(run_dir)
@@ -77,11 +77,34 @@ def render_run_candidates(run_dir: Path) -> None:
         return
     store = manual_review_store_or_stop()
     hide_completed = st.checkbox("Hide completed items", value=True)
+    display_limit = _candidate_display_limit(app_config)
     display_items = _filter_and_prepare_items(candidates_dict, store, hide_completed)
     page_items = _paginate_candidates(display_items)
     for item_key, options in page_items:
         item = _parse_item_from_key(item_key)
-        _render_item_card(item_key, item, options, run_dir, store)
+        _render_item_card(item_key, item, options[:display_limit], run_dir, store)
+
+
+def _candidate_display_limit(app_config=None) -> int:
+    """Return Manual Review candidate display count from config plus UI extra."""
+    base_limit = _configured_candidate_limit(app_config)
+    st.caption(f"Showing {base_limit} candidates per item from config by default.")
+    extra = st.number_input(
+        "Additional candidates to show per item",
+        min_value=0,
+        max_value=100,
+        value=0,
+        step=1,
+        help="Adds this many saved candidates below the default visible options.",
+    )
+    return base_limit + int(extra)
+
+
+def _configured_candidate_limit(app_config=None) -> int:
+    """Return configured Manual Review candidate count with default fallback."""
+    matching = getattr(app_config, "matching", None)
+    value = getattr(matching, "manual_review_candidate_limit", 5)
+    return max(1, int(value))
 
 
 def _filter_and_prepare_items(candidates_dict, store, hide_completed):
@@ -152,7 +175,7 @@ def render_selection_form(
 def _create_callbacks(item, options, run_dir, store, idx_key, nm_key, query_key):
     """Create callback functions for form interactions."""
     def _trigger_save():
-        _save(item, options, st.session_state.get(idx_key, 0), st.session_state.get(nm_key, False), st.session_state.get(query_key, ""), run_dir, store)
+        _save_from_state(item, options, run_dir, store, idx_key, nm_key, query_key)
     def on_radio():
         if st.session_state.get(idx_key, 0) > 0:
             st.session_state[nm_key], st.session_state[query_key] = False, ""
@@ -166,6 +189,15 @@ def _create_callbacks(item, options, run_dir, store, idx_key, nm_key, query_key)
             st.session_state[idx_key], st.session_state[nm_key] = 0, False
         _trigger_save()
     return on_radio, on_nm, on_query
+
+
+def _save_from_state(item, options, run_dir, store, idx_key, nm_key, query_key):
+    """Persist the current widget state for one manual-review item."""
+    _save(
+        item, options, st.session_state.get(idx_key, 0),
+        st.session_state.get(nm_key, False),
+        st.session_state.get(query_key, ""), run_dir, store,
+    )
 
 
 def _render_form_ui(options, idx_key, nm_key, query_key, callbacks):
@@ -244,4 +276,5 @@ __all__ = [
     "render_manual_review_tab",
     "render_run_candidates",
     "render_selection_form",
+    "_configured_candidate_limit",
 ]
