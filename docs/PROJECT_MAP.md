@@ -55,6 +55,11 @@
   artifact folders.
 - Streamlit Order exposes the matching risk policy and flagged-match action used
   by the CLI.
+- Streamlit Order now stores a per-session submission fingerprint for the Excel
+  path and order options, preventing the same completed order form submission
+  from starting the same large Excel run again accidentally.
+- Streamlit Order run-control logs now use nanosecond timestamps so two quick
+  submissions cannot reuse the same output log path.
 - Streamlit Manual Review can save decisions and start a current-run
   `not_matching` cart-removal flow from edited rows.
 - Streamlit Results summarizes order AI trace phases/statuses/provider errors
@@ -376,3 +381,11 @@
   - Fixed import paths in `src/tawreed/api/` from `...tawreed.*` to `..*`
   - All tests passing: 417 passed, 20 skipped (100% success rate)
   - CLI entry point `python run.py --help` works correctly
+- **July 10, 2026 - Streamlit duplicate order-run guard:**
+  - Added a Streamlit order submission fingerprint to block accidental reruns of
+    the same Excel file and options after a completed background order process.
+  - Switched order run-control output log names from second timestamps to
+    nanosecond timestamps to avoid path collisions on quick submissions.
+  - Focused Streamlit order tests passed: `21 passed`.
+  - Unit validation passed through `tools/run_unit_tests.py`: 463 tests passed,
+    20 skipped. `tools/rule_audit.py` still reports existing baseline debt.

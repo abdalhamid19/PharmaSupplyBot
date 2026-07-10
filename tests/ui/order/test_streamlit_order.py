@@ -8,6 +8,7 @@ from src.core.ordering.prevented_items import PreventedItem, load_prevented_item
 from src.ui.order import streamlit_order
 from src.ui.order.streamlit_order import order_command
 from src.ui.order.streamlit_order import DEFAULT_PREVENTED_ITEMS_PATH
+from src.ui.order.streamlit_order_form import order_output_path
 from src.ui.order.streamlit_order_form import order_form_fields
 from src.ui.order.streamlit_order_form import order_run_summary_csv_path
 from src.ui.fields.streamlit_excel_fields import order_excel_options
@@ -165,6 +166,20 @@ class StreamlitOrderTests(unittest.TestCase):
                 path = order_run_summary_csv_path("wardany", {"match_only": True})
 
         self.assertEqual(path, summary)
+
+    def test_order_output_path_uses_subsecond_unique_name(self) -> None:
+        with (
+            patch(
+                "src.ui.order.streamlit_order_form.run_control_dir",
+                return_value=Path("runs"),
+            ),
+            patch("time.time_ns", side_effect=[1001, 1002]),
+        ):
+            first = order_output_path()
+            second = order_output_path()
+
+        self.assertNotEqual(first, second)
+        self.assertEqual(first, Path("runs") / "order_output_1001.log")
 
     def test_order_command_adds_item_workers_when_parallel(self) -> None:
         command = order_command(
@@ -376,6 +391,41 @@ class StreamlitOrderTests(unittest.TestCase):
 
         error.assert_called_once()
         run_submission.assert_not_called()
+
+    def test_run_order_submission_blocks_duplicate_streamlit_submit(self) -> None:
+        form_values = {
+            "limit": 5,
+            "profile_mode": "Single profile",
+            "profile_key": "wardany",
+            "debug_browser": False,
+            "resume": False,
+            "highest_discount": False,
+            "min_discount_percent": 0,
+        }
+        excel_path = Path("data/input/order_items/orders.xlsx")
+        fingerprint = streamlit_order.order_submission_fingerprint(form_values, excel_path)
+
+        with (
+            patch.dict(
+                "src.ui.order.streamlit_order.st.session_state",
+                {"last_order_submission_fingerprint": fingerprint},
+                clear=True,
+            ),
+            patch("src.ui.order.streamlit_order.st.warning") as warning,
+            patch("src.ui.order.streamlit_order.prepare_order_state_files") as prepare,
+            patch("src.ui.order.streamlit_order.start_order_process") as start_process,
+        ):
+            streamlit_order.run_order_submission(
+                SimpleNamespace(profiles={"wardany": object()}),
+                "wardany",
+                Path("config.yaml"),
+                form_values,
+                excel_path,
+            )
+
+        warning.assert_called_once()
+        prepare.assert_not_called()
+        start_process.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -54,7 +54,7 @@ def _append_optional_ai_text(args: list[str], flag: str, value: object) -> None:
 
 def order_output_path() -> Path:
     """Return a unique output path for the current background order run."""
-    return run_control_dir() / f"order_output_{int(__import__('time').time())}.log"
+    return run_control_dir() / f"order_output_{__import__('time').time_ns()}.log"
 
 
 def order_stop_flag_path() -> Path:

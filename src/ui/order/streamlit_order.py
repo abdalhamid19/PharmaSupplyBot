@@ -105,9 +105,26 @@ def run_order_submission(
     excel_path: Path,
 ) -> None:
     """Run one order submission and render its summary output."""
-    from ..streamlit_shared import csv_row_count
+    fingerprint = order_submission_fingerprint(form_values, excel_path)
+    if warn_if_duplicate_order_submission(fingerprint):
+        return
     if not prepare_order_state_files(app_config, form_values):
         return
+    start_valid_order_submission(
+        default_profile, config_path, form_values, excel_path, fingerprint
+    )
+
+
+def start_valid_order_submission(
+    default_profile: str,
+    config_path: Path,
+    form_values: dict[str, object],
+    excel_path: Path,
+    fingerprint: tuple[tuple[str, str], ...],
+) -> None:
+    """Start one validated background order process from Streamlit."""
+    from ..streamlit_shared import csv_row_count
+
     summary_path = order_run_summary_csv_path(default_profile, form_values)
     previous_row_count = csv_row_count(summary_path)
     command = order_command(config_path, form_values, excel_path)
@@ -115,8 +132,38 @@ def run_order_submission(
     start_order_process(
         command, summary_path, previous_row_count, stop_flag_path, form_values
     )
+    st.session_state["last_order_submission_fingerprint"] = fingerprint
     st.success("Order flow started. Use Stop Order to stop after the current item.")
     st.rerun()
+
+
+def order_submission_was_started(fingerprint: tuple[tuple[str, str], ...]) -> bool:
+    """Return whether this Streamlit session already started the same order."""
+    return st.session_state.get("last_order_submission_fingerprint") == fingerprint
+
+
+def warn_if_duplicate_order_submission(fingerprint: tuple[tuple[str, str], ...]) -> bool:
+    """Warn and return True when the same Streamlit order already started."""
+    if not order_submission_was_started(fingerprint):
+        return False
+    st.warning(
+        "This order submission was already started. Change the form to run it again."
+    )
+    return True
+
+
+def order_submission_fingerprint(
+    form_values: dict[str, object], excel_path: Path
+) -> tuple[tuple[str, str], ...]:
+    """Return a stable identity for one Streamlit order submission."""
+    ignored = {"upload"}
+    pairs = [("excel_path", str(excel_path))]
+    pairs.extend(
+        (key, str(value))
+        for key, value in sorted(form_values.items())
+        if key not in ignored
+    )
+    return tuple(pairs)
 
 
 __all__ = [
@@ -164,4 +211,8 @@ __all__ = [
     # Main entry points
     "render_order_tab",
     "run_order_submission",
+    "start_valid_order_submission",
+    "order_submission_was_started",
+    "warn_if_duplicate_order_submission",
+    "order_submission_fingerprint",
 ]
