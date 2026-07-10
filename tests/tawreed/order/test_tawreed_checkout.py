@@ -31,15 +31,27 @@ class TawreedCheckoutTests(unittest.TestCase):
         runtime = build_runtime_config({})
         self.assertFalse(runtime.submit_order)
 
-    def test_manual_review_candidate_limit_defaults_to_five(self) -> None:
+    def test_manual_review_candidate_limits_default_to_five(self) -> None:
         matching = build_matching_config({})
-        self.assertEqual(matching.manual_review_candidate_limit, 5)
+        self.assertEqual(matching.manual_review_save_candidate_limit, 5)
+        self.assertEqual(matching.manual_review_display_candidate_limit, 5)
 
-    def test_manual_review_candidate_limit_can_be_configured(self) -> None:
+    def test_manual_review_candidate_limits_can_be_configured(self) -> None:
+        matching = build_matching_config(
+            {"matching": {
+                "manual_review_save_candidate_limit": 12,
+                "manual_review_display_candidate_limit": 7,
+            }}
+        )
+        self.assertEqual(matching.manual_review_save_candidate_limit, 12)
+        self.assertEqual(matching.manual_review_display_candidate_limit, 7)
+
+    def test_old_manual_review_candidate_limit_alias_controls_save_count(self) -> None:
         matching = build_matching_config(
             {"matching": {"manual_review_candidate_limit": 12}}
         )
-        self.assertEqual(matching.manual_review_candidate_limit, 12)
+        self.assertEqual(matching.manual_review_save_candidate_limit, 12)
+        self.assertEqual(matching.manual_review_display_candidate_limit, 5)
 
     def test_confirm_order_clicks_checkout_and_final_confirmation(self) -> None:
         selectors = SimpleNamespace(

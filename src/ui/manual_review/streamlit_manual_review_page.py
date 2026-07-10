@@ -103,7 +103,7 @@ def _candidate_display_limit(app_config=None) -> int:
 def _configured_candidate_limit(app_config=None) -> int:
     """Return configured Manual Review candidate count with default fallback."""
     matching = getattr(app_config, "matching", None)
-    value = getattr(matching, "manual_review_candidate_limit", 5)
+    value = getattr(matching, "manual_review_display_candidate_limit", 5)
     return max(1, int(value))
 
 

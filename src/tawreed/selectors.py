@@ -121,9 +121,27 @@ def _mapped_selectors(
 ) -> dict[str, str]:
     """Resolve a selector group from nested config values and defaults."""
     return {
-        field_name: _get(selectors_config, section, key, default=default_value)
+        field_name: _with_fallback_selector(
+            _get(selectors_config, section, key, default=default_value),
+            default_value,
+        )
         for field_name, (section, key, default_value) in selector_defaults.items()
     }
+
+
+def _with_fallback_selector(configured_value: str, default_value: str) -> str:
+    """Keep built-in selector fallbacks when config provides a narrower selector."""
+    configured_selectors = _split_selector_list(configured_value)
+    default_selectors = _split_selector_list(default_value)
+    merged_selectors = configured_selectors + [
+        selector for selector in default_selectors if selector not in configured_selectors
+    ]
+    return ", ".join(merged_selectors)
+
+
+def _split_selector_list(selector_value: str) -> list[str]:
+    """Split the comma-separated selector lists used by this config."""
+    return [selector.strip() for selector in selector_value.split(",") if selector.strip()]
 
 
 def _warehouse_selector_values(warehouse_selectors: dict[str, Any]) -> dict[str, str]:

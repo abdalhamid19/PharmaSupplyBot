@@ -173,7 +173,7 @@ class StreamlitManualReviewTests(unittest.TestCase):
         from types import SimpleNamespace
 
         app_config = SimpleNamespace(
-            matching=SimpleNamespace(manual_review_candidate_limit=9)
+            matching=SimpleNamespace(manual_review_display_candidate_limit=9)
         )
 
         self.assertEqual(_configured_candidate_limit(app_config), 9)

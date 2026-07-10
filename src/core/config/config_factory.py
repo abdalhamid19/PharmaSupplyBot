@@ -15,7 +15,7 @@ MATCHING_BOOL_KEYS = {"exact_match_accept", "require_identity_token_for_flag",
     "enable_approved_match_re_review_on_fail", "enable_manufacturer_check",
     "reject_extra_brand_token"}
 MATCHING_INT_KEYS = {"candidate_top_k", "fuzzy_prefix_len", "query_cache_size",
-    "manual_review_candidate_limit"}
+    "manual_review_save_candidate_limit", "manual_review_display_candidate_limit"}
 
 def build_excel_config(excel_values: dict[str, Any]) -> ExcelConfig:
     """Build Excel column settings from the raw YAML dictionary."""
@@ -97,4 +97,8 @@ def _matching_float_values(matching_values, default_config) -> dict[str, float]:
 
 def _matching_value(matching_values, default_config: MatchingConfig, name: str) -> Any:
     """Return one configured matching value with dataclass defaults."""
+    if name == "manual_review_save_candidate_limit":
+        return matching_values.get(
+            name, matching_values.get("manual_review_candidate_limit", getattr(default_config, name))
+        )
     return matching_values.get(name, getattr(default_config, name))

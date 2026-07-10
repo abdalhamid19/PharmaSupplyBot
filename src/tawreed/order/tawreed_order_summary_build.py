@@ -129,7 +129,7 @@ def _save_review_candidates_if_available(decision, item, matching_config=None) -
 
 def _review_candidate_limit(matching_config=None) -> int:
     """Return configured Manual Review candidate limit for this run."""
-    value = getattr(matching_config, "manual_review_candidate_limit", 5)
+    value = getattr(matching_config, "manual_review_save_candidate_limit", 5)
     return max(1, int(value))
 
 

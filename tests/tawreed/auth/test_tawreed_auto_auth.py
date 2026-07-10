@@ -71,6 +71,25 @@ class TawreedAutoAuthTests(unittest.TestCase):
         self.assertIn("input[name='username']", selectors.login_email)
         self.assertIn("button:has-text('دخول')", selectors.login_submit)
 
+    def test_configured_login_selector_keeps_builtin_fallbacks(self) -> None:
+        config = SimpleNamespace(
+            selectors={
+                "login": {
+                    "email_input": "input[type='email'], input[name='email']",
+                    "submit_button": "button[type='submit']",
+                }
+            },
+            warehouse_strategy={},
+        )
+
+        selectors = _selectors(config)
+
+        self.assertTrue(selectors.login_email.startswith("input[type='email']"))
+        self.assertIn("#username", selectors.login_email)
+        self.assertIn("input[name='username']", selectors.login_email)
+        self.assertTrue(selectors.login_submit.startswith("button[type='submit']"))
+        self.assertIn("button:has-text('دخول')", selectors.login_submit)
+
 
 if __name__ == "__main__":
     unittest.main()

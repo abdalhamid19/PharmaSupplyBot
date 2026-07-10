@@ -51,7 +51,8 @@ class MatchingConfig:
     candidate_top_k: int = 5
     fuzzy_prefix_len: int = 3
     query_cache_size: int = 256
-    manual_review_candidate_limit: int = 5
+    manual_review_save_candidate_limit: int = 5
+    manual_review_display_candidate_limit: int = 5
     require_identity_token_for_flag: bool = True
     enable_auto_save_verified_match: bool = True
     enable_auto_match_re_review_on_fail: bool = False
