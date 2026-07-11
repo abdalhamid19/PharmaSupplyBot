@@ -4,7 +4,7 @@
 
 This audit covers the `order_item_summary` CSV/XLSX column problem reported for:
 
-- `winner_sales_price`
+- `winner_Purchase_Price`
 - `selected_discount_percent`
 - `selected_store_name`
 - duplicated `winner_store_name`
@@ -14,7 +14,7 @@ This audit covers the `order_item_summary` CSV/XLSX column problem reported for:
 
 The requested business meaning is:
 
-- `winner_sales_price` means the actual purchase price.
+- `winner_Purchase_Price` means the actual purchase price.
 - `selected_discount_percent` is the same business value as the old `winner_discount`.
 - `selected_store_name` is the same business value as the old `winner_store_name`.
 - Therefore `winner_store_name` and `winner_discount` must be removed from new summaries.
@@ -43,7 +43,7 @@ The fix is intentionally small and surgical:
 - Removed `winner_discount` from new `order_item_summary` rows.
 - Kept `selected_store_name` as the canonical store column.
 - Kept `selected_discount_percent` as the canonical discount column.
-- Added `winner_sales_price` as the actual purchase/sale price from Tawreed payload `salePrice` or `salesPrice`.
+- Added `winner_Purchase_Price` as the actual purchase/sale price from Tawreed payload `salePrice` or `salesPrice`.
 - Kept existing `winner_sale_price` unchanged as the public/reference price from `retailPrice`, `publicPrice`, `price`, or `sellingPrice` to avoid breaking existing consumers that may read that column.
 - Added shared split logic so both order summary paths can split multi-store values consistently.
 - Moved `(qty N)` out of the split store/discount cells into `selected_qty_N` columns.
@@ -126,7 +126,7 @@ The live output confirmed:
 
 - no `winner_store_name` column in the new CSV/XLSX header
 - no `winner_discount` column in the new CSV/XLSX header
-- `winner_sales_price` exists and was populated with `52.0`
+- `winner_Purchase_Price` exists and was populated with `52.0`
 - `selected_store_name` exists
 - `selected_discount_percent` exists
 

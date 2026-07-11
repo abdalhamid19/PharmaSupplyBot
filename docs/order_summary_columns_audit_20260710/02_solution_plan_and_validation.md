@@ -31,7 +31,7 @@ Rejected for this change because it would touch more of the Tawreed runtime flow
 
 Rejected because the user only requested removing `winner_store_name` and `winner_discount`. Existing consumers may depend on `winner_sale_price` as the public/reference price column.
 
-The new `winner_sales_price` was added for purchase price while preserving `winner_sale_price` for compatibility.
+The new `winner_Purchase_Price` was added for purchase price while preserving `winner_sale_price` for compatibility.
 
 ## Implemented Design
 
@@ -61,7 +61,7 @@ src/core/ordering/order_winner_fields.py
 
 New behavior:
 
-- emits `winner_sales_price`
+- emits `winner_Purchase_Price`
 - no longer emits `winner_store_name`
 - no longer emits `winner_discount`
 - emits canonical selected fields and split columns via the shared helper
@@ -87,7 +87,7 @@ New behavior:
 
 ## Tests Added
 
-### `test_winner_sales_price_and_split_selected_stores`
+### `test_winner_purchase_price_and_split_selected_stores`
 
 File:
 
@@ -97,7 +97,7 @@ tests/core/ordering/test_order_run_artifacts.py
 
 This verifies:
 
-- `winner_sales_price` comes from `salePrice`.
+- `winner_Purchase_Price` comes from `salePrice`.
 - `winner_sale_price` remains the public/reference price.
 - `winner_store_name` is absent.
 - `winner_discount` is absent.
@@ -116,7 +116,7 @@ This verifies the requested item shape directly:
 
 - item name: `MELO OINT. 30 GM`
 - quantity: `15`
-- `winner_sales_price` is populated
+- `winner_Purchase_Price` is populated
 - selected stores split correctly
 - selected discounts split correctly
 - quantities split into their own columns
@@ -149,7 +149,7 @@ artifacts/order/wardany/20260710_1957
 
 Observed `order_item_summary_20260710_1957.csv` headers included:
 
-- `winner_sales_price`
+- `winner_Purchase_Price`
 - `selected_store_name`
 - `selected_discount_percent`
 
@@ -162,7 +162,7 @@ Observed MELO row contained:
 
 - `item_name = MELO OINT. 30 GM`
 - `winner_sale_price = 80.0`
-- `winner_sales_price = 52.0`
+- `winner_Purchase_Price = 52.0`
 - `selected_store_name = شركه الهدي - ريان سابقا (الجيزه)`
 - `selected_discount_percent = 35%`
 

@@ -8,7 +8,7 @@ The existing local artifact `artifacts/wardany/order_item_summary.csv` had both 
 - `winner_discount`
 - `selected_store_name`
 - `selected_discount_percent`
-- `winner_sales_price`
+- `winner_Purchase_Price`
 
 The existing local artifact `artifacts/wardany/order_item_summary.xlsx` already showed a slightly different header shape, but older duplicate columns were still present at the end of that workbook in the inspected file.
 
@@ -104,9 +104,9 @@ This was a real requirement issue.
 
 The existing `winner_sale_price` was already used as a public/reference price based on `retailPrice`, `publicPrice`, `price`, or `sellingPrice`.
 
-The requested `winner_sales_price` means purchase price. Tawreed payloads expose that as `salePrice` in the observed data, so the implementation maps:
+The requested `winner_Purchase_Price` means purchase price. Tawreed payloads expose that as `salePrice` in the observed data, so the implementation maps:
 
-- `winner_sales_price` from `salePrice` or `salesPrice`
+- `winner_Purchase_Price` from `salePrice` or `salesPrice`
 - `winner_sale_price` remains unchanged for compatibility
 
 ## Most Likely Root Cause Ranking

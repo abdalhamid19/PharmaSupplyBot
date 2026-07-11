@@ -32,7 +32,7 @@ def _winner_identity_fields(candidate: dict, en_name: str) -> dict[str, object]:
         "winner_store_product_id": candidate_id,
         "winner_available_quantity": candidate.get("availableQuantity", ""),
         "winner_sale_price": public_price,
-        "winner_sales_price": sales_price,
+        "winner_Purchase_Price": sales_price,
     }
 
 

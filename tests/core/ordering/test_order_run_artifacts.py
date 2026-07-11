@@ -205,7 +205,7 @@ class OrderRunArtifactsTests(unittest.TestCase):
         self.assertEqual(row["candidate_manufacturer"], "PFIZER")
         self.assertEqual(row["manufacturer_check_decision"], "conflict")
 
-    def test_winner_sales_price_and_split_selected_stores(self):
+    def test_winner_purchase_price_and_split_selected_stores(self):
         """Multi-store selections are split from highest discount to lowest."""
         from src.core.ordering.order_run_artifact_rows import order_item_summary_row
 
@@ -231,7 +231,7 @@ class OrderRunArtifactsTests(unittest.TestCase):
         )
 
         self.assertEqual(row["winner_sale_price"], 25)
-        self.assertEqual(row["winner_sales_price"], 18.5)
+        self.assertEqual(row["winner_Purchase_Price"], 18.5)
         self.assertEqual(
             row["selected_store_name"], "Store Low (qty 1) | Store High (qty 2)"
         )
@@ -278,7 +278,7 @@ class OrderRunArtifactsTests(unittest.TestCase):
         self.assertEqual(row["item_name"], "MELO OINT. 30 GM")
         self.assertEqual(row["item_qty"], 15)
         self.assertEqual(row["ordered_total_qty"], 15)
-        self.assertEqual(row["winner_sales_price"], 62.0)
+        self.assertEqual(row["winner_Purchase_Price"], 62.0)
         self.assertEqual(row["selected_store_name_1"], "Warehouse 30")
         self.assertEqual(row["selected_discount_percent_1"], "30%")
         self.assertEqual(row["selected_qty_1"], "10")
