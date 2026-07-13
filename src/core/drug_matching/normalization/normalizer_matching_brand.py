@@ -33,6 +33,8 @@ def _brand_match_check(d: DrugComponents, m: DrugComponents, brand_prefix_min: i
     
     if d_clean and m_clean:
         brand_exception = _known_brand_variant_match(d, m, d_clean, m_clean)
+        if _co_prefixed_brand_mismatch(d_clean, m_clean) and not brand_exception:
+            return False, "different_brand"
         shorter = min(len(d_clean), len(m_clean))
         prefix_len = min(len(d_clean), len(m_clean), max(brand_prefix_min, int(shorter * 0.75)))
         prefix_len = min(prefix_len, len(d_clean), len(m_clean))
@@ -56,10 +58,23 @@ def _brand_match_check(d: DrugComponents, m: DrugComponents, brand_prefix_min: i
                 and not brand_exception
             ):
                 return False, "different_brand"
-            if longer - shorter == 2 and fuzz.ratio(d_clean, m_clean) < 82:
+            # COAVAZIR vs AVAZIR has ratio ~85.7 with len_diff 2; treat as distinct.
+            if longer - shorter == 2 and fuzz.ratio(d_clean, m_clean) < 86:
                 return False, "different_brand"
     
     return True, "ok"
+
+
+def _co_prefixed_brand_mismatch(left_clean: str, right_clean: str) -> bool:
+    """Return True when one brand is exactly CO + the other (distinct product line)."""
+    if not left_clean or not right_clean or left_clean == right_clean:
+        return False
+    longer, shorter = (
+        (left_clean, right_clean)
+        if len(left_clean) >= len(right_clean)
+        else (right_clean, left_clean)
+    )
+    return longer == f"CO{shorter}"
 
 
 def _known_brand_variant_match(d: DrugComponents, m: DrugComponents, d_clean: str, m_clean: str) -> bool:
@@ -80,5 +95,6 @@ def _known_brand_variant_match(d: DrugComponents, m: DrugComponents, d_clean: st
 
 __all__ = [
     "_brand_match_check",
+    "_co_prefixed_brand_mismatch",
     "_known_brand_variant_match",
 ]
