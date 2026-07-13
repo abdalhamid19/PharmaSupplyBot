@@ -63,7 +63,7 @@ CRITICAL_MODIFIERS = frozenset({
     "PLUS", "EXTRA", "ADVANCE", "FORTE", "NIGHT", "COLD", "SINUS", "D", "R",
     "MEN", "WOMEN", "MALE", "FEMALE", "XR", "XL", "SR", "CR", "MR", "ER", "DR",
     "PRONTO", "VAGINAL", "NASAL", "MOUTH", "CARE", "COLLEDGE", "MACRO", "EVA",
-    "MAN", "MILGA"
+    "MAN", "MILGA", "JOINT",
 })
 
 BABY_FORMULA_MODIFIERS = frozenset({

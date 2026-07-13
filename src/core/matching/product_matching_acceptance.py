@@ -400,12 +400,30 @@ def _diagnostic_acceptance(
         return False, "", rejection_reason
 
     pre_rejection = _candidate_variant_rejection(score_query, candidate)
-    if not candidate_has_store_product_id(candidate) and not pre_rejection:
-        acceptance = _numeric_acceptance(score_query, candidate, breakdown, matching_config)
-        return _orderable_acceptance(candidate, acceptance)
-
     acceptance = _numeric_acceptance(score_query, candidate, breakdown, matching_config)
-    acceptance = _orderable_acceptance(candidate, acceptance)
+    if not candidate_has_store_product_id(candidate) and not pre_rejection:
+        return _unorderable_acceptance(candidate, acceptance, breakdown)
+    return _orderable_acceptance(candidate, acceptance)
+
+
+def _unorderable_acceptance(
+    candidate: dict[str, Any],
+    acceptance: tuple[bool, str, str],
+    breakdown,
+) -> tuple[bool, str, str]:
+    """Classify recognized but non-orderable rows for status reporting.
+
+    When the catalog exposes a product without storeProductId, auto-ordering must
+    stay blocked. Soft numeric-only rejections at a high enough score still mean
+    the product was recognized, so surface the classic missing-id reason used by
+    not-orderable summary status (see HALOPERIDOL RETARD / HAEMOJET AMP).
+    """
+    if acceptance[0]:
+        return False, "", "Candidate missing orderable storeProductId"
+    reason = (acceptance[2] or "").lower()
+    score = float(getattr(breakdown, "total_score", 0.0) or 0.0)
+    if "unrequested numeric" in reason and score >= 9.0:
+        return False, "", "Candidate missing orderable storeProductId"
     return acceptance
 
 
@@ -427,7 +445,8 @@ def _numeric_acceptance(
     if _any_safe_omission(extra_numeric_tokens, requested, offered):
         return True, "Extra numeric tokens represent safe omission", ""
 
-    return False, "", "unrequested numeric token: storeProductId"
+    tokens = ", ".join(sorted(extra_numeric_tokens))
+    return False, "", f"unrequested numeric token: {tokens}"
 
 
 def _extra_numeric_tokens(score_query: str, candidate: dict[str, Any]) -> set[str]:
@@ -487,6 +506,7 @@ __all__ = [
     "_safe_omitted_percentage_concentration",
     "_numeric_tokens",
     "_diagnostic_acceptance",
+    "_unorderable_acceptance",
     "_numeric_acceptance",
     "_extra_numeric_tokens",
     "_iter_results",

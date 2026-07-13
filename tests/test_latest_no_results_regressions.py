@@ -247,6 +247,7 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
             ("80838", "CO_AVAZIR 5GM EYE OINTMENT", "AVAZIR 0.3 % EYE DROPS 10 ML"),
             ("79407", "LILI FEMININE WASH 250ML", "LILIOX 10 SACHETS"),
             ("58580", "ISIS CINNAMON WITH GINGER 20 BAG", "ISIS CINNAMON 20 FILTER BAGS"),
+            ("74096", "CAL MAG 30TAB", "CAL MAG JOINT 30 TAB"),
         ]
         for code, item_name, candidate_name in cases:
             with self.subTest(item_name=item_name):
@@ -266,6 +267,7 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
                 "ISIS CINNAMON WITH GINGER 20 BAG",
                 "ISIS GINGER CINNAMON 20 FILTER BAGS",
             ),
+            ("74096", "CAL MAG 30TAB", "CAL MAG 30 F.C. TABLETS"),
         ]
         for code, item_name, candidate_name in cases:
             with self.subTest(item_name=item_name):
@@ -275,6 +277,48 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
                 )
                 self.assertIsNotNone(decision.best_match)
                 self.assertEqual(decision.best_match.data["productNameEn"], candidate_name)
+
+    def test_cal_mag_prefers_plain_over_joint(self) -> None:
+        """CAL MAG 30TAB must choose plain tablets, never the JOINT variant."""
+        item = Item(code="74096", name="CAL MAG 30TAB", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _candidate("CAL MAG JOINT 30 TAB", store_id="2144187"),
+                        _candidate("CAL MAG 30 F.C. TABLETS", store_id="2288836"),
+                    ],
+                )
+            ],
+        )
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(
+            decision.best_match.data["productNameEn"],
+            "CAL MAG 30 F.C. TABLETS",
+        )
+
+    def test_cal_mag_joint_query_still_matches_joint(self) -> None:
+        """Explicit JOINT queries must still match the JOINT SKU."""
+        item = Item(code="84407", name="CAL MAG JOINT 30TAB", qty=1)
+        decision = explain_best_product_match(
+            item,
+            [
+                (
+                    item.name,
+                    [
+                        _candidate("CAL MAG JOINT 30 TAB", store_id="2144187"),
+                        _candidate("CAL MAG 30 F.C. TABLETS", store_id="2288836"),
+                    ],
+                )
+            ],
+        )
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(
+            decision.best_match.data["productNameEn"],
+            "CAL MAG JOINT 30 TAB",
+        )
 
 
 def _candidate(english_name: str, store_id: str = "store-1") -> dict[str, object]:

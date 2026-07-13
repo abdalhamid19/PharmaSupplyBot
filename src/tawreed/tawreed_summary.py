@@ -133,7 +133,11 @@ class SummaryStatus:
             return "manual-review-required"
         if "unavailable" in lowered or "out of stock" in lowered:
             return "matched-but-unavailable"
-        if "cart button disabled" in lowered:
+        if (
+            "not orderable" in lowered
+            or "missing storeproductid" in lowered
+            or "cart button disabled" in lowered
+        ):
             return "not-orderable"
         return "skipped"
 
@@ -166,8 +170,19 @@ def _diagnostic_missing_orderable_identity(
     reason = diagnostic.rejection_reason.lower()
     if "candidate missing orderable storeproductid" in reason:
         return True
-    hard_rejections = ("component mismatch", "identity token", "different_brand")
-    return diagnostic.score >= 12.0 and not any(text in reason for text in hard_rejections)
+    hard_rejections = (
+        "component mismatch",
+        "identity token",
+        "different_brand",
+        "semantic token",
+    )
+    if any(text in reason for text in hard_rejections):
+        return False
+    # Soft numeric-only blocks with strong brand/form score still mean the catalog
+    # row was recognized; report not-orderable instead of no-results.
+    if "unrequested numeric" in reason and diagnostic.score >= 9.0:
+        return True
+    return diagnostic.score >= 12.0
 
 
 # ============================================================================

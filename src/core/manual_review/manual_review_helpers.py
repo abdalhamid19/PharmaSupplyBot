@@ -137,15 +137,23 @@ def _find_name_match_in_candidates(
     from ..matching_types import SearchMatch, MatchDecision
     
     for index, candidate in enumerate(candidates):
-        if not candidate_store_product_id(candidate):
-            continue
         c_en = candidate_name(candidate).lower()
         c_ar = candidate_ar(candidate).lower()
-        if (target_en and c_en == target_en) or (target_ar and c_ar == target_ar):
-            # Skip validation for name match to preserve backward compatibility
-            # التخطي من التحقق لمطابقة الاسم للحفاظ على التوافق مع الإصدارات السابقة
-            match = SearchMatch(query, index, 999.0, candidate)
-            return MatchDecision(match, [], "Approved by saved manual review (Name match).")
+        if not ((target_en and c_en == target_en) or (target_ar and c_ar == target_ar)):
+            continue
+        # Orderable rows force an immediate accepted match. Non-orderable rows
+        # (empty storeProductId) still count as a recognized approved product so
+        # downstream status can become not-orderable instead of no-results.
+        match = SearchMatch(query, index, 999.0, candidate)
+        if candidate_store_product_id(candidate):
+            return MatchDecision(
+                match, [], "Approved by saved manual review (Name match)."
+            )
+        return MatchDecision(
+            match,
+            [],
+            "Approved by saved manual review (Name match, not orderable).",
+        )
     return None
 
 

@@ -126,13 +126,21 @@ def accepted_no_match_result(bot, item: Item, decision, require_available: bool)
 
 def manual_review_result(bot, item, started_at, queries, results, review_decision=None):
     """Return a saved manual-review match from current candidates when available."""
+    from src.core.matching.candidate_identity import candidate_has_store_product_id
+
     decision = manual_review_match(item, results, review_decision)
     if not decision:
         return None
     bot.last_match_decision, bot.last_searched_queries = decision, queries
     bot.last_match_elapsed_seconds = time.perf_counter() - started_at
     write_match_log(bot, item, decision)
-    return decision.best_match
+    match = decision.best_match
+    if match and not candidate_has_store_product_id(match.data):
+        raise bot.skip_item_exception(
+            f"Matched product is not orderable (missing storeProductId) "
+            f"for '{item.name}'."
+        )
+    return match
 
 
 __all__ = [
