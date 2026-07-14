@@ -38,15 +38,19 @@ def require_api_match(bot, api: TawreedApiClient, item: Item, require_available:
 
 def _check_api_match(
     bot, item, started_at, queries, results, require_available, review_decision
-) -> Any | None:
+):
     """Helper to check manual or automated api match."""
+    from .tawreed_api_flow_matching import _require_orderable_api_match
+
     decision = _api_match_decision(bot, item, results, review_decision)
     if _is_saved_manual_review_match(decision):
         bot.last_match_decision, bot.last_searched_queries = decision, queries
         bot.last_match_elapsed_seconds = time.perf_counter() - started_at
-        return decision.best_match
+        return _require_orderable_api_match(bot, item, decision.best_match)
     if decisive_match(bot, item, decision, started_at, queries, require_available):
-        return bot.last_match_decision.best_match
+        return _require_orderable_api_match(
+            bot, item, bot.last_match_decision.best_match
+        )
     return None
 
 
@@ -129,7 +133,9 @@ def _has_only_non_orderable_candidates(results) -> bool:
 
 
 def _accepted_api_match(bot, item: Item, decision, require_available: bool):
-    match = decision.best_match
+    from .tawreed_api_flow_matching import _require_orderable_api_match
+
+    match = _require_orderable_api_match(bot, item, decision.best_match)
     if require_available and int(match.data.get("availableQuantity") or 0) <= 0:
         raise bot.skip_item_exception(
             f"Matched product is out of stock for '{item.name}'."

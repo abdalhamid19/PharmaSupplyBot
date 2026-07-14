@@ -46,9 +46,16 @@ def _add_single_api_item(bot, api, item, record_timing):
 
 def _add_single_item_to_cart(bot, api, match, item, record_timing):
     """Execute add-to-cart API call and record timing."""
+    from src.core.matching.candidate_identity import candidate_has_store_product_id
     from ..products.tawreed_products_flow import _min_disc
     from ..store.tawreed_pricing import discount_value_as_percent, first_discount_value
-    
+
+    if not candidate_has_store_product_id(match.data):
+        raise bot.skip_item_exception(
+            f"Matched product is not orderable (missing storeProductId) "
+            f"for '{item.name}'."
+        )
+
     min_discount = _min_disc(bot)
     if min_discount > 0:
         store_discount = discount_value_as_percent(first_discount_value(match.data))
@@ -56,9 +63,16 @@ def _add_single_item_to_cart(bot, api, match, item, record_timing):
             raise bot.skip_item_exception(
                 f"Store discount ({store_discount:g}%) is below minimum ({min_discount:g}%)."
             )
-    
+
     cart_start = time.perf_counter()
-    api.add_to_cart(match, int(item.qty))
+    try:
+        api.add_to_cart(match, int(item.qty))
+    except ValueError as error:
+        # Defense in depth: never let empty/invalid storeProductId crash the run.
+        message = str(error)
+        if "storeProductId" in message:
+            raise bot.skip_item_exception(message) from error
+        raise
     record_timing(bot, "add_to_cart_seconds", time.perf_counter() - cart_start)
     bot.last_ordered_total_qty = int(item.qty)
 

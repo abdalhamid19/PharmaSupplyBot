@@ -50,18 +50,17 @@ def _check_api_match(
     bot, item, started_at, queries, results, require_available, review_decision
 ) -> Any | None:
     """Helper to check manual or automated api match."""
-    from src.core.manual_review.manual_review_runtime import saved_manual_review_decision
-    from src.core.matching.product_matching import explain_best_product_match
     from ..matching.tawreed_search_decision import decisive_match
-    from ..matching.tawreed_timing import record_timing
-    
+
     decision = _api_match_decision(bot, item, results, review_decision)
     if _is_saved_manual_review_match(decision):
         bot.last_match_decision, bot.last_searched_queries = decision, queries
         bot.last_match_elapsed_seconds = time.perf_counter() - started_at
-        return decision.best_match
+        return _require_orderable_api_match(bot, item, decision.best_match)
     if decisive_match(bot, item, decision, started_at, queries, require_available):
-        return bot.last_match_decision.best_match
+        return _require_orderable_api_match(
+            bot, item, bot.last_match_decision.best_match
+        )
     return None
 
 
@@ -173,10 +172,24 @@ def _has_only_non_orderable_candidates(results) -> bool:
 
 
 def _accepted_api_match(bot, item: Item, decision, require_available: bool):
-    match = decision.best_match
+    match = _require_orderable_api_match(bot, item, decision.best_match)
     if require_available and int(match.data.get("availableQuantity") or 0) <= 0:
         raise bot.skip_item_exception(
             f"Matched product is out of stock for '{item.name}'."
+        )
+    return match
+
+
+def _require_orderable_api_match(bot, item: Item, match):
+    """Reject recognized matches that cannot be ordered via storeProductId."""
+    from src.core.matching.candidate_identity import candidate_has_store_product_id
+
+    if match is None:
+        return None
+    if not candidate_has_store_product_id(match.data):
+        raise bot.skip_item_exception(
+            f"Matched product is not orderable (missing storeProductId) "
+            f"for '{item.name}'."
         )
     return match
 
@@ -198,5 +211,6 @@ __all__ = [
     "_raise_non_orderable_exception",
     "_has_only_non_orderable_candidates",
     "_accepted_api_match",
+    "_require_orderable_api_match",
     "_is_saved_manual_review_match",
 ]

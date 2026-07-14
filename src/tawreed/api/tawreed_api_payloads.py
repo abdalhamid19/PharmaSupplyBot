@@ -24,6 +24,16 @@ def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str
     payload = _copy_body(body)
     candidate = match if isinstance(match, dict) else (getattr(match, "data", {}) or {})
     store_product_id = candidate_store_product_id(candidate)
+    if not store_product_id:
+        raise ValueError(
+            "Cannot add to cart without orderable storeProductId on the match."
+        )
+    try:
+        store_product_id_int = int(float(str(store_product_id).strip()))
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            f"Invalid storeProductId for add-to-cart: {store_product_id!r}"
+        ) from error
 
     # The discovered add-to-cart request always uses mode "all" with this data
     # shape; customerId is injected by TawreedApiClient from the JWT token.
@@ -31,7 +41,7 @@ def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str
     payload.setdefault("langCode", "ar")
     payload["data"] = {
         "customerId": None,
-        "storeProductId": int(store_product_id),
+        "storeProductId": store_product_id_int,
         "quantity": int(quantity),
         "typeId": 1,
     }
