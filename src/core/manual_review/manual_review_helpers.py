@@ -3,7 +3,7 @@
 import logging
 import time
 
-from .manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
+from .manual_review_store import ManualReviewDecision, ManualReviewStore
 from ..utils.excel import Item
 from ..identity.manufacturer_identity import manufacturer_conflict
 
@@ -14,7 +14,8 @@ def _lookup_with_retry(item: Item, max_attempts: int = 3) -> ManualReviewDecisio
     """Lookup decision with retry logic."""
     for attempt in range(max_attempts):
         try:
-            result = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup(item.code, item.name)
+            # Use default path resolved at call time so tests can patch DEFAULT_MANUAL_REVIEW_DB
+            result = ManualReviewStore().lookup(item.code, item.name)
             if attempt > 0:
                 logger.info(f"Manual review lookup succeeded on attempt {attempt + 1} for {item.code}/{item.name}")
             return result

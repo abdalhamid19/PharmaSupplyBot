@@ -40,7 +40,8 @@ class ManualReviewDecisionCache:
 
 def preload_manual_review_decisions(items: Iterable[Item]) -> ManualReviewDecisionCache:
     """Load manual-review decisions for this run in one store call."""
-    decisions = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB).lookup_many(items)
+    # Default path is resolved at call time so tests can patch DEFAULT_MANUAL_REVIEW_DB
+    decisions = ManualReviewStore().lookup_many(items)
     return ManualReviewDecisionCache(decisions)
 
 

@@ -36,12 +36,15 @@ from .streamlit_manual_review_input import (
 
 
 def manual_review_store_or_stop() -> ManualReviewStore:
-    """Return the CockroachDB manual-review store or stop the Streamlit page."""
+    """Return the local SQLite manual-review store or stop the Streamlit page."""
     try:
         return ManualReviewStore()
     except Exception as error:
         st.error(f"Manual review database is not available: {error}")
-        st.info("Set DB_PASSWORD and DB_SSLMODE=require in .env, then restart Streamlit.")
+        st.info(
+            "Local SQLite DB should be at state/manual_review_decisions.db "
+            "(or set SQLITE_DB_PATH in .env), then restart Streamlit."
+        )
         st.stop()
 
 

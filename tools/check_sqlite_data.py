@@ -1,17 +1,38 @@
-import sqlite3
+"""Quick inspection of the local manual-review SQLite database."""
 
-conn = sqlite3.connect('data/manual_review/manual_review.sqlite3')
-cur = conn.cursor()
+from __future__ import annotations
 
-print('Total records:', cur.execute('SELECT COUNT(*) FROM manual_review_decisions').fetchone()[0])
-print('\nSample records:')
-cur.execute('SELECT item_code, item_name, approved, correct_store_product_id, correct_product_name FROM manual_review_decisions LIMIT 5')
-for row in cur.fetchall():
-    print(row)
+import sys
+from pathlib import Path
 
-print('\nSchema:')
-cur.execute('PRAGMA table_info(manual_review_decisions)')
-for col in cur.fetchall():
-    print(col)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-conn.close()
+from src.core.manual_review.manual_review_store import (
+    DEFAULT_MANUAL_REVIEW_DB,
+    ManualReviewStore,
+)
+
+
+def main() -> None:
+    db_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_MANUAL_REVIEW_DB
+    print(f"Database: {db_path}")
+    if not db_path.exists():
+        print("File does not exist yet.")
+        return
+
+    store = ManualReviewStore(db_path)
+    decisions = store.list_decisions()
+    print(f"Total records: {len(decisions)}")
+    print("\nSample records:")
+    for decision in decisions[:5]:
+        print(
+            decision.item_code,
+            decision.item_name,
+            decision.approved,
+            decision.manual_decision,
+            decision.correct_product_name,
+        )
+
+
+if __name__ == "__main__":
+    main()

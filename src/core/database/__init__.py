@@ -1,9 +1,9 @@
-"""Database module for database connection and query management.
+"""Database module for local SQLite connection and query management.
 
 This module contains all database-related functionality including:
 - Database connection management
-- Database credentials handling
-- Database connection pooling
+- Database path / credentials handling
+- SQLite connection pooling
 - Database query execution
 """
 

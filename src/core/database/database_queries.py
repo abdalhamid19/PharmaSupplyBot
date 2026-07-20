@@ -1,23 +1,23 @@
-"""Database query execution methods."""
+"""Database query execution methods for SQLite."""
 
 from __future__ import annotations
 
-from typing import Optional
-from psycopg2 import Error
 import logging
+import sqlite3
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class DatabaseQueries:
-    """Handles database query execution."""
+    """Handles SQLite query execution."""
 
     def __init__(self, pool):
-        """Initialize query executor with connection pool."""
+        """Initialize query executor with a connection pool."""
         self.pool = pool
 
     def execute_query(self, query: str, params: tuple = ()) -> list:
-        """Execute a SELECT query and return results."""
+        """Execute a SELECT (or PRAGMA) query and return rows."""
         with self.pool.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(query, params)
@@ -26,7 +26,7 @@ class DatabaseQueries:
             return results
 
     def execute_update(self, query: str, params: tuple = ()) -> int:
-        """Execute an INSERT/UPDATE/DELETE query and return affected rows."""
+        """Execute an INSERT/UPDATE/DELETE and return affected rows."""
         with self.pool.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(query, params)
@@ -36,17 +36,17 @@ class DatabaseQueries:
             return affected
 
     def test_connection(self) -> bool:
-        """Test the database connection."""
+        """Test the SQLite connection."""
         try:
             with self.pool.get_connection() as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT version();")
+                cur.execute("SELECT sqlite_version();")
                 result = cur.fetchone()
-                logger.info(f"Database test successful: {result[0][:50]}...")
+                logger.info("SQLite test successful: version %s", result[0])
                 cur.close()
                 return True
-        except Error as e:
-            logger.error(f"Database test failed: {e}")
+        except sqlite3.Error as e:
+            logger.error("SQLite test failed: %s", e)
             return False
 
 

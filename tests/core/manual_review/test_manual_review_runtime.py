@@ -38,7 +38,7 @@ class ManualReviewRuntimeTests(unittest.TestCase):
             ManualReviewStore(db_path).upsert(
                 ManualReviewDecision("1", "Panadol", False, correct_query="Pana 24")
             )
-            with patch("src.core.manual_review.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB", db_path):
+            with patch("src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB", db_path):
                 queries = manual_review_queries(Item("1", "Panadol", 1), ["Panadol"])
 
         self.assertEqual(queries, ["Pana 24", "Panadol"])
@@ -49,7 +49,7 @@ class ManualReviewRuntimeTests(unittest.TestCase):
             ManualReviewStore(db_path).upsert(
                 ManualReviewDecision("1", "Panadol", True, "store-1")
             )
-            with patch("src.core.manual_review.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB", db_path):
+            with patch("src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB", db_path):
                 decision = manual_review_match(
                     Item("1", "Panadol", 1),
                     [("Panadol", [{"storeProductId": "store-1", "productNameEn": "P"}])],
@@ -71,7 +71,7 @@ class ManualReviewRuntimeTests(unittest.TestCase):
                     "CYTO", item.name, True, "store-cytotec", correct_query="CYTOTEC"
                 )
             )
-            with patch("src.core.manual_review.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB", db_path):
+            with patch("src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB", db_path):
                 queries = manual_review_queries(item, ["CYTO"])
                 decision = manual_review_match(
                     item,
@@ -100,7 +100,7 @@ class ManualReviewRuntimeTests(unittest.TestCase):
                     "1", "Panadol", False, "store-1", manual_decision="not_matching"
                 )
             )
-            with patch("src.core.manual_review.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB", db_path):
+            with patch("src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB", db_path):
                 filtered = filter_manual_review_candidates(
                     Item("1", "Panadol", 1),
                     [("Panadol", [{"storeProductId": "store-1"}, {"storeProductId": "store-2"}])],
@@ -169,8 +169,12 @@ class _FakeManualReviewDb:
         return 1
 
     def execute_query(self, query, params=()):
-        if "information_schema.columns" in query:
-            return [("manual_decision",), ("correct_product_name_ar",)]
+        # PRAGMA table_info: cid, name, type, notnull, dflt_value, pk
+        if "PRAGMA table_info" in query or "pragma table_info" in query.lower():
+            return [
+                (0, "manual_decision", "TEXT", 1, "''", 0),
+                (1, "correct_product_name_ar", "TEXT", 1, "''", 0),
+            ]
         self.lookup_queries.append((query, params))
         return [
             ("1", "Panadol", 1, "s1", "approved_match", "Panadol", "", "Panadol", ""),

@@ -1,62 +1,56 @@
-"""Database connection pool management."""
+"""SQLite connection management."""
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from typing import Generator, Optional
-from psycopg2 import pool, Error
 import logging
+import sqlite3
+import threading
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Generator, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class DatabasePool:
-    """Manages connection pool to CockroachDB Cloud."""
+    """Manages SQLite connections for the manual-review store."""
 
     def __init__(self, credentials):
-        """Initialize connection pool with credentials."""
+        """Initialize with credentials that provide a filesystem path."""
         self.credentials = credentials
-        self.connection_pool: Optional[pool.SimpleConnectionPool] = None
+        self.path: Path = Path(credentials.path)
+        self._connected = False
+        self._lock = threading.RLock()
 
     def connect(self) -> None:
-        """Initialize connection pool to CockroachDB Cloud."""
-        if not self.credentials.password:
-            raise RuntimeError("DB_PASSWORD is not configured. Set DB_PASSWORD for CockroachDB.")
-        self._create_connection_pool()
-        logger.info(f"Connected to CockroachDB: {self.credentials.host}:{self.credentials.port}")
-
-    def _create_connection_pool(self):
-        """Create the connection pool."""
-        try:
-            self.connection_pool = pool.SimpleConnectionPool(
-                1, 5,
-                host=self.credentials.host,
-                port=self.credentials.port,
-                database=self.credentials.database,
-                user=self.credentials.user,
-                password=self.credentials.password,
-                sslmode=self.credentials.sslmode
-            )
-        except Error as e:
-            logger.error(f"Failed to connect to database: {e}")
-            raise
+        """Ensure the database directory exists and the file is reachable."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Touch/open once so connection errors surface early.
+        with self.get_connection() as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA foreign_keys=ON")
+        self._connected = True
+        logger.info("Connected to SQLite: %s", self.path)
 
     def close(self) -> None:
-        """Close all connections in the pool."""
-        if self.connection_pool:
-            self.connection_pool.closeall()
-            logger.info("Database connections closed")
+        """Mark the pool closed (connections are opened per use)."""
+        self._connected = False
+        logger.info("SQLite database closed: %s", self.path)
 
     @contextmanager
-    def get_connection(self) -> Generator:
-        """Get a connection from the pool (context manager)."""
-        if not self.connection_pool:
-            raise RuntimeError("Database not connected. Call connect() first.")
-        conn = self.connection_pool.getconn()
-        try:
-            yield conn
-        finally:
-            self.connection_pool.putconn(conn)
+    def get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        """Open a short-lived SQLite connection (context manager)."""
+        with self._lock:
+            conn = sqlite3.connect(
+                str(self.path),
+                check_same_thread=False,
+                timeout=30.0,
+            )
+            try:
+                conn.execute("PRAGMA foreign_keys=ON")
+                yield conn
+            finally:
+                conn.close()
 
 
 __all__ = ["DatabasePool"]

@@ -20,10 +20,10 @@ class TawreedSearchLogicTests(unittest.TestCase):
         self.temp_dir = TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "manual_review.sqlite3"
         
-        # Patch the DEFAULT_MANUAL_REVIEW_DB path inside manual_review_runtime
-        import src.core.manual_review.manual_review_runtime
-        self.original_db_path = src.core.manual_review.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB
-        src.core.manual_review.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB = self.db_path
+        # Patch the default SQLite path used by ManualReviewStore()
+        import src.core.manual_review.manual_review_store as store_module
+        self.original_db_path = store_module.DEFAULT_MANUAL_REVIEW_DB
+        store_module.DEFAULT_MANUAL_REVIEW_DB = self.db_path
 
         self.store = ManualReviewStore(self.db_path)
         self.item = Item(code="TEST1", name="Product X", qty="1")
@@ -31,8 +31,8 @@ class TawreedSearchLogicTests(unittest.TestCase):
         self.bot_mock.config.matching.candidate_top_k = 5
 
     def tearDown(self) -> None:
-        import src.core.manual_review.manual_review_runtime
-        src.core.manual_review.manual_review_runtime.DEFAULT_MANUAL_REVIEW_DB = self.original_db_path
+        import src.core.manual_review.manual_review_store as store_module
+        store_module.DEFAULT_MANUAL_REVIEW_DB = self.original_db_path
         self.temp_dir.cleanup()
 
     def test_match_decision_returns_forced_manual_review_match(self) -> None:

@@ -1,4 +1,4 @@
-"""CockroachDB persistence for human-approved manual-review decisions."""
+"""SQLite persistence for human-approved manual-review decisions."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable, Any
 
 from ..database import get_db_manager
+from ..database.database_credentials import _DEFAULT_DB_PATH
 from .manual_review_hints import hint_key
 from .manual_review_store_sql import (
     CREATE_DECISIONS_TABLE,
@@ -28,7 +29,7 @@ from .manual_review_store_query import (
     _flat_keys,
 )
 
-DEFAULT_MANUAL_REVIEW_DB = None
+DEFAULT_MANUAL_REVIEW_DB = _DEFAULT_DB_PATH
 
 
 @dataclass(frozen=True)
@@ -52,13 +53,19 @@ class ManualReviewDecision:
 
 
 class ManualReviewStore:
-    """CockroachDB store for reusable manual-review decisions."""
+    """SQLite store for reusable manual-review decisions."""
 
     _schema_initialized_db_ids: set[int] = set()
 
-    def __init__(self, path: Path | None = None, database_manager=None):
-        """Initialize the CockroachDB-backed store; `path` is ignored."""
-        self.db = database_manager or get_db_manager()
+    def __init__(self, path: Path | str | None = None, database_manager=None):
+        """Initialize the store for a SQLite path (or injected database manager)."""
+        if database_manager is not None:
+            self.db = database_manager
+            self.path = getattr(database_manager, "path", path)
+        else:
+            db_path = Path(path) if path is not None else DEFAULT_MANUAL_REVIEW_DB
+            self.path = db_path
+            self.db = get_db_manager(db_path)
         self._init_schema_once()
 
     def upsert(self, decision: ManualReviewDecision) -> None:
@@ -72,12 +79,12 @@ class ManualReviewStore:
         """Batch insert/update multiple decisions in one transaction (much faster)."""
         if not decisions:
             return
-        
+
         values = [
             _decision_values(*hint_key(d.item_code, d.item_name), d)
             for d in decisions
         ]
-        
+
         with self.db.get_connection() as conn:
             cur = conn.cursor()
             cur.executemany(UPSERT_DECISION, values)
@@ -88,7 +95,7 @@ class ManualReviewStore:
         """Return a previously saved decision for an item when one exists."""
         code_key, name_key = hint_key(item_code, item_name)
         rows = self.db.execute_query(
-            SELECT_DECISIONS + " where item_code_key=%s and item_name_key=%s",
+            SELECT_DECISIONS + " where item_code_key=? and item_name_key=?",
             (code_key, name_key),
         )
         return _decision_from_row(rows[0]) if rows else None
@@ -113,7 +120,7 @@ class ManualReviewStore:
         """Remove a previously saved decision for an item."""
         code_key, name_key = hint_key(item_code, item_name)
         self.db.execute_update(
-            "delete from manual_review_decisions where item_code_key=%s and item_name_key=%s",
+            "delete from manual_review_decisions where item_code_key=? and item_name_key=?",
             (code_key, name_key),
         )
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from .manual_review_hints import hint_key
 from .manual_review_store_sql import ALTER_DECISIONS_TABLE, ALTER_DECISIONS_TABLE_AR
 
 
@@ -43,11 +42,11 @@ def _decision_from_row(row):
 
 
 def _ensure_column(db, column: str, alter_query: str) -> None:
-    rows = db.execute_query(
-        "select column_name from information_schema.columns "
-        "where table_name = 'manual_review_decisions'"
-    )
-    if column not in {row[0] for row in rows}:
+    """Add a column when missing (SQLite PRAGMA table_info)."""
+    rows = db.execute_query("PRAGMA table_info(manual_review_decisions)")
+    # PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
+    names = {row[1] for row in rows}
+    if column not in names:
         db.execute_update(alter_query)
 
 

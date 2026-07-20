@@ -32,7 +32,7 @@ def _chunks(values: list[tuple[str, str]], size: int):
 
 
 def _lookup_many_sql(keys: list[tuple[str, str]]) -> str:
-    clauses = " or ".join("(item_code_key=%s and item_name_key=%s)" for _ in keys)
+    clauses = " or ".join("(item_code_key=? and item_name_key=?)" for _ in keys)
     return f"{SELECT_DECISIONS} where {clauses}"
 
 
