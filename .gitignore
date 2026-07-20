@@ -15,17 +15,6 @@ artifacts/
 data/manual_review/*.sqlite3
 data/manual_review/*.sqlite3-*
 
-# Input directory
-data/input/*
-!data/input/order_items/
-data/input/order_items/*
-!data/input/order_items/.gitkeep
-!data/input/prevented_items/
-data/input/prevented_items/*
-!data/input/prevented_items/.gitkeep
-!data/input/remove_items/
-data/input/remove_items/*
-!data/input/remove_items/.gitkeep
 
 .DS_Store
 Thumbs.db
