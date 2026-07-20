@@ -12,12 +12,8 @@ config.yaml
 artifacts/
 # State directory contains sensitive config and API endpoints
 # state/
-data/manual_review/*.sqlite3
-data/manual_review/*.sqlite3-*
 
 
-.DS_Store
-Thumbs.db
 artifacts/debug/
 
 # Output files (legacy)
