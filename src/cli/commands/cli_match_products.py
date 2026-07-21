@@ -22,6 +22,8 @@ from src.core.drug_matching.config import (
 from src.core.drug_matching.pipeline import MatchPipeline
 from src.core.drug_matching.tracing import MatchTraceLog
 from src.core.matching.matching_trace import configure_async_logging
+from src.core.errors import ValidationError
+from ..registry import register
 
 
 def _match_profile(args: argparse.Namespace) -> str:
@@ -64,7 +66,7 @@ def _pipeline_from_args(args: argparse.Namespace) -> MatchPipeline:
         run = current_artifact_run()
         pipeline._trace = MatchTraceLog(
             log_dir=str(run.directory) if run else None, enabled=True
-        )
+    )
     return pipeline
 
 
@@ -151,7 +153,10 @@ def _tawreed_products_path(args: argparse.Namespace) -> Path:
         path = _latest_tawreed_catalog(str(args.profile))
         if path:
             return path
-    raise SystemExit("Provide --tawreed-csv or --profile for match-products.")
+    raise ValidationError(
+        "Provide --tawreed-csv or --profile for match-products.",
+        hint="Re-run the command with one of these flags.",
+        )
 
 
 def _latest_tawreed_catalog(profile_key: str) -> Path | None:
@@ -165,6 +170,7 @@ def _latest_tawreed_catalog(profile_key: str) -> Path | None:
     return max(existing, key=lambda path: path.stat().st_mtime) if existing else None
 
 
+@register("match-products")
 def run_match_products_command(app_config, args: argparse.Namespace) -> int:
     """Run standalone matching against an exported Tawreed products CSV."""
     load_env()

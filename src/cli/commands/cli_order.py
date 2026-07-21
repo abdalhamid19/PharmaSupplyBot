@@ -14,6 +14,7 @@ from src.core.ordering.order_ai_matching import OrderAiSettings
 from src.tawreed.tawreed import TawreedBot
 from ..cli_shared import build_bot
 from .cli_order_items import order_bot_options
+from ..registry import register
 
 
 # ============ AI Settings ============
@@ -115,6 +116,7 @@ def order_bot(
 # ============ Main Command Runner ============
 
 
+@register("order")
 def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Place orders from Excel for the selected profiles."""
     load_env()

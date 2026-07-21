@@ -6,8 +6,10 @@ import argparse
 
 from src.core.config.config_models import AppConfig
 from ..cli_shared import build_bot
+from ..registry import register
 
 
+@register("auth")
 def run_auth_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Authenticate and persist session state for the selected profiles."""
     profiles = app_config.profiles_to_run(profile=args.profile, all_profiles=args.all_profiles)

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable
 
 from src.core.artifact_run import current_artifact_run
+from src.core.errors import ValidationError
 from src.core.manual_review.manual_review_corrections import corrected_items_from_manual_review_csv
 from src.core.ordering.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
@@ -188,7 +189,10 @@ def manual_review_correction_items(args) -> Iterable[Item] | None:
 def require_order_excel(args) -> None:
     """Validate that an Excel file was provided for order processing."""
     if not getattr(args, "excel", None):
-        raise SystemExit("Provide --excel or --from-manual-review-corrections.")
+        raise ValidationError(
+            "Provide --excel or --from-manual-review-corrections.",
+            hint="Re-run with one of these flags.",
+        )
 
 
 def load_items_for_order_mode(
@@ -219,7 +223,10 @@ def reject_prevented_excel_as_order_source(
 ) -> None:
     """Stop accidental ordering from the prevented-items management file."""
     if prevented_path and is_prevented_items_excel_path(excel_path, prevented_path):
-        raise SystemExit("Order Excel cannot be the prevented-items Excel file.")
+        raise ValidationError(
+            "Order Excel cannot be the prevented-items Excel file.",
+            hint="Use a different --excel path.",
+        )
 
 
 # ============ Bot Options ============

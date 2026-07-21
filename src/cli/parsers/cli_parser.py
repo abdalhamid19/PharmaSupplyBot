@@ -52,6 +52,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Tawreed authentication, ordering, and exports CLI"
     )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Minimum log level emitted to console (default: INFO).",
+    )
+    parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Suppress console output below WARNING. Files are still written.",
+    )
+    parser.add_argument(
+        "--json-logs",
+        action="store_true",
+        help="Emit log records as JSON (useful for CI / log aggregators).",
+    )
     subparsers = parser.add_subparsers(dest="cmd", required=True)
     build_auth_parser(subparsers)
     build_order_parser(subparsers)

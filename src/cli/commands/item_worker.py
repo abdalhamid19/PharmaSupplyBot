@@ -10,7 +10,7 @@ from src.core.artifact_run import artifact_run, current_artifact_run
 from src.core.config.config import load_config
 from src.core.utils.excel import Item
 from src.tawreed.auth.tawreed_session import SessionInvalidError
-from ..cli_shared import build_bot, invalid_session_exit
+from ..cli_shared import build_bot, raise_invalid_session
 
 
 def execute_order_worker(bot, items, profile_key: str) -> dict[str, Any]:
@@ -108,7 +108,7 @@ def report_worker_results(
         status = result.get("status")
         if status == "session_invalid":
             error = SessionInvalidError(str(result.get("error", "")))
-            raise invalid_session_exit(base_url, profile_key, error) from None
+            raise_invalid_session(profile_key, error)
         if status == "error":
             print(f"[{profile_key}] Worker error: {result.get('error', '')}")
 

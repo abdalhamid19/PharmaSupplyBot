@@ -16,7 +16,7 @@ from src.tawreed.api.tawreed_api_client import TawreedApiUnavailable
 from src.tawreed.auth.tawreed_session import SessionInvalidError
 from .cli_order import order_ai_settings, order_bot
 from .cli_order_items import match_only, summary_label
-from ..cli_shared import api_unavailable_exit, invalid_session_exit
+from ..cli_shared import raise_api_unavailable, raise_invalid_session
 from .item_worker import report_worker_results, run_order_chunk
 
 
@@ -80,9 +80,9 @@ def run_profile_order(
     try:
         bot.place_order_from_items(items)
     except TawreedApiUnavailable as error:
-        raise api_unavailable_exit(profile_key, error) from error
+        raise_api_unavailable(profile_key, error)
     except SessionInvalidError as error:
-        raise invalid_session_exit(base_url, profile_key, error) from error
+        raise_invalid_session(profile_key, error)
 
 
 def run_profile_match_only(
@@ -92,9 +92,9 @@ def run_profile_match_only(
     try:
         bot.match_items_only(items)
     except TawreedApiUnavailable as error:
-        raise api_unavailable_exit(profile_key, error) from error
+        raise_api_unavailable(profile_key, error)
     except SessionInvalidError as error:
-        raise invalid_session_exit(base_url, profile_key, error) from error
+        raise_invalid_session(profile_key, error)
 
 
 # ============ Parallel Order Execution ============

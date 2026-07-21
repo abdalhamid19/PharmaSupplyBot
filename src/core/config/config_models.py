@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.core.errors import ValidationError
+
 @dataclass(frozen=True)
 class ExcelConfig:
     """Excel column names and quantity bounds used to load shortage items."""
@@ -86,13 +88,17 @@ class AppConfig:
         if len(self.profiles) == 1:
             profile_key = next(iter(self.profiles.keys()))
             return [(profile_key, self.profiles[profile_key])]
-        raise SystemExit("Please provide --profile <name> or use --all-profiles")
+        raise ValidationError(
+            "Please provide --profile <name> or use --all-profiles",
+            hint="Re-run the command with one of these flags.",
+        )
 
     def _selected_profile(self, profile: str) -> list[tuple[str, ProfileConfig]]:
         """Return one explicitly selected profile or raise a descriptive error."""
         if profile not in self.profiles:
             available_profiles = ", ".join(self.profiles.keys())
-            raise KeyError(
-                f"Unknown profile '{profile}'. Available: {available_profiles}"
+            raise ValidationError(
+                f"Unknown profile '{profile}'. Available: {available_profiles}",
+                            hint="Re-run with one of the available profile names.",
             )
         return [(profile, self.profiles[profile])]

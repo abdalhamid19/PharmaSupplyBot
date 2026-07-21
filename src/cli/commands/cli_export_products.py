@@ -12,9 +12,11 @@ from src.tawreed.products.tawreed_product_export import (
     export_tawreed_products,
 )
 from src.tawreed.auth.tawreed_session import SessionInvalidError
-from ..cli_shared import build_bot, invalid_session_exit, require_state_file
+from ..cli_shared import build_bot, raise_invalid_session, require_state_file
+from ..registry import register
 
 
+@register("export-products")
 def run_export_products_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Export Tawreed products for the selected authenticated profiles."""
     profiles = app_config.profiles_to_run(
@@ -42,7 +44,7 @@ def _run_export_profile(
             stem=f"{args.stem}_{run.run_id}",
         )
     except SessionInvalidError as error:
-        raise invalid_session_exit(app_config.base_url, profile_key, error)
+        raise_invalid_session(profile_key, error)
 
 
 def _positive_page_size(value: int) -> int:
