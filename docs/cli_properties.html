@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>خصائص CLI في PharmaSupplyBot</title>
+  <style>
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      line-height: 1.8;
+      margin: 0;
+      padding: 24px;
+      background: #f8fafc;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      background: white;
+      padding: 28px;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+    h1, h2, h3 { color: #0f172a; }
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: #fcfdff;
+    }
+    code, pre {
+      font-family: Consolas, Monaco, monospace;
+      direction: ltr;
+      text-align: left;
+    }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.95em;
+    }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    ul { padding-right: 20px; }
+    .pill {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1d4ed8;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.9em;
+      margin-left: 6px;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ملف شرح خصائص الـ CLI في PharmaSupplyBot</h1>
+    <p>هذا الملف يشرح الأوامر والخيارات الأساسية المتاحة في واجهة سطر الأوامر الحالية، استنادًا إلى تعريفات الـ parsers الموجودة داخل المشروع.</p>
+
+    <h2>1) ما هو الـ CLI هنا؟</h2>
+    <div class="card">
+      <p>الـ CLI مبني باستخدام <code>argparse</code> ويوفر عدة أوامر فرعية (subcommands) لإدارة:</p>
+      <ul>
+        <li>تسجيل الدخول/المصادقة</li>
+        <li>إنشاء الطلبات تلقائيًا من Excel</li>
+        <li>إزالة عناصر من السلة في Tawreed</li>
+        <li>تصدير منتجات Tawreed إلى CSV/XLSX/TXT</li>
+        <li>مقارنة المخزون مع منتجات Tawreed</li>
+      </ul>
+    </div>
+
+    <h2>2) الخصائص العامة المشتركة بين معظم الأوامر</h2>
+    <div class="card">
+      <h3>الخيارات المشتركة</h3>
+      <ul>
+        <li><code>--config</code>: مسار ملف الإعدادات <code>config.yaml</code>.</li>
+        <li><code>--profile</code>: اسم البروفايل من ملف الإعدادات مثل <code>wardany</code>.</li>
+        <li><code>--all-profiles</code>: تشغيل الأمر على كل البروفايلات الموجودة.</li>
+      </ul>
+      <p>هذه الخيارات تظهر في معظم الأوامر لأنها تسمح باختيار البيئة التي سيتم العمل عليها.</p>
+    </div>
+
+    <h2>3) الأوامر المتاحة</h2>
+
+    <div class="card">
+      <h3>أمر <code>auth</code></h3>
+      <span class="pill">الغرض</span>
+      <p>تسجيل الدخول يدويًا مرة واحدة وحفظ حالة الجلسة.</p>
+      <span class="pill">الخيارات</span>
+      <ul>
+        <li><code>--headless</code>: تشغيل تسجيل الدخول بدون واجهة مرئية.</li>
+        <li><code>--wait-seconds</code>: مدة انتظار Browser قبل إيقاف التشغيل، القيمة الافتراضية <code>600</code>.</li>
+      </ul>
+      <pre>python run.py auth --headless</pre>
+    </div>
+
+    <div class="card">
+      <h3>أمر <code>order</code></h3>
+      <span class="pill">الغرض</span>
+      <p>إنشاء أوامر تلقائيًا من ملف Excel مع دعم تشغيل Browser أو API أو Auto.</p>
+      <span class="pill">الخيارات الرئيسية</span>
+      <ul>
+        <li><code>--excel</code>: مسار ملف Excel الخاص بالطلبات.</li>
+        <li><code>--limit</code>: حد لعدد العناصر المعالجة.</li>
+        <li><code>--start-item</code> و <code>--end-item</code>: تحديد نطاق العناصر داخل الورقة.</li>
+        <li><code>--resume</code>: تخطي العناصر التي سبق معالجتها.</li>
+        <li><code>--debug-browser</code>: فتح متصفح مرئي أثناء التشغيل.</li>
+        <li><code>--match-only</code>: تشغيل matching فقط دون إضافة العناصر للسلة.</li>
+        <li><code>--execution-mode</code>: اختيار الوضع <code>auto</code> أو <code>api</code> أو <code>browser</code>.</li>
+        <li><code>--item-workers</code>: عدد العمال المتوازيين داخل نفس البروفايل.</li>
+        <li><code>--warehouse-mode</code>: اختيار طريقة اختيار المستودع <code>first_available</code> أو <code>max_available</code> أو <code>max_discount</code>.</li>
+        <li><code>--min-discount-percent</code>: حد أدنى للخصم لاختيار المتاجر/المستودعات.</li>
+        <li><code>--prevented-items-excel</code>: ملف XLSX يحتوي على العناصر الممنوعة من الطلب.</li>
+      </ul>
+      <span class="pill">خيارات AI والمراجعة</span>
+      <ul>
+        <li><code>--matching-risk-policy</code>: <code>safe</code> أو <code>aggressive</code>.</li>
+        <li><code>--flagged-match-action</code>: <code>manual-review-only</code> أو <code>add-to-cart</code>.</li>
+        <li><code>--provider</code> / <code>--model</code> / <code>--api-key</code> / <code>--review-model</code>.</li>
+        <li><code>--ai-accept-confidence</code> و <code>--ai-review-threshold</code>.</li>
+        <li><code>--no-ai-preflight</code>.</li>
+        <li><code>--rotation-preflight-policy</code>.</li>
+      </ul>
+      <pre>python run.py order --excel data/input/order_items/sample.xlsx --profile wardany --limit 10</pre>
+    </div>
+
+    <div class="card">
+      <h3>أمر <code>remove-cart</code></h3>
+      <span class="pill">الغرض</span>
+      <p>إزالة العناصر المتطابقة من سلة Tawreed.</p>
+      <span class="pill">الخيارات</span>
+      <ul>
+        <li><code>--excel</code>: ملف Excel يحتوي على العناصر المراد حذفها من السلة.</li>
+        <li><code>--debug-browser</code>: فتح نافذة متصفح مرئية.</li>
+        <li><code>--stop-flag</code>: ملف إشارة لإيقاف العملية بين العناصر.</li>
+        <li><code>--execution-mode</code>: نفس الخيارات <code>auto</code> / <code>api</code> / <code>browser</code>.</li>
+        <li><code>--item-workers</code>: عدد العمال المتوازيين.</li>
+        <li><code>--from-manual-review</code>: ملف مراجعة يدوي لإزالة الصفوف غير المطابقة.</li>
+        <li><code>--manual-review-scope</code>: <code>current-run</code> أو <code>saved-decisions</code>.</li>
+        <li><code>--manual-decision</code>: حاليًا <code>not_matching</code>.</li>
+      </ul>
+      <pre>python run.py remove-cart --excel data/input/remove_items/sample.xlsx --profile wardany</pre>
+    </div>
+
+    <div class="card">
+      <h3>أمر <code>export-products</code></h3>
+      <span class="pill">الغرض</span>
+      <p>تصدير منتجات Tawreed إلى ملفات CSV / XLSX / TXT.</p>
+      <span class="pill">الخيارات</span>
+      <ul>
+        <li><code>--output-dir</code>: مجلد الإخراج، يدعم العنصر <code>{profile}</code>.</li>
+        <li><code>--stem</code>: اسم الملف بدون الامتداد.</li>
+        <li><code>--page-size</code>: حجم الصفحات عند استدعاء API.</li>
+        <li><code>--limit</code>: حد عدد الصفوف للتصدير (0 = الكل).</li>
+        <li><code>--debug-browser</code>: تشغيل تصدير مع متصفح مرئي.</li>
+      </ul>
+      <pre>python run.py export-products --profile wardany --limit 100</pre>
+    </div>
+
+    <div class="card">
+      <h3>أمر <code>match-products</code></h3>
+      <span class="pill">الغرض</span>
+      <p>مقارنة ملف المخزون مع منتجات Tawreed وإنتاج ملف CSV مدمج.</p>
+      <span class="pill">الخيارات</span>
+      <ul>
+        <li><code>--excel</code>: ملف Excel/CSV للمخزون.</li>
+        <li><code>--tawreed-csv</code>: ملف منتجات Tawreed بصيغة CSV.</li>
+        <li><code>--output</code>: مسار ملف الإخراج.</li>
+        <li><code>--limit</code> / <code>--start</code> / <code>--end</code>: نطاق المعالجة.</li>
+        <li><code>--resume</code> و <code>--trace</code>.</li>
+        <li><code>--no-ai</code>: تعطيل الذكاء الاصطناعي.</li>
+        <li><code>--threshold</code> و <code>--ai-threshold</code>: حدود الثقة.</li>
+        <li><code>--ai-verify-policy</code>: <code>score</code> / <code>fuzzy</code> / <code>all-non-exact</code> / <code>all</code>.</li>
+        <li><code>--ai-search-policy</code>: <code>safe</code> / <code>review-candidates</code> / <code>expanded</code> / <code>aggressive</code>.</li>
+        <li><code>--provider</code> / <code>--model</code> / <code>--api-key</code> / <code>--review-model</code>.</li>
+        <li><code>--concurrency</code> / <code>--ai-search-limit</code>.</li>
+        <li><code>--no-ai-preflight</code> و <code>--rotation-preflight-policy</code>.</li>
+      </ul>
+      <pre>python run.py match-products --excel data/input/inventory.xlsx --output artifacts/output/matches.csv</pre>
+    </div>
+
+    <h2>4) أمثلة عملية</h2>
+    <div class="card">
+      <pre>python run.py auth --headless</pre>
+      <pre>python run.py order --excel data/input/order_items/orders.xlsx --profile wardany --limit 20 --execution-mode auto</pre>
+      <pre>python run.py export-products --profile wardany --output-dir artifacts/{profile} --limit 500</pre>
+      <pre>python run.py match-products --excel data/input/inventory.xlsx --output artifacts/output/results.csv --resume --trace</pre>
+    </div>
+
+    <h2>5) ملاحظات مهمة</h2>
+    <div class="card">
+      <ul>
+        <li>الأوامر تستخدم عادة ملف <code>state/config.yaml</code> كإعداد افتراضي.</li>
+        <li>بعض الخيارات مثل <code>--limit</code> قد تكون <code>0</code> تعني “بدون حد” أو “الكل” حسب الأمر.</li>
+        <li>الأمر <code>order</code> هو الأكثر تعقيدًا لأنه يجمع بين: matching، AI، filters، resume، وexecution modes.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
