@@ -225,6 +225,4 @@ __all__ = [
     "_item_error_label",
     "_item_error_details",
     "_artifact_details",
-]
-# Note: "_console_safe" was removed in stage 2 of the logging unification;
-# call-sites now use the project-wide structured logger.
+]  # noqa: F405
