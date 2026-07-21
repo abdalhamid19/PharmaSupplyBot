@@ -78,7 +78,7 @@ def main() -> int:
             extra={"exit_code": error.exit_code, "profile": error.profile},
         )
         if error.hint:
-            logger.info("hint: %s", error.hint)
+            logger.warning("hint: %s", error.hint)
         return error.exit_code
     except Exception:
         # Anything else is an internal bug — log full traceback for the

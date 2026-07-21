@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import argparse
+import logging
 import multiprocessing
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,8 @@ from .cli_cart_removal_source import cart_removal_items
 from .item_worker import build_cart_payloads, report_worker_results, resolve_item_workers
 from ..registry import register
 
+logger = logging.getLogger(__name__)
+
 
 @register("remove-cart")
 def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> int:
@@ -26,7 +29,10 @@ def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> 
     )
     for profile_key, profile in profiles:
         with artifact_run("remove-cart", profile_key) as run:
-            print(f"[{profile_key}] Artifact run: {run.directory}")
+            logger.info(
+                "artifact run started",
+                extra={"profile": profile_key, "directory": str(run.directory)},
+            )
             _run_remove_cart_profile(app_config, profile_key, profile, args)
     return 0
 
@@ -95,7 +101,10 @@ def _run_parallel_cart_removal(
 def _execute_cart_workers(profile_key, chunks, payloads):
     """Execute cart removal workers in parallel."""
     from .item_worker import run_cart_removal_chunk
-    print(f"[{profile_key}] Launching {len(chunks)} parallel cart-removal workers...")
+    logger.info(
+        "launching parallel workers",
+        extra={"profile": profile_key, "workers": len(chunks)},
+    )
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
         return pool.map(run_cart_removal_chunk, payloads)

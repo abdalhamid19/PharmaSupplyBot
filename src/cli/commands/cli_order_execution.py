@@ -1,6 +1,7 @@
 """Order execution logic for single and parallel profile runs."""
 
 from __future__ import annotations
+import logging
 
 import multiprocessing
 from pathlib import Path
@@ -19,6 +20,8 @@ from .cli_order_items import match_only, summary_label
 from ..cli_shared import raise_api_unavailable, raise_invalid_session
 from .item_worker import report_worker_results, run_order_chunk
 
+logger = logging.getLogger(__name__)
+
 
 # ============ Single Profile Execution ============
 
@@ -33,7 +36,7 @@ def run_single_profile(
     from src.core.artifact_run import artifact_run
 
     with artifact_run("order", profile_key) as run:
-        print(f"[{profile_key}] Artifact run: {run.directory}")
+        logger.info("artifact run started", extra={"profile": profile_key, "directory": str(run.directory)})
         run_single_profile_items(app_config, profile_key, profile, args)
 
 
@@ -123,7 +126,7 @@ def run_parallel_order(
 
 def execute_order_workers(profile_key, chunks, payloads):
     """Execute order workers in parallel."""
-    print(f"[{profile_key}] Launching {len(chunks)} parallel item workers...")
+    logger.info("launching parallel workers", extra={"profile": profile_key, "workers": len(chunks)})
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
         return pool.map(run_order_chunk, payloads)

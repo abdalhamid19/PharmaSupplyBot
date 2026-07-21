@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 from pathlib import Path
 
 from src.core.artifact_run import (
@@ -24,6 +25,8 @@ from src.core.drug_matching.tracing import MatchTraceLog
 from src.core.matching.matching_trace import configure_async_logging
 from src.core.errors import ValidationError
 from ..registry import register
+
+logger = logging.getLogger(__name__)
 
 
 def _match_profile(args: argparse.Namespace) -> str:
@@ -178,11 +181,14 @@ def run_match_products_command(app_config, args: argparse.Namespace) -> int:
     logger, listener = configure_async_logging("INFO")
     try:
         with artifact_run("match-products", _match_profile(args)) as run:
-            print(f"[{run.profile_key}] Artifact run: {run.directory}")
+            logger.info(
+                "artifact run started",
+                extra={"profile": run.profile_key, "directory": str(run.directory)},
+            )
             pipeline = _pipeline_from_args(args)
-            logger.info("Starting product matching")
+            logger.info("starting product matching")
             results = asyncio.run(_run_pipeline(pipeline, args))
-            logger.info("Matched %s rows", len(results))
+            logger.info("matched rows", extra={"count": len(results)})
     finally:
         listener.stop()
     return 0

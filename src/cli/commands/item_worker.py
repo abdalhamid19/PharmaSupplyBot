@@ -1,6 +1,7 @@
 """Item-level worker subprocess and pool utilities."""
 
 from __future__ import annotations
+import logging
 
 from contextlib import nullcontext
 from pathlib import Path
@@ -11,6 +12,8 @@ from src.core.config.config import load_config
 from src.core.utils.excel import Item
 from src.tawreed.auth.tawreed_session import SessionInvalidError
 from ..cli_shared import build_bot, raise_invalid_session
+
+logger = logging.getLogger(__name__)
 
 
 def execute_order_worker(bot, items, profile_key: str) -> dict[str, Any]:
@@ -110,7 +113,7 @@ def report_worker_results(
             error = SessionInvalidError(str(result.get("error", "")))
             raise_invalid_session(profile_key, error)
         if status == "error":
-            print(f"[{profile_key}] Worker error: {result.get('error', '')}")
+            logger.warning("worker error", extra={"profile": profile_key, "error": result.get("error", "")})
 
 
 def run_order_chunk(payload: dict[str, Any]) -> dict[str, Any]:

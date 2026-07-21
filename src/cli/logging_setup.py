@@ -1,31 +1,54 @@
 """Centralized logging configuration for the PharmaSupplyBot CLI.
 
-Stage-1 skeleton: this module exposes just enough surface area for
-``run.py`` to wire up the logging system before a real command runs.
-The full implementation (file rotation, JSON output, --quiet support)
-will land in Stage 2 of the logging_system rollout — see
-``docs/logging_system.md`` for the design.
+This module is the single entry point for configuring Python's logging
+package across the entire CLI. It is intentionally framework-agnostic
+and exposes one helper: :func:`configure_logging`.
 
-Stage-1 contract:
+Design goals
+------------
+* Zero new dependencies (stdlib only).
+* Per-run files written to ``logs/`` with automatic rotation.
+* Predictable routing: WARNING+ to stderr, everything else to stdout
+  unless the caller opts into ``--quiet``.
+* Honors CLI flags: ``--log-level``, ``--quiet``, ``--json-logs``.
+* Idempotent: calling :func:`configure_logging` twice is safe — the
+  second call replaces handlers on the root logger only, so existing
+  loggers (created via ``logging.getLogger(__name__)``) automatically
+  inherit the new config.
 
-* :func:`configure_logging` is safe to call multiple times.
-* :func:`get_logger` is the canonical accessor that every module in
-  the project should use (``logging.getLogger(__name__)`` works too,
-  but going through this helper keeps tests easier to monkey-patch).
+Routing rules
+-------------
+========================  ==========================
+Level                     Where it goes
+========================  ==========================
+DEBUG (--quiet OFF)       stdout + ``logs/app.log``
+INFO  (--quiet OFF)       stdout + ``logs/app.log``
+WARNING                   stderr + ``logs/app.log``
+ERROR                     stderr + ``logs/app.log`` + ``logs/errors.log``
+CRITICAL                  stderr + ``logs/app.log`` + ``logs/errors.log``
+DEBUG/INFO (--quiet ON)   ``logs/app.log`` only (console suppressed)
+========================  ==========================
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import logging.handlers
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 DEFAULT_LEVEL: int = logging.INFO
 LOG_FORMAT: str = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 DATE_FORMAT: str = "%Y-%m-%dT%H:%M:%S%z"
 LOG_DIR: Path = Path("logs")
+APP_LOG_FILE: str = "app.log"
+ERROR_LOG_FILE: str = "errors.log"
+ROTATION_WHEN: str = "midnight"
+ROTATION_BACKUPS: int = 14  # أسبوعين من الملفات
 
 
 @dataclass(frozen=True)
@@ -38,33 +61,88 @@ class LoggingConfig:
     log_dir: Path = LOG_DIR
 
 
-def configure_logging(config: LoggingConfig | None = None) -> None:
-    """Initialize the root logger.
+# ─────────────────────────── Formatters ───────────────────────────
 
-    Stage-1 behaviour: a single console handler is attached (stderr for
-    WARNING+, stdout-equivalent for the rest). File handlers will be
-    added in Stage 2.
+
+class JsonFormatter(logging.Formatter):
+    """Emit each log record as a single-line JSON object.
+
+    Standard :class:`logging.LogRecord` attributes are mapped to a
+    stable schema (``ts``, ``level``, ``logger``, ``message``,
+    ``exception``). Anything passed via ``logger.info("...", extra={...})``
+    is merged in, except internal fields prefixed with ``_``.
+    """
+
+    # الحقول القياسية التي لا نريد تكرارها من record.__dict__
+    _RESERVED = frozenset({
+        "name", "msg", "args", "levelname", "levelno", "pathname",
+        "filename", "module", "exc_info", "exc_text", "stack_info",
+        "lineno", "funcName", "created", "msecs", "relativeCreated",
+        "thread", "threadName", "processName", "process", "message",
+        "asctime", "taskName",
+    })
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict[str, Any] = {
+            "ts": self.formatTime(record, DATE_FORMAT),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        # ضمّ الحقول المخصصة من extra={...}
+        for key, value in record.__dict__.items():
+            if key in self._RESERVED or key.startswith("_"):
+                continue
+            payload[key] = value
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        if record.stack_info:
+            payload["stack"] = record.stack_info
+        return json.dumps(payload, ensure_ascii=False, default=str)
+
+
+# ─────────────────────────── Public API ───────────────────────────
+
+
+def configure_logging(config: LoggingConfig | None = None) -> None:
+    """Initialize the root logger with handlers derived from ``config``.
+
+    Safe to call multiple times — subsequent calls remove the previously
+    attached handlers before adding fresh ones, so calling this twice
+    in tests / REPL does not duplicate output.
+
+    The handler set is:
+
+    * one console handler (stderr), level filtered by ``quiet`` flag
+    * one rotating app file (``logs/app.log``), captures DEBUG+
+    * one rotating error file (``logs/errors.log``), captures ERROR+
     """
     cfg = config or LoggingConfig()
     root = logging.getLogger()
     root.setLevel(_resolve_level(cfg.level))
 
-    # Remove any handlers we previously attached (idempotent re-init).
+    # إزالة أي handlers سابقة — يمنع التكرار عند إعادة الاستدعاء
     for handler in list(root.handlers):
         root.removeHandler(handler)
+        try:
+            handler.close()
+        except Exception:  # pragma: no cover - defensive
+            pass
 
-    console = logging.StreamHandler(stream=sys.stderr)
-    if cfg.quiet:
-        console.setLevel(logging.WARNING)
-    else:
-        console.setLevel(root.level)
-    console.setFormatter(logging.Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT))
-    root.addHandler(console)
+    for handler in (
+        _build_console_handler(cfg, root.level),
+        _build_app_file_handler(cfg),
+        _build_error_file_handler(cfg),
+    ):
+        root.addHandler(handler)
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Return a named logger."""
+    """Return a named logger — thin wrapper for testability."""
     return logging.getLogger(name)
+
+
+# ─────────────────────────── Internals ───────────────────────────
 
 
 def _resolve_level(level: str) -> int:
@@ -75,12 +153,66 @@ def _resolve_level(level: str) -> int:
     return numeric
 
 
+def _build_console_handler(cfg: LoggingConfig, root_level: int) -> logging.Handler:
+    """Console handler on stderr; WARNING+ always visible, rest gated by --quiet."""
+    handler = logging.StreamHandler(stream=sys.stderr)
+    if cfg.quiet:
+        handler.setLevel(logging.WARNING)
+    else:
+        handler.setLevel(root_level)
+    handler.setFormatter(_select_formatter(cfg))
+    return handler
+
+
+def _build_app_file_handler(cfg: LoggingConfig) -> logging.Handler:
+    """Rotating file handler for the general application log."""
+    cfg.log_dir.mkdir(parents=True, exist_ok=True)
+    path = cfg.log_dir / APP_LOG_FILE
+    handler = logging.handlers.TimedRotatingFileHandler(
+        filename=path,
+        when=ROTATION_WHEN,
+        backupCount=ROTATION_BACKUPS,
+        encoding="utf-8",
+        utc=False,
+    )
+    handler.setLevel(logging.DEBUG)  # خزّن كل شيء في الملف
+    handler.setFormatter(_select_formatter(cfg))
+    return handler
+
+
+def _build_error_file_handler(cfg: LoggingConfig) -> logging.Handler:
+    """Separate file for ERROR+ records (easier alerting later)."""
+    cfg.log_dir.mkdir(parents=True, exist_ok=True)
+    path = cfg.log_dir / ERROR_LOG_FILE
+    handler = logging.handlers.TimedRotatingFileHandler(
+        filename=path,
+        when=ROTATION_WHEN,
+        backupCount=ROTATION_BACKUPS,
+        encoding="utf-8",
+        utc=False,
+    )
+    handler.setLevel(logging.ERROR)
+    handler.setFormatter(_select_formatter(cfg))
+    return handler
+
+
+def _select_formatter(cfg: LoggingConfig) -> logging.Formatter:
+    return JsonFormatter() if cfg.json_logs else logging.Formatter(
+        fmt=LOG_FORMAT, datefmt=DATE_FORMAT,
+    )
+
+
 __all__ = [
     "LoggingConfig",
+    "JsonFormatter",
     "configure_logging",
     "get_logger",
     "DEFAULT_LEVEL",
     "LOG_FORMAT",
     "DATE_FORMAT",
     "LOG_DIR",
+    "APP_LOG_FILE",
+    "ERROR_LOG_FILE",
+    "ROTATION_WHEN",
+    "ROTATION_BACKUPS",
 ]

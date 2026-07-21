@@ -6,8 +6,11 @@ import csv
 import itertools
 from pathlib import Path
 from typing import Iterable
+import logging
 
 from src.core.artifact_run import current_artifact_run
+
+logger = logging.getLogger(__name__)
 from src.core.errors import ValidationError
 from src.core.manual_review.manual_review_corrections import corrected_items_from_manual_review_csv
 from src.core.ordering.prevented_items import (
@@ -142,7 +145,7 @@ def ensure_non_empty_items(
     try:
         first_item = next(probe_iter)
     except StopIteration:
-        print(f"[{profile_key}] No remaining items to process.")
+        logger.info("no remaining items", extra={"profile": profile_key})
         return None
     return itertools.chain([first_item], probe_iter)
 

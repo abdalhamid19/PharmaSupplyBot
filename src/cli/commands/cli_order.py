@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import logging
 from pathlib import Path
 
 from src.core.artifact_run import artifact_run
@@ -15,6 +16,8 @@ from src.tawreed.tawreed import TawreedBot
 from ..cli_shared import build_bot
 from .cli_order_items import order_bot_options
 from ..registry import register
+
+logger = logging.getLogger(__name__)
 
 
 # ============ AI Settings ============
@@ -154,8 +157,9 @@ def run_parallel_profiles(
     """Submit profile-level order runs to the configured thread pool."""
     from .cli_order_execution import run_single_profile
 
-    print(
-        f"Running {len(profiles)} profiles in parallel (max_workers={max_workers})..."
+    logger.info(
+        "running profiles in parallel",
+        extra={"profile_count": len(profiles), "max_workers": max_workers},
     )
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from pathlib import Path
 
 from src.core.artifact_run import artifact_run
@@ -15,6 +16,8 @@ from src.tawreed.auth.tawreed_session import SessionInvalidError
 from ..cli_shared import build_bot, raise_invalid_session, require_state_file
 from ..registry import register
 
+logger = logging.getLogger(__name__)
+
 
 @register("export-products")
 def run_export_products_command(app_config: AppConfig, args: argparse.Namespace) -> int:
@@ -24,7 +27,10 @@ def run_export_products_command(app_config: AppConfig, args: argparse.Namespace)
     )
     for profile_key, profile in profiles:
         with artifact_run("export-products", profile_key) as run:
-            print(f"[{profile_key}] Artifact run: {run.directory}")
+            logger.info(
+                "artifact run started",
+                extra={"profile": profile_key, "directory": str(run.directory)},
+            )
             _run_export_profile(app_config, profile_key, profile, args, run)
     return 0
 

@@ -9,11 +9,14 @@ __pycache__/
 config.yaml
 
 artifacts/
-# State directory contains sensitive config and API endpoints
-# state/
-
+# State directory contains sensitive Playwright storage state and cookies
+state/
 
 artifacts/debug/
+
+# Logging output (created by configure_logging)
+logs/
+*.log
 
 # Output files (legacy)
 output.json
