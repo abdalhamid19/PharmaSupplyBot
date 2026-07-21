@@ -285,6 +285,65 @@ py run.py auth --profile wardany
 - `state/<profile>.json`: ملفات حفظ الجلسة.
 - `artifacts/<profile>/`: نتائج التشغيل (Summaries, Screenshots, Logs).
 
+## Logging
+
+كل أمر CLI يستخدم نظام تسجيل موحّد قائم على stdlib
+`logging`. تُكتب السجلات إلى:
+
+- **stderr**: سجلات بمستوى `INFO+` افتراضياً (أو `WARNING+` مع `--quiet`).
+- `logs/app.log`: كل شيء من مستوى `DEBUG+`، تدوير يومي، 14 نسخة احتياطية.
+- `logs/errors.log`: `ERROR+` فقط (مفصل للمراقبة).
+
+### خيارات CLI للـ logging
+
+```bash
+# زيادة مستوى التفاصيل
+py run.py auth --log-level DEBUG --profile wardany
+
+# كتم ما دون التحذيرات على stderr (الملفات تبقى تكتب كل شيء)
+py run.py --quiet auth --profile wardany
+
+# إخراج JSON صالح للتحليل الآلي (مفيد لـ CI و log aggregators)
+py run.py --json-logs auth --profile wardany
+
+# قيمة غير معروفة تُرفض من argparse
+py run.py --log-level BOGUS auth --help
+# exit 2
+```
+
+### كتابة logging في module جديد
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def do_thing(profile: str) -> None:
+    logger.info("starting work", extra={"profile": profile})
+    try:
+        ...
+    except SomeError:
+        logger.exception("work failed for profile")
+```
+
+القواعد (مُتحقَّقة بـ CI guards في `tests/core/test_logging_audit.py`):
+
+- ❌ لا `print(...)` في `src/`
+- ❌ لا `logging.basicConfig(...)` خارج `src/cli/logging_setup.py`
+- ❌ لا أسماء logger حرفية (استخدم `__name__`)
+- ❌ لا معالجة يدوية لـ handlers
+- ❌ لا `_console_safe(...)` — كان workaround قديم
+
+### فحص الـ logging
+
+```bash
+py scripts/audit_logging.py
+```
+
+يُولّد تقرير markdown في `docs/audit_logging.md` بأعداد كل الانتهاكات.
+اليوم كل الأرقام صفر. انظر `docs/logging_system.md` للتفاصيل الكاملة.
+
 ## ملاحظات إضافية
 
 - محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.

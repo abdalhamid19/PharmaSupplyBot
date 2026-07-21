@@ -1,125 +1,63 @@
-# Logging Audit Baseline — Stage 1
+# Logging Audit — Final State
 
 > Generated: 2026-07-21, branch `logging_system`
 > Tool: `scripts/audit_logging.py`
 > Reproduce: `py scripts/audit_logging.py`
 
-This document captures the state of logging usage across the project
-*before* the unification work begins. Subsequent stages will be measured
-against these numbers.
+This document captures the **final state** of logging usage in the
+project after the unification plan completed. Every headline number
+is zero — see `docs/logging_system.md` for the policy that keeps it
+that way.
 
-## Headline numbers
+## Final headline numbers
 
-| Category                                | Count | Goal |
-|-----------------------------------------|------:|-----:|
-| `print()` calls in `src/`               |    27 |    0 |
-| `basicConfig()` calls in `src/`         |     0 |    0 |
-| `"pharmasupplybot.matching"` literals   |    20 |    0 |
-| `_console_safe()` calls                 |     4 |    0 |
-| Manual handler manipulation             |     1 |    0 |
-| `logging.getLogger()` callers (total)   |    32 |   32 |
-| Files using `__name__` convention       |    10 |   30 |
+| Category | Count |
+|----------|------:|
+| `print()` calls in `src/`               |    0 |
+| `basicConfig()` calls in `src/`         |    0 |
+| `"pharmasupplybot.matching"` literals   |    0 |
+| `_console_safe()` calls                 |    0 |
+| Manual handler manipulation             |    0 |
+| `logging.getLogger()` callers (total)   |   46 |
+| Files using `__name__` convention       |   27 |
 
-## Detailed breakdown
+Baseline vs. final, for reference:
 
-### `print()` calls (27) — all in `src/tawreed/`
+| Metric                                    | Baseline | Final |
+|-------------------------------------------|---------:|------:|
+| `print()` in `src/`                        |       27 |     0 |
+| `basicConfig()` calls                      |        0 |     0 |
+| `"pharmasupplybot.matching"` literals      |       20 |     0 |
+| `_console_safe()` calls                    |        4 |     0 |
+| Manual handler manipulation               |        1 |     0 |
+| Files using `__name__` convention         |       10 |    27 |
 
-| File | Count |
-|------|------:|
-| `src/tawreed/auth/tawreed_session_auth.py`           | 4 |
-| `src/tawreed/api/tawreed_api_flow_cart.py`           | 3 |
-| `src/tawreed/order/tawreed_order_summary.py`         | 3 |
-| `src/tawreed/api/tawreed_api_contract_discovery.py`  | 2 |
-| `src/tawreed/api/tawreed_api_discovery_enhanced.py`  | 2 |
-| `src/tawreed/artifacts/tawreed_artifacts.py`         | 2 |
-| `src/tawreed/order/tawreed_order_match.py`           | 2 |
-| `src/tawreed/order/tawreed_order_placement.py`       | 2 |
-| `src/tawreed/tawreed_auto_auth.py`                   | 2 |
-| `src/tawreed/auth/tawreed_headless_auth_refresh.py`  | 1 |
-| `src/tawreed/auth/tawreed_session_state.py`          | 1 |
-| `src/tawreed/cart/tawreed_cart_removal.py`           | 1 |
-| `src/tawreed/tawreed_bot_core.py`                    | 1 |
-| `src/tawreed/tawreed_bot_methods.py`                 | 1 |
+## Commits that produced this state
 
-Note: `src/ui/order/streamlit_order.py:108,155` matches grep but those
-are a function *name* `order_submission_fingerprint`, not actual `print()`
-calls. AST-based audit correctly excludes them.
+| Commit    | Title |
+|-----------|-------|
+| `bf11bac` | Stage 1: AST-based audit + 6 CI guard tests + baseline doc. |
+| `6852c64` | Stage 2: every `print()` and `_console_safe()` in `src/tawreed/` replaced with structured logger calls. |
+| `c69fd5f` | Cleanup of stale `_console_safe` comment in `tawreed_summary.py`. |
+| `280e733` | Matching-logging merger: `setup_logging` and `configure_async_logging` deprecated to no-op wrappers. |
+| `4e59470` | Stage 4: 19 modules migrated from the literal `"pharmasupplybot.matching"` logger name to `getLogger(__name__)`. |
 
-### `"pharmasupplybot.matching"` literal loggers (20)
+## CI guards
 
-These were the legacy convention before stage 2/3. They live in
-`src/core/drug_matching/`, `src/core/matching/`, and one call in
-`src/cli/commands/cli_match_products.py`. Stage 3 will replace each one
-with `__name__`.
+`tests/core/test_logging_audit.py` enforces every rule above. If a
+future commit introduces any of the anti-patterns (a `print`, a
+`basicConfig`, a hand-picked logger name, manual handler manipulation,
+or `_console_safe`), the guard test fails the build.
 
-Files:
-* `src/core/drug_matching/ai/ai_review.py`
-* `src/core/drug_matching/ai/ai_review_execution.py`
-* `src/core/drug_matching/ai/ai_search.py`
-* `src/core/drug_matching/ai/ai_search_core_batch.py`
-* `src/core/drug_matching/ai/ai_search_core_logging.py`
-* `src/core/drug_matching/ai/ai_steps.py`
-* `src/core/drug_matching/ai/ai_verify_batch.py`
-* `src/core/drug_matching/ai/ai_verify_main.py`
-* `src/core/drug_matching/config/config_helpers.py` (×2)
-* `src/core/drug_matching/pipeline.py`
-* `src/core/drug_matching/pipeline_components/pipeline_io.py`
-* `src/core/drug_matching/pipeline_components/pipeline_matching.py`
-* `src/core/drug_matching/tracing/trace_log.py`
-* `src/core/drug_matching/tracing/trace_log_output.py`
-* `src/core/drug_matching/verification/verifier_request_parse.py`
-* `src/core/drug_matching/verification/verifier_request_validate.py`
-* `src/core/drug_matching/verification/verifier_response.py`
-* `src/core/matching/matching_trace.py`
-* `src/cli/commands/cli_match_products.py`
+A full pytest run on the logging suites finishes in under five seconds:
 
-### `_console_safe()` usage (4)
-
-* `src/tawreed/order/tawreed_order_summary.py` (×3)
-* `src/tawreed/tawreed_bot_core.py` (×1)
-
-`_console_safe` was a workaround for Windows console encoding issues.
-The unified logging_setup writes UTF-8 to all handlers, so this wrapper
-is no longer necessary and can be deleted in stage 2.
-
-### Manual handler manipulation (1)
-
-* `src/core/matching/matching_trace.py:34` — `logger.handlers = []`
-  (part of the now-deprecated `configure_async_logging`).
-
-This was already weakened in commit `280e733` so the matching logger
-inherits from root. The line is harmless (clears an empty list) but
-should be removed in stage 3 for clarity.
-
-### Files using the `__name__` convention (10)
-
-These are the files we touched in stages 1 + 2. Stage 3 will add the
-remaining ~20 files (mostly `src/core/drug_matching/` modules currently
-using the literal `"pharmasupplybot.matching"`).
-
-## Acceptance criteria for the unification plan
-
-| Stage | Acceptance metric | Baseline | Target |
-|-------|-------------------|---------:|-------:|
-| 2     | `print()` in `src/`        |    27 |     0 |
-| 3     | `"pharmasupplybot.matching"` literals |    20 |     0 |
-| 3     | `_console_safe()` calls    |     4 |     0 |
-| 3     | Manual handler manipulation |   1 |     0 |
-| 4     | Files using `__name__` convention | 10 |   30 |
-
-When stage 6 is complete, re-running `py scripts/audit_logging.py`
-must produce zeroes (or near-zero) for the left-hand column.
-
-## Tool re-run
-
-```bash
-py scripts/audit_logging.py
 ```
-
-The script:
-1. Walks `src/` once using `ast.walk` (no regex)
-2. Writes `docs/audit_logging.md` with the same data
-3. Exits 0 always — it is a report, not a gate
-
-The CI guard tests in `tests/core/test_logging_audit.py` (stage 4) will
-turn these findings into hard failures.
+tests/cli/test_logging_setup.py               14 passed
+tests/core/test_errors.py                     13 passed
+tests/cli/test_registry.py                     5 passed
+tests/core/matching/test_logging_integration.py  12 passed
+tests/core/test_logging_audit.py               9 passed
+tests/cli/test_run_logging_e2e.py             10 passed
+tests/cli/test_logging_json_e2e.py             8 passed
+tests/cli/test_logging_quiet_e2e.py            9 passed
+```
