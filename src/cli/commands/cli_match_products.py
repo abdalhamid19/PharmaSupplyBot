@@ -18,11 +18,9 @@ from src.core.drug_matching.config import (
     MatchingConfig,
     load_env,
     resolve_api_config,
-    setup_logging,
 )
 from src.core.drug_matching.pipeline import MatchPipeline
 from src.core.drug_matching.tracing import MatchTraceLog
-from src.core.matching.matching_trace import configure_async_logging
 from src.core.errors import ValidationError
 from ..registry import register
 
@@ -175,22 +173,23 @@ def _latest_tawreed_catalog(profile_key: str) -> Path | None:
 
 @register("match-products")
 def run_match_products_command(app_config, args: argparse.Namespace) -> int:
-    """Run standalone matching against an exported Tawreed products CSV."""
+    """Run standalone matching against an exported Tawreed products CSV.
+
+    The root logger has already been configured by ``run.main()``, so
+    this command does not need to install its own handlers — it just
+    uses the matching-scoped logger that inherits from root.
+    """
     load_env()
-    setup_logging("INFO")
-    logger, listener = configure_async_logging("INFO")
-    try:
-        with artifact_run("match-products", _match_profile(args)) as run:
-            logger.info(
-                "artifact run started",
-                extra={"profile": run.profile_key, "directory": str(run.directory)},
-            )
-            pipeline = _pipeline_from_args(args)
-            logger.info("starting product matching")
-            results = asyncio.run(_run_pipeline(pipeline, args))
-            logger.info("matched rows", extra={"count": len(results)})
-    finally:
-        listener.stop()
+    matching_logger = logging.getLogger("pharmasupplybot.matching")
+    with artifact_run("match-products", _match_profile(args)) as run:
+        matching_logger.info(
+            "artifact run started",
+            extra={"profile": run.profile_key, "directory": str(run.directory)},
+        )
+        pipeline = _pipeline_from_args(args)
+        matching_logger.info("starting product matching")
+        results = asyncio.run(_run_pipeline(pipeline, args))
+        matching_logger.info("matched rows", extra={"count": len(results)})
     return 0
 
 

@@ -13,11 +13,22 @@ logger = logging.getLogger("pharmasupplybot.matching")
 
 
 def setup_logging(level: str = "INFO") -> None:
-    """Configure synchronous fallback logging for CLI execution."""
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
+    """Adjust the matching logger level only — no handler setup.
+
+    .. deprecated::
+        The matching workflow now flows through the unified logging
+        configured by :func:`src.cli.logging_setup.configure_logging`.
+        Calling this used to invoke ``logging.basicConfig`` which
+        destroyed the file handlers installed by the unified setup,
+        causing ``logs/app.log`` to silently lose matching records.
+
+        This function is preserved so existing callers do not break,
+        but it now ONLY adjusts the ``pharmasupplybot.matching``
+        logger level — no handlers are installed, no ``basicConfig``
+        is called.
+    """
+    logging.getLogger("pharmasupplybot.matching").setLevel(
+        getattr(logging, level.upper(), logging.INFO)
     )
 
 
