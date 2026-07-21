@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Iterable
 
 from src.core.utils.excel import Item
 from .tawreed_api_client import TawreedApiClient
+
+
+logger = logging.getLogger(__name__)
 
 
 def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> bool:
@@ -79,13 +83,22 @@ def _add_single_item_to_cart(bot, api, match, item, record_timing):
 
 def _submit_order_if_enabled(bot, api: TawreedApiClient, added_any: bool) -> None:
     if not added_any or bot._stop_requested():
-        print(f"[{bot.profile_key}] Stop requested or incomplete. Order confirmation skipped.")
+        logger.info(
+            "order confirmation skipped (stop requested or no items added)",
+            extra={"profile": bot.profile_key},
+        )
         return
     if getattr(bot, "match_only", False):
-        print(f"[{bot.profile_key}] Match-only run. Final order submission skipped.")
+        logger.info(
+            "order submission skipped (match-only run)",
+            extra={"profile": bot.profile_key},
+        )
         return
     if not bot.config.runtime.submit_order:
-        print(f"[{bot.profile_key}] Items added to cart. Final order submission is disabled.")
+        logger.info(
+            "order submission disabled by config",
+            extra={"profile": bot.profile_key},
+        )
         return
     api.submit_order()
 

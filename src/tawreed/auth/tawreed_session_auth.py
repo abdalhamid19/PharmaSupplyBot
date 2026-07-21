@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
+
+
+logger = logging.getLogger(__name__)
 
 
 class SessionInvalidError(RuntimeError):
@@ -31,28 +35,45 @@ def attempt_env_login(page: Page, selectors) -> None:
 
 
 def print_auth_instructions(wait_seconds: int, headless: bool = False) -> None:
-    """Explain the authentication behavior to the operator."""
+    """Log authentication behaviour guidance to the operator.
+
+    The message still uses multi-line formatting because it's explaining
+    the flow rather than reporting a single event.
+    """
     if headless:
-        print(
-            "Headless browser opened for credential-based login.\n"
-            f"- I will wait up to {wait_seconds} seconds for Tawreed to authenticate.\n"
-            "- If the site requires CAPTCHA/OTP or extra human verification, this mode will fail.\n"
+        logger.warning(
+            "headless login flow instructions",
+            extra={
+                "wait_seconds": wait_seconds,
+                "instructions": (
+                    "Headless browser opened for credential-based login. "
+                    f"I will wait up to {wait_seconds} seconds for Tawreed to "
+                    "authenticate. If the site requires CAPTCHA/OTP or extra "
+                    "human verification, this mode will fail."
+                ),
+            },
         )
         return
-    print(
-        "Browser opened. Please complete login manually.\n"
-        "- I will keep the browser open for up to "
-        f"{wait_seconds} seconds waiting for login detection.\n"
-        "- If the site requires OTP/CAPTCHA, finish it in the browser.\n"
+    logger.warning(
+        "interactive login flow instructions",
+        extra={
+            "wait_seconds": wait_seconds,
+            "instructions": (
+                "Browser opened. Please complete login manually. "
+                f"I will keep the browser open for up to {wait_seconds} seconds "
+                "waiting for login detection. If the site requires OTP/CAPTCHA, "
+                "finish it in the browser."
+            ),
+        },
     )
 
 
 def print_login_detection_result(detected: bool) -> None:
-    """Print the result of login detection."""
+    """Log the result of login detection."""
     if detected:
-        print("Login detected.")
+        logger.info("login detected")
     else:
-        print("Login not detected within timeout.")
+        logger.warning("login not detected within timeout")
 
 
 def wait_for_network_idle(page) -> None:

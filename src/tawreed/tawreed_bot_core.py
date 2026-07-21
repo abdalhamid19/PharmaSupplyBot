@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from src.core.config.config_models import AppConfig, ProfileConfig
@@ -14,12 +15,10 @@ from .cart.tawreed_cart_flow import TawreedCartFlow
 from .order.tawreed_order_flow import TawreedOrderFlow, _SkipItem, _NoResultsItem
 
 
-def _console_safe(text: str) -> str:
-    """Return text that can be printed on cp1252 Windows consoles without crashing."""
-    return text.encode("cp1252", errors="replace").decode("cp1252")
+__all__ = ["TawreedBotCore"]
 
 
-__all__ = ["TawreedBotCore", "_console_safe"]
+logger = logging.getLogger(__name__)
 
 
 class TawreedBotCore:
@@ -95,5 +94,5 @@ class TawreedBotCore:
         return OrderAiDecisionService(self.order_ai_settings)
 
     def log(self, message: str) -> None:
-        """Print a profile-scoped diagnostic message."""
-        print(_console_safe(f"[{self.profile_key}] {message}"))
+        """Record a profile-scoped diagnostic message via the unified logger."""
+        logger.info(message, extra={"profile": self.profile_key})

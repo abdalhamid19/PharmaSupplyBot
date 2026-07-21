@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .tawreed_bot_core import TawreedBotCore, _console_safe
+from .tawreed_bot_core import TawreedBotCore
 from .tawreed_bot_api import TawreedBotApi
 from .tawreed_bot_order_ai import TawreedBotOrderAi
 from .tawreed_bot_methods import TawreedBotMethods

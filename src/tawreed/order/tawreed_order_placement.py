@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 from src.core.manual_review.manual_review_runtime import (
@@ -19,6 +20,9 @@ from ..tawreed_checkout import confirm_order
 from .tawreed_order_processing import OrderItemProcessor
 from .tawreed_order_summary import OrderSummaryRecorder
 from ..auth.tawreed_session import close_browser, close_context, open_order_page
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -110,16 +114,16 @@ class OrderPlacementFlow:
         completed = self._process_items(page, items)
         if completed and not self.bot._stop_requested():
             if not self.bot.config.runtime.submit_order:
-                print(
-                    f"[{self.bot.profile_key}] Items added to cart. "
-                    "Final order submission is disabled for manual human review."
+                logger.info(
+                    "items added to cart (final submission disabled for manual review)",
+                    extra={"profile": self.bot.profile_key},
                 )
                 return
             confirm_order(page, self.bot.selectors, self.bot.config.runtime.timeout_ms)
         else:
-            print(
-                f"[{self.bot.profile_key}] Stop requested or incomplete. "
-                "Order confirmation skipped."
+            logger.warning(
+                "order confirmation skipped (stop requested or incomplete)",
+                extra={"profile": self.bot.profile_key},
             )
 
     def _process_items(self, page, items: Iterable[Item]) -> bool:

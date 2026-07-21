@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
+from typing import Any
 
 from .tawreed_api_contract_base import DEFAULT_CONTRACT_PATH
+
+
+logger = logging.getLogger(__name__)
 
 
 def begin_api_contract_capture(page) -> list[dict[str, Any]]:
@@ -104,9 +109,12 @@ def save_captured_requests(
 
 
 def _print_capture_summary(count, output_file):
-    """Print capture summary."""
-    print(f"[API Discovery] Captured {count} requests")
-    print(f"[API Discovery] Saved to: {output_file}")
+    """Log the capture summary at INFO level."""
+    logger.info("API discovery captured requests", extra={"count": count})
+    logger.info(
+        "API discovery saved capture",
+        extra={"output_file": str(output_file)},
+    )
 
 
 def analyze_add_to_cart_payload(captured_file: Path) -> dict[str, Any]:

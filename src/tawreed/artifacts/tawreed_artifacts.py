@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -30,6 +31,9 @@ from src.core.cart.cart_removal_items import CartRemovalItem
 from src.core.cart.cart_removal_summary import CartRemovalSummary
 
 
+logger = logging.getLogger(__name__)
+
+
 def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") -> None:
     """Persist screenshot, HTML, and URL artifacts for debugging failures."""
     try:
@@ -40,7 +44,13 @@ def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") 
         _write_screenshot_artifact(page, screenshot_path)
         _write_html_artifact(page, html_path)
         _write_text_artifact(page, text_path, details)
-        print(f"[{profile_key}] Saved artifacts to: {artifacts_dir}")
+        logger.info(
+            "saved artifacts",
+            extra={
+                "profile": profile_key,
+                "artifacts_dir": str(artifacts_dir),
+            },
+        )
     except Exception:
         pass
 
@@ -104,8 +114,11 @@ def append_xlsx_artifact(
 
 
 def _log_xlsx_permission_error(profile_key: str, label: str) -> None:
-    """Print a friendly message when an XLSX artifact is open elsewhere."""
-    print(f"[{profile_key}] Could not update {label}.xlsx; close it and retry.")
+    """Log a friendly message when an XLSX artifact is open elsewhere."""
+    logger.warning(
+        "could not update xlsx artifact (file may be open)",
+        extra={"profile": profile_key, "artifact_label": label},
+    )
 
 
 def _write_screenshot_artifact(page: Page, screenshot_path: Path) -> None:

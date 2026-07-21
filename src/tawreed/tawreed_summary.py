@@ -214,11 +214,6 @@ def _artifact_details(label: str, error: Exception, **extra: object) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _console_safe(text: str) -> str:
-    """Return text that can be printed on cp1252 Windows consoles without crashing."""
-    return text.encode("cp1252", errors="replace").decode("cp1252")
-
-
 __all__ = [
     # Builder
     "SummaryBuilder",
@@ -230,5 +225,6 @@ __all__ = [
     "_item_error_label",
     "_item_error_details",
     "_artifact_details",
-    "_console_safe",
 ]
+# Note: "_console_safe" was removed in stage 2 of the logging unification;
+# call-sites now use the project-wide structured logger.

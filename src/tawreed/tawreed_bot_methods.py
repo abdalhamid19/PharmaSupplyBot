@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 from src.core.cart.cart_removal_items import CartRemovalItem
 from src.core.utils.excel import Item
 from .tawreed_constants import PRODUCTS_PAGE_ROUTE
+
+
+logger = logging.getLogger(__name__)
 
 
 class TawreedBotMethods:
@@ -41,11 +45,12 @@ class TawreedBotMethods:
         self.cart_flow.remove_cart_items(items)
 
     def _stop_before_item(self, item: Item) -> bool:
-        """Return True and print a diagnostic when a run should stop before an item."""
+        """Return True and log a diagnostic when a run should stop before an item."""
         if not self._stop_requested():
             return False
-        print(
-            f"[{self.profile_key}] Stop requested before item {item.code} / {item.name}."
+        logger.info(
+            "stop requested before item",
+            extra={"profile": self.profile_key, "code": item.code, "name": item.name},
         )
         return True
 

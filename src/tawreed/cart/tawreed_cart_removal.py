@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable
 
@@ -14,6 +15,9 @@ from src.core.utils.excel import Item
 from ..artifacts.tawreed_artifacts import append_cart_removal_summary
 from ..tawreed_constants import VISIBLE_DIALOG_SELECTOR
 from ..matching.tawreed_search_logic import require_product_match
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -130,12 +134,12 @@ def _unique(names: list[str]) -> list[str]:
 
 
 def _log(bot, message: str) -> None:
-    """Log through the bot when available, else print ASCII-safe text."""
-    logger = getattr(bot, "log", None)
-    if logger:
-        logger(message)
+    """Log through the bot when available, else via the unified logger."""
+    bot_log = getattr(bot, "log", None)
+    if bot_log:
+        bot_log(message)
         return
-    print(message.encode("ascii", errors="replace").decode("ascii"))
+    logger.info(message, extra={"profile": getattr(bot, "profile_key", "-")})
 
 
 # ============================================================================
