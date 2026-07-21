@@ -14,7 +14,7 @@ from .ai_verify_helpers import _trace_skip_all_verify
 from .ai_verify_selection import _select_for_verification, _build_verify_items
 from .ai_verify_batch import _batch_verify, _apply_verification
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 async def run_ai_verification(

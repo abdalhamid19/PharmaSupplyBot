@@ -11,7 +11,7 @@ from ..verification.verifier import AIVerifier
 from .ai_search_core import _try_search_one, _search_batch
 from .ai_search_trace import _trace_skip_all_search
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 def _get_unmatched(results):

@@ -11,7 +11,7 @@ from ..indexing.indexer import DrugIndex
 from ..tracing.trace_log import MatchTraceLog
 from .pipeline_io import PipelineIO
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 _RESULT_COLS = [
     "code", "drug_name", "matched_product_name_en",

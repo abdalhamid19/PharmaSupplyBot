@@ -27,12 +27,11 @@ def configure_async_logging(level: str = "INFO") -> tuple[logging.Logger, "Queue
     will harmlessly call ``None.stop()`` (which would AttributeError);
     the recommended replacement is to drop the try/finally entirely.
     """
-    logger = logging.getLogger("pharmasupplybot.matching")
+    logger = logging.getLogger(__name__)
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    # Re-attach to the root logger hierarchy so messages reach
-    # logs/app.log and the console handler configured by run.py.
-    logger.handlers = []
-    logger.propagate = True
+    # The unified logging_setup in run.main() has already attached the
+    # right handlers to the root logger, so this child logger inherits
+    # them automatically via propagate=True (the default).
     return logger, None
 
 

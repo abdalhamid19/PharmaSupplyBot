@@ -154,8 +154,17 @@ def _resolve_level(level: str) -> int:
 
 
 def _build_console_handler(cfg: LoggingConfig, root_level: int) -> logging.Handler:
-    """Console handler on stderr; WARNING+ always visible, rest gated by --quiet."""
-    handler = logging.StreamHandler(stream=sys.stderr)
+    """Console handler on stderr; WARNING+ always visible, rest gated by --quiet.
+
+    We deliberately do *not* pass ``stream=sys.stderr`` at construction
+    time. With a captured argument, the handler holds a reference to
+    that specific stream object forever; if a test runner (e.g. pytest)
+    later swaps out ``sys.stderr`` for a capture object, the handler
+    keeps writing to the *original* stream and the test sees nothing.
+    Using the no-arg form means the handler resolves ``sys.stderr`` on
+    every ``emit`` call, picking up whatever the runtime has in place.
+    """
+    handler = logging.StreamHandler()
     if cfg.quiet:
         handler.setLevel(logging.WARNING)
     else:

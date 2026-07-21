@@ -10,7 +10,7 @@ import pandas as pd
 
 from ..config import MatchingConfig
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 def _manual_review_path(output_path: str) -> str:

@@ -10,7 +10,7 @@ import logging
 
 from .verifier_core import _TRANSIENT_COMBO_FAILURE_LIMIT
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 class FailureTracker:

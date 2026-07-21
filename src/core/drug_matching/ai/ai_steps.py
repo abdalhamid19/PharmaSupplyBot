@@ -17,7 +17,7 @@ from .ai_verify import run_ai_verification
 from .ai_search import run_ai_search
 from .ai_review import run_ai_review
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 # Re-export main functions for backward compatibility
 __all__ = [

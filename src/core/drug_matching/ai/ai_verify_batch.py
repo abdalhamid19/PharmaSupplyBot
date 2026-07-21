@@ -8,7 +8,7 @@ from ..normalization.normalizer import parse_drug
 from ..verification.verifier import AIVerifier
 from .ai_verify_helpers import _trace_api_attempts, _trace_parse_failure
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 async def _batch_verify(verifier, items, cfg):

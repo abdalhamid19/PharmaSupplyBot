@@ -14,7 +14,7 @@ from ..verification.verifier import AIVerifier
 from .ai_review_selection import _select_for_review, _build_review_items
 from .ai_review_execution import _batch_review, _apply_review_results
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 def _trace_skip_all_review(results, trace, reason):

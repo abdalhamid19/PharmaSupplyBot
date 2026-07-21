@@ -178,29 +178,71 @@ def test_no_manual_logger_handler_manipulation() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "allowed_arg_predicate",
-    [
-        # Either no arg at all → root logger
-        lambda args: len(args) == 0,
-        # Or __name__ → module-scoped logger
-        lambda args: len(args) == 1 and isinstance(args[0], ast.Name) and args[0].id == "__name__",
-    ],
-    ids=["no-args-root", "dunder-name"],
+def _is_setup_module(path: Path) -> bool:
+    """logging_setup.py is the one sanctioned place to touch handlers."""
+    return path.name == "logging_setup.py"
+
+
+_PACKAGE_ROOT_NAMES = (
+    "src.core.drug_matching",
 )
-def test_get_logger_calls_use_allowed_forms(allowed_arg_predicate) -> None:
-    """logging.getLogger() may only be called with no args (root) or __name__."""
+
+
+def _is_allowed_logger_call(rel_path, call) -> bool:
+    """Return True if this getLogger(...) call follows the project convention.
+
+    Allowed forms:
+    * ``logging.getLogger()`` (no args, root logger) — anywhere except
+      logging_setup.py.
+    * ``logging.getLogger(__name__)`` (module-scoped) — anywhere.
+    * ``logging.getLogger("src.core.drug_matching")`` (package-root) —
+      only allowed from config_helpers.py.
+    * Inside ``src/cli/logging_setup.py`` we run the root logger and
+      expose a pass-through ``get_logger(name)`` helper for consumers.
+    """
+    rel = rel_path.as_posix()
+    # logging_setup.py is the one sanctioned place that owns the
+    # root logger and exposes a pass-through helper.
+    if rel == "src/cli/logging_setup.py":
+        return True
+    # config_helpers.py is allowed to grab the matching package root.
+    if rel == "src/core/drug_matching/config/config_helpers.py":
+        if (
+            len(call.args) == 1
+            and isinstance(call.args[0], ast.Constant)
+            and isinstance(call.args[0].value, str)
+            and call.args[0].value in _PACKAGE_ROOT_NAMES
+        ):
+            return True
+    if len(call.args) == 0:
+        return True
+    if (
+        len(call.args) == 1
+        and isinstance(call.args[0], ast.Name)
+        and call.args[0].id == "__name__"
+    ):
+        return True
+    return False
+
+
+def test_get_logger_calls_use_allowed_forms() -> None:
+    """logging.getLogger() must use only the allowed forms in src/.
+
+    See :func:`_is_allowed_logger_call` for the policy.
+    """
     offenders: list[tuple[Path, int, str]] = []
 
     def predicate(n: ast.Call) -> bool:
         return _callee_name(n.func) in ("logging.getLogger", "getLogger")
 
     for p, ln, call in _calls_with(predicate):
-        if not allowed_arg_predicate(call.args):
+        rel = p.relative_to(PROJECT_ROOT)
+        if not _is_allowed_logger_call(rel, call):
             arg_repr = ast.unparse(call.args[0]) if call.args else ""
-            offenders.append((p.relative_to(PROJECT_ROOT), ln, arg_repr))
+            offenders.append((rel, ln, arg_repr))
     assert not offenders, (
-        "logging.getLogger() must use either no args or __name__:\n"
+        "logging.getLogger() must use one of the allowed forms "
+        "(no args, __name__, or a configured package root):\n"
         + "\n".join(f"  {p}:{ln} -> getLogger({arg!r})" for p, ln, arg in offenders)
     )
 

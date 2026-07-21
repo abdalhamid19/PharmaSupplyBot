@@ -7,7 +7,7 @@ from ..config import MatchingConfig
 from ..verification.verifier import AIVerifier
 from .ai_review_result_applier import ReviewResultApplier
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 _AI_REVIEW_OVERRIDE_CONFIDENCE = 0.75
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from .config_models import Paths
 from .config_providers import PROVIDERS
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -23,13 +23,14 @@ def setup_logging(level: str = "INFO") -> None:
         causing ``logs/app.log`` to silently lose matching records.
 
         This function is preserved so existing callers do not break,
-        but it now ONLY adjusts the ``pharmasupplybot.matching``
-        logger level — no handlers are installed, no ``basicConfig``
-        is called.
+        but it now ONLY adjusts the matching package's root logger
+        level — no handlers are installed, no ``basicConfig`` is
+        called.
     """
-    logging.getLogger("pharmasupplybot.matching").setLevel(
-        getattr(logging, level.upper(), logging.INFO)
-    )
+    # Adjust the matching package root so every submodule
+    # (which uses getLogger(__name__)) inherits the new level.
+    matching_root = logging.getLogger("src.core.drug_matching")
+    matching_root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
 
 def load_env(path: Path | None = None) -> None:

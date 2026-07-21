@@ -23,7 +23,7 @@ from .trace_log_summary import SummaryWriter
 from .trace_log_output import TraceOutputWriter
 from .trace_log_phases import Phase1Methods, Phase2Methods
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 TRACE_MINIMAL = 1
 TRACE_NORMAL = 2

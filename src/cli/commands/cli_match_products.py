@@ -180,7 +180,7 @@ def run_match_products_command(app_config, args: argparse.Namespace) -> int:
     uses the matching-scoped logger that inherits from root.
     """
     load_env()
-    matching_logger = logging.getLogger("pharmasupplybot.matching")
+    matching_logger = logging.getLogger(__name__)
     with artifact_run("match-products", _match_profile(args)) as run:
         matching_logger.info(
             "artifact run started",

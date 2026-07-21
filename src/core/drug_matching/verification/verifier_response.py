@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from .verifier_request_validate import FailureTracker
     from .verifier_request_build import RequestPlanner
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 def process_api_response(result: dict[str, Any]) -> dict[str, Any]:

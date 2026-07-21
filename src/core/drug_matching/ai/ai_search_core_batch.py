@@ -8,7 +8,7 @@ import logging
 from .ai_search_core_execution import _try_search_one
 from .ai_search_trace import _trace_search_exception
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 async def _search_batch(verifier, results, index, unmatched, cfg, trace):

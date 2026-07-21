@@ -35,7 +35,7 @@ class TraceOutputWriter:
         self._txt_writer.save_txt(txt_path)
         summary_writer = SummaryWriter(self._parent)
         summary_writer.save_summary(summary_path)
-        logger = logging.getLogger("pharmasupplybot.matching")
+        logger = logging.getLogger(__name__)
         logger.info(
             f"Trace saved: {csv_path} + {txt_path} + {summary_path}",
         )

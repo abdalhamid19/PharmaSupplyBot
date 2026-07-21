@@ -17,7 +17,7 @@ from .verifier_core import (
 if TYPE_CHECKING:
     pass
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 class ResponseHandler:

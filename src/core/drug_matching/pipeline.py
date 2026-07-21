@@ -22,7 +22,7 @@ from .pipeline_components.pipeline_matching import (
     PipelineMatching,
 )
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
