@@ -68,7 +68,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit log records as JSON (useful for CI / log aggregators).",
     )
-    subparsers = parser.add_subparsers(dest="cmd", required=True)
+    parser.add_argument(
+        "--show-completion",
+        choices=["bash", "zsh", "fish"],
+        default=None,
+        metavar="SHELL",
+        help=(
+            "Print a shell-completion script for the given shell "
+            "(bash, zsh, or fish), then exit. "
+            "Install with: eval \"$(python run.py --show-completion SHELL)\""
+        ),
+    )
+    subparsers = parser.add_subparsers(dest="cmd", required=False)
     build_auth_parser(subparsers)
     build_order_parser(subparsers)
     build_remove_cart_parser(subparsers)

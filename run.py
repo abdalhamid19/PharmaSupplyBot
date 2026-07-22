@@ -60,6 +60,23 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
+    # Handle meta-flags first, before any logging/config setup. They
+    # are pure side-effects (print to stdout, exit) and must not
+    # require a config file or any other state.
+    if getattr(args, "show_completion", None):
+        from src.cli.completion import SUPPORTED_SHELLS, emit_completion
+
+        try:
+            print(emit_completion(args.show_completion))
+            return 0
+        except ValueError as exc:
+            print(
+                f"error: {exc}\n"
+                f"supported shells: {', '.join(SUPPORTED_SHELLS)}",
+                file=sys.stderr,
+            )
+            return 5  # ValidationError exit code
+
     # ✨ Initialize logging BEFORE running the command so every module
     # that grabs a logger at import time sees the configured handlers.
     configure_logging(_resolve_logging_config(args))
@@ -78,6 +95,12 @@ def main() -> int:
         ]
         if loaded:
             logger.info("user config loaded from: %s", ", ".join(loaded))
+
+    if not getattr(args, "cmd", None):
+        # No subcommand and no --show-completion → show help and exit
+        # with the standard "user error" code.
+        parser.print_help(sys.stderr)
+        return 5
 
     try:
         # Preset first, then defaults, then explicit CLI args win.
