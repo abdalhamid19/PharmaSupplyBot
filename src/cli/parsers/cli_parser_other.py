@@ -73,6 +73,7 @@ def _add_export_runtime_arguments(argument_parser: argparse.ArgumentParser) -> N
     )
     argument_parser.add_argument(
         "--limit",
+        "-n",
         type=int,
         default=0,
         help="Maximum rows to export for testing (0 = all Tawreed products)",

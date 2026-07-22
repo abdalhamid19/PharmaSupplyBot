@@ -39,6 +39,7 @@ def add_excel_argument(
     """Add the required Excel-path argument for one CLI command."""
     argument_parser.add_argument(
         "--excel",
+        "-x",
         required=False,
         help=f"Path to {label} Excel file, usually under {default_directory}",
     )

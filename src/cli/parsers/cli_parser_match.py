@@ -25,13 +25,13 @@ def build_match_products_parser(subparsers: argparse._SubParsersAction) -> None:
 
 
 def _add_match_input_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--excel", required=True, help="Inventory Excel or CSV file")
+    parser.add_argument("--excel", "-x", required=True, help="Inventory Excel or CSV file")
     parser.add_argument("--tawreed-csv", default=None, help="Tawreed products CSV")
     parser.add_argument("--output", default=None, help="Output CSV path")
 
 
 def _add_match_range_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--limit", "-n", type=int, default=None)
     parser.add_argument("--start", type=int, default=None)
     parser.add_argument("--end", type=int, default=None)
     parser.add_argument("--resume", action="store_true")

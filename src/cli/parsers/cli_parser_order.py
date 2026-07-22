@@ -23,6 +23,7 @@ def add_order_runtime_arguments(argument_parser: argparse.ArgumentParser) -> Non
 def _add_order_limits_and_debug(argument_parser: argparse.ArgumentParser) -> None:
     argument_parser.add_argument(
         "--limit",
+        "-n",
         type=int,
         default=0,
         help="Limit number of items (0 = no limit)",
@@ -155,6 +156,7 @@ def build_remove_cart_parser(subparsers: argparse._SubParsersAction) -> None:
     add_common_arguments(remove_parser)
     remove_parser.add_argument(
         "--excel",
+        "-x",
         default=None,
         help="Path to cart-removal Excel file, usually under data/input/remove_items/",
     )
