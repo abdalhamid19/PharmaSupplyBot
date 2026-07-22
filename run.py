@@ -25,6 +25,13 @@ from src.cli.cli_commands import (
     run_order_command,
     run_remove_cart_command,
 )
+from src.cli.cli_config import (
+    GLOBAL_CONFIG_PATH,
+    LOCAL_CONFIG_PATH,
+    apply_preset,
+    describe_sources,
+    inject_defaults,
+)
 from src.cli.logging_setup import LoggingConfig, configure_logging
 from src.cli.parsers.cli_parser import build_parser
 from src.cli.registry import get_command
@@ -50,14 +57,35 @@ def _resolve_logging_config(args) -> LoggingConfig:
 def main() -> int:
     """Run the CLI command requested by the user."""
     load_dotenv()
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
 
     # ✨ Initialize logging BEFORE running the command so every module
     # that grabs a logger at import time sees the configured handlers.
     configure_logging(_resolve_logging_config(args))
     logger = logging.getLogger(__name__)
 
+    # ✨ Log user-config sources (once per run, at INFO so it's visible
+    # without --log-level DEBUG). Quiet mode suppresses this so cron
+    # logs stay clean.
+    if not getattr(args, "quiet", False):
+        sources = describe_sources()
+        loaded = [
+            p for p, exists in (
+                (str(GLOBAL_CONFIG_PATH), sources["global_exists"]),
+                (str(LOCAL_CONFIG_PATH.resolve()) if LOCAL_CONFIG_PATH.exists() else None, sources["local_exists"]),
+            ) if exists
+        ]
+        if loaded:
+            logger.info("user config loaded from: %s", ", ".join(loaded))
+
     try:
+        # Preset first, then defaults, then explicit CLI args win.
+        # This three-step merge implements the documented precedence:
+        #   CLI args > --preset > ./.pharmabotrc > ~/.pharmabotrc > built-in defaults
+        args = apply_preset(parser, args, getattr(args, "preset", None))
+        args = inject_defaults(parser, args)
+
         config_path = Path(args.config)
         app_config = load_config(config_path)
         command = get_command(args.cmd)
@@ -66,6 +94,19 @@ def main() -> int:
             extra={"cmd": args.cmd, "config": str(config_path)},
         )
         return command(app_config, args)
+    except ValueError as error:
+        # Preset-related failures (unknown preset name).
+        # Convert to a typed PharmaSupplyError so it gets logged with
+        # the same structured context as any other validation failure.
+        wrapped = ValidationError(str(error))
+        logger.error(
+            "command failed: %s",
+            wrapped.message,
+            extra={"exit_code": wrapped.exit_code},
+        )
+        if wrapped.hint:
+            logger.warning("hint: %s", wrapped.hint)
+        return wrapped.exit_code
     except LookupError as error:
         # Unknown subcommand (shouldn't happen — argparse catches this).
         logger.error("unknown command: %s", error)

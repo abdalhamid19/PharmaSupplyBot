@@ -1,0 +1,298 @@
+"""User-level CLI configuration: ``~/.pharmabotrc`` and ``--preset``.
+
+This module is intentionally small and dependency-light. It supports
+two complementary conveniences on top of ``argparse``:
+
+1. **User config file** — a YAML file (``~/.pharmabotrc`` globally,
+   ``./.pharmabotrc`` per-project) that supplies *defaults* for any
+   flag the operator did not pass on the command line. CLI flags
+   always win, so this is purely a "fill the blanks" mechanism.
+2. **Presets** — named groups of flags under the top-level ``presets:``
+   key. The user selects one with ``--preset <name>``; the preset
+   values are merged *under* the CLI args (so anything typed on the
+   command line still overrides).
+
+Precedence (highest to lowest)::
+
+    CLI args > --preset > ./.pharmabotrc > ~/.pharmabotrc > built-in defaults
+
+The module never raises on a missing or malformed file. The philosophy
+is: "the user's hands must not be forced" — bad config falls back
+to argparse's built-in defaults, with a one-line warning logged so
+the operator knows their file was ignored.
+
+Why YAML and not TOML/JSON? Because the project's main
+``config.example.yaml`` is already YAML, and PyYAML is a transitive
+dependency of the project (``python-dotenv`` pulls it in for some
+distros, and ``requirements.txt`` lists it explicitly). Zero new
+dependencies.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from argparse import ArgumentParser, Namespace
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+logger = logging.getLogger(__name__)
+
+
+# ─────────────────────────── Public constants ───────────────────────────
+
+#: Global user config path (in the operator's home directory).
+GLOBAL_CONFIG_PATH = Path.home() / ".pharmabotrc"
+
+#: Project-local override (committed or gitignored as the team prefers).
+LOCAL_CONFIG_PATH = Path(".pharmabotrc")
+
+
+# ─────────────────────────── Load + merge ─────────────────────────────
+
+
+def load_user_config() -> dict[str, Any]:
+    """Load and merge ``~/.pharmabotrc`` with ``./.pharmabotrc``.
+
+    Local (project-level) config wins over global. Missing files are
+    not errors. A malformed file logs a warning and returns the
+    successfully-parsed layer (or ``{}``).
+
+    Returns a dict with two top-level keys when files are present::
+
+        {
+            "default": { "--profile": "wardany", "--config": "state/config.yaml" },
+            "presets": {
+                "quick-dry-run": { "--match-only": True, "--limit": 20, ... },
+                ...
+            },
+        }
+    """
+    merged: dict[str, Any] = {"default": {}, "presets": {}}
+
+    # Global first, local overrides
+    for path in (GLOBAL_CONFIG_PATH, LOCAL_CONFIG_PATH):
+        data = _read_yaml_safe(path)
+        if not data:
+            continue
+        if isinstance(data.get("default"), dict):
+            merged["default"].update(data["default"])
+        if isinstance(data.get("presets"), dict):
+            merged["presets"].update(data["presets"])
+        logger.debug("loaded user config from %s", path)
+
+    return merged
+
+
+def list_presets(config: dict[str, Any] | None = None) -> list[str]:
+    """Return the names of all available presets, sorted."""
+    if config is None:
+        config = load_user_config()
+    return sorted((config.get("presets") or {}).keys())
+
+
+def get_preset(name: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return a preset's flag dict, or an empty dict if the name is unknown.
+
+    A missing preset is **not** an error here — the caller (``run.py``)
+    is responsible for deciding what to do (warn, list alternatives,
+    or hard-fail). This keeps ``get_preset`` testable in isolation.
+    """
+    if config is None:
+        config = load_user_config()
+    presets = config.get("presets") or {}
+    preset = presets.get(name)
+    if not isinstance(preset, dict):
+        return {}
+    return dict(preset)
+
+
+# ─────────────────────────── Preset application ────────────────────────
+
+
+def apply_preset(
+    parser: ArgumentParser,
+    args: Namespace,
+    preset_name: str | None,
+) -> Namespace:
+    """Apply a named preset to ``args`` *underneath* the explicit CLI values.
+
+    Algorithm:
+        1. Resolve the preset dict (empty if ``preset_name`` is falsy).
+        2. For each ``--flag: value`` in the preset, override ``args``
+           *only if* the user did not pass it explicitly on the CLI.
+
+    "Did not pass explicitly" is detected by ``_was_passed()``, which
+    uses argparse's ``default`` sentinel: any value that still equals
+    the parser's declared default is treated as "not set by the user".
+    This is the standard argparse idiom and is reliable for the
+    action types used by this CLI (``store_true``, ``store_const``,
+    ``store``, ``append``).
+    """
+    if not preset_name:
+        return args
+
+    config = load_user_config()
+    preset = get_preset(preset_name, config)
+    if not preset:
+        available = list_presets(config)
+        hint = (
+            f"Available presets: {', '.join(available)}"
+            if available
+            else "No presets defined. Add a 'presets:' section to ~/.pharmabotrc."
+        )
+        # We raise here so run.py can convert to ValidationError + exit 5
+        raise ValueError(f"Unknown preset '{preset_name}'. {hint}")
+
+    logger.info("applying preset: %s", preset_name)
+    for flag, value in preset.items():
+        if not _was_passed(parser, args, flag):
+            setattr(args, _dest_for_flag(flag), value)
+            logger.debug("preset %s: %s = %r", preset_name, flag, value)
+
+    return args
+
+
+# ─────────────────────────── Defaults injection ────────────────────────
+
+
+def inject_defaults(parser: ArgumentParser, args: Namespace) -> Namespace:
+    """Fill any unset CLI argument from the user-config ``default`` block.
+
+    This runs *after* ``parse_args()`` and *before* the command
+    handler. It must never override a value the user typed on the
+    command line — see ``_was_passed`` for the heuristic.
+    """
+    config = load_user_config()
+    defaults = config.get("default") or {}
+    if not defaults:
+        return args
+
+    logger.debug("injecting %d default(s) from user config", len(defaults))
+    for flag, value in defaults.items():
+        if not _was_passed(parser, args, flag):
+            setattr(args, _dest_for_flag(flag), value)
+            logger.debug("default %s = %r", flag, value)
+
+    return args
+
+
+# ─────────────────────────── Internals ────────────────────────────────
+
+
+def _read_yaml_safe(path: Path) -> dict[str, Any] | None:
+    """Read YAML, returning ``None`` on any failure (logged, not raised)."""
+    if not path.exists():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+    except (OSError, yaml.YAMLError) as exc:
+        logger.warning(
+            "could not read user config %s: %s (continuing with no override)",
+            path,
+            exc,
+        )
+        return None
+    if not isinstance(data, dict):
+        logger.warning(
+            "user config %s is not a YAML mapping (got %s); ignoring",
+            path,
+            type(data).__name__,
+        )
+        return None
+    return data
+
+
+def _dest_for_flag(flag: str) -> str:
+    """Convert ``--excel`` → ``excel``. Tolerates a single leading dash."""
+    return flag.lstrip("-").replace("-", "_")
+
+
+def _was_passed(parser: ArgumentParser, args: Namespace, flag: str) -> bool:
+    """Return True if the user supplied ``flag`` on the command line.
+
+    Strategy: compare ``getattr(args, dest)`` to the parser's declared
+    default for that action. If they differ, the user (or a preset
+    applied earlier) has set the value. This is the only reliable
+    way to detect "explicit" values in argparse without re-parsing
+    ``sys.argv``.
+    """
+    import argparse  # local to keep import cost down on hot path
+
+    dest = _dest_for_flag(flag)
+    action = _find_action(parser, dest)
+    if action is None:
+        # Flag unknown to this parser — treat as already-set so we
+        # don't pollute ``args`` with garbage. Caller will see a
+        # different error from argparse downstream.
+        return True
+    current = getattr(args, dest, None)
+    default = _action_default(action)
+    # For store_true actions, the user passing the flag flips it to True.
+    # So if current is True and default is False, the user set it.
+    if isinstance(action, argparse._StoreTrueAction):
+        return bool(current) and not bool(default)
+    return current != default
+
+
+def _find_action(parser: ArgumentParser, dest: str):
+    """Locate the argparse action for a given dest across this parser + subparsers."""
+    for action in parser._actions:
+        if action.dest == dest:
+            return action
+    # Subparsers (e.g. "order", "auth") — scan those too
+    for sub in getattr(parser, "_subparsers", None) or []:
+        for action in sub.choices.values():  # type: ignore[union-attr]
+            found = _find_action(action, dest)
+            if found is not None:
+                return found
+    return None
+
+
+def _action_default(action) -> Any:
+    """Return the declared default for an argparse action, normalising ``None``."""
+    default = getattr(action, "default", None)
+    if default is None:
+        # ``store_true`` / ``store_false`` default to False implicitly
+        import argparse as _a
+
+        if isinstance(action, _a._StoreTrueAction):
+            return False
+        if isinstance(action, _a._StoreFalseAction):
+            return True
+    return default
+
+
+# ─────────────────────────── Self-check helper ────────────────────────
+
+
+def describe_sources() -> dict[str, Any]:
+    """Diagnostic: report which config files exist and what they'd contribute.
+
+    Used by ``run.py`` for the one-time "loaded config from ..." log
+    line on first run, and by tests.
+    """
+    return {
+        "global_path": str(GLOBAL_CONFIG_PATH),
+        "global_exists": GLOBAL_CONFIG_PATH.exists(),
+        "local_path": str(LOCAL_CONFIG_PATH.resolve())
+        if LOCAL_CONFIG_PATH.exists()
+        else str(LOCAL_CONFIG_PATH),
+        "local_exists": LOCAL_CONFIG_PATH.exists(),
+        "config": load_user_config(),
+    }
+
+
+__all__ = [
+    "GLOBAL_CONFIG_PATH",
+    "LOCAL_CONFIG_PATH",
+    "load_user_config",
+    "list_presets",
+    "get_preset",
+    "apply_preset",
+    "inject_defaults",
+    "describe_sources",
+]

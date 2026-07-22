@@ -7,9 +7,12 @@ import argparse
 
 def add_common_arguments(argument_parser: argparse.ArgumentParser) -> None:
     """Add CLI arguments shared by the auth and order commands."""
-    argument_parser.add_argument("--config", default="state/config.yaml", help="Path to config.yaml")
+    argument_parser.add_argument(
+        "--config", "-c", default="state/config.yaml", help="Path to config.yaml"
+    )
     argument_parser.add_argument(
         "--profile",
+        "-p",
         default=None,
         help="Profile key from config.yaml (e.g. wardany)",
     )
@@ -17,6 +20,14 @@ def add_common_arguments(argument_parser: argparse.ArgumentParser) -> None:
         "--all-profiles",
         action="store_true",
         help="Run for all profiles in config.yaml",
+    )
+    argument_parser.add_argument(
+        "--preset",
+        default=None,
+        help=(
+            "Name of a preset from ~/.pharmabotrc (or ./.pharmabotrc). "
+            "CLI flags override preset values."
+        ),
     )
 
 
