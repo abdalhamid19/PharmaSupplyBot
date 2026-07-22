@@ -25,3 +25,8 @@ output_decision.json
 login_test_result.txt
 product_matching_functions.txt
 test_avil_fix.xlsx
+
+# npx skills side-effects (not part of the project)
+.hermes/
+.kiro/
+skills-lock.json
