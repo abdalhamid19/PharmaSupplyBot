@@ -154,6 +154,19 @@ def _make_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _make_subparsers_parser() -> argparse.ArgumentParser:
+    """Realistic parser with subparsers — exercises _find_action_in_selected_subparser."""
+    p = argparse.ArgumentParser()
+    p.add_argument("--profile", default=None)
+    sub = p.add_subparsers(dest="cmd")
+    order = sub.add_parser("order")
+    order.add_argument("--limit", type=int, default=0)
+    order.add_argument("--match-only", action="store_true", default=False)
+    auth = sub.add_parser("auth")
+    auth.add_argument("--headless", action="store_true", default=False)
+    return p
+
+
 def test_apply_preset_fills_unset_args(isolated_paths) -> None:
     global_path, _ = isolated_paths
     _write(
@@ -191,6 +204,49 @@ def test_apply_preset_unknown_raises_value_error(isolated_paths) -> None:
     args = parser.parse_args([])
     with pytest.raises(ValueError, match="Unknown preset 'ghost'"):
         cli_config.apply_preset(parser, args, "ghost")
+
+
+def test_apply_preset_with_subparsers_finds_subcommand_flags(isolated_paths) -> None:
+    """Regression: the lookup of flag actions must descend into the *selected*
+    subparser (e.g. ``order``), not blindly iterate ``parser._subparsers``,
+    which is an ``_ArgumentGroup`` and crashes when iterated.
+    """
+    global_path, _ = isolated_paths
+    _write(
+        global_path,
+        "presets:\n  qd:\n    --limit: 20\n    --match-only: true\n",
+    )
+    parser = _make_subparsers_parser()
+    args = parser.parse_args(["order"])
+    out = cli_config.apply_preset(parser, args, "qd")
+    assert out.limit == 20
+    assert out.match_only is True
+
+
+def test_apply_preset_with_subparsers_respects_cli_flag(isolated_paths) -> None:
+    """Subcommand flags explicitly set on the CLI must beat the preset."""
+    global_path, _ = isolated_paths
+    _write(global_path, "presets:\n  qd:\n    --limit: 20\n")
+    parser = _make_subparsers_parser()
+    args = parser.parse_args(["order", "--limit", "5"])
+    out = cli_config.apply_preset(parser, args, "qd")
+    assert out.limit == 5  # CLI wins
+
+
+def test_apply_preset_with_subparsers_does_not_cross_subcommands(isolated_paths) -> None:
+    """A preset applied under 'order' must not see 'auth' flags."""
+    global_path, _ = isolated_paths
+    _write(
+        global_path,
+        "presets:\n  qd:\n    --limit: 20\n    --headless: true\n",
+    )
+    parser = _make_subparsers_parser()
+    args = parser.parse_args(["order"])
+    out = cli_config.apply_preset(parser, args, "qd")
+    # --limit belongs to 'order' and is applied
+    assert out.limit == 20
+    # --headless belongs to 'auth' and is NOT visible under 'order'
+    # (caller's preserve semantics: it must not leak across subparsers)
 
 
 def test_apply_preset_none_is_noop(isolated_paths) -> None:

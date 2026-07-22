@@ -223,7 +223,10 @@ def _was_passed(parser: ArgumentParser, args: Namespace, flag: str) -> bool:
     import argparse  # local to keep import cost down on hot path
 
     dest = _dest_for_flag(flag)
-    action = _find_action(parser, dest)
+    # For subcommand flags (e.g. --limit inside the 'order' subparser),
+    # the parent parser's actions only know about the *main* flags.
+    # We need to search the *selected* subparser to find the right action.
+    action = _find_action_in_selected_subparser(parser, args, dest)
     if action is None:
         # Flag unknown to this parser — treat as already-set so we
         # don't pollute ``args`` with garbage. Caller will see a
@@ -238,17 +241,41 @@ def _was_passed(parser: ArgumentParser, args: Namespace, flag: str) -> bool:
     return current != default
 
 
-def _find_action(parser: ArgumentParser, dest: str):
-    """Locate the argparse action for a given dest across this parser + subparsers."""
+def _find_action_in_selected_subparser(
+    parser: ArgumentParser, args: Namespace, dest: str
+):
+    """Find the argparse action for ``dest`` on the selected subparser.
+
+    argparse's ``parser._subparsers`` is an ``_ArgumentGroup`` (not a
+    list) and exposes the per-subcommand parsers as a ``choices``
+    mapping on the subparser action itself. We pull the right one
+    via ``getattr(args, 'cmd', None)`` (the dest of the subparser
+    action — set by ``add_subparsers(dest='cmd')`` in the main parser).
+    """
+    # First try the main parser (top-level flags like --profile, --config)
     for action in parser._actions:
         if action.dest == dest:
             return action
-    # Subparsers (e.g. "order", "auth") — scan those too
-    for sub in getattr(parser, "_subparsers", None) or []:
-        for action in sub.choices.values():  # type: ignore[union-attr]
-            found = _find_action(action, dest)
-            if found is not None:
-                return found
+
+    # Then try the selected subparser, if any
+    sub = _get_selected_subparser(parser, args)
+    if sub is not None:
+        for action in sub._actions:
+            if action.dest == dest:
+                return action
+    return None
+
+
+def _get_selected_subparser(parser: ArgumentParser, args: Namespace):
+    """Return the subparser chosen by ``args.cmd``, or None."""
+    # The subparsers action is registered on the main parser; its
+    # .choices dict maps subcommand name → subparser.
+    for action in parser._actions:
+        choices = getattr(action, "choices", None)
+        if isinstance(choices, dict) and len(choices) > 0:
+            selected_name = getattr(args, "cmd", None)
+            if selected_name and selected_name in choices:
+                return choices[selected_name]
     return None
 
 
