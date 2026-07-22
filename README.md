@@ -344,6 +344,104 @@ py scripts/audit_logging.py
 يُولّد تقرير markdown في `docs/audit_logging.md` بأعداد كل الانتهاكات.
 اليوم كل الأرقام صفر. انظر `docs/logging_system.md` للتفاصيل الكاملة.
 
+## تحسينات واجهة الـCLI (Stage 1)
+
+مجموعة تحسينات على تجربة الاستخدام اليومية للأوامر، كلها backward compatible:
+
+### 1. ملف إعدادات شخصي + `--preset`
+
+بدل تكرار `--profile wardany --config state/config.yaml` في كل أمر، احفظ defaults + presets في `~/.pharmabotrc`:
+
+```yaml
+# ~/.pharmabotrc (أو ./.pharmabotrc لتجاوز محلي)
+default:
+  --profile: wardany
+  --config: state/config.yaml
+
+presets:
+  # تشغيل سريع: 20 صنف، بدون إضافة للسلة
+  quick-dry-run:
+    --limit: 20
+    --match-only: true
+    --execution-mode: auto
+    --item-workers: 4
+
+  # طلب كامل بمساعدة AI مع سياسة صارمة
+  ai-strict:
+    --ai: true
+    --execution-mode: auto
+    --ai-verify-policy: score
+    --ai-search-policy: safe
+    --ai-accept-confidence: 0.95
+```
+
+**Precedence** (من الأعلى للأقل):
+```
+CLI args > --preset > ./.pharmabotrc > ~/.pharmabotrc > built-in defaults
+```
+
+أي flag تكتبه على الـcommand line يفوز على الـpreset والـfile.
+
+**الاستخدام:**
+
+```powershell
+# بدل كده (144 حرف)
+py run.py order --profile wardany --config state/config.yaml --excel data/inv.xlsx --limit 20 --match-only --execution-mode auto --item-workers 4
+
+# كده (76 حرف — نقص 47%)
+py run.py order -e data/inv.xlsx --preset quick-dry-run
+```
+
+### 2. اختصارات للأعلام المتكررة
+
+| Shortcut | Long form | Subcommands |
+|---|---|---|
+| `-p` | `--profile` | كل الأوامر الخمسة |
+| `-c` | `--config` | كل الأوامر الخمسة |
+| `-x` | `--excel` | `order`, `remove-cart`, `match-products` |
+| `-n` | `--limit` | `order`, `match-products`, `export-products` |
+
+الشكل الكامل بيشتغل زي الأول — مفيش breaking changes.
+
+### 3. إكمال تلقائي للـShell (Tab completion)
+
+بعد تثبيت واحد لكل shell:
+
+```bash
+# bash
+eval "$(py run.py --show-completion bash)"
+
+# zsh
+eval "$(py run.py --show-completion zsh)"
+
+# fish
+py run.py --show-completion fish | source
+```
+
+بعدها الـTab بيكمّل:
+- أسماء الـsubcommands الخمسة
+- flags الـsubcommand الحالي (طويلة وقصيرة)
+- القيم المسموحة للـenum flags (مثلاً `--execution-mode` → `auto api browser`)
+
+مصدر الحقيقة واحد: `build_parser()`. أي subcommand أو flag جديد بيظهر تلقائياً في الـcompletion.
+
+### 4. ملخص موحّد في نهاية كل أمر
+
+كل أمر بيطبع block ثابت بعد ما يخلص:
+
+```text
+✅ order completed
+   - processed    20
+   - matched      14
+   - flagged      1
+   - duration     25s
+   - summary      artifacts\order\wardany\20260722_1411
+```
+
+- **stdout** مع `✅` عند النجاح، **stderr** مع `❌` عند الفشل (عشان يبان حتى لو الـoutput بيتـpipe)
+- مخفي تحت `--quiet` (cron-friendly)
+- الـfields بتختلف حسب الأمر (الـorder بيعرض processed/matched/flagged، الـauth بيعرض profiles، إلخ)
+
 ## ملاحظات إضافية
 
 - محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
