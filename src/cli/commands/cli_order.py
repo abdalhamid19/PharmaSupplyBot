@@ -136,20 +136,40 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     )
 
     timer = CommandTimer()
-    summary_paths: list[Path] = []
+    run_directories: list[Path] = []
+    processed = matched = flagged = 0
     with timer:
-        execute_profiles(app_config, profiles, args)
-        # Collect the per-profile summary CSV paths so we can
-        # surface them in the command summary. The order command
-        # writes to artifacts/<profile>/<run_id>/order_summary*.csv
-        # — we look one level deep from each profile's artifact dir.
-        for profile_key, _ in profiles:
-            summary_paths.extend(_find_order_summary_csvs(profile_key))
+        from src.core.artifact_run import current_artifact_run
 
-    # Optional: read counts from the first summary CSV if it's there.
-    # We keep this best-effort — a missing or malformed CSV must not
-    # crash the summary block.
-    processed, matched, flagged = _count_from_summary_csvs(summary_paths)
+        execute_profiles(app_config, profiles, args)
+
+        # Snapshot: pull active run (if still set) + fall back to the
+        # most recent run directory per profile from disk.
+        active = current_artifact_run()
+        if active and active.directory.exists():
+            run_directories.append(active.directory)
+        else:
+            for profile_key, _ in profiles:
+                run_directories.extend(_newest_run_dirs(profile_key))
+
+        # Read counters from CSVs in THIS run's directory only.
+        # We only count ``order_item_summary_*.csv`` — that file has
+        # one row per INPUT item, which is what the operator means
+        # by "processed". The ``match_only_summary_*.csv`` file has
+        # one row per CANDIDATE (many candidates per item when AI
+        # runs), so we deliberately exclude it to avoid inflating
+        # the counter.
+        for d in run_directories:
+            for path in d.glob("order_item_summary_*.csv"):
+                p, m, f = _count_from_summary_csvs([path])
+                processed += p
+                matched += m
+                flagged += f
+
+    # The "summary" field shows the first run's directory (or the
+    # active one if available) so the operator can `ls` / open the
+    # artifacts without guessing.
+    primary_dir = run_directories[0] if run_directories else None
 
     print_command_summary(
         "order",
@@ -158,7 +178,7 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
             "matched": matched,
             "flagged": flagged,
             "duration": format_duration(timer.seconds),
-            "summary": summary_paths[0] if summary_paths else None,
+            "summary": primary_dir,
         },
         success=True,
         quiet=is_quiet(args),
@@ -166,22 +186,19 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     return 0
 
 
-def _find_order_summary_csvs(profile_key: str) -> list[Path]:
-    """Locate order-summary CSVs written by the order command.
-
-    Searches the artifact run directories for any ``order_summary*.csv``
-    file written during this run. We use mtime (newest first) to pick
-    the most recent one per profile.
+def _newest_run_dirs(profile_key: str) -> list[Path]:
+    """Return the most recent run directories under
+    ``artifacts/order/<profile>/**/`` (one per timestamp).
     """
     base = Path("artifacts") / "order" / profile_key
     if not base.exists():
-        # Fallback: also check artifacts/<profile>/ for legacy layout
         base = Path("artifacts") / profile_key
     if not base.exists():
         return []
-    csvs = list(base.glob("**/order_summary*.csv"))
-    csvs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return csvs
+    dirs = [d for d in base.iterdir() if d.is_dir()]
+    # Sort by directory name (which is the timestamped run_id) — newest last.
+    dirs.sort(key=lambda d: d.name, reverse=True)
+    return [dirs[0]] if dirs else []
 
 
 def _count_from_summary_csvs(paths: list[Path]) -> tuple[int, int, int]:
@@ -190,6 +207,19 @@ def _count_from_summary_csvs(paths: list[Path]) -> tuple[int, int, int]:
     Reads each CSV's ``status`` and ``manual_review_required`` columns
     if present. Returns ``(0, 0, 0)`` when no CSVs are readable so
     the caller still gets a clean summary block.
+
+    Status values we recognise (from src/tawreed/order/tawreed_order_summary.py):
+      * "matched-only"   — we found a candidate, did not add to cart
+      * "added-to-cart"  — successful end-to-end placement
+      * "no-results"     — no candidate matched the query
+      * "not-orderable"  — candidate found but can't be ordered
+      * "failed"         — errored mid-flow
+      * "manual-review"  — requires human review (counted as flagged)
+
+    The ``matched`` total includes both ``matched-only`` and
+    ``added-to-cart`` since both indicate a successful match
+    (whether or not it was placed). The ``flagged`` total is rows
+    whose ``manual_review_required`` column is truthy.
     """
     if not paths:
         return 0, 0, 0
@@ -202,16 +232,11 @@ def _count_from_summary_csvs(paths: list[Path]) -> tuple[int, int, int]:
                 reader = _csv.DictReader(fh)
                 for row in reader:
                     total += 1
-                    if str(row.get("status", "")).strip() in (
-                        "matched-only",
-                        "added-to-cart",
-                    ):
+                    status = str(row.get("status", "")).strip()
+                    if status in ("matched-only", "added-to-cart"):
                         matched += 1
-                    if str(row.get("manual_review_required", "")).strip().lower() in (
-                        "true",
-                        "1",
-                        "yes",
-                    ):
+                    mr = str(row.get("manual_review_required", "")).strip().lower()
+                    if mr in ("true", "1", "yes"):
                         flagged += 1
     except (OSError, KeyError, ValueError):
         return 0, 0, 0

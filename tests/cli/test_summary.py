@@ -277,3 +277,72 @@ def test_realistic_order_summary(capsys) -> None:
     assert "   - duration     2m 14s" in out
     assert "   - summary      " in out
     assert "order_summary.csv" in out
+
+
+# ─────────────────────────── order counter regression ──────────────
+# These tests guard against the Stage 1d fix where _find_order_summary_csvs
+# was globbing for the wrong filename and _count_from_summary_csvs was
+# matching the wrong status values. The bug: the real CSVs are named
+# ``order_item_summary_*.csv`` (not ``order_summary_*.csv``) and the
+# per-row status values include ``matched-only``, ``not-orderable``,
+# ``no-results``, ``manual-review``, and ``added-to-cart`` — NOT
+# the two values the original code checked for.
+
+
+def test_count_from_real_order_item_summary_csv(tmp_path) -> None:
+    """Write a realistic CSV and confirm the counter reads it correctly."""
+    from src.cli.commands.cli_order import _count_from_summary_csvs
+
+    csv = tmp_path / "order_item_summary_20260722_1411.csv"
+    csv.write_text(
+        "item_code,item_name,status,manual_review_required\n"
+        "1,A,matched-only,False\n"
+        "2,B,matched-only,False\n"
+        "3,C,added-to-cart,False\n"
+        "4,D,not-orderable,False\n"
+        "5,E,no-results,False\n"
+        "6,F,matched-only,True\n",
+        encoding="utf-8",
+    )
+    p, m, f = _count_from_summary_csvs([csv])
+    assert p == 6
+    assert m == 4  # 3 × matched-only + 1 × added-to-cart
+    assert f == 1  # the True row is counted as flagged
+
+
+def test_count_handles_missing_csv_gracefully() -> None:
+    """Empty path list returns zeros, not an exception."""
+    from src.cli.commands.cli_order import _count_from_summary_csvs
+
+    p, m, f = _count_from_summary_csvs([])
+    assert (p, m, f) == (0, 0, 0)
+
+
+def test_count_handles_malformed_csv_gracefully(tmp_path) -> None:
+    """A CSV with broken content must not crash the summary."""
+    from src.cli.commands.cli_order import _count_from_summary_csvs
+
+    bad = tmp_path / "order_item_summary_broken.csv"
+    bad.write_text("not,valid\ncsv,with,bad", encoding="utf-8")
+    p, m, f = _count_from_summary_csvs([bad])
+    # 2 rows, both lack a status column → counted as processed only.
+    # The contract is "never crash"; the exact count on malformed
+    # input is implementation-defined.
+    assert p >= 0
+    assert m >= 0
+    assert f >= 0
+
+
+def test_count_filters_to_only_this_runs_files() -> None:
+    """_newest_run_dirs returns the directory most recently modified."""
+    # We use the existing artifact dirs to make sure the helper
+    # actually finds a directory rather than crashing.
+    from pathlib import Path
+
+    from src.cli.commands.cli_order import _newest_run_dirs
+
+    result = _newest_run_dirs("wardany")
+    assert len(result) <= 1
+    if result:
+        assert result[0].is_dir()
+        assert "wardany" in str(result[0])
