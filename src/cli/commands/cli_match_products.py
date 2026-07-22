@@ -179,17 +179,48 @@ def run_match_products_command(app_config, args: argparse.Namespace) -> int:
     this command does not need to install its own handlers — it just
     uses the matching-scoped logger that inherits from root.
     """
+    from ..cli_shared import (
+        CommandTimer,
+        format_duration,
+        is_quiet,
+        print_command_summary,
+    )
+
     load_env()
     matching_logger = logging.getLogger(__name__)
-    with artifact_run("match-products", _match_profile(args)) as run:
-        matching_logger.info(
-            "artifact run started",
-            extra={"profile": run.profile_key, "directory": str(run.directory)},
-        )
-        pipeline = _pipeline_from_args(args)
-        matching_logger.info("starting product matching")
-        results = asyncio.run(_run_pipeline(pipeline, args))
-        matching_logger.info("matched rows", extra={"count": len(results)})
+    timer = CommandTimer()
+    matched_count = 0
+    total_count = 0
+    saved_path: str | None = None
+    with timer:
+        with artifact_run("match-products", _match_profile(args)) as run:
+            matching_logger.info(
+                "artifact run started",
+                extra={"profile": run.profile_key, "directory": str(run.directory)},
+            )
+            pipeline = _pipeline_from_args(args)
+            matching_logger.info("starting product matching")
+            results = asyncio.run(_run_pipeline(pipeline, args))
+            total_count = len(results)
+            if "matched_product_name_en" in results.columns:
+                matched_count = int(
+                    (results["matched_product_name_en"].fillna("") != "").sum()
+                )
+            saved_path = str(args.output or _default_output_path() or "")
+            matching_logger.info("matched rows", extra={"count": matched_count})
+
+    print_command_summary(
+        "match-products",
+        {
+            "processed": total_count,
+            "matched": matched_count,
+            "unmatched": total_count - matched_count,
+            "duration": format_duration(timer.seconds),
+            "summary": saved_path or None,
+        },
+        success=True,
+        quiet=is_quiet(args),
+    )
     return 0
 
 

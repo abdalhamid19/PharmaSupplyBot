@@ -122,13 +122,100 @@ def order_bot(
 @register("order")
 def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Place orders from Excel for the selected profiles."""
+    from ..cli_shared import (
+        CommandTimer,
+        format_duration,
+        is_quiet,
+        print_command_summary,
+    )
+
     load_env()
     apply_order_overrides(app_config, args)
     profiles = app_config.profiles_to_run(
         profile=args.profile, all_profiles=args.all_profiles
     )
-    execute_profiles(app_config, profiles, args)
+
+    timer = CommandTimer()
+    summary_paths: list[Path] = []
+    with timer:
+        execute_profiles(app_config, profiles, args)
+        # Collect the per-profile summary CSV paths so we can
+        # surface them in the command summary. The order command
+        # writes to artifacts/<profile>/<run_id>/order_summary*.csv
+        # — we look one level deep from each profile's artifact dir.
+        for profile_key, _ in profiles:
+            summary_paths.extend(_find_order_summary_csvs(profile_key))
+
+    # Optional: read counts from the first summary CSV if it's there.
+    # We keep this best-effort — a missing or malformed CSV must not
+    # crash the summary block.
+    processed, matched, flagged = _count_from_summary_csvs(summary_paths)
+
+    print_command_summary(
+        "order",
+        {
+            "processed": processed,
+            "matched": matched,
+            "flagged": flagged,
+            "duration": format_duration(timer.seconds),
+            "summary": summary_paths[0] if summary_paths else None,
+        },
+        success=True,
+        quiet=is_quiet(args),
+    )
     return 0
+
+
+def _find_order_summary_csvs(profile_key: str) -> list[Path]:
+    """Locate order-summary CSVs written by the order command.
+
+    Searches the artifact run directories for any ``order_summary*.csv``
+    file written during this run. We use mtime (newest first) to pick
+    the most recent one per profile.
+    """
+    base = Path("artifacts") / "order" / profile_key
+    if not base.exists():
+        # Fallback: also check artifacts/<profile>/ for legacy layout
+        base = Path("artifacts") / profile_key
+    if not base.exists():
+        return []
+    csvs = list(base.glob("**/order_summary*.csv"))
+    csvs.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return csvs
+
+
+def _count_from_summary_csvs(paths: list[Path]) -> tuple[int, int, int]:
+    """Return ``(processed, matched, flagged)`` totals across CSVs.
+
+    Reads each CSV's ``status`` and ``manual_review_required`` columns
+    if present. Returns ``(0, 0, 0)`` when no CSVs are readable so
+    the caller still gets a clean summary block.
+    """
+    if not paths:
+        return 0, 0, 0
+    total = matched = flagged = 0
+    try:
+        import csv as _csv
+
+        for path in paths:
+            with path.open("r", encoding="utf-8", newline="") as fh:
+                reader = _csv.DictReader(fh)
+                for row in reader:
+                    total += 1
+                    if str(row.get("status", "")).strip() in (
+                        "matched-only",
+                        "added-to-cart",
+                    ):
+                        matched += 1
+                    if str(row.get("manual_review_required", "")).strip().lower() in (
+                        "true",
+                        "1",
+                        "yes",
+                    ):
+                        flagged += 1
+    except (OSError, KeyError, ValueError):
+        return 0, 0, 0
+    return total, matched, flagged
 
 
 def execute_profiles(

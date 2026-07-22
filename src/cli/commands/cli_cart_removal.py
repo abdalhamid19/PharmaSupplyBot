@@ -13,7 +13,15 @@ from src.core.utils.chunking import split_into_chunks
 from src.tawreed.artifacts.order_result_merger import merge_worker_summaries
 from src.tawreed.tawreed import TawreedBot
 from src.tawreed.auth.tawreed_session import SessionInvalidError
-from ..cli_shared import build_bot, raise_invalid_session, require_state_file
+from ..cli_shared import (
+    CommandTimer,
+    build_bot,
+    format_duration,
+    is_quiet,
+    print_command_summary,
+    raise_invalid_session,
+    require_state_file,
+)
 from .cli_cart_removal_source import cart_removal_items
 from .item_worker import build_cart_payloads, report_worker_results, resolve_item_workers
 from ..registry import register
@@ -24,16 +32,37 @@ logger = logging.getLogger(__name__)
 @register("remove-cart")
 def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Remove requested items from Tawreed carts for the selected profiles."""
-    profiles = app_config.profiles_to_run(
-        profile=args.profile, all_profiles=args.all_profiles
+    timer = CommandTimer()
+    items_total = 0
+    with timer:
+        profiles = app_config.profiles_to_run(
+            profile=args.profile, all_profiles=args.all_profiles
+        )
+        for profile_key, profile in profiles:
+            with artifact_run("remove-cart", profile_key) as run:
+                logger.info(
+                    "artifact run started",
+                    extra={"profile": profile_key, "directory": str(run.directory)},
+                )
+                _run_remove_cart_profile(app_config, profile_key, profile, args)
+                # Capture the count AFTER the run so the summary reflects what
+                # was actually attempted. cart_removal_items() may normalize
+                # duplicates or drop empty rows.
+                try:
+                    items_total += len(cart_removal_items(args, load_cart_removal_items))
+                except Exception:  # noqa: BLE001 - summary must not crash
+                    pass
+
+    print_command_summary(
+        "remove-cart",
+        {
+            "profiles": [p for p, _ in profiles],
+            "items": items_total,
+            "duration": format_duration(timer.seconds),
+        },
+        success=True,
+        quiet=is_quiet(args),
     )
-    for profile_key, profile in profiles:
-        with artifact_run("remove-cart", profile_key) as run:
-            logger.info(
-                "artifact run started",
-                extra={"profile": profile_key, "directory": str(run.directory)},
-            )
-            _run_remove_cart_profile(app_config, profile_key, profile, args)
     return 0
 
 
