@@ -49,6 +49,19 @@ app = typer.Typer(
 # ─────────────────────────── Global options ───────────────────────────
 
 
+VALID_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+
+def _validate_log_level(value: str) -> str:
+    """Callback for ``--log-level``: reject unknown values with exit 2."""
+    upper = value.upper()
+    if upper not in VALID_LOG_LEVELS:
+        raise typer.BadParameter(
+            f"Invalid value: {value!r}. Choose from {', '.join(VALID_LOG_LEVELS)}."
+        )
+    return upper
+
+
 @app.callback()
 def _root(
     ctx: Context,
@@ -56,6 +69,7 @@ def _root(
         "INFO",
         "--log-level",
         envvar="PHARMABOT_LOG_LEVEL",
+        callback=_validate_log_level,
         help="Minimum log level emitted to console (DEBUG/INFO/WARNING/ERROR/CRITICAL).",
     ),
     quiet: bool = typer.Option(

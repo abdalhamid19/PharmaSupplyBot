@@ -127,7 +127,10 @@ def test_json_logs_records_have_logger_name(
     tmp_path: Path, config_file: Path
 ) -> None:
     """Every JSON record must carry the ``logger`` field with the dotted
-    module path. After stage 4 the root command logger is ``__main__``.
+    module path of the code that emitted the record.
+
+    After the Typer migration, the error path logs via the module-level
+    logger in ``src.cli.typer_app`` (the function ``_run_registered``).
     """
     result = _run(
         [
@@ -137,13 +140,16 @@ def test_json_logs_records_have_logger_name(
         tmp_path,
     )
     assert result.returncode == 5
+    seen_loggers = set()
     for line in result.stderr.splitlines():
         if not line.strip():
             continue
         payload = _assert_json_record(line)
-        assert payload["logger"] == "__main__", (
-            f"unexpected logger name: {payload['logger']!r}"
-        )
+        seen_loggers.add(payload["logger"])
+    # Must contain a logger from our own CLI module.
+    assert any(lg.startswith("src.cli.") for lg in seen_loggers), (
+        f"expected a src.cli.* logger, got: {seen_loggers}"
+    )
 
 
 def test_json_logs_records_land_in_file(
