@@ -95,4 +95,57 @@ def _stringify(value: Any) -> str:
     return str(value)
 
 
-__all__ = ["FormatFlags", "render_table"]
+def render_summary(
+    command: str,
+    fields: dict[str, Any],
+    fmt: FormatFlags,
+    *,
+    success: bool = True,
+) -> str:
+    """Render a command summary block (the legacy ``print_command_summary``).
+
+    Three formats:
+
+    * **JSON** — envelope ``{"ok": bool, "data": {...} | None, "error": {...} | None}``.
+      The error envelope is symmetric: success carries data, failure carries error.
+    * **Plain** — ``OK command`` / ``FAIL command`` header + ``key=value`` rows.
+      Stable, grep-friendly, no ANSI codes.
+    * **Human** — Rich ``Panel`` with an icon (✅ / ❌) and the field rows.
+    """
+    if fmt.json:
+        if success:
+            payload = {"ok": True, "data": {"command": command, **fields}, "error": None}
+        else:
+            payload = {
+                "ok": False,
+                "data": None,
+                "error": {
+                    "code": "COMMAND_FAILED",
+                    "message": str(fields),
+                    "command": command,
+                },
+            }
+        return json.dumps(payload, ensure_ascii=False, default=str)
+
+    if fmt.plain:
+        status = "OK" if success else "FAIL"
+        header = f"{status} {command}"
+        body = "\n".join(f"{k}={_stringify(v)}" for k, v in fields.items())
+        return f"{header}\n{body}" if body else header
+
+    # Human-readable Rich panel.
+    from rich.panel import Panel
+
+    icon = "✅" if success else "❌"
+    body_lines = [f"{label:<14} {_stringify(value)}" for label, value in fields.items()]
+    console = Console(
+        no_color=fmt.no_color,
+        force_terminal=False,
+        record=True,
+        color_system=None if fmt.no_color else "auto",
+    )
+    console.print(Panel("\n".join(body_lines) if body_lines else "", title=f"{icon} {command}"))
+    return console.export_text()
+
+
+__all__ = ["FormatFlags", "render_table", "render_summary"]

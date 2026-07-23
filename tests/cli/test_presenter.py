@@ -108,3 +108,69 @@ def test_render_table_empty_rows_returns_envelope() -> None:
     parsed = json.loads(out)
     assert parsed["ok"] is True
     assert parsed["data"] == []
+
+
+# ─────────────────────────── render_summary ───────────────────────────
+
+
+from src.cli.presenter import render_summary  # noqa: E402
+
+
+def test_render_summary_json_envelope_success() -> None:
+    fmt = FormatFlags(json=True, no_color=True)
+    out = render_summary(
+        "order",
+        {"processed": 18, "matched": 16, "duration": "2m 14s"},
+        fmt,
+        success=True,
+    )
+    parsed = json.loads(out)
+    assert parsed["ok"] is True
+    assert parsed["data"]["command"] == "order"
+    assert parsed["data"]["processed"] == 18
+    assert parsed["data"]["matched"] == 16
+    assert parsed["error"] is None
+
+
+def test_render_summary_json_envelope_failure() -> None:
+    fmt = FormatFlags(json=True, no_color=True)
+    out = render_summary(
+        "order",
+        {"processed": 5},
+        fmt,
+        success=False,
+    )
+    parsed = json.loads(out)
+    assert parsed["ok"] is False
+    assert parsed["data"] is None
+    assert parsed["error"]["code"] == "COMMAND_FAILED"
+
+
+def test_render_summary_plain_kv_format() -> None:
+    fmt = FormatFlags(plain=True, no_color=True)
+    out = render_summary(
+        "auth",
+        {"profiles": ["wardany"], "duration": "30s"},
+        fmt,
+        success=True,
+    )
+    lines = out.split("\n")
+    assert lines[0] == "OK auth"
+    # Lists serialise via ``str`` (which produces Python ``['wardany']``);
+    # the plain format is grep-friendly on the keys, not the values.
+    assert "duration=30s" in lines[2]
+    assert "profiles=" in lines[1]
+
+
+def test_render_summary_human_renders_panel_with_icon() -> None:
+    fmt = FormatFlags(no_color=True)
+    out = render_summary(
+        "order",
+        {"processed": 18, "matched": 16},
+        fmt,
+        success=True,
+    )
+    # Panel should contain the command name + key fields
+    assert "order" in out
+    assert "processed" in out
+    assert "matched" in out
