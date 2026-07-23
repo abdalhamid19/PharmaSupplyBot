@@ -303,13 +303,35 @@ py run.py auth --log-level DEBUG --profile wardany
 # كتم ما دون التحذيرات على stderr (الملفات تبقى تكتب كل شيء)
 py run.py --quiet auth --profile wardany
 
-# إخراج JSON صالح للتحليل الآلي (مفيد لـ CI و log aggregators)
-py run.py --json-logs auth --profile wardany
+# إخراج JSON صالح للتحليل الآلي (مفيد لـ CI و log aggregators).
+# الـ flag اتغير من --json-logs لـ --json-log-records للوضوح بين logs و data.
+py run.py --json-log-records auth --profile wardany
 
-# قيمة غير معروفة تُرفض من argparse
+# تلوين الـ console output بـ Rich (الـ files تبقى plain text للـ aggregators)
+py run.py --rich-logs auth --profile wardany
+
+# قيمة غير معروفة تُرفض قبل الـ command (Typer callback → exit 2)
 py run.py --log-level BOGUS auth --help
 # exit 2
 ```
+
+### Output formats (--format)
+
+كل subcommand بيطلّع بيانات (export-products, match-products, remove-cart, order)
+يدعم ثلاث صيغ:
+
+```bash
+# human (default): Rich-rendered table على TTY، plain TSV لو piped
+py run.py export-products --profile wardany
+
+# json: envelope {"ok": true, "data": [...]} على stdout، stderr للـ diagnostics
+py run.py export-products --profile wardany --format json | jq .
+
+# plain: TSV rows على stdout (grep-friendly، بدون ألوان)
+py run.py export-products --profile wardany --format plain | head
+```
+
+الـ `--format` flag موجود حتى على `auth` (no-op هناك) عشان يبقى الـ UX ثابت.
 
 ### كتابة logging في module جديد
 
