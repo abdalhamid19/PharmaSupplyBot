@@ -140,13 +140,20 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
     ns = apply_preset(None, ns, getattr(ns, "preset", None))  # type: ignore[arg-type]
     ns = inject_defaults(None, ns)  # type: ignore[arg-type]
 
-    # 4. Load config + dispatch.
-    config_path = Path(getattr(ns, "config", "config.yaml"))
-    app_config = load_config(config_path)
-    command = get_command(cmd_name)
+    # 4. Load config + dispatch (full wrap so PharmaSupplyError always logs).
     try:
+        config_path = Path(getattr(ns, "config", "config.yaml"))
+        app_config = load_config(config_path)
+        command = get_command(cmd_name)
         return command(app_config, ns)
     except PharmaSupplyError as exc:
+        logger.error(
+            "command failed: %s",
+            exc.message,
+            extra={"exit_code": exc.exit_code, "profile": exc.profile},
+        )
+        if exc.hint:
+            logger.warning("hint: %s", exc.hint)
         typer.echo(f"{exc}", err=True)
         raise typer.Exit(exc.exit_code)
     except Exception:

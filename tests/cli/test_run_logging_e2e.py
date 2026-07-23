@@ -151,14 +151,16 @@ def test_command_exits_and_logs(
 
 
 def test_help_commands_only_emit_root_records(tmp_path: Path) -> None:
-    """``--help`` causes argparse to print usage and sys.exit(0) BEFORE
+    """``--help`` causes Typer to print usage and sys.exit(0) BEFORE
     ``run.main()`` configures logging. Therefore no application logs
     are produced. This test pins that behaviour so a future change that
     re-orders initialisation doesn't silently start logging on help.
     """
     result = _run([str(PY), str(RUN), "auth", "--help"], tmp_path)
     assert result.returncode == 0
-    assert "usage:" in result.stdout or "usage:" in result.stderr
+    # Typer renders ``Usage:`` (capital U) in its Rich-styled help.
+    output = (result.stdout or "") + (result.stderr or "")
+    assert "Usage:" in output
     # No logs/ directory created when --help short-circuits.
     assert not (_logs_dir(tmp_path) / "app.log").exists()
 
