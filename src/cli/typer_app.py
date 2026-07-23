@@ -216,5 +216,217 @@ def export_products_cmd(
     raise typer.Exit(_run_registered(ctx, "export-products"))
 
 
+@app.command("match-products")
+def match_products_cmd(
+    ctx: Context,
+    config: str = typer.Option(
+        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+    ),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
+    all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
+    preset: str | None = typer.Option(None, "--preset", help="User-config preset name."),
+    excel: str = typer.Option(..., "--excel", "-x", help="Inventory Excel/CSV file."),
+    tawreed_csv: str | None = typer.Option(
+        None, "--tawreed-csv", help="Tawreed products CSV path."
+    ),
+    output: str | None = typer.Option(None, "--output", help="Output CSV path."),
+    limit: int | None = typer.Option(None, "--limit", "-n", help="Limit items."),
+    start: int | None = typer.Option(None, "--start", help="Start item index."),
+    end: int | None = typer.Option(None, "--end", help="End item index."),
+    resume: bool = typer.Option(False, "--resume", help="Resume from saved state."),
+    trace: bool = typer.Option(False, "--trace", help="Trace mode."),
+    no_ai: bool = typer.Option(False, "--no-ai", help="Disable AI matching."),
+    threshold: int = typer.Option(80, "--threshold", help="Score threshold."),
+    ai_threshold: float = typer.Option(90.0, "--ai-threshold", help="AI score threshold."),
+    ai_verify_policy: str = typer.Option(
+        "score", "--ai-verify-policy",
+        help="AI verify policy: score, fuzzy, all-non-exact, all.",
+    ),
+    ai_search_policy: str = typer.Option(
+        "review-candidates", "--ai-search-policy",
+        help="AI search policy: safe, review-candidates, expanded, aggressive.",
+    ),
+    provider: str | None = typer.Option(None, "--provider", help="AI provider."),
+    model: str | None = typer.Option(None, "--model", help="AI model."),
+    api_key: str | None = typer.Option(None, "--api-key", help="AI API key."),
+    review_model: str | None = typer.Option(None, "--review-model", help="AI review model."),
+    concurrency: int | None = typer.Option(None, "--concurrency", help="AI concurrency."),
+    ai_search_limit: int | None = typer.Option(
+        None, "--ai-search-limit", help="Limit AI search results."
+    ),
+    no_ai_preflight: bool = typer.Option(
+        False, "--no-ai-preflight", help="Skip AI preflight check."
+    ),
+    rotation_preflight_policy: str = typer.Option(
+        "smart", "--rotation-preflight-policy", help="API-rotation preflight policy."
+    ),
+    format: str | None = typer.Option(
+        None, "--format",
+        help="Output format: human (default, TTY-only), json, or plain.",
+    ),
+) -> None:
+    """Match an inventory Excel/CSV file against exported Tawreed products."""
+    raise typer.Exit(_run_registered(ctx, "match-products"))
+
+
+@app.command("remove-cart")
+def remove_cart_cmd(
+    ctx: Context,
+    config: str = typer.Option(
+        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+    ),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
+    all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
+    preset: str | None = typer.Option(None, "--preset", help="User-config preset name."),
+    excel: str | None = typer.Option(
+        None, "--excel", "-x", help="Path to cart-removal Excel file."
+    ),
+    debug_browser: bool = typer.Option(
+        False, "--debug-browser", help="Open a visible browser for this run."
+    ),
+    stop_flag: str | None = typer.Option(
+        None, "--stop-flag", help="Stop-request flag file path."
+    ),
+    execution_mode: str = typer.Option(
+        "auto", "--execution-mode",
+        help="Execution backend: auto, api, or browser.",
+    ),
+    item_workers: int | None = typer.Option(
+        None, "--item-workers", help="Parallel item workers per profile."
+    ),
+    from_manual_review: str | None = typer.Option(
+        None, "--from-manual-review", help="Manual-review CSV path."
+    ),
+    manual_review_scope: str = typer.Option(
+        "current-run", "--manual-review-scope",
+        help="Manual-review scope: current-run or saved-decisions.",
+    ),
+    manual_decision: str = typer.Option(
+        "not_matching", "--manual-decision", help="Manual decision filter."
+    ),
+    format: str | None = typer.Option(
+        None, "--format",
+        help="Output format: human (default, TTY-only), json, or plain.",
+    ),
+) -> None:
+    """Remove matching products from Tawreed carts."""
+    raise typer.Exit(_run_registered(ctx, "remove-cart"))
+
+
+@app.command("order")
+def order_cmd(
+    ctx: Context,
+    config: str = typer.Option(
+        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+    ),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
+    all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
+    preset: str | None = typer.Option(None, "--preset", help="User-config preset name."),
+    excel: str | None = typer.Option(
+        None, "--excel", "-x",
+        help="Path to order Excel file, usually under data/input/order_items/.",
+    ),
+    # Runtime
+    limit: int = typer.Option(0, "--limit", "-n", help="Limit items (0 = no limit)."),
+    debug_browser: bool = typer.Option(
+        False, "--debug-browser", help="Open a visible browser for this run."
+    ),
+    max_workers: int | None = typer.Option(
+        None, "--max-workers", help="Max parallel profiles (0 = unlimited)."
+    ),
+    start_item: int = typer.Option(
+        1, "--start-item", help="Start processing from this item number."
+    ),
+    end_item: int = typer.Option(
+        0, "--end-item", help="Stop after this item number (0 = end of sheet)."
+    ),
+    resume: bool = typer.Option(
+        False, "--resume", help="Skip items in the active summary CSV."
+    ),
+    stop_flag: str | None = typer.Option(
+        None, "--stop-flag", help="Stop-request flag file path."
+    ),
+    fast_search: bool = typer.Option(
+        False, "--fast-search", help="Stop after the first acceptable match."
+    ),
+    match_only: bool = typer.Option(
+        False, "--match-only", help="Only run matching; never add to cart."
+    ),
+    execution_mode: str = typer.Option(
+        "auto", "--execution-mode",
+        help="Execution backend: auto, api, or browser.",
+    ),
+    item_workers: int | None = typer.Option(
+        None, "--item-workers", help="Parallel item workers per profile."
+    ),
+    # Risk
+    matching_risk_policy: str = typer.Option(
+        "safe", "--matching-risk-policy",
+        help="Matching risk policy: safe or aggressive.",
+    ),
+    flagged_match_action: str = typer.Option(
+        "manual-review-only", "--flagged-match-action",
+        help="Action for flagged matches: manual-review-only or add-to-cart.",
+    ),
+    # AI
+    ai: bool = typer.Option(False, "--ai", help="Enable active AI matching."),
+    provider: str | None = typer.Option(None, "--provider", help="AI provider."),
+    model: str | None = typer.Option(None, "--model", help="AI model."),
+    api_key: str | None = typer.Option(None, "--api-key", help="AI API key."),
+    review_model: str | None = typer.Option(None, "--review-model", help="AI review model."),
+    concurrency: int | None = typer.Option(None, "--concurrency", help="AI concurrency."),
+    ai_verify_policy: str = typer.Option(
+        "score", "--ai-verify-policy",
+        help="AI verify policy: score, fuzzy, all-non-exact, all.",
+    ),
+    ai_search_policy: str = typer.Option(
+        "review-candidates", "--ai-search-policy",
+        help="AI search policy: safe, review-candidates, expanded, aggressive.",
+    ),
+    ai_accept_confidence: float = typer.Option(
+        0.9, "--ai-accept-confidence", help="AI auto-accept confidence."
+    ),
+    ai_verify_soft_accept_confidence: float = typer.Option(
+        0.8, "--ai-verify-soft-accept-confidence",
+        help="AI soft-accept confidence for verify policy.",
+    ),
+    ai_review_threshold: float = typer.Option(
+        0.95, "--ai-review-threshold", help="Threshold to flag for manual review."
+    ),
+    no_ai_preflight: bool = typer.Option(
+        False, "--no-ai-preflight", help="Skip AI preflight check."
+    ),
+    rotation_preflight_policy: str = typer.Option(
+        "smart", "--rotation-preflight-policy", help="API-rotation preflight policy."
+    ),
+    # Filter
+    warehouse_mode: str | None = typer.Option(
+        None, "--warehouse-mode",
+        help="Warehouse selection override: first_available, max_available, max_discount.",
+    ),
+    min_discount_percent: float | None = typer.Option(
+        None, "--min-discount-percent",
+        help="Only stores with discount ≥ this percent.",
+    ),
+    prevented_items_excel: str = typer.Option(
+        "data/input/prevented_items/drugprevented.xlsx",
+        "--prevented-items-excel",
+        help="Path to XLSX of items that must not be ordered.",
+    ),
+    # Manual review
+    from_manual_review_corrections: str | None = typer.Option(
+        None, "--from-manual-review-corrections",
+        help="Manual-review CSV with corrected rows to search match-only.",
+    ),
+    # Format
+    format: str | None = typer.Option(
+        None, "--format",
+        help="Output format: human (default, TTY-only), json, or plain.",
+    ),
+) -> None:
+    """Create orders from Excel (no human interaction)."""
+    raise typer.Exit(_run_registered(ctx, "order"))
+
+
 # Re-export for downstream imports
 __all__ = ["app"]
