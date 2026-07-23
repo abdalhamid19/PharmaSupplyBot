@@ -113,7 +113,7 @@ def get_preset(name: str, config: dict[str, Any] | None = None) -> dict[str, Any
 
 
 def apply_preset(
-    parser: ArgumentParser,
+    parser: ArgumentParser | None,
     args: Namespace,
     preset_name: str | None,
 ) -> Namespace:
@@ -158,7 +158,7 @@ def apply_preset(
 # ─────────────────────────── Defaults injection ────────────────────────
 
 
-def inject_defaults(parser: ArgumentParser, args: Namespace) -> Namespace:
+def inject_defaults(parser: ArgumentParser | None, args: Namespace) -> Namespace:
     """Fill any unset CLI argument from the user-config ``default`` block.
 
     This runs *after* ``parse_args()`` and *before* the command
@@ -218,7 +218,7 @@ def _was_passed(
 ) -> bool:
     """Return True if the user (or a preset) supplied ``flag`` with a non-default value.
 
-    Two calling conventions are supported for backward compatibility:
+    Three calling conventions are supported:
 
     * **New (parser-agnostic)**: ``_was_passed(flag: str, current: Any, default: Any)``
       — caller resolves the current value and declared default, helper does the
@@ -227,22 +227,18 @@ def _was_passed(
     * **Legacy (argparse-only)**: ``_was_passed(parser, args, flag: str)``
       — helper inspects argparse internals to resolve ``current`` + ``default``.
 
-    The legacy form is kept so the existing call sites in ``apply_preset``
-    and ``inject_defaults`` (which receive a real argparse ``parser`` and
-    ``Namespace``) keep working unchanged.
+    * **Typer-aware shim**: ``_was_passed(None, args, flag: str)`` — ``parser`` is
+      optional. When ``None``, ``args._typer_defaults`` (set by the Typer app's
+      ``_collect_defaults``) supplies the declared defaults.
 
-    The new form is what Typer code paths use — Typer sets parameter
-    defaults on ``ParameterInfo.default``, and the caller snapshots those
-    into ``args._typer_defaults`` (see :mod:`src.cli.cli_runner`).
+    The legacy + shim forms are kept so existing call sites in ``apply_preset``
+    and ``inject_defaults`` (which receive an ``ArgumentParser | None`` and a
+    ``Namespace``) keep working unchanged.
     """
     # Legacy argparse path: positional args are (parser, args, flag)
-    if isinstance(parser_or_flag, ArgumentParser) and not isinstance(
-        args_or_current, Namespace
-    ):
-        # Bad call shape — fall through to the new API for a clearer error.
-        pass
+    # (parser can be None for the Typer sidecar path.)
     if (
-        isinstance(parser_or_flag, ArgumentParser)
+        (parser_or_flag is None or isinstance(parser_or_flag, ArgumentParser))
         and isinstance(args_or_current, Namespace)
         and isinstance(flag_or_default, str)
     ):
@@ -257,20 +253,36 @@ def _was_passed(
     return current != default
 
 
-def _was_passed_argparse(parser: ArgumentParser, args: Namespace, flag: str) -> bool:
-    """Legacy argparse path for ``_was_passed``. See :func:`_was_passed`."""
+def _was_passed_argparse(
+    parser: ArgumentParser | None, args: Namespace, flag: str
+) -> bool:
+    """Resolve ``current`` + ``default`` for ``flag`` and delegate to :func:`_was_passed`.
+
+    Two resolver paths:
+
+    1. **Typer sidecar** (preferred when ``parser`` is ``None``): read
+       ``args._typer_defaults`` (a ``dict[str, Any]`` snapshot of declared
+       Typer parameter defaults).
+    2. **argparse introspection** (when a parser is supplied): walk
+       ``parser._actions`` and the selected subparser's ``_actions`` to find
+       the matching ``Action`` and read its ``.default``.
+    """
     import argparse  # local to keep import cost down on hot path
 
     dest = _dest_for_flag(flag)
-    # Typer sidecar takes priority: when args was built from a Typer
-    # context, _typer_defaults holds the declared parameter defaults.
+
+    # Typer sidecar: snapshot of declared defaults lives on the namespace.
     typer_defaults = getattr(args, "_typer_defaults", None)
     if isinstance(typer_defaults, dict) and dest in typer_defaults:
         current = getattr(args, dest, None)
         default = typer_defaults[dest]
         return _was_passed(flag, current, default)
 
-    # Pure argparse introspection (kept for tests + legacy callers).
+    # No argparse parser to introspect (Typer sidecar path with no defaults).
+    if parser is None:
+        return True  # unknown to Typer sidecar — treat as already-set.
+
+    # Pure argparse introspection.
     action = _find_action_in_selected_subparser(parser, args, dest)
     if action is None:
         # Flag unknown to this parser — treat as already-set so we
