@@ -173,13 +173,47 @@ def _collect_defaults(ctx: Context) -> dict[str, Any]:
 @app.command("auth")
 def auth_cmd(
     ctx: Context,
-    profile: str | None = typer.Option(None, "--profile", help="Single profile key."),
-    all_profiles: bool = typer.Option(False, "--all-profiles", help="All profiles."),
-    headless: bool = typer.Option(False, "--headless", help="Run browser headless."),
-    wait_seconds: int = typer.Option(30, "--wait-seconds", help="2FA wait time."),
+    config: str = typer.Option(
+        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+    ),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
+    all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
+    preset: str | None = typer.Option(None, "--preset", help="User-config preset name."),
+    headless: bool = typer.Option(False, "--headless", help="Run headless login."),
+    wait_seconds: int = typer.Option(600, "--wait-seconds", help="Browser wait time (s)."),
 ) -> None:
     """Authenticate and persist session state for the selected profiles."""
     raise typer.Exit(_run_registered(ctx, "auth"))
+
+
+@app.command("export-products")
+def export_products_cmd(
+    ctx: Context,
+    config: str = typer.Option(
+        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+    ),
+    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
+    all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
+    preset: str | None = typer.Option(None, "--preset", help="User-config preset name."),
+    output_dir: str = typer.Option(
+        "artifacts/{profile}", "--output-dir",
+        help="Output directory; {profile} is replaced with the profile key.",
+    ),
+    stem: str = typer.Option(
+        "tawreed_products", "--stem", help="Output filename without extension."
+    ),
+    page_size: int = typer.Option(100, "--page-size", help="Tawreed API page size."),
+    limit: int = typer.Option(0, "--limit", "-n", help="Max rows to export (0 = all)."),
+    debug_browser: bool = typer.Option(
+        False, "--debug-browser", help="Open a visible browser for this run."
+    ),
+    format: str | None = typer.Option(
+        None, "--format",
+        help="Output format: human (default, TTY-only), json, or plain.",
+    ),
+) -> None:
+    """Export all Tawreed store products to CSV, XLSX, and TXT."""
+    raise typer.Exit(_run_registered(ctx, "export-products"))
 
 
 # Re-export for downstream imports
