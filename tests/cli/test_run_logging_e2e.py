@@ -35,6 +35,9 @@ RUN = PROJECT / "run.py"
 def _base_env(tmp_path: Path) -> dict[str, str]:
     """Build a subprocess env that resolves Windows DLLs and points the
     CWD at ``tmp_path`` so each test gets a fresh ``logs/`` directory.
+
+    Sets ``PYTHONIOENCODING=utf-8`` so Rich-rendered box-drawing characters
+    (used by Typer's --help output) decode correctly.
     """
     return {
         "PATH": (
@@ -43,6 +46,8 @@ def _base_env(tmp_path: Path) -> dict[str, str]:
             "C:\\Users\\QUANTUM\\AppData\\Local\\Programs\\Python\\Python313"
         ),
         "PYTHONPATH": str(PROJECT),
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1",
         "SYSTEMROOT": "C:\\Windows",
         "TEMP": str(tmp_path),
         "USERPROFILE": str(tmp_path),
