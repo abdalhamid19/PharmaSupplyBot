@@ -1,6 +1,6 @@
-"""End-to-end tests for --json-logs output across every CLI command.
+"""End-to-end tests for --json-log-records output across every CLI command.
 
-When ``--json-logs`` is set, every log record must be emitted as a
+When ``--json-log-records`` is set, every log record must be emitted as a
 single-line JSON object that decodes without error and contains the
 schema documented in :mod:`src.cli.logging_setup`.
 """
@@ -83,7 +83,7 @@ def test_json_logs_failure_emits_valid_json(
     """A ValidationError must be emitted on stderr as parseable JSON."""
     result = _run(
         [
-            "--json-logs",
+            "--json-log-records",
             "auth", "--config", str(config_file), "--profile", "no_such_xyz",
         ],
         tmp_path,
@@ -106,7 +106,7 @@ def test_json_logs_hint_appears_on_stderr(
     """The WARNING 'hint' record should also be JSON."""
     result = _run(
         [
-            "--json-logs",
+            "--json-log-records",
             "auth", "--config", str(config_file), "--profile", "no_such_xyz",
         ],
         tmp_path,
@@ -131,7 +131,7 @@ def test_json_logs_records_have_logger_name(
     """
     result = _run(
         [
-            "--json-logs",
+            "--json-log-records",
             "auth", "--config", str(config_file), "--profile", "no_such_xyz",
         ],
         tmp_path,
@@ -152,7 +152,7 @@ def test_json_logs_records_land_in_file(
     """The file handler must also receive JSON records."""
     result = _run(
         [
-            "--json-logs",
+            "--json-log-records",
             "auth", "--config", str(config_file), "--profile", "no_such_xyz",
         ],
         tmp_path,
@@ -164,7 +164,7 @@ def test_json_logs_records_land_in_file(
     for line in app_log.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
-        # Each line in the file is JSON because --json-logs is global.
+        # Each line in the file is JSON because --json-log-records is global.
         _assert_json_record(line)
 
 
@@ -174,7 +174,7 @@ def test_json_logs_timestamp_format(
     """The ``ts`` field must be ISO-8601 with timezone offset."""
     result = _run(
         [
-            "--json-logs",
+            "--json-log-records",
             "auth", "--config", str(config_file), "--profile", "no_such_xyz",
         ],
         tmp_path,
@@ -196,11 +196,11 @@ import re  # noqa: E402  -- placed after non-import for the helper above
 def test_json_logs_no_human_format_leak(
     tmp_path: Path, config_file: Path
 ) -> None:
-    """When --json-logs is on, the console must NOT contain any of the
+    """When --json-log-records is on, the console must NOT contain any of the
     human-format tokens (no ``|``-separated level names)."""
     result = _run(
         [
-            "--json-logs",
+            "--json-log-records",
             "auth", "--config", str(config_file), "--profile", "no_such_xyz",
         ],
         tmp_path,
@@ -216,7 +216,7 @@ def test_json_logs_no_human_format_leak(
 
 
 def test_human_format_default(tmp_path: Path, config_file: Path) -> None:
-    """Without --json-logs, the console must use the human format
+    """Without --json-log-records, the console must use the human format
     (pipe-separated level), and that must NOT be valid JSON.
     """
     result = _run(
@@ -238,5 +238,5 @@ def test_human_format_default(tmp_path: Path, config_file: Path) -> None:
             # Good — line is not JSON.
             pass
         else:
-            pytest.fail(f"unexpected JSON record when --json-logs is off: {line!r}")
+            pytest.fail(f"unexpected JSON record when --json-log-records is off: {line!r}")
     assert found_human, "no human-format ERROR line found on stderr"

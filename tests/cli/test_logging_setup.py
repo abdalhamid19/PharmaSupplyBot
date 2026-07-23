@@ -115,6 +115,50 @@ def test_json_logs_emits_valid_json(
     assert payload["count"] == 7
 
 
+def test_rich_logs_uses_rich_handler_when_enabled(
+    log_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--rich-logs`` swaps the console handler for RichHandler.
+
+    The file handler stays plain (so log-aggregator parsers still work).
+    """
+    from rich.logging import RichHandler
+
+    configure_logging(LoggingConfig(level="INFO", rich_logs=True, log_dir=log_dir))
+    root = logging.getLogger()
+    console_handlers = [
+        h for h in root.handlers
+        if not isinstance(h, logging.handlers.TimedRotatingFileHandler)
+    ]
+    assert any(isinstance(h, RichHandler) for h in console_handlers)
+
+    # File handler is still plain (NOT RichHandler).
+    file_handlers = [
+        h for h in root.handlers
+        if isinstance(h, logging.handlers.TimedRotatingFileHandler)
+    ]
+    assert all(not isinstance(h, RichHandler) for h in file_handlers)
+
+
+def test_rich_logs_falls_back_to_plain_handler_when_rich_missing(
+    log_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If Rich isn't importable, --rich-logs degrades to plain StreamHandler."""
+    # Hide rich.logging from the import system.
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "rich.logging" or name.startswith("rich.logging"):
+            raise ImportError("simulated missing rich")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    configure_logging(LoggingConfig(level="INFO", rich_logs=True, log_dir=log_dir))
+    # No exception raised → the fallback path worked.
+
+
 def test_error_file_only_records_errors_and_above(log_dir: Path) -> None:
     configure_logging(LoggingConfig(level="DEBUG", log_dir=log_dir))
     logger = get_logger("test.errors")

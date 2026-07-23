@@ -58,6 +58,7 @@ class LoggingConfig:
     level: str = "INFO"
     quiet: bool = False
     json_logs: bool = False
+    rich_logs: bool = False
     log_dir: Path = LOG_DIR
 
 
@@ -156,6 +157,15 @@ def _resolve_level(level: str) -> int:
 def _build_console_handler(cfg: LoggingConfig, root_level: int) -> logging.Handler:
     """Console handler on stderr; WARNING+ always visible, rest gated by --quiet.
 
+    Three modes:
+
+    * **Default** — stdlib ``StreamHandler`` with the standard text
+      formatter. Plain, log-aggregator-friendly.
+    * **--json-log-records** — :class:`JsonFormatter` (one JSON object
+      per line). For CI / log shippers.
+    * **--rich-logs** — :class:`rich.logging.RichHandler` for colourised
+      output on the operator's terminal. File handlers stay plain.
+
     We deliberately do *not* pass ``stream=sys.stderr`` at construction
     time. With a captured argument, the handler holds a reference to
     that specific stream object forever; if a test runner (e.g. pytest)
@@ -164,7 +174,16 @@ def _build_console_handler(cfg: LoggingConfig, root_level: int) -> logging.Handl
     Using the no-arg form means the handler resolves ``sys.stderr`` on
     every ``emit`` call, picking up whatever the runtime has in place.
     """
-    handler = logging.StreamHandler()
+    if cfg.rich_logs:
+        try:
+            from rich.logging import RichHandler
+
+            handler: logging.Handler = RichHandler(rich_tracebacks=True)
+        except ImportError:
+            # Fall back to plain handler if Rich isn't installed.
+            handler = logging.StreamHandler()
+    else:
+        handler = logging.StreamHandler()
     if cfg.quiet:
         handler.setLevel(logging.WARNING)
     else:

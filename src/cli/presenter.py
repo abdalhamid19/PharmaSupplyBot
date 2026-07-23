@@ -19,8 +19,49 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
+from contextlib import contextmanager
 from rich.console import Console
 from rich.table import Table
+
+
+@contextmanager
+def progress(label: str = "Working", *, quiet: bool = False):
+    """Render a Rich progress spinner on **stderr**.
+
+    No-op when ``quiet`` is ``True`` (cron-safe, also when stdout is
+    piped). All output goes to ``stderr`` so piping stdout into ``jq``
+    or another downstream tool stays clean.
+
+    Usage::
+
+        with progress("Placing order", quiet=is_quiet(args)):
+            do_long_thing()
+
+    The yielded object is a :class:`rich.progress.Progress` instance
+    (also a no-op when ``quiet`` is True — yields ``None``).
+    """
+    if quiet:
+        yield None
+        return
+    from rich.progress import (
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        TimeElapsedColumn(),
+        transient=True,
+        redirect_stdout=False,
+    ) as prog:
+        task = prog.add_task(label, total=None)
+        yield prog
+
+
+__all__ = ["FormatFlags", "render_table", "render_summary", "progress"]
 
 
 @dataclass(frozen=True)
@@ -146,6 +187,3 @@ def render_summary(
     )
     console.print(Panel("\n".join(body_lines) if body_lines else "", title=f"{icon} {command}"))
     return console.export_text()
-
-
-__all__ = ["FormatFlags", "render_table", "render_summary"]

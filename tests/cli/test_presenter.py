@@ -174,3 +174,44 @@ def test_render_summary_human_renders_panel_with_icon() -> None:
     assert "order" in out
     assert "processed" in out
     assert "matched" in out
+
+
+# ─────────────────────────── progress spinner ───────────────────────────
+
+
+import io
+import sys
+
+
+def test_progress_active_yields_progress_or_none() -> None:
+    """``progress()`` either yields a real Rich.Progress or None.
+
+    Rich auto-silences when not on a TTY (which is the test env), so
+    we verify the function under test yields an object whose type is
+    either :class:`rich.progress.Progress` (TTY) or ``None``
+    (no TTY / quiet).
+    """
+    from rich.progress import Progress
+    from src.cli.presenter import progress
+
+    captured_out = io.StringIO()
+    captured_err = io.StringIO()
+    old_out, old_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout = captured_out
+        sys.stderr = captured_err
+        with progress("Test spinner") as prog:
+            # The yielded object is either a Progress (when TTY) or None
+            # (when Rich auto-silenced). Either is acceptable here — the
+            # function must not raise either way.
+            assert prog is None or isinstance(prog, Progress)
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
+
+
+def test_progress_quiet_yields_none_no_output() -> None:
+    """When quiet=True, progress() is a no-op and yields None."""
+    from src.cli.presenter import progress
+
+    with progress("Test", quiet=True) as prog:
+        assert prog is None

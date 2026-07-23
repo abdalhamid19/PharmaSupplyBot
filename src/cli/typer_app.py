@@ -28,6 +28,7 @@ from src.cli import cli_commands  # noqa: F401
 from src.cli.cli_runner import ns_from_ctx
 from src.cli.cli_config import apply_preset, inject_defaults
 from src.cli.logging_setup import LoggingConfig, configure_logging
+from src.cli.presenter import FormatFlags
 from src.cli.registry import get_command
 from src.core.config.config import load_config
 from src.core.errors import PharmaSupplyError
@@ -129,6 +130,7 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
             level=obj.get("log_level", "INFO"),
             quiet=bool(obj.get("quiet", False)),
             json_logs=bool(obj.get("json_logs", False)),
+            rich_logs=bool(obj.get("rich_logs", False)),
         )
     )
 
@@ -141,9 +143,14 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
     ns = inject_defaults(None, ns)  # type: ignore[arg-type]
 
     # 4. Load config + dispatch (full wrap so PharmaSupplyError always logs).
+    fmt = FormatFlags.resolve(explicit="json" if obj.get("json_logs") else None)
     try:
         config_path = Path(getattr(ns, "config", "config.yaml"))
         app_config = load_config(config_path)
+        logger.debug(
+            "dispatching command",
+            extra={"cmd": cmd_name, "config": str(config_path)},
+        )
         command = get_command(cmd_name)
         return command(app_config, ns)
     except PharmaSupplyError as exc:
@@ -154,7 +161,11 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
         )
         if exc.hint:
             logger.warning("hint: %s", exc.hint)
-        typer.echo(f"{exc}", err=True)
+        # In JSON-logs mode, the logger.error call already produced a
+        # structured record; skip the duplicate human-format echo so the
+        # stderr stream stays pure JSON for CI consumers.
+        if not fmt.json:
+            typer.echo(f"{exc}", err=True)
         raise typer.Exit(exc.exit_code)
     except Exception:
         logger.exception("unhandled exception in command %s", cmd_name)
