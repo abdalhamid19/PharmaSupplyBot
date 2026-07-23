@@ -211,21 +211,66 @@ def _dest_for_flag(flag: str) -> str:
     return flag.lstrip("-").replace("-", "_")
 
 
-def _was_passed(parser: ArgumentParser, args: Namespace, flag: str) -> bool:
-    """Return True if the user supplied ``flag`` on the command line.
+def _was_passed(
+    parser_or_flag: Any,
+    args_or_current: Any,
+    flag_or_default: str | Any = None,
+) -> bool:
+    """Return True if the user (or a preset) supplied ``flag`` with a non-default value.
 
-    Strategy: compare ``getattr(args, dest)`` to the parser's declared
-    default for that action. If they differ, the user (or a preset
-    applied earlier) has set the value. This is the only reliable
-    way to detect "explicit" values in argparse without re-parsing
-    ``sys.argv``.
+    Two calling conventions are supported for backward compatibility:
+
+    * **New (parser-agnostic)**: ``_was_passed(flag: str, current: Any, default: Any)``
+      — caller resolves the current value and declared default, helper does the
+      equality check. Works with Typer, argparse, or any source of defaults.
+
+    * **Legacy (argparse-only)**: ``_was_passed(parser, args, flag: str)``
+      — helper inspects argparse internals to resolve ``current`` + ``default``.
+
+    The legacy form is kept so the existing call sites in ``apply_preset``
+    and ``inject_defaults`` (which receive a real argparse ``parser`` and
+    ``Namespace``) keep working unchanged.
+
+    The new form is what Typer code paths use — Typer sets parameter
+    defaults on ``ParameterInfo.default``, and the caller snapshots those
+    into ``args._typer_defaults`` (see :mod:`src.cli.cli_runner`).
     """
+    # Legacy argparse path: positional args are (parser, args, flag)
+    if isinstance(parser_or_flag, ArgumentParser) and not isinstance(
+        args_or_current, Namespace
+    ):
+        # Bad call shape — fall through to the new API for a clearer error.
+        pass
+    if (
+        isinstance(parser_or_flag, ArgumentParser)
+        and isinstance(args_or_current, Namespace)
+        and isinstance(flag_or_default, str)
+    ):
+        return _was_passed_argparse(parser_or_flag, args_or_current, flag_or_default)
+
+    # New parser-agnostic path: positional args are (flag, current, default)
+    flag = parser_or_flag
+    current = args_or_current
+    default = flag_or_default
+    if isinstance(default, bool):
+        return bool(current) and not bool(default)
+    return current != default
+
+
+def _was_passed_argparse(parser: ArgumentParser, args: Namespace, flag: str) -> bool:
+    """Legacy argparse path for ``_was_passed``. See :func:`_was_passed`."""
     import argparse  # local to keep import cost down on hot path
 
     dest = _dest_for_flag(flag)
-    # For subcommand flags (e.g. --limit inside the 'order' subparser),
-    # the parent parser's actions only know about the *main* flags.
-    # We need to search the *selected* subparser to find the right action.
+    # Typer sidecar takes priority: when args was built from a Typer
+    # context, _typer_defaults holds the declared parameter defaults.
+    typer_defaults = getattr(args, "_typer_defaults", None)
+    if isinstance(typer_defaults, dict) and dest in typer_defaults:
+        current = getattr(args, dest, None)
+        default = typer_defaults[dest]
+        return _was_passed(flag, current, default)
+
+    # Pure argparse introspection (kept for tests + legacy callers).
     action = _find_action_in_selected_subparser(parser, args, dest)
     if action is None:
         # Flag unknown to this parser — treat as already-set so we
