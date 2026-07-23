@@ -178,13 +178,8 @@ def auth_cmd(
     headless: bool = typer.Option(False, "--headless", help="Run browser headless."),
     wait_seconds: int = typer.Option(30, "--wait-seconds", help="2FA wait time."),
 ) -> None:
-    """Authenticate and persist session state for the selected profiles.
-
-    [STUB — Task 5] The handler is wired in Task 6.
-    """
-    # For now, just confirm the stub is reachable and the options were parsed.
-    typer.echo(f"auth stub: profile={profile} headless={headless}")
-    raise typer.Exit(0)
+    """Authenticate and persist session state for the selected profiles."""
+    raise typer.Exit(_run_registered(ctx, "auth"))
 
 
 # Re-export for downstream imports
