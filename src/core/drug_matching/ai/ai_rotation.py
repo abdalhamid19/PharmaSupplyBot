@@ -6,8 +6,8 @@ import os
 from dataclasses import dataclass, field
 
 from .ai_health import split_csv, dedupe, mask_key
-from .ai_rotation_config import PROVIDER_ORDER, DEFAULT_MODELS
-from ..config import PROVIDERS, cloudflare_base_url, provider_base_url
+from .ai_rotation_config import PROVIDER_ORDER
+from ..config import PROVIDERS, AIConfig, ProviderPool, cloudflare_base_url, provider_base_url
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,12 +54,30 @@ def _provider_keys(provider: str, info: dict) -> list[tuple[str, str]]:
 
 
 def _provider_models(provider: str, info: dict) -> list[str]:
-    env_name = f"{provider.upper()}_MODELS"
-    env_models = split_csv(os.getenv(env_name, ""))
-    defaults = list(DEFAULT_MODELS.get(provider, ()))
-    if not defaults and info.get("default_model"):
-        defaults = [info["default_model"]]
-    return dedupe(env_models + defaults)
+    """Return the rotation model list for ``provider``.
+
+    Resolution order (matches :class:`AIConfig.from_sources`):
+        1. ``{PROVIDER}_MODELS`` env var (CSV) — wins if non-empty.
+        2. ``ai.providers.{name}.models`` from ``config.yaml``.
+        3. :class:`AIConfig` dataclass defaults (currently empty —
+           there are no provider-agnostic rotation defaults).
+        4. ``info["default_model"]`` from :data:`PROVIDERS` — single-model
+           fallback so a provider with no YAML pool still gets attempted.
+
+    The returned list is de-duplicated while preserving order so that
+    a provider-specific rotation picks each distinct model exactly once.
+    """
+    ai_pool = AIConfig.from_sources().provider(provider)
+    if ai_pool is not None:
+        env_name = f"{provider.upper()}_MODELS"
+        env_models = split_csv(os.getenv(env_name, ""))
+        if env_models:
+            return dedupe(env_models)
+        return dedupe(list(ai_pool.models))
+    # Final fallback: single default model from PROVIDERS registry.
+    if info.get("default_model"):
+        return [info["default_model"]]
+    return []
 
 
 def _model_tier(rank: int, model_count: int) -> int:

@@ -68,13 +68,17 @@ def _provider_api_config(provider: str, model: str, api_key: str) -> dict:
     keys = _dedupe((api_key, *(os.getenv(key, "") for key in info["env_keys"])))
     from .config_providers import provider_base_url
     ai_defaults = AIConfig.from_sources()
+    ai_pool = ai_defaults.provider(provider)
+    default_model = (
+        ai_pool.default_model if ai_pool is not None else info.get("default_model", "")
+    )
     return {
         "api_key": keys[0] if keys else "",
         "api_keys": keys,
         "base_url": provider_base_url(info),
         "model": model
         or os.getenv("AI_MODEL", "").strip()
-        or ai_defaults.primary_model,
+        or default_model,
         "fallback_models": _fallback_models(),
     }
 

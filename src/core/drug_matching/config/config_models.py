@@ -25,13 +25,20 @@ class AIConfig:
     Precedence (highest to lowest):
         1. CLI flag / explicit constructor argument
         2. Environment variable (``AI_MODEL`` / ``FALLBACK_MODELS`` /
-           ``REVIEW_MODEL`` / ``AI_REVIEW_THRESHOLD``)
+           ``REVIEW_MODEL`` / ``AI_REVIEW_THRESHOLD`` /
+           ``{PROVIDER}_MODELS``)
         3. ``ai:`` block of ``config.yaml``
         4. Hardcoded defaults in this dataclass
 
     The dataclass is the resolved shape — it always returns a non-empty
     value, never ``None``, so downstream consumers never have to guard
     for missing config.
+
+    ``providers`` is a tuple of :class:`ProviderPool` entries, one per
+    provider declared under ``ai.providers.*`` in YAML. Consumers that
+    previously imported ``DEFAULT_MODELS`` / ``GROQ_MODELS`` from
+    ``ai.ai_rotation_config`` should now call
+    ``AIConfig.from_sources().provider("groq").models``.
     """
 
     primary_model: str = "minimax-m2.5-free"
@@ -42,6 +49,7 @@ class AIConfig:
     )
     review_model: str = "big-pickle"
     review_threshold: float = 0.95
+    providers: tuple["ProviderPool", ...] = ()
 
     @classmethod
     def from_sources(
@@ -64,6 +72,8 @@ class AIConfig:
 
         def _pick_yaml(key: str) -> Any:
             return yaml_block.get(key) if isinstance(yaml_block, dict) else None
+
+        providers = _resolve_providers(yaml_block)
 
         return cls(
             primary_model=_resolve_str(
@@ -90,7 +100,19 @@ class AIConfig:
                 _pick_yaml("review_threshold"),
                 cls.review_threshold,
             ),
+            providers=providers,
         )
+
+    def provider(self, name: str) -> "ProviderPool | None":
+        """Return the resolved :class:`ProviderPool` for ``name``, or ``None``.
+
+        Lookup is case-insensitive (``"groq"`` and ``"GROQ"`` both match).
+        """
+        name_lower = name.lower()
+        for pool in self.providers:
+            if pool.name == name_lower:
+                return pool
+        return None
 
 
 def _load_yaml_ai_block(config_path: Path | None) -> dict[str, Any]:
@@ -200,6 +222,94 @@ def _resolve_float(*layers: Any) -> float:
 
 
 @dataclass(frozen=True)
+class ProviderPool:
+    """Resolved per-provider model list.
+
+    Replaces the previous hardcoded ``GROQ_MODELS`` / ``OPENROUTER_MODELS``
+    / ``DEFAULT_MODELS`` constants in
+    :mod:`src.core.drug_matching.ai.ai_rotation_config`.
+
+    The ``default_model`` is the first entry of ``models`` (or an explicit
+    ``default_model:`` from YAML), used by
+    :func:`src.core.drug_matching.config.config_helpers.resolve_api_config`
+    when no ``--model`` flag / env override is set for that provider.
+
+    The ``models`` list is used by ``ai.ai_rotation._provider_models``
+    to enumerate rotation attempts.
+    """
+
+    name: str
+    default_model: str
+    models: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.default_model and self.models:
+            object.__setattr__(self, "default_model", self.models[0])
+
+
+def _resolve_providers(yaml_block: dict[str, Any]) -> tuple[ProviderPool, ...]:
+    """Build a sorted tuple of :class:`ProviderPool` from a YAML ``ai:`` block.
+
+    Resolution per provider:
+        1. ``{PROVIDER}_MODELS`` env var (CSV) — wins if non-empty.
+        2. ``ai.providers.{name}.models`` from YAML.
+        3. Skip the provider entirely (returns an empty tuple) if neither
+           yields a non-empty list — the consumer can then fall back to
+           the ``PROVIDERS[provider].default_model`` from
+           :mod:`config_providers` if available.
+
+    Returns a tuple (not a dict) so the dataclass stays hashable and
+    immutable. Use :meth:`AIConfig.provider` for by-name lookups.
+    """
+    raw_providers = (
+        yaml_block.get("providers") if isinstance(yaml_block, dict) else None
+    )
+    if not isinstance(raw_providers, dict):
+        return ()
+
+    pools: list[ProviderPool] = []
+    for name in sorted(raw_providers):
+        block = raw_providers.get(name)
+        if not isinstance(block, dict):
+            continue
+
+        env_name = f"{name.upper()}_MODELS"
+        env_models = _split_csv(os.getenv(env_name, ""))
+        yaml_models = block.get("models")
+        yaml_default = block.get("default_model")
+
+        # Layer 1 (env) wins over Layer 2 (yaml).
+        if env_models:
+            models = env_models
+        elif isinstance(yaml_models, list):
+            models = tuple(
+                str(m).strip() for m in yaml_models if str(m).strip()
+            )
+        elif isinstance(yaml_models, str):
+            models = _split_csv(yaml_models)
+        else:
+            continue  # no models defined for this provider
+
+        if not models:
+            continue
+
+        default_model = (
+            str(yaml_default).strip()
+            if isinstance(yaml_default, str) and yaml_default.strip()
+            else models[0]
+        )
+
+        pools.append(
+            ProviderPool(
+                name=name,
+                default_model=default_model,
+                models=models,
+            )
+        )
+    return tuple(pools)
+
+
+@dataclass(frozen=True)
 class MatchingConfig:
     """Thresholds used by the indexed drug matcher."""
 
@@ -273,6 +383,8 @@ __all__ = [
     "ROOT_DIR",
     "MatchingConfig",
     "APIConfig",
+    "AIConfig",
+    "ProviderPool",
     "Paths",
     "_default_output_csv",
 ]

@@ -7,6 +7,7 @@ from .config_models import (
     MatchingConfig,
     APIConfig,
     AIConfig,
+    ProviderPool,
     Paths,
     _default_output_csv,
 )

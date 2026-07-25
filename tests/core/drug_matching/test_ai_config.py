@@ -295,20 +295,31 @@ def test_resolve_api_config_explicit_model_wins(
 def test_resolve_api_config_provider_path_uses_yaml_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Provider-specific path also benefits from the AIConfig fallback."""
+    """Provider-specific path uses the YAML ``default_model`` when present.
+
+    Stage 2 migrated per-provider ``default_model`` from
+    ``config_providers.PROVIDERS`` into ``ai.providers.*`` of
+    ``config.yaml``; ``_provider_api_config`` now resolves the default
+    from the YAML pool before falling back to the registry.
+    """
     monkeypatch.delenv("AI_MODEL", raising=False)
 
     import src.core.drug_matching.config.config_models as m
 
     monkeypatch.setattr(
         m, "_load_yaml_ai_block", lambda config_path=None: {
-            "primary_model": "yaml-primary",
+            "providers": {
+                "groq": {
+                    "default_model": "yaml-groq-default",
+                    "models": ["yaml-groq-default"],
+                },
+            },
         }
     )
 
     resolved = resolve_api_config(provider="groq", model="", api_key="")
 
-    assert resolved["model"] == "yaml-primary"
+    assert resolved["model"] == "yaml-groq-default"
 
 
 # ──────────────────────── YAML fallback chain ────────────────────────────
