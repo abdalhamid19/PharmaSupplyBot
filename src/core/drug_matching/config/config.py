@@ -6,6 +6,7 @@ from .config_models import (
     ROOT_DIR,
     MatchingConfig,
     APIConfig,
+    AIConfig,
     Paths,
     _default_output_csv,
 )

@@ -31,6 +31,7 @@ from src.cli.logging_setup import LoggingConfig, configure_logging
 from src.cli.presenter import FormatFlags
 from src.cli.registry import get_command
 from src.core.config.config import load_config
+from src.core.drug_matching.config import AIConfig
 from src.core.errors import PharmaSupplyError
 
 
@@ -156,6 +157,9 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
     ns = apply_preset(None, ns, getattr(ns, "preset", None))  # type: ignore[arg-type]
     ns = inject_defaults(None, ns)  # type: ignore[arg-type]
 
+    # 3b. Overlay ``ai:`` config.yaml defaults onto the namespace.
+    ns = _apply_ai_defaults(ns, ctx)
+
     # 4. Load config + dispatch (full wrap so PharmaSupplyError always logs).
     fmt = FormatFlags.resolve(explicit="json" if obj.get("json_logs") else None)
     try:
@@ -197,6 +201,59 @@ def _collect_defaults(ctx: Context) -> dict[str, Any]:
         if name is not None:
             defaults[name] = param.default
     return defaults
+
+
+def _apply_ai_defaults(ns: Any, ctx: Context) -> Any:
+    """Overlay ``ai:`` config.yaml values onto the parsed ``Namespace``.
+
+    For each AI-related field (``model`` / ``review_model`` /
+    ``ai_review_threshold``), this:
+
+    1. Skips override when the user explicitly passed the CLI flag
+       (detected by comparing against the declared default).
+    2. Otherwise, leaves ``os.environ``-driven resolution to
+       :class:`AIConfig` (env wins over YAML).
+
+    Streamlit-driven flows run their own resolution in
+    :func:`src.ui.order.streamlit_order_command._order_ai_threshold_args`
+    and never reach this code path, so the change is CLI-only.
+    """
+    declared = _collect_defaults(ctx)
+    ai_defaults = AIConfig.from_sources(config_path=Path(getattr(ns, "config", "config.yaml")))
+
+    # Mapping: (namespace attr, ai_defaults attr, expected declared default).
+    overlays: tuple[tuple[str, str, Any], ...] = (
+        ("model", "primary_model", None),
+        ("review_model", "review_model", None),
+        ("ai_review_threshold", "review_threshold", 0.95),
+    )
+    for attr, ai_attr, _expected_default in overlays:
+        declared_default = declared.get(attr)
+        current = getattr(ns, attr, None)
+        if _was_passed_for(declared_default, current):
+            continue
+        setattr(ns, attr, getattr(ai_defaults, ai_attr))
+    return ns
+
+
+def _was_passed_for(declared_default: Any, current: Any) -> bool:
+    """Heuristic: did the user pass this option on the CLI?
+
+    Mirrors the logic in :func:`src.cli.cli_config._was_passed` but is
+    scoped to a single attribute so the post-process step does not need
+    a reference to the original parser.
+    """
+    if declared_default is None:
+        # ``typer.Option(None, ...)`` — only treat as "passed" when the
+        # user provided a non-empty value.
+        if current is None:
+            return False
+        if isinstance(current, str) and not current.strip():
+            return False
+        return True
+    if isinstance(declared_default, float):
+        return bool(current is not None and current != declared_default)
+    return bool(current is not None and current != declared_default)
 
 
 # ─────────────────────────── One stub subcommand (auth) ────────────────

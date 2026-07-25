@@ -105,3 +105,30 @@ runtime:
   # Each extra worker spawns its own Chromium process (~150MB RAM each).
   # Keep at or below 4 to avoid triggering Tawreed concurrent-session limits.
   item_workers: 1
+
+# ── AI provider defaults ──────────────────────────────────────────────────
+# These values populate `resolve_api_config()` and the verifier when the
+# operator did not pass `--model` / `--review-model` / `--ai-review-threshold`
+# on the command line and the matching env vars (`AI_MODEL`,
+# `FALLBACK_MODELS`, `REVIEW_MODEL`, `AI_REVIEW_THRESHOLD`) are unset.
+#
+# Precedence (highest to lowest):
+#   CLI flag > .env override > this file > hardcoded default
+#
+# Why in YAML and not .env?
+#   - These are project config, not secrets.
+#   - They ride along with `git` so model changes are reviewable.
+#   - .env stays lean (API keys + per-run overrides only).
+ai:
+  # Primary verification model used by `OPENROUTER_*` keys.
+  primary_model: "minimax-m2.5-free"
+  # Comma-separated models tried in order when the primary provider fails.
+  fallback_models:
+    - "nemotron-3-super-free"
+    - "hy3-preview-free"
+    - "trinity-large-preview-free"
+  # Second-opinion model for low-confidence AI verdicts (cross-verification).
+  # Leave empty to reuse the primary model for review.
+  review_model: "big-pickle"
+  # AI verdicts below this confidence are flagged for manual review.
+  review_threshold: 0.95
