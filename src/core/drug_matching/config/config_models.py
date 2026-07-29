@@ -11,8 +11,6 @@ from typing import Any
 
 import yaml
 
-from .config_providers import PROVIDERS
-
 logger = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).resolve().parents[4]
@@ -309,6 +307,154 @@ def _resolve_providers(yaml_block: dict[str, Any]) -> tuple[ProviderPool, ...]:
     return tuple(pools)
 
 
+# ─────────────────────────── ProviderMetadata ───────────────────────────
+
+
+@dataclass(frozen=True)
+class ProviderMetadata:
+    """Resolved per-provider connection settings.
+
+    Replaces the previous hardcoded ``PROVIDERS`` dict in
+    :mod:`src.core.drug_matching.config.config_providers`. Carries the
+    bits that are NOT model lists: the API base URL, the env-var names
+    that hold credentials (multiple for rotation), and any per-provider
+    account-id env var (currently only Cloudflare).
+
+    Combined with :class:`ProviderPool` (same ``name``), the two cover
+    everything the rotation layer needs without touching
+    ``config_providers.py`` anymore.
+    """
+
+    name: str
+    base_url: str = ""
+    env_keys: tuple[str, ...] = ()
+    account_id_env: str = ""
+
+    def has_credentials(self) -> bool:
+        """Return True when at least one env_key resolves to a non-empty value."""
+        return any(os.getenv(k, "").strip() for k in self.env_keys)
+
+
+#: Fallback metadata for the 8 supported providers, used when the
+#: active ``config.yaml`` does not declare ``ai.providers.<name>.*``.
+#: This keeps the runtime working in environments that have not yet
+#: migrated (e.g. legacy ``state/config.yaml`` without ``base_url:``).
+_FALLBACK_PROVIDER_METADATA: dict[str, ProviderMetadata] = {
+    "openrouter": ProviderMetadata(
+        name="openrouter",
+        base_url="https://openrouter.ai/api/v1",
+        env_keys=("OPENROUTER_API_KEY_1", "OPENROUTER_API_KEY"),
+    ),
+    "opencode": ProviderMetadata(
+        name="opencode",
+        base_url="https://opencode.ai/zen/v1",
+        env_keys=("OPENCODE_API_KEY_1", "OPENCODE_API_KEY"),
+    ),
+    "groq": ProviderMetadata(
+        name="groq",
+        base_url="https://api.groq.com/openai/v1",
+        env_keys=("GROQ_API_KEY_1", "GROQ_API_KEY"),
+    ),
+    "github": ProviderMetadata(
+        name="github",
+        base_url="https://models.github.ai/inference",
+        env_keys=("GITHUB_API_KEY_1", "GITHUB_API_KEY"),
+    ),
+    "cloudflare": ProviderMetadata(
+        name="cloudflare",
+        base_url="",
+        env_keys=("CLOUDFLARE_API_TOKEN_1", "CLOUDFLARE_API_TOKEN"),
+        account_id_env="CLOUDFLARE_ACCOUNT_ID",
+    ),
+    "cerebras": ProviderMetadata(
+        name="cerebras",
+        base_url="https://api.cerebras.ai/v1",
+        env_keys=("CEREBRAS_API_KEY_1", "CEREBRAS_API_KEY"),
+    ),
+    "google": ProviderMetadata(
+        name="google",
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        env_keys=("GOOGLE_API_KEY_1", "GOOGLE_API_KEY"),
+    ),
+    "mistral": ProviderMetadata(
+        name="mistral",
+        base_url="https://api.mistral.ai/v1",
+        env_keys=("MISTRAL_API_KEY_1", "MISTRAL_API_KEY"),
+    ),
+    "custom": ProviderMetadata(
+        name="custom",
+        env_keys=("CUSTOM_API_KEY",),
+    ),
+}
+
+
+def _yaml_block_has_metadata(block: dict[str, Any]) -> bool:
+    """Return True if a YAML provider block declares any connection field.
+
+    Used by :func:`get_provider_metadata` to decide between honouring
+    the YAML entry (even if partially filled) and falling back to the
+    hardcoded table. Empty blocks (``ai.providers.groq: {}``) are
+    treated as 'no YAML metadata here'.
+    """
+    return any(
+        key in block
+        for key in ("base_url", "env_keys", "env_key", "account_id_env")
+    )
+
+
+def get_provider_metadata(
+    name: str,
+    *,
+    config_path: Path | None = None,
+) -> ProviderMetadata | None:
+    """Resolve :class:`ProviderMetadata` for ``name``.
+
+    Resolution order:
+        1. ``ai.providers.{name}`` block in ``config.yaml`` — only if
+           it declares at least one connection field (``base_url`` /
+           ``env_keys`` / ``env_key`` / ``account_id_env``). An empty
+           block (``ai.providers.<name>: {}``) is treated as 'not
+           declared here' so the hardcoded fallback takes over.
+        2. :data:`_FALLBACK_PROVIDER_METADATA` (hardcoded registry).
+
+    Returns ``None`` when the provider is unknown on both layers. The
+    ``rotation`` pseudo-provider is intentionally absent from the
+    fallback table — callers must handle it explicitly via
+    :func:`PROVIDER_ORDER` from ``ai_rotation_config``.
+    """
+    yaml_block = _load_yaml_ai_block(config_path)
+    raw_providers = (
+        yaml_block.get("providers") if isinstance(yaml_block, dict) else None
+    )
+    if isinstance(raw_providers, dict):
+        block = raw_providers.get(name)
+        if isinstance(block, dict) and _yaml_block_has_metadata(block):
+            base_url = str(block.get("base_url", "")).strip()
+            raw_keys = block.get("env_keys")
+            if isinstance(raw_keys, list):
+                env_keys = tuple(
+                    str(k).strip() for k in raw_keys if str(k).strip()
+                )
+            elif isinstance(raw_keys, str):
+                env_keys = tuple(
+                    k.strip() for k in raw_keys.split(",") if k.strip()
+                )
+            elif isinstance(block.get("env_key"), str):
+                # Legacy single-key layout — accept for back-compat.
+                env_keys = (block["env_key"].strip(),)
+            else:
+                env_keys = ()
+            account_id_env = str(block.get("account_id_env", "")).strip()
+            return ProviderMetadata(
+                name=name,
+                base_url=base_url,
+                env_keys=env_keys,
+                account_id_env=account_id_env,
+            )
+
+    return _FALLBACK_PROVIDER_METADATA.get(name)
+
+
 @dataclass(frozen=True)
 class MatchingConfig:
     """Thresholds used by the indexed drug matcher."""
@@ -385,6 +531,8 @@ __all__ = [
     "APIConfig",
     "AIConfig",
     "ProviderPool",
+    "ProviderMetadata",
+    "get_provider_metadata",
     "Paths",
     "_default_output_csv",
 ]

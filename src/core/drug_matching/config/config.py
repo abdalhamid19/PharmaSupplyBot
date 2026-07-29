@@ -8,6 +8,8 @@ from .config_models import (
     APIConfig,
     AIConfig,
     ProviderPool,
+    ProviderMetadata,
+    get_provider_metadata,
     Paths,
     _default_output_csv,
 )

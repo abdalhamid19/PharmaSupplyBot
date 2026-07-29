@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 
-from .config_models import AIConfig, Paths
+from .config_models import AIConfig, Paths, get_provider_metadata
 from .config_providers import PROVIDERS
 
 logger = logging.getLogger(__name__)
@@ -64,18 +64,25 @@ def resolve_api_config(provider: str = "", model: str = "", api_key: str = "") -
 
 
 def _provider_api_config(provider: str, model: str, api_key: str) -> dict:
-    info = PROVIDERS[provider]
-    keys = _dedupe((api_key, *(os.getenv(key, "") for key in info["env_keys"])))
+    info = PROVIDERS.get(provider, {})
+    meta = get_provider_metadata(provider)
+    # Use the YAML-derived metadata when present, otherwise the legacy
+    # PROVIDERS dict (preserves behaviour for un-migrated configs).
+    env_keys = meta.env_keys if meta is not None else info.get("env_keys", ())
+    base_url = meta.base_url if meta is not None else str(info.get("base_url", ""))
+    keys = _dedupe((api_key, *(os.getenv(key, "").strip() for key in env_keys)))
     from .config_providers import provider_base_url
     ai_defaults = AIConfig.from_sources()
     ai_pool = ai_defaults.provider(provider)
     default_model = (
-        ai_pool.default_model if ai_pool is not None else info.get("default_model", "")
+        ai_pool.default_model
+        if ai_pool is not None
+        else str(info.get("default_model", ""))
     )
     return {
         "api_key": keys[0] if keys else "",
         "api_keys": keys,
-        "base_url": provider_base_url(info),
+        "base_url": base_url or provider_base_url(info),
         "model": model
         or os.getenv("AI_MODEL", "").strip()
         or default_model,
