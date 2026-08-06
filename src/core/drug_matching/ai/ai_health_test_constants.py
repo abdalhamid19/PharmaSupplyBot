@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..config import PROVIDERS
+from ..config import get_provider_metadata
 
-OPENCODE_BASE_URL = PROVIDERS["opencode"]["base_url"]
+OPENCODE_BASE_URL = (
+    get_provider_metadata("opencode").base_url
+    if get_provider_metadata("opencode") is not None
+    else "https://opencode.ai/zen/v1"
+)
 
 TEST_MESSAGES = [
     {

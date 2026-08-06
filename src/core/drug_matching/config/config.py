@@ -6,6 +6,10 @@ from .config_models import (
     ROOT_DIR,
     MatchingConfig,
     APIConfig,
+    AIConfig,
+    ProviderPool,
+    ProviderMetadata,
+    get_provider_metadata,
     Paths,
     _default_output_csv,
 )

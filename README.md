@@ -265,6 +265,128 @@ py run.py auth --profile wardany
 - ثم ارفع ملف `state/<profile>.json` داخل تبويب `Order`
 - إذا لم ترفع الملف، فستستخدم الواجهة أي default state مهيأ على الخادم لنفس الـ profile إذا كان موجودًا
 
+## إعدادات الذكاء الاصطناعي (`ai:` في `config.yaml`)
+
+كل إعدادات الـ AI (الموديلات، الـ rotation pools، مفاتيح الـ providers)
+تعيش تحت مفتاح `ai:` واحد في `config.yaml`. هذا يحل محل ثلاثة
+مصادر متناثرة كانت موجودة قبل ذلك:
+
+  1. متغيرات بيئية (`AI_MODEL`, `FALLBACK_MODELS`, `REVIEW_MODEL`,
+     `AI_REVIEW_THRESHOLD`, `{PROVIDER}_MODELS`) — كانت الإعدادات
+     الأساسية في `.env`.
+  2. tuples الـ rotation (`GROQ_MODELS`, `OPENCODE_MODELS`, ...) في
+     `src/core/drug_matching/ai/ai_rotation_config.py`.
+  3. dict الـ `PROVIDERS` (base_url / env_keys / account_id_env) في
+     `src/core/drug_matching/config/config_providers.py`.
+
+كل المصادر الثلاثة بقت declarative في الـ YAML تحت `ai:`، مع
+الحفاظ على `.env` كـ override per-run فقط.
+
+### الـ precedence chain
+
+كل قيمة `ai.*` تتحلّل بهذا الترتيب (الأعلى يفوز):
+
+```
+1. CLI flag / explicit constructor argument
+   (مثل: --model openai/gpt-4o-mini)
+2. Environment variable override
+   (AI_MODEL / FALLBACK_MODELS / REVIEW_MODEL / AI_REVIEW_THRESHOLD)
+3. ai: block في config.yaml
+4. Hardcoded default في الـ dataclass
+```
+
+ولـ per-provider model pool:
+
+```
+1. {PROVIDER}_MODELS env var (CSV)  ← override per-run
+2. ai.providers.{name}.models من config.yaml
+3. meta.default_model (single-model fallback)
+```
+
+### الهيكل
+
+```yaml
+ai:
+  # الـ verification model الأساسي (OpenRouter)
+  primary_model: "minimax-m2.5-free"
+  # قائمة الـ fallback لما الـ primary يفشل
+  fallback_models:
+    - "nemotron-3-super-free"
+    - "hy3-preview-free"
+    - "trinity-large-preview-free"
+  # الـ model اللي بيعمل cross-check لو الـ verdict أقل من review_threshold
+  review_model: "big-pickle"
+  # الـ confidence threshold — أي verdict أقل من ده بيروح manual review
+  review_threshold: 0.95
+
+  # كل provider (8 مدعومين): base_url + env_keys + account_id_env + models
+  providers:
+    groq:
+      default_model: "openai/gpt-oss-120b"
+      base_url: "https://api.groq.com/openai/v1"
+      env_keys: ["GROQ_API_KEY_1", "GROQ_API_KEY"]
+      models:
+        - "openai/gpt-oss-120b"
+        - "meta-llama/llama-4-scout-17b-16e-instruct"
+        - ...
+    cloudflare:
+      default_model: "@cf/openai/gpt-oss-120b"
+      base_url: ""     # مش مستخدم — الـ URL مشتق من account_id
+      env_keys:
+        - "CLOUDFLARE_API_TOKEN_1"
+        - "CLOUDFLARE_API_TOKEN_2"
+        - ...
+        - "CLOUDFLARE_API_TOKEN"   # legacy single-key
+      account_id_env: "CLOUDFLARE_ACCOUNT_ID"
+      models:
+        - "@cf/openai/gpt-oss-120b"
+        - ...
+    openrouter:  # providers مشابهين لـ cerebras / google / mistral / github / opencode
+      default_model: "..."
+      base_url: "https://openrouter.ai/api/v1"
+      env_keys: ["OPENROUTER_API_KEY_1", "OPENROUTER_API_KEY"]
+      models: [...]
+```
+
+### كيف تضيف provider جديد
+
+1. ضيف block جديد تحت `ai.providers.<name>` في `config.yaml`
+   (base_url / env_keys / default_model / models).
+2. ضيف الـ env vars في `.env`.
+3. لو الـ provider جديد على `PROVIDER_ORDER` (rotation policy):
+   عدّل `src/core/drug_matching/ai/ai_rotation_config.py`.
+
+### الـ API اللي بيستهلك الـ `ai:` block
+
+في `src/core/drug_matching/config/`:
+
+  * `AIConfig.from_sources(...)` → resolved `AIConfig` dataclass
+    مع `providers: tuple[ProviderPool, ...]`.
+  * `AIConfig.provider(name)` → `ProviderPool | None`
+    (case-insensitive lookup).
+  * `get_provider_metadata(name)` → `ProviderMetadata | None`
+    (base_url / env_keys / account_id_env).
+  * `ProviderPool(name, default_model, models)` و
+    `ProviderMetadata(name, base_url, env_keys, account_id_env)`
+    هم الـ frozen dataclasses المعروضة.
+
+### Override per-run
+
+```bash
+# جرّب model مختلف على Tawreed:
+GROQ_MODELS="llama-3.3-70b-versatile,llama-3.1-8b-instant" \
+  py run.py order --profile wardany --provider groq
+
+# أو فعّل rotation كامل مع override للـ primary:
+AI_MODEL=openai/gpt-5 \
+  py run.py order --provider rotation --review-model gemini-2.5-pro
+```
+
+### الـ backwards compatibility
+
+`PROVIDERS` dict في `config_providers.py` لسه موجود (alias for legacy
+tests)، لكن لا تضيف عليه — استخدم `ai.providers.<name>` في الـ YAML.
+
 ## هيكل المشروع (للتحسين والصيانة)
 
 تم تنظيم الكود البرمجي في حزم منفصلة لزيادة الوضوح:
@@ -303,13 +425,35 @@ py run.py auth --log-level DEBUG --profile wardany
 # كتم ما دون التحذيرات على stderr (الملفات تبقى تكتب كل شيء)
 py run.py --quiet auth --profile wardany
 
-# إخراج JSON صالح للتحليل الآلي (مفيد لـ CI و log aggregators)
-py run.py --json-logs auth --profile wardany
+# إخراج JSON صالح للتحليل الآلي (مفيد لـ CI و log aggregators).
+# الـ flag اتغير من --json-logs لـ --json-log-records للوضوح بين logs و data.
+py run.py --json-log-records auth --profile wardany
 
-# قيمة غير معروفة تُرفض من argparse
+# تلوين الـ console output بـ Rich (الـ files تبقى plain text للـ aggregators)
+py run.py --rich-logs auth --profile wardany
+
+# قيمة غير معروفة تُرفض قبل الـ command (Typer callback → exit 2)
 py run.py --log-level BOGUS auth --help
 # exit 2
 ```
+
+### Output formats (--format)
+
+كل subcommand بيطلّع بيانات (export-products, match-products, remove-cart, order)
+يدعم ثلاث صيغ:
+
+```bash
+# human (default): Rich-rendered table على TTY، plain TSV لو piped
+py run.py export-products --profile wardany
+
+# json: envelope {"ok": true, "data": [...]} على stdout، stderr للـ diagnostics
+py run.py export-products --profile wardany --format json | jq .
+
+# plain: TSV rows على stdout (grep-friendly، بدون ألوان)
+py run.py export-products --profile wardany --format plain | head
+```
+
+الـ `--format` flag موجود حتى على `auth` (no-op هناك) عشان يبقى الـ UX ثابت.
 
 ### كتابة logging في module جديد
 

@@ -120,16 +120,19 @@ def test_log_level_debug_increases_verbosity(tmp_path: Path, config_file: Path) 
     app_log = (tmp_path / "logs" / "app.log").read_text(encoding="utf-8")
     assert "dispatching command" in app_log
 
-
 def test_log_level_unknown_choice_rejected(tmp_path: Path) -> None:
-    """An unrecognised ``--log-level`` value must be rejected by argparse
-    before run.py sees it."""
+    """An unrecognised ``--log-level`` value must be rejected before
+    run.py sees it (Typer callback raises ``BadParameter`` → exit 2).
+    """
     result = _run(
         ["--log-level", "BOGUS", "auth", "--help"],
         tmp_path,
     )
-    assert result.returncode == 2  # argparse usage error
-    assert "invalid choice" in result.stderr or "invalid choice" in result.stdout
+    assert result.returncode == 2  # Typer validation error
+    # Typer renders this as ``Invalid value: ...`` (not argparse's
+    # ``invalid choice``); accept either form for portability.
+    output = (result.stderr or "") + (result.stdout or "")
+    assert "Invalid value" in output or "invalid choice" in output
 
 
 def test_log_level_warning_suppresses_info(tmp_path: Path, config_file: Path) -> None:

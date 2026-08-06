@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 
-from .config_models import Paths
+from .config_models import AIConfig, Paths, get_provider_metadata
 from .config_providers import PROVIDERS
 
 logger = logging.getLogger(__name__)
@@ -43,28 +43,49 @@ def load_env(path: Path | None = None) -> None:
 
 
 def resolve_api_config(provider: str = "", model: str = "", api_key: str = "") -> dict:
-    """Resolve API settings from arguments and environment variables."""
+    """Resolve API settings from arguments and environment variables.
+
+    The ``model`` and ``api_key`` arguments take precedence over the
+    environment. When neither is set, the resolution falls back to
+    :class:`AIConfig`, which itself reads ``ai:`` from ``config.yaml``
+    (then env, then hardcoded defaults).
+    """
     if provider and provider in PROVIDERS:
         return _provider_api_config(provider, model, api_key)
     keys = _configured_env_key_values()
+    ai_defaults = AIConfig.from_sources()
     return {
         "api_key": api_key or os.getenv("OPENROUTER_API_KEY", ""),
         "api_keys": _dedupe((api_key, *keys)),
         "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-        "model": model or os.getenv("AI_MODEL", "openai/gpt-4o-mini"),
+        "model": model or os.getenv("AI_MODEL", "").strip() or ai_defaults.primary_model,
         "fallback_models": _fallback_models(),
     }
 
 
 def _provider_api_config(provider: str, model: str, api_key: str) -> dict:
-    info = PROVIDERS[provider]
-    keys = _dedupe((api_key, *(os.getenv(key, "") for key in info["env_keys"])))
+    info = PROVIDERS.get(provider, {})
+    meta = get_provider_metadata(provider)
+    # Use the YAML-derived metadata when present, otherwise the legacy
+    # PROVIDERS dict (preserves behaviour for un-migrated configs).
+    env_keys = meta.env_keys if meta is not None else info.get("env_keys", ())
+    base_url = meta.base_url if meta is not None else str(info.get("base_url", ""))
+    keys = _dedupe((api_key, *(os.getenv(key, "").strip() for key in env_keys)))
     from .config_providers import provider_base_url
+    ai_defaults = AIConfig.from_sources()
+    ai_pool = ai_defaults.provider(provider)
+    default_model = (
+        ai_pool.default_model
+        if ai_pool is not None
+        else str(info.get("default_model", ""))
+    )
     return {
         "api_key": keys[0] if keys else "",
         "api_keys": keys,
-        "base_url": provider_base_url(info),
-        "model": model or os.getenv("AI_MODEL", "") or info["default_model"],
+        "base_url": base_url or provider_base_url(info),
+        "model": model
+        or os.getenv("AI_MODEL", "").strip()
+        or default_model,
         "fallback_models": _fallback_models(),
     }
 
@@ -83,11 +104,18 @@ def _configured_env_key_values() -> tuple[str, ...]:
 
 
 def _fallback_models() -> tuple[str, ...]:
-    return tuple(
-        model.strip()
-        for model in os.getenv("FALLBACK_MODELS", "").split(",")
-        if model.strip()
+    """Resolve the ``FALLBACK_MODELS`` list using the standard precedence.
+
+    Order: ``FALLBACK_MODELS`` env var → ``ai.fallback_models`` in
+    ``config.yaml`` → :class:`AIConfig` dataclass defaults.
+    """
+    env_value = os.getenv("FALLBACK_MODELS", "")
+    env_models = tuple(
+        model.strip() for model in env_value.split(",") if model.strip()
     )
+    if env_models:
+        return env_models
+    return AIConfig.from_sources().fallback_models
 
 
 def _dedupe(values) -> tuple[str, ...]:

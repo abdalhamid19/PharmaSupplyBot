@@ -6,10 +6,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from ..config import PROVIDERS
+from ..config import get_provider_metadata
 from .ai_health_test import AIKey, empty_result
 
-OPENCODE_BASE_URL = PROVIDERS["opencode"]["base_url"]
+OPENCODE_BASE_URL = (
+    get_provider_metadata("opencode").base_url
+    if get_provider_metadata("opencode") is not None
+    else "https://opencode.ai/zen/v1"
+)
 OUT_DIR = Path("output/api_model_tests")
 
 
