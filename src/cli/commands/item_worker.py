@@ -24,6 +24,7 @@ def execute_order_worker(bot, items, profile_key: str) -> dict[str, Any]:
     except SessionInvalidError as err:
         return _worker_error_result("session_invalid", profile_key, err)
     except Exception as err:
+        logger.exception("item_worker.execute_order_worker: profile=%s", profile_key)
         return _worker_error_result("error", profile_key, err)
 
 
@@ -35,6 +36,7 @@ def execute_cart_removal_worker(bot, items, profile_key: str) -> dict[str, Any]:
     except SessionInvalidError as err:
         return _worker_error_result("session_invalid", profile_key, err)
     except Exception as err:
+        logger.exception("item_worker.execute_cart_removal_worker: profile=%s", profile_key)
         return _worker_error_result("error", profile_key, err)
 
 

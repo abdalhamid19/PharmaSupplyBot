@@ -48,6 +48,11 @@ SWALLOW_ALLOWLIST: dict[str, str] = {
     # ``dict`` payload. KeyboardInterrupt / SystemExit are deliberately
     # swallowed to keep the UI responsive.
     "src/ui/views/streamlit_process.py": "streamlit subprocess wrapper — UI-facing failure capture",
+    # Handler teardown: if a handler fails to close (file lock, I/O error
+    # during interpreter shutdown), we cannot recover — the process is
+    # exiting anyway. Catching here is the documented Python pattern for
+    # ``__exit__``-style defensive code.
+    "src/cli/logging_setup.py": "logging handler teardown — defensive, no recovery possible during interpreter shutdown",
 }
 
 

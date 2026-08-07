@@ -50,8 +50,8 @@ def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> 
                 # duplicates or drop empty rows.
                 try:
                     items_total += len(cart_removal_items(args, load_cart_removal_items))
-                except Exception:  # noqa: BLE001 - summary must not crash
-                    pass
+                except Exception:  # noqa: BLE001 - logged; summary keeps running for other profiles
+                    logger.exception("cli.remove-cart: cart_removal_items failed for profile")
 
     print_command_summary(
         "remove-cart",
