@@ -102,17 +102,12 @@ def _provider_keys(
 def _provider_models(provider: str, meta: ProviderMetadata) -> list[str]:
     """Return the rotation model list for ``provider``.
 
-    Resolution order (matches :class:`AIConfig.from_sources`):
-        1. ``{PROVIDER}_MODELS`` env var (CSV) — wins if non-empty.
-        2. ``ai.providers.{name}.models`` from YAML.
-        3. ``meta.default_model`` (single-model fallback).
+    Resolution order:
+        1. ``ai.providers.{name}.models`` from YAML.
+        2. ``meta.default_model`` (single-model fallback).
     """
     ai_pool = AIConfig.from_sources().provider(provider)
     if ai_pool is not None:
-        env_name = f"{provider.upper()}_MODELS"
-        env_models = split_csv(os.getenv(env_name, ""))
-        if env_models:
-            return dedupe(env_models)
         return dedupe(list(ai_pool.models))
     return [meta.default_model] if meta.default_model else []
 

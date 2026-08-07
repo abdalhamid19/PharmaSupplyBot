@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -22,31 +21,23 @@ class AIConfig:
 
     Precedence (highest to lowest):
         1. CLI flag / explicit constructor argument
-        2. Environment variable (``AI_MODEL`` / ``FALLBACK_MODELS`` /
-           ``REVIEW_MODEL`` / ``AI_REVIEW_THRESHOLD`` /
-           ``{PROVIDER}_MODELS``)
-        3. ``ai:`` block of ``config.yaml``
-        4. Hardcoded defaults in this dataclass
+        2. ``ai:`` block of ``config.yaml`` (or ``state/config.yaml``)
 
-    The dataclass is the resolved shape — it always returns a non-empty
-    value, never ``None``, so downstream consumers never have to guard
-    for missing config.
+    **No environment-variable overrides and no hardcoded defaults** —
+    the dataclass fields are empty by default and the caller is expected
+    to supply a value explicitly (CLI) or via YAML. If neither is set,
+    consumers see an empty string / empty tuple and must skip the
+    corresponding feature (the verifier logs ``no_api_key`` /
+    ``no_review_model`` in that case).
 
     ``providers`` is a tuple of :class:`ProviderPool` entries, one per
-    provider declared under ``ai.providers.*`` in YAML. Consumers that
-    previously imported ``DEFAULT_MODELS`` / ``GROQ_MODELS`` from
-    ``ai.ai_rotation_config`` should now call
-    ``AIConfig.from_sources().provider("groq").models``.
+    provider declared under ``ai.providers.*`` in YAML.
     """
 
-    primary_model: str = "minimax-m2.5-free"
-    fallback_models: tuple[str, ...] = (
-        "nemotron-3-super-free",
-        "hy3-preview-free",
-        "trinity-large-preview-free",
-    )
-    review_model: str = "big-pickle"
-    review_threshold: float = 0.95
+    primary_model: str = ""
+    fallback_models: tuple[str, ...] = ()
+    review_model: str = ""
+    review_threshold: float = 0.0
     providers: tuple["ProviderPool", ...] = ()
 
     @classmethod
@@ -59,12 +50,11 @@ class AIConfig:
         review_threshold: float | None = None,
         config_path: Path | None = None,
     ) -> "AIConfig":
-        """Resolve AI defaults from explicit args → env → yaml → hardcoded.
+        """Resolve AI defaults from explicit args → yaml.
 
-        Any explicit arg that is ``None`` falls through to the next layer.
-        Pass ``""`` (empty string) or ``0.0`` to skip that layer and use the
-        YAML/env value verbatim — use this when the caller already loaded
-        the value from a CLI flag default.
+        Two layers only — CLI/explicit args first, then ``state/config.yaml``.
+        Pass ``""`` / ``()`` / ``0.0`` to skip that layer and use the YAML
+        value verbatim.
         """
         yaml_block = _load_yaml_ai_block(config_path)
 
@@ -76,27 +66,19 @@ class AIConfig:
         return cls(
             primary_model=_resolve_str(
                 primary_model,
-                os.getenv("AI_MODEL", "").strip(),
                 _pick_yaml("primary_model"),
-                cls.primary_model,
             ),
             fallback_models=_resolve_tuple(
                 fallback_models,
-                _split_csv(os.getenv("FALLBACK_MODELS", "")),
                 _pick_yaml("fallback_models"),
-                cls.fallback_models,
             ),
             review_model=_resolve_str(
                 review_model,
-                os.getenv("REVIEW_MODEL", "").strip(),
                 _pick_yaml("review_model"),
-                cls.review_model,
             ),
             review_threshold=_resolve_float(
                 review_threshold,
-                _parse_float_env(os.getenv("AI_REVIEW_THRESHOLD", "")),
                 _pick_yaml("review_threshold"),
-                cls.review_threshold,
             ),
             providers=providers,
         )
@@ -248,13 +230,11 @@ class ProviderPool:
 def _resolve_providers(yaml_block: dict[str, Any]) -> tuple[ProviderPool, ...]:
     """Build a sorted tuple of :class:`ProviderPool` from a YAML ``ai:`` block.
 
-    Resolution per provider:
-        1. ``{PROVIDER}_MODELS`` env var (CSV) — wins if non-empty.
-        2. ``ai.providers.{name}.models`` from YAML.
-        3. Skip the provider entirely (returns an empty tuple) if neither
-           yields a non-empty list — the consumer can then fall back to
-           the ``PROVIDERS[provider].default_model`` from
-           :mod:`config_providers` if available.
+    Resolution per provider (YAML only — no env override):
+        1. ``ai.providers.{name}.models`` from YAML.
+        2. Skip the provider entirely if no models are declared — the
+           consumer falls back to ``PROVIDERS[provider].default_model``
+           from :mod:`config_providers` if available.
 
     Returns a tuple (not a dict) so the dataclass stays hashable and
     immutable. Use :meth:`AIConfig.provider` for by-name lookups.
@@ -271,15 +251,10 @@ def _resolve_providers(yaml_block: dict[str, Any]) -> tuple[ProviderPool, ...]:
         if not isinstance(block, dict):
             continue
 
-        env_name = f"{name.upper()}_MODELS"
-        env_models = _split_csv(os.getenv(env_name, ""))
         yaml_models = block.get("models")
         yaml_default = block.get("default_model")
 
-        # Layer 1 (env) wins over Layer 2 (yaml).
-        if env_models:
-            models = env_models
-        elif isinstance(yaml_models, list):
+        if isinstance(yaml_models, list):
             models = tuple(
                 str(m).strip() for m in yaml_models if str(m).strip()
             )

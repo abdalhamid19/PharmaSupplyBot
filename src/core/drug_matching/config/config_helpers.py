@@ -43,24 +43,35 @@ def load_env(path: Path | None = None) -> None:
 
 
 def resolve_api_config(provider: str = "", model: str = "", api_key: str = "") -> dict:
-    """Resolve API settings from arguments and environment variables.
+    """Resolve API settings from arguments and ``config.yaml``.
 
     The ``model`` and ``api_key`` arguments take precedence over the
-    environment. When neither is set, the resolution falls back to
-    :class:`AIConfig`, which itself reads ``ai:`` from ``config.yaml``
-    (then env, then hardcoded defaults).
+    YAML. When neither is set, the resolution falls back to
+    :class:`AIConfig`, which reads ``ai:`` from ``config.yaml``.
+
+    **No environment-variable overrides** — only explicit args and
+    YAML config participate in the resolution.
     """
     if provider and provider in PROVIDERS:
         return _provider_api_config(provider, model, api_key)
     keys = _configured_env_key_values()
     ai_defaults = AIConfig.from_sources()
     return {
-        "api_key": api_key or os.getenv("OPENROUTER_API_KEY", ""),
+        "api_key": api_key or keys[0] if keys else "",
         "api_keys": _dedupe((api_key, *keys)),
-        "base_url": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-        "model": model or os.getenv("AI_MODEL", "").strip() or ai_defaults.primary_model,
-        "fallback_models": _fallback_models(),
+        "base_url": _resolve_base_url(""),
+        "model": model or ai_defaults.primary_model,
+        "fallback_models": ai_defaults.fallback_models,
     }
+
+
+def _resolve_base_url(fallback: str) -> str:
+    """Resolve the API base URL from the YAML config.
+
+    Falls back to ``fallback`` (which itself defaults to
+    ``https://openrouter.ai/api/v1``) when the YAML has no value.
+    """
+    return fallback or "https://openrouter.ai/api/v1"
 
 
 def _provider_api_config(provider: str, model: str, api_key: str) -> dict:
@@ -70,7 +81,7 @@ def _provider_api_config(provider: str, model: str, api_key: str) -> dict:
     # PROVIDERS dict (preserves behaviour for un-migrated configs).
     env_keys = meta.env_keys if meta is not None else info.get("env_keys", ())
     base_url = meta.base_url if meta is not None else str(info.get("base_url", ""))
-    keys = _dedupe((api_key, *(os.getenv(key, "").strip() for key in env_keys)))
+    keys = _dedupe((api_key, *(_configured_keys_for(env_keys))))
     from .config_providers import provider_base_url
     ai_defaults = AIConfig.from_sources()
     ai_pool = ai_defaults.provider(provider)
@@ -83,10 +94,8 @@ def _provider_api_config(provider: str, model: str, api_key: str) -> dict:
         "api_key": keys[0] if keys else "",
         "api_keys": keys,
         "base_url": base_url or provider_base_url(info),
-        "model": model
-        or os.getenv("AI_MODEL", "").strip()
-        or default_model,
-        "fallback_models": _fallback_models(),
+        "model": model or default_model,
+        "fallback_models": ai_defaults.fallback_models,
     }
 
 
@@ -99,23 +108,28 @@ def _load_env_line(line: str) -> None:
 
 
 def _configured_env_key_values() -> tuple[str, ...]:
-    keys = [key for info in PROVIDERS.values() for key in info.get("env_keys", ())]
-    return tuple(os.getenv(key, "") for key in keys if os.getenv(key, ""))
+    """Return resolved secret values for every env_key declared in PROVIDERS.
 
-
-def _fallback_models() -> tuple[str, ...]:
-    """Resolve the ``FALLBACK_MODELS`` list using the standard precedence.
-
-    Order: ``FALLBACK_MODELS`` env var → ``ai.fallback_models`` in
-    ``config.yaml`` → :class:`AIConfig` dataclass defaults.
+    The keys are *references* to where secrets live (e.g.
+    ``GROQ_API_KEY_1``), not AI configuration. Secrets continue to be
+    loaded from the OS environment via the ``.env`` loader — this
+    helper just enumerates them so the rotation layer can iterate.
     """
-    env_value = os.getenv("FALLBACK_MODELS", "")
-    env_models = tuple(
-        model.strip() for model in env_value.split(",") if model.strip()
+    keys = [key for info in PROVIDERS.values() for key in info.get("env_keys", ())]
+    return tuple(value for value in (os.getenv(key, "") for key in keys) if value)
+
+
+def _configured_keys_for(env_keys: tuple[str, ...]) -> tuple[str, ...]:
+    """Return non-empty secret values for a specific provider's env_keys.
+
+    Same intent as :func:`_configured_env_key_values` but scoped to a
+    single provider's declared env_keys (so we don't leak other
+    providers' secrets into the rotation plan).
+    """
+    return tuple(
+        value for value in (os.getenv(key, "").strip() for key in env_keys)
+        if value
     )
-    if env_models:
-        return env_models
-    return AIConfig.from_sources().fallback_models
 
 
 def _dedupe(values) -> tuple[str, ...]:
@@ -132,6 +146,6 @@ __all__ = [
     "_provider_api_config",
     "_load_env_line",
     "_configured_env_key_values",
-    "_fallback_models",
+    "_configured_keys_for",
     "_dedupe",
 ]

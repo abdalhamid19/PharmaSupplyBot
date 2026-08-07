@@ -102,6 +102,140 @@ def _resolve_providers(yaml_block):
 
 ## 3. الـ Rotation: من provider واحد لـ "plan كامل" من المحاولات
 
+---
+
+### 3.0 ملاحظة مهمة: العلاقة بين `env_keys` في YAML والـ `.env` الحقيقي
+
+كثير من الناس أول ما يبصّوا على الـ YAML بيلاقوا إن `env_keys` فيها اسمين بس (مثلاً لـ opencode):
+
+```yaml
+opencode:
+  env_keys:
+    - OPENCODE_API_KEY_1
+    - OPENCODE_API_KEY        # singular fallback
+```
+
+بينما الـ `.env` ممكن يكون فيه **7 مفاتيح**:
+
+```bash
+OPENCODE_API_KEY_1=***
+OPENCODE_API_KEY_2=***
+OPENCODE_API_KEY_3=***
+OPENCODE_API_KEY_4=***
+OPENCODE_API_KEY_5=***
+OPENCODE_API_KEY_6=***
+OPENCODE_API_KEY=***
+```
+
+**ده مش bug** — ده defensive design. الـ YAML مش بيحدد "الحد الأقصى" للمفاتيح المتاحة، بيحدد **قائمة "محاولات التحميل"**: الكود بيلفّ على كل اسم في القائمة، ولو الـ env-var فاضي في الـ runtime → بيتجاهله وبيكمّل للي بعده.
+
+الكود المسؤول في `src/core/drug_matching/ai/ai_rotation.py:81-99`:
+
+```python
+def _provider_keys(meta, account_id_envs=()):
+    keys = []
+    for env_name in meta.env_keys:          # ❶ لفّ على كل اسم في YAML
+        value = os.getenv(env_name, "").strip()
+        if value:                           # ❷ لو مضبوط فعلياً → ضيفه
+            keys.append((env_name, value))
+    return dedupe(keys)                     # ❸ dedupe بس — مفيش حد أدنى/أقصى
+```
+
+#### القاعدة الذهبية
+
+| الحالة | السلوك |
+|---|---|
+| `.env` فيه مفاتيح **أكثر** من YAML | الكود بيقرأ الموجود في الـ YAML بس (الـ 2 مثلاً). الباقي **مش بيُستخدم** |
+| `.env` فيه مفاتيح **أقل** من YAML | شغّال عادي — الـ entries الفاضية بتتجاهل بصمت |
+| YAML و `.env` متطابقين | الاستخدام الأمثل |
+
+#### متى ده بيبقى مشكلة فعلية؟
+
+لو عندك `OPENCODE_API_KEY_2..6` في الـ `.env` وعايز الـ rotation يستخدمها، لازم **تضيفها للـ YAML**:
+
+```yaml
+opencode:
+  env_keys:
+    - OPENCODE_API_KEY_1
+    - OPENCODE_API_KEY_2
+    - OPENCODE_API_KEY_3
+    - OPENCODE_API_KEY_4
+    - OPENCODE_API_KEY_5
+    - OPENCODE_API_KEY_6
+    - OPENCODE_API_KEY
+```
+
+كده عدد الـ attempts المتاحة لـ opencode بيبقى `7 keys × 7 models = 49 attempt` (مع `ai_max_concurrent: 5` في `MatchingConfig`، يعني 5 attempts بتـ run بالتوازي والباقي في الـ queue).
+
+#### وصفة عملية: وسّع الـ YAML خطوة بخطوة
+
+**قبل ما تلمس `state/config.yaml`** — نفّذ الخطوات دي بالترتيب:
+
+##### Step 1: اعرف المفاتيح اللي عندك فعلاً (بدون ما تسرّب القيم)
+
+```bash
+# عدد المفاتيح المضبوطة لـ opencode في الـ env الحالي
+env | grep -c '^OPENCODE_API_KEY[_=]'      # 7 (لو كلهم مضبوطين)
+env | grep '^OPENCODE_API_KEY' | sort      # يعرض الأسماء فقط بدون القيم
+```
+
+##### Step 2: ولّد الـ YAML entry الجديد من الـ env تلقائياً
+
+```bash
+# helper: اطبع env_keys list كاملة لأي provider
+PROVIDER=opencode
+env | grep "^${PROVIDER^^}_API_KEY" \
+  | cut -d= -f1 \
+  | sed 's/^/    - /'
+```
+
+النتيجة لازم تكون الـ 7 الأسامي بالترتيب.
+
+##### Step 3: طبّق التعديل على `state/config.yaml`
+
+افتح `state/config.yaml` وغيّر الـ `opencode.env_keys` لقائمة الـ 7، **راعي الترتيب**: المفاتيح الأقوى (الأعلى quota) في الأول، الـ singular fallback في الآخر.
+
+##### Step 4: تحقق قبل ما تشغّل
+
+```python
+# snippet قابل للنسخ — اعمل verify بدون ما تشغّل match فعلي
+python -c "
+import os
+from src.core.drug_matching.ai.ai_rotation import _provider_attempts
+attempts = _provider_attempts('opencode')
+print(f'opencode attempts available: {len(attempts)}')
+print(f'unique keys: {len({a.api_key for a in attempts})}')
+print(f'unique models: {len({a.model for a in attempts})}')
+# المتوقع: 49 attempts / 7 keys / 7 models
+"
+```
+
+#### ⚠️ حاجات لازم تتجنبها
+
+| ❌ غلط | ✅ الصح |
+|---|---|
+| تضيف مفاتيح للـ YAML مش موجودة في `.env` | اعكس: `.env` أولاً، ثم YAML |
+| تكرر نفس الـ key value في entries مختلفة (مثلاً `_1` و `_2` بنفس الـ token) | استخدم مفاتيح مختلفة فعلاً — الـ dedupe بيمنع تكرار الـ attempt بس بيضيّع slot |
+| تنسى الـ singular fallback (`OPENCODE_API_KEY` بدون رقم) | ضيفه آخر القائمة عشان يـ fallback لو الـ numbered keys كلها فولت rate-limit |
+| توسّع لـ 20+ key لـ provider بطيء | راعي `ai_max_concurrent: 5` — لو 50 attempt و 5 concurrent، الـ batch هيتأخر |
+
+#### مقارنة سريعة عبر كل الـ providers
+
+| provider | YAML `env_keys` | `.env.example` | الفرق |
+|---|---|---|---|
+| `opencode` | 2 | 7 | YAML بيحتاج توسيع |
+| `groq` | 2 | 2 | متطابق |
+| `openrouter` | 2 | 2 | متطابق |
+| `github` | 2 | 2 | متطابق |
+| `cerebras` | 2 | 2 | متطابق |
+| `google` | 2 | 2 | متطابق |
+| `mistral` | 2 | 2 | متطابق |
+| `cloudflare` | 7 (`_1.._6` + singular) | 7 | متطابق |
+
+> **الخلاصة**: الـ YAML هو "الـ source of truth" للمفاتيح اللي الـ rotation يقدر يستخدمها. لو عندك مفاتيح زيادة في `.env` ومش متصرّفة في `state/config.yaml` → الـ rotation **مش هتعرف وجودها**.
+
+---
+
 **File**: `src/core/drug_matching/ai/ai_rotation.py`
 
 ### 3.1 الـ `AIModelAttempt` (line 20-45)

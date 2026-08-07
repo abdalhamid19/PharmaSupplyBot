@@ -15,7 +15,7 @@ from .config import (
     _provider_api_config,
     _load_env_line,
     _configured_env_key_values,
-    _fallback_models,
+    _configured_keys_for,
     _dedupe,
 )
 
