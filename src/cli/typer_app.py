@@ -358,6 +358,60 @@ def match_products_cmd(
     raise typer.Exit(_run_registered(ctx, "match-products"))
 
 
+@app.command("list-models")
+def list_models_cmd(
+    ctx: Context,
+    config: str = typer.Option(
+        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+    ),
+    provider: str | None = typer.Option(
+        None, "--provider", "-p",
+        help="Comma-separated provider names to probe (default: all).",
+    ),
+    timeout: float = typer.Option(
+        20.0, "--timeout", help="Per-request timeout (seconds)."
+    ),
+    format: str | None = typer.Option(
+        None, "--format",
+        help="Output format: human (default, TTY-only), json, or plain.",
+    ),
+) -> None:
+    """List AI models available per provider by probing live /models endpoints."""
+    raise typer.Exit(_run_registered(ctx, "list-models"))
+
+
+@app.command("test-models")
+def test_models_cmd(
+    ctx: Context,
+    config: str = typer.Option(
+        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+    ),
+    provider: str | None = typer.Option(
+        None, "--provider", "-p",
+        help="Comma-separated provider names to test (default: all).",
+    ),
+    timeout: float = typer.Option(
+        25.0, "--timeout", help="Per-request timeout (seconds)."
+    ),
+    max_tokens: int = typer.Option(
+        64, "--max-tokens", help="Max tokens for the probe request."
+    ),
+    concurrency: int = typer.Option(
+        6, "--concurrency", help="Parallel probe requests."
+    ),
+    all_keys: bool = typer.Option(
+        False, "--all-keys",
+        help="Probe every API key x model (default: first key per model).",
+    ),
+    format: str | None = typer.Option(
+        None, "--format",
+        help="Output format: human (default, TTY-only), json, or plain.",
+    ),
+) -> None:
+    """Live-test all configured AI models: status, latency, and exact failure cause."""
+    raise typer.Exit(_run_registered(ctx, "test-models"))
+
+
 @app.command("remove-cart")
 def remove_cart_cmd(
     ctx: Context,
