@@ -295,13 +295,52 @@ py run.py auth --profile wardany
 4. Hardcoded default في الـ dataclass
 ```
 
-ولـ per-provider model pool:
+ولـ per-provider model pool (اللي بيستخدمه `ai_rotation` و `config_helpers.resolve_api_config`):
 
 ```
-1. {PROVIDER}_MODELS env var (CSV)  ← override per-run
-2. ai.providers.{name}.models من config.yaml
-3. meta.default_model (single-model fallback)
+1. {PROVIDER}_MODELS env var (CSV)       ← override per-run، بيكسب لو مش فاضي
+2. ai.providers.{name}.models من YAML    ← الـ rotation pool الكامل
+3. ai.providers.{name}.default_model     ← موديل واحد بس (بيرجع لأول عنصر في models لو مش مكتوب)
+4. _FALLBACK_PROVIDER_METADATA في الكود  ← آخر معقل، alias قديم للـ tests
 ```
+
+#### الـ `default_model` (الموديل المبدئي لكل provider)
+
+ده الموديل اللي بيُستخدم لما `--model` flag مش متحدد. بيتحلّل بالترتيب:
+
+| المصدر | الشرط | النتيجة |
+|---|---|---|
+| `ai.providers.{name}.default_model` في YAML | مكتوب صراحةً كـ string | يستخدم القيمة دي |
+| `ai.providers.{name}.models[0]` | الـ YAML فيه `models:` لكن مفيش `default_model:` | أول عنصر في القائمة |
+| (مفيش pool) | مفيش models خالص | الـ provider بيـ skip — الـ consumer يرجع لـ `_FALLBACK_PROVIDER_METADATA` |
+
+**مثال:**
+
+```yaml
+ai:
+  providers:
+    groq:
+      default_model: "openai/gpt-oss-120b"   # ← meta.default_model (case A)
+      models:
+        - "openai/gpt-oss-120b"
+        - "meta-llama/llama-4-scout-17b-16e-instruct"
+        - "llama-3.3-70b-versatile"
+```
+
+لما `--provider groq` بدون `--model` → يستخدم `openai/gpt-oss-120b`.
+لما `--provider rotation` → يجرّب الـ models بالترتيب: GPT-OSS → Llama-4 → Llama-3.3.
+
+#### الـ `models` (الـ rotation pool)
+
+ده **قائمة الموديلات** اللي `ai_rotation._provider_models` بيمشي عليها لو واحد فشل. بيتحلّل:
+
+1. `{PROVIDER}_MODELS` env var (CSV، مثل `GROQ_MODELS="llama-3.3-70b,llama-3.1-8b"`) — لو فاضي اتخطاه
+2. `ai.providers.{name}.models` من YAML (list أو string CSV)
+3. لو الاتنين فاضيين → الـ provider بيـ skip بالكامل
+
+#### الـ `meta` في الـ hardcoded fallback
+
+الـ `_FALLBACK_PROVIDER_METADATA` في `src/core/drug_matching/config/config_models.py:342` فيه 8 providers (groq, cloudflare, openrouter, cerebras, google, mistral, github, opencode) — ده الـ layer الأخير اللي بيضمن إن في default حتى لو الـ YAML فاضي. الـ `PROVIDERS` dict في `config_providers.py` مجرد alias قديم ليه.
 
 ### الهيكل
 

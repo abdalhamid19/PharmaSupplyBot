@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "DEVELOPMENT_HISTORY.md",
+                "file": "swallow_audit_stage1_guide.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "DEVELOPMENT_HISTORY"
+              "title": "swallow_audit_stage1_guide"
             }
           }
         ]
@@ -189,5 +189,7 @@
     }
   },
   "active": "e7c7824b9bfdea94",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "DEVELOPMENT_HISTORY.md"
+  ]
 }
