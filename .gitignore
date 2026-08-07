@@ -12,6 +12,7 @@ config.yaml
 # Source code in src/tawreed/artifacts/ IS tracked; runtime capture files are not.
 artifacts/debug/
 artifacts/captures/
+artifacts/
 
 # State directory contains sensitive Playwright storage state and cookies
 state/
