@@ -108,6 +108,13 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
                 if isinstance(func, ast.Name) and func.id == "error":
                     # bare `error(...)` is unusual but counts
                     has_logger = True
+                # Helper calls that delegate to a logger are also acceptable.
+                # Pattern: any function whose name starts with `_log_` / `log_`
+                # is a project-convention helper that emits a log record.
+                if isinstance(func, ast.Name) and func.id.startswith(("log_", "_log_")):
+                    has_logger = True
+                if isinstance(func, ast.Attribute) and func.attr.startswith(("log_", "_log_")):
+                    has_logger = True
             if isinstance(node, ast.Raise):
                 has_raise = True
     return has_logger, has_raise

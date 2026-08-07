@@ -1,9 +1,13 @@
 """Response validation functions for AI health checks."""
 
 import json
+import logging
 from typing import Any
 
 from ..verification.verifier import extract_json
+
+
+logger = logging.getLogger(__name__)
 
 
 def content_from_response(data: Any) -> tuple[str, str]:
@@ -19,6 +23,7 @@ def content_from_response(data: Any) -> tuple[str, str]:
             )
         return str(content or ""), ""
     except Exception as exc:
+        logger.debug("ai_health.content_from_response: bad response shape: %s", exc)
         return "", f"{type(exc).__name__}: {exc}"
 
 

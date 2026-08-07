@@ -85,6 +85,13 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
                     has_logger = True
                 if isinstance(func, ast.Name) and func.id == "error":
                     has_logger = True
+                # Project convention: helper calls named `log_*` / `_log_*`
+                # delegate to a logger. They count as "not silent" without
+                # forcing every module to import `logging` directly.
+                if isinstance(func, ast.Name) and func.id.startswith(("log_", "_log_")):
+                    has_logger = True
+                if isinstance(func, ast.Attribute) and func.attr.startswith(("log_", "_log_")):
+                    has_logger = True
             if isinstance(node, ast.Raise):
                 has_raise = True
     return has_logger, has_raise

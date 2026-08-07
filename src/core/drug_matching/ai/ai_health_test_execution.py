@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any
 
@@ -16,6 +17,9 @@ from .ai_health_validation import (
     _apply_error_quota_hints,
     _validate_content,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 async def execute_one(
@@ -44,6 +48,10 @@ async def execute_one(
         ) as resp:
             return await _handle_response(resp, result)
     except Exception as exc:
+        logger.warning(
+            "ai_health.execute_one: provider=%s model=%s raised %s",
+            key.value[:6], model, type(exc).__name__,
+        )
         result["error_type"] = type(exc).__name__
         result["error_message"] = str(exc)[:300]
         return result
