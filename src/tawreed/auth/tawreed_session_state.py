@@ -118,7 +118,7 @@ def discard_session_state(state_path: Path) -> None:
     try:
         state_path.unlink(missing_ok=True)
     except Exception:
-        pass
+        logger.debug("tawreed_session_state.discard_session_state: best-effort discard failed")
 
 
 __all__ = [

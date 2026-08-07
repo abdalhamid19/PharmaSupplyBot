@@ -81,7 +81,7 @@ def wait_for_network_idle(page) -> None:
     try:
         page.wait_for_load_state("networkidle", timeout=5000)
     except Exception:
-        pass
+        logger.debug("tawreed_session_auth.wait_for_network_idle: networkidle wait failed (non-fatal)")
 
 
 def perform_tawreed_auth(bot, wait_seconds: int, headless: bool) -> None:

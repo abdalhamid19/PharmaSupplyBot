@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page

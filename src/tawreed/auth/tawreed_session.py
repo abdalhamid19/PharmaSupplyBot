@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -65,7 +68,7 @@ def close_context(context) -> None:
     try:
         context.close()
     except Exception:
-        pass
+        logger.debug("tawreed_session.close_context: best-effort context close failed")
 
 
 def close_browser(browser) -> None:
@@ -73,7 +76,7 @@ def close_browser(browser) -> None:
     try:
         browser.close()
     except Exception:
-        pass
+        logger.debug("tawreed_session.close_browser: best-effort browser close failed")
 
 
 # ============================================================================
@@ -99,6 +102,7 @@ def _is_login_form_visible(page: Page, selectors) -> bool:
         ).first.is_visible(timeout=2000)
         return bool(login_email_visible or login_password_visible)
     except Exception:
+        logger.debug("tawreed_session._is_logged_in_marker_visible: detection failed")
         return False
 
 
@@ -112,6 +116,7 @@ def _ready_surface_visible(
         page.locator(ready_selector).first.wait_for(timeout=timeout_ms)
         return True
     except Exception:
+        logger.debug("tawreed_session._ready_surface_visible: check failed")
         return False
 
 
