@@ -99,8 +99,10 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
             if isinstance(node, ast.Call):
                 func = node.func
                 # logging.error / logging.warning / logger.error / logger.warning
+                # Plus logger.debug — a debug log line also reaches the operator
+                # (via logs/app.log at DEBUG level), so it counts as "not silent".
                 if isinstance(func, ast.Attribute) and func.attr in {
-                    "error", "warning", "exception", "critical", "info",
+                    "error", "warning", "exception", "critical", "info", "debug", "log",
                 }:
                     has_logger = True
                 if isinstance(func, ast.Name) and func.id == "error":

@@ -73,7 +73,10 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
     """Return (has_logger_call, has_raise). Either is enough to clear the finding."""
     has_logger = False
     has_raise = False
-    LOGGER_METHODS = {"error", "warning", "exception", "critical", "info"}
+    LOGGER_METHODS = {
+        "error", "warning", "exception", "critical", "info",
+        "debug", "log",  # debug/log also reach the operator via logs/app.log
+    }
     for stmt in body:
         for node in ast.walk(stmt):
             if isinstance(node, ast.Call):
