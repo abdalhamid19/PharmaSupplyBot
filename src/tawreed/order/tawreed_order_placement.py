@@ -57,6 +57,7 @@ def _save_api_contract_capture(captured: list[dict]) -> None:
         from ..api.tawreed_api_contract import save_api_contract_capture
         save_api_contract_capture(captured)
     except Exception:
+        logger.debug("order._save_api_contract_capture: save failed (non-fatal)")
         pass
 
 
@@ -162,6 +163,7 @@ class OrderPlacementFlow:
         try:
             context = manual_review_cache_context(preload_manual_review_decisions(items))
         except Exception:
+            logger.debug("order._process_single_item: placement failed (non-fatal)")
             return nullcontext()
         self.bot._record_pending_item_timing(
             "manual_review_lookup_seconds", time.perf_counter() - started_at

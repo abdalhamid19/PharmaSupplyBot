@@ -71,6 +71,7 @@ class MatchOnlyFlow:
         try:
             context = manual_review_cache_context(preload_manual_review_decisions(items))
         except Exception:
+            logger.debug("order._manual_review_cache_for_items: cache failed (non-fatal)")
             return nullcontext()
         self.bot._record_pending_item_timing(
             "manual_review_lookup_seconds", time.perf_counter() - started_at
