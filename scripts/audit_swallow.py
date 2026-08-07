@@ -134,6 +134,9 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
         "record_failure", "record_skip", "record_combo_failure",
         "record_match_only_failure", "record_match_only_skip",
     }
+    # Single-name function calls that are project logging helpers.
+    # Includes bare `_log(...)` (tawreed cart_removal pattern).
+    SINGLE_NAME_LOG_HELPERS = {"_log"}
     for stmt in body:
         for node in ast.walk(stmt):
             if isinstance(node, ast.Call):
@@ -147,6 +150,9 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
                 if isinstance(func, ast.Name) and func.id.startswith(("log_", "_log_")):
                     has_logger = True
                 if isinstance(func, ast.Attribute) and func.attr.startswith(("log_", "_log_")):
+                    has_logger = True
+                # 2b) Bare `_log(...)` single-name helper.
+                if isinstance(func, ast.Name) and func.id in SINGLE_NAME_LOG_HELPERS:
                     has_logger = True
                 # 3) Summary recorder calls (any object.<record_*>(...))
                 # We accept any attribute call whose name is in the
@@ -167,7 +173,9 @@ def _audit_swallowed(tree: ast.AST, src_path: Path, src_lines: list[str]) -> lis
     """Find every ``except Exception`` that neither logs nor re-raises."""
     findings: list[Finding] = []
     rel = src_path.relative_to(PROJECT_ROOT)
-    if str(rel) in SWALLOW_ALLOWLIST:
+    # Use as_posix() so the key matches the SWALLOW_ALLOWLIST entries
+    # (which are written with forward slashes regardless of platform).
+    if rel.as_posix() in SWALLOW_ALLOWLIST:
         return []
 
     for handler in [n for n in ast.walk(tree) if isinstance(n, ast.ExceptHandler)]:

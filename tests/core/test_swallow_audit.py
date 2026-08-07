@@ -96,6 +96,7 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
         "record_failure", "record_skip", "record_combo_failure",
         "record_match_only_failure", "record_match_only_skip",
     }
+    SINGLE_NAME_LOG_HELPERS = {"_log"}
     for stmt in body:
         for node in ast.walk(stmt):
             if isinstance(node, ast.Call):
@@ -110,6 +111,9 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
                 if isinstance(func, ast.Name) and func.id.startswith(("log_", "_log_")):
                     has_logger = True
                 if isinstance(func, ast.Attribute) and func.attr.startswith(("log_", "_log_")):
+                    has_logger = True
+                # Bare `_log(...)` single-name helper.
+                if isinstance(func, ast.Name) and func.id in SINGLE_NAME_LOG_HELPERS:
                     has_logger = True
                 # Summary recorder calls (structured-log equivalent).
                 if isinstance(func, ast.Attribute) and func.attr in RECORDER_METHODS:
@@ -132,7 +136,9 @@ def _all_swallowed_handlers() -> list[tuple[Path, int]]:
         if _is_excluded(py):
             continue
         rel = py.relative_to(PROJECT_ROOT)
-        if str(rel) in SWALLOW_ALLOWLIST:
+        # Use as_posix() so the key matches the SWALLOW_ALLOWLIST entries
+        # (which are written with forward slashes regardless of platform).
+        if rel.as_posix() in SWALLOW_ALLOWLIST:
             continue
         try:
             text = py.read_text(encoding="utf-8")
