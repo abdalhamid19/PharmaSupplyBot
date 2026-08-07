@@ -31,6 +31,7 @@ def is_logged_in_marker_visible(page: Page, logged_in_marker: str, timeout_ms: i
         page.locator(logged_in_marker).first.wait_for(timeout=timeout_ms)
         return True
     except Exception:
+        logger.debug("tawreed.selector_visible: selector check failed (non-fatal)")
         return False
 
 

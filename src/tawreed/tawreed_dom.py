@@ -66,6 +66,7 @@ def _badge_int(row, selector: str) -> int:
         text = _inner_text(row.locator(selector).first, FAST_OPTIONAL_TEXT_TIMEOUT_MS)
         return int(float(text.strip()))
     except Exception:
+        logger.debug("tawreed._badge_int: parse failed (non-fatal)")
         return 0
 
 
@@ -155,6 +156,7 @@ def _row_name_lines(row) -> list[str]:
         text = _inner_text(div, FAST_OPTIONAL_TEXT_TIMEOUT_MS).strip()
         return [line.strip() for line in text.splitlines() if line.strip()]
     except Exception:
+        logger.debug("tawreed._row_name_lines: extract failed (non-fatal)")
         return []
 
 

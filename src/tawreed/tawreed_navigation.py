@@ -23,6 +23,7 @@ def go_to_orders(page: Page, go_to_orders_selector: str, ready_selector: str) ->
     try:
         page.locator(go_to_orders_selector).first.click()
     except Exception:
+        logger.debug("tawreed.go_to_orders: nav failed (non-fatal)")
         open_products_link_fallback(page)
     _wait_for_ready_selector(page, ready_selector)
 
@@ -32,9 +33,11 @@ def open_products_link_fallback(page: Page) -> None:
     try:
         page.get_by_role("link", name="Products").first.click()
     except Exception:
+        logger.debug("tawreed.open_products_link_fallback: outer failed (non-fatal)")
         try:
             page.get_by_text("Products", exact=False).first.click()
         except Exception:
+            logger.debug("tawreed.open_products_link_fallback: inner click failed (non-fatal)")
             page.get_by_text("المنتجات", exact=False).first.click()
 
 
@@ -53,4 +56,5 @@ def _wait_for_ready_selector(page: Page, ready_selector: str) -> None:
     try:
         page.locator(ready_selector).first.wait_for(timeout=2000)
     except Exception:
+        logger.debug("tawreed._wait_for_ready_selector: wait failed (non-fatal)")
         pass

@@ -39,6 +39,7 @@ def bounded_requested_quantity(quantity_input, requested_quantity: int) -> int:
     try:
         max_quantity = max(1, int(float(max_attr)))
     except Exception:
+        logger.debug("tawreed.bounded_requested_quantity: bound calc failed (non-fatal)")
         max_quantity = 1
     return max(1, min(int(requested_quantity), max_quantity))
 def fill_quantity_input(dialog, quantity: int) -> int:
@@ -71,7 +72,9 @@ def visible_product_rows(page: Page):
 def is_no_results_row(row) -> bool:
     """Return whether the current table row is Tawreed's no-results placeholder."""
     try: text = str(row.inner_text(timeout=300))
-    except Exception: return False
+    except Exception:
+        logger.debug("tawreed.is_no_results_row: detection failed (non-fatal)")
+        return False
     norm = " ".join(text.split()).lower()
     return any(k in norm for k in ("no results found", "لايوجد نتائج", "لا يوجد نتائج"))
 def visible_dialog_masks(page: Page):
