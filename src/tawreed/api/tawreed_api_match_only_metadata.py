@@ -1,6 +1,9 @@
 """API match-only store metadata helpers."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 
 def record_api_match_only_store_metadata(bot, api, match) -> None:
@@ -14,6 +17,7 @@ def record_api_match_only_store_metadata(bot, api, match) -> None:
     try:
         choice = api_match_only_store_choice(bot, api, data)
     except Exception:
+        logger.debug("api.match_only_metadata: write failed (non-fatal)")
         return
     if choice:
         record_single_store(bot, choice.store)

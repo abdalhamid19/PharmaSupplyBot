@@ -46,6 +46,7 @@ def _request_body(request) -> dict[str, Any]:
         body = request.post_data_json
         return body() if callable(body) else body
     except Exception:
+        logger.debug("api._request_body: bad JSON (non-fatal)")
         return {}
 
 
@@ -80,6 +81,7 @@ def _capture_request_details(request, captured):
     try:
         post_data = request.post_data_json
     except Exception:
+        logger.debug("api._capture_request_details: capture failed (non-fatal)")
         post_data = None
     
     captured.append({

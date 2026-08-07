@@ -39,6 +39,7 @@ def _capture_request_details(request, captured):
     try:
         post_data = request.post_data_json
     except Exception:
+        logger.debug("api._capture_request_details: capture failed (non-fatal)")
         post_data = None
     
     captured.append({
