@@ -172,15 +172,13 @@ def test_configured_attempts_uses_yaml_base_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``configured_attempts`` reads base_url from YAML, not Python registry."""
-    monkeypatch.setenv("GROQ_API_KEY", "test-key")
-    monkeypatch.delenv("GROQ_MODELS", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("OPENROUTER_MODELS", raising=False)
 
-    attempts = configured_attempts("groq")
+    attempts = configured_attempts("openrouter")
     assert attempts
     # The base_url matches the YAML in state/config.yaml (not Python legacy).
-    assert attempts[0].base_url == "https://api.groq.com/openai/v1"
+    assert attempts[0].base_url == "https://openrouter.ai/api/v1"
 
 
 def test_configured_attempts_unknown_provider_returns_empty(

@@ -109,7 +109,13 @@ def _provider_models(provider: str, meta: ProviderMetadata) -> list[str]:
     ai_pool = AIConfig.from_sources().provider(provider)
     if ai_pool is not None:
         return dedupe(list(ai_pool.models))
-    return [meta.default_model] if meta.default_model else []
+    # No YAML pool (e.g. provider declared with empty ``models``). Prefer
+    # the metadata default when available, otherwise yield nothing so an
+    # empty provider contributes zero attempts to the rotation plan.
+    default_model = getattr(meta, "default_model", "") or getattr(
+        meta, "default_model", ""
+    )
+    return [default_model] if default_model else []
 
 
 def _model_tier(rank: int, model_count: int) -> int:

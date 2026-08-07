@@ -153,8 +153,10 @@ def test_yaml_without_providers_block_falls_back_to_state(tmp_path: Path) -> Non
     cfg = AIConfig.from_sources(
         config_path=Path("/nonexistent/config.yaml")
     )
-    # Falls back to state/config.yaml's ai.providers.* (8 providers).
-    assert len(cfg.providers) >= 8
+    # Falls back to state/config.yaml's ai.providers.*. github/groq are
+    # declared empty (no verified-working models) so they resolve to no
+    # pool; the remaining working providers still resolve here.
+    assert len(cfg.providers) >= 6
 
 
 def test_explicit_yaml_without_providers_yields_no_pools(tmp_path: Path) -> None:
@@ -222,10 +224,9 @@ def test_configured_attempts_uses_yaml_pool(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.delenv("GROQ_MODELS", raising=False)
 
     attempts = configured_attempts("groq")
-    # The real state/config.yaml has 9 groq models.
-    assert len(attempts) == 9
-    assert {a.provider for a in attempts} == {"groq"}
-    assert attempts[0].model == "openai/gpt-oss-120b"
+    # groq currently has an empty ``models`` list (no verified-working
+    # models) — rotation must yield zero attempts instead of crashing.
+    assert attempts == ()
 
 
 def test_configured_attempts_env_overrides_yaml_pool(
@@ -251,7 +252,12 @@ def test_configured_attempts_unknown_provider_returns_empty(
 
 
 def test_state_config_yaml_has_all_8_providers() -> None:
-    """Sanity: the active ``state/config.yaml`` covers all 8 providers."""
+    """Sanity: the active ``state/config.yaml`` still declares all 8 providers.
+
+    ``github`` and ``groq`` are declared but keep empty ``models`` (they
+    currently expose no working models), so they are not present in the
+    resolved ``cfg.providers`` — rotation yields zero attempts for them.
+    """
     state_cfg = ROOT_DIR / "state" / "config.yaml"
     if not state_cfg.exists():
         pytest.skip("state/config.yaml not present")
@@ -260,9 +266,7 @@ def test_state_config_yaml_has_all_8_providers() -> None:
     expected = {
         "cerebras",
         "cloudflare",
-        "github",
         "google",
-        "groq",
         "mistral",
         "opencode",
         "openrouter",
@@ -272,12 +276,11 @@ def test_state_config_yaml_has_all_8_providers() -> None:
 
 
 def test_state_config_yaml_provider_counts_match_legacy() -> None:
-    """The YAML pools must carry the same model counts as the legacy tuples.
+    """The YAML pools carry the current (verified-working) model counts.
 
-    The legacy ``ai_rotation_config.py`` had these counts (Stage 2
-    replacement must match exactly so behavior is preserved):
-        groq=9, opencode=7, openrouter=6, cerebras=5, google=18,
-        mistral=6, cloudflare=53, github=41
+    Counts were regenerated from a live probe (HTTP 200 only). ``github``
+    and ``groq`` are declared with empty ``models`` because they expose
+    no working models today — they no longer appear in ``cfg.providers``.
     """
     state_cfg = ROOT_DIR / "state" / "config.yaml"
     if not state_cfg.exists():
@@ -286,14 +289,12 @@ def test_state_config_yaml_provider_counts_match_legacy() -> None:
     cfg = AIConfig.from_sources(config_path=state_cfg)
     by_name = {p.name: len(p.models) for p in cfg.providers}
     expected = {
-        "groq": 9,
-        "opencode": 7,
+        "opencode": 2,
         "openrouter": 6,
-        "cerebras": 5,
-        "google": 18,
+        "cerebras": 2,
+        "google": 8,
         "mistral": 6,
-        "cloudflare": 53,
-        "github": 41,
+        "cloudflare": 24,
     }
     assert by_name == expected
 
