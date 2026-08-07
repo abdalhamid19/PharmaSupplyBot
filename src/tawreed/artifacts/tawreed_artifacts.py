@@ -52,6 +52,7 @@ def dump_artifacts(page: Page, profile_key: str, label: str, details: str = "") 
             },
         )
     except Exception:
+        logger.debug("artifacts.dump_artifacts: dump failed (non-fatal)")
         pass
 
 
@@ -126,6 +127,7 @@ def _write_screenshot_artifact(page: Page, screenshot_path: Path) -> None:
     try:
         page.screenshot(path=str(screenshot_path), full_page=True)
     except Exception:
+        logger.debug("artifacts._write_screenshot_artifact: write failed (non-fatal)")
         pass
 
 
@@ -136,6 +138,7 @@ def _write_html_artifact(page: Page, html_path: Path) -> None:
         pretty_html = html_content.replace("><", ">\n<")
         html_path.write_text(pretty_html, encoding="utf-8")
     except Exception:
+        logger.debug("artifacts._write_html_artifact: write failed (non-fatal)")
         pass
 
 
@@ -147,6 +150,7 @@ def _write_text_artifact(page: Page, text_path: Path, details: str) -> None:
             content += details
         text_path.write_text(content, encoding="utf-8")
     except Exception:
+        logger.debug("artifacts._write_text_artifact: write failed (non-fatal)")
         pass
 
 

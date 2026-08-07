@@ -8,11 +8,13 @@ __pycache__/
 # Configuration files (real config is in state/)
 config.yaml
 
-artifacts/
+# Sensitive: Playwright API contract captures may include request bodies with tokens.
+# Source code in src/tawreed/artifacts/ IS tracked; runtime capture files are not.
+artifacts/debug/
+artifacts/captures/
+
 # State directory contains sensitive Playwright storage state and cookies
 state/
-
-artifacts/debug/
 
 # Logging output (created by configure_logging)
 logs/
