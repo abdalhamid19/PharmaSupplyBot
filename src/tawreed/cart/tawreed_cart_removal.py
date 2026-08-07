@@ -65,6 +65,7 @@ def _visible_confirmation_dialog(page):
         if dialogs.count() > 0:
             return dialogs.last
     except Exception:
+        logger.debug("cart._visible_confirmation_dialog: detection failed (non-fatal)")
         return None
     return None
 
@@ -82,6 +83,7 @@ def _find_row_idx(page, target, selector) -> int | None:
         try:
             text = rows.nth(i).inner_text(timeout=500)
         except Exception:
+            logger.debug("cart._find_row_idx: row lookup failed (non-fatal)")
             continue
         if cart_row_matches_names(text, target.names):
             return i
@@ -209,6 +211,8 @@ def _delete_cart_row(page, row_index: int, selectors: CartRemovalSelectors) -> i
         _wait_after_cart_delete(page)
         return 1
     except Exception:
+        logger.debug("cart._process_removal_target: removal failed (non-fatal)")
+        return count, status, reason
         if page.locator(selectors.cart_rows).count() < before_count:
             return 1
         raise
