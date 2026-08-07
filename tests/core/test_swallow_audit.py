@@ -74,12 +74,27 @@ def _except_type_name(handler: ast.ExceptHandler) -> str | None:
 
 
 def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
-    """Return (has_logger_call, has_raise). Either is enough to clear the finding."""
+    """Return (has_logger_call, has_raise). Either is enough to clear the finding.
+
+    Mirrors :func:`scripts/audit_swallow._body_has_logger_or_raise` so the
+    guard test and the audit script never drift. Three categories:
+
+    1. Direct stdlib / project logger methods (``logger.error`` etc.).
+    2. Project logging helpers named ``log_*`` / ``_log_*``.
+    3. Recorder methods on the ``summary_recorder`` object — the project
+       structured-logging component. Methods like ``record_failure``,
+       ``record_skip``, ``record_match_only_failure`` are equivalent to
+       logger calls for this codebase.
+    """
     has_logger = False
     has_raise = False
     LOGGER_METHODS = {
         "error", "warning", "exception", "critical", "info",
         "debug", "log",  # debug/log also reach the operator via logs/app.log
+    }
+    RECORDER_METHODS = {
+        "record_failure", "record_skip", "record_combo_failure",
+        "record_match_only_failure", "record_match_only_skip",
     }
     for stmt in body:
         for node in ast.walk(stmt):
@@ -96,13 +111,22 @@ def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
                     has_logger = True
                 if isinstance(func, ast.Attribute) and func.attr.startswith(("log_", "_log_")):
                     has_logger = True
+                # Summary recorder calls (structured-log equivalent).
+                if isinstance(func, ast.Attribute) and func.attr in RECORDER_METHODS:
+                    has_logger = True
             if isinstance(node, ast.Raise):
                 has_raise = True
     return has_logger, has_raise
 
 
 def _all_swallowed_handlers() -> list[tuple[Path, int]]:
-    """Walk src/ and return every swallowed ``except Exception`` as (file, lineno)."""
+    """Walk src/ and return every swallowed ``except Exception`` as (file, lineno).
+
+    Files in :data:`SWALLOW_ALLOWLIST` are reviewed and intentional —
+    the audit script and this guard both honor the same list. The list
+    itself is mirrored in ``scripts/audit_swallow.py`` and locked by
+    :func:`test_swallow_allowlist_matches_audit_script`.
+    """
     findings: list[tuple[Path, int]] = []
     for py in sorted(SRC_ROOT.rglob("*.py")):
         if _is_excluded(py):

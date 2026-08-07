@@ -10,52 +10,16 @@ Such handlers silently hide failures from the operator.
 
 | Metric | Count |
 |--------|------:|
-| Swallowed `except Exception` handlers in `src/` | 81 |
-| Files in allowlist (intentional) | 1 |
+| Swallowed `except Exception` handlers in `src/` | 5 |
+| Files in allowlist (intentional) | 5 |
 
 ## Per-file breakdown
 
 | File | Count |
 |------|------:|
-| `src\tawreed\artifacts\tawreed_artifacts.py` | 4 |
-| `src\tawreed\auth\tawreed_session.py` | 4 |
-| `src\tawreed\cart\tawreed_cart_removal.py` | 4 |
-| `src\tawreed\order\tawreed_order_processing.py` | 4 |
-| `src\tawreed\tawreed_dialogs.py` | 4 |
-| `src\tawreed\tawreed_dom.py` | 4 |
-| `src\tawreed\tawreed_navigation.py` | 4 |
-| `src\tawreed\matching\tawreed_timing.py` | 3 |
-| `src\tawreed\order\tawreed_order_placement.py` | 3 |
-| `src\tawreed\products\tawreed_products_flow.py` | 3 |
-| `src\tawreed\store\tawreed_pricing.py` | 3 |
-| `src\cli\commands\item_worker.py` | 2 |
-| `src\tawreed\api\tawreed_api_contract_discovery.py` | 2 |
-| `src\tawreed\auth\tawreed_auth.py` | 2 |
-| `src\tawreed\auth\tawreed_session_state.py` | 2 |
-| `src\tawreed\cart\tawreed_cart_flow.py` | 2 |
-| `src\tawreed\matching\tawreed_strategy.py` | 2 |
-| `src\tawreed\order\tawreed_order_match.py` | 2 |
-| `src\tawreed\products\product_export_headers.py` | 2 |
-| `src\tawreed\products\tawreed_product_search.py` | 2 |
-| `src\tawreed\tawreed_login_detection.py` | 2 |
-| `src\tawreed\tawreed_ui.py` | 2 |
-| `src\cli\commands\cli_cart_removal.py` | 1 |
 | `src\cli\logging_setup.py` | 1 |
-| `src\core\drug_matching\ai\ai_health_test_execution.py` | 1 |
-| `src\core\drug_matching\ai\ai_health_validation.py` | 1 |
-| `src\core\drug_matching\verification\verifier_request.py` | 1 |
-| `src\core\manual_review\manual_review_helpers.py` | 1 |
-| `src\core\utils\excel.py` | 1 |
-| `src\tawreed\api\tawreed_api_discovery_enhanced.py` | 1 |
-| `src\tawreed\api\tawreed_api_match_only_metadata.py` | 1 |
-| `src\tawreed\artifacts\order_result_merger.py` | 1 |
-| `src\tawreed\artifacts\order_worker_artifact_merger.py` | 1 |
-| `src\tawreed\auth\tawreed_session_auth.py` | 1 |
-| `src\tawreed\products\product_export_api.py` | 1 |
-| `src\tawreed\products\tawreed_match_only_metadata.py` | 1 |
-| `src\ui\auth\streamlit_headless_auth.py` | 1 |
+| `src\tawreed\cart\tawreed_cart_removal.py` | 1 |
 | `src\ui\order\streamlit_order_process.py` | 1 |
-| `src\ui\streamlit_default_state.py` | 1 |
 | `src\ui\streamlit_remove_cart.py` | 1 |
 | `src\ui\views\streamlit_product_matching.py` | 1 |
 
@@ -63,85 +27,9 @@ Such handlers silently hide failures from the operator.
 
 | File:Line | Function | Snippet |
 |-----------|----------|---------|
-| `src\cli\commands\cli_cart_removal.py:53` | `run_remove_cart_command` | `except Exception:  # noqa: BLE001 - summary must not crash` |
-| `src\cli\commands\item_worker.py:26` | `execute_order_worker` | `except Exception as err:` |
-| `src\cli\commands\item_worker.py:37` | `execute_cart_removal_worker` | `except Exception as err:` |
 | `src\cli\logging_setup.py:130` | `configure_logging` | `except Exception:  # pragma: no cover - defensive` |
-| `src\core\drug_matching\ai\ai_health_test_execution.py:46` | `execute_one` | `except Exception as exc:` |
-| `src\core\drug_matching\ai\ai_health_validation.py:21` | `content_from_response` | `except Exception as exc:` |
-| `src\core\drug_matching\verification\verifier_request.py:128` | `_make_single_request` | `except Exception as e:` |
-| `src\core\manual_review\manual_review_helpers.py:22` | `_lookup_with_retry` | `except Exception as e:` |
-| `src\core\utils\excel.py:48` | `_to_int` | `except Exception:` |
-| `src\tawreed\api\tawreed_api_contract_discovery.py:48` | `_request_body` | `except Exception:` |
-| `src\tawreed\api\tawreed_api_contract_discovery.py:82` | `_capture_request_details` | `except Exception:` |
-| `src\tawreed\api\tawreed_api_discovery_enhanced.py:41` | `_capture_request_details` | `except Exception:` |
-| `src\tawreed\api\tawreed_api_match_only_metadata.py:16` | `record_api_match_only_store_metadata` | `except Exception:` |
-| `src\tawreed\artifacts\order_result_merger.py:118` | `_remove_worker_files` | `except Exception:` |
-| `src\tawreed\artifacts\order_worker_artifact_merger.py:52` | `_remove_worker_text` | `except Exception:` |
-| `src\tawreed\artifacts\tawreed_artifacts.py:54` | `dump_artifacts` | `except Exception:` |
-| `src\tawreed\artifacts\tawreed_artifacts.py:128` | `_write_screenshot_artifact` | `except Exception:` |
-| `src\tawreed\artifacts\tawreed_artifacts.py:138` | `_write_html_artifact` | `except Exception:` |
-| `src\tawreed\artifacts\tawreed_artifacts.py:149` | `_write_text_artifact` | `except Exception:` |
-| `src\tawreed\auth\tawreed_auth.py:34` | `access_token_from_state` | `except Exception:` |
-| `src\tawreed\auth\tawreed_auth.py:88` | `_jwt_payload` | `except Exception:` |
-| `src\tawreed\auth\tawreed_session.py:67` | `close_context` | `except Exception:` |
-| `src\tawreed\auth\tawreed_session.py:75` | `close_browser` | `except Exception:` |
-| `src\tawreed\auth\tawreed_session.py:101` | `_is_login_form_visible` | `except Exception:` |
-| `src\tawreed\auth\tawreed_session.py:114` | `_ready_surface_visible` | `except Exception:` |
-| `src\tawreed\auth\tawreed_session_auth.py:83` | `wait_for_network_idle` | `except Exception:` |
-| `src\tawreed\auth\tawreed_session_state.py:106` | `save_session_state` | `except Exception:` |
-| `src\tawreed\auth\tawreed_session_state.py:120` | `discard_session_state` | `except Exception:` |
-| `src\tawreed\cart\tawreed_cart_flow.py:107` | `_save_api_contract_capture` | `except Exception:` |
-| `src\tawreed\cart\tawreed_cart_flow.py:76` | `_prepare_cart_page` | `except Exception:` |
-| `src\tawreed\cart\tawreed_cart_removal.py:67` | `_visible_confirmation_dialog` | `except Exception:` |
-| `src\tawreed\cart\tawreed_cart_removal.py:168` | `_process_removal_target` | `except Exception as error:` |
-| `src\tawreed\cart\tawreed_cart_removal.py:84` | `_find_row_idx` | `except Exception:` |
-| `src\tawreed\cart\tawreed_cart_removal.py:111` | `resolve_cart_removal_targets` | `except Exception as e:` |
-| `src\tawreed\matching\tawreed_strategy.py:45` | `warehouse_row_quantity` | `except Exception:` |
-| `src\tawreed\matching\tawreed_strategy.py:112` | `_store_discount_value` | `except Exception:` |
-| `src\tawreed\matching\tawreed_timing.py:55` | `wait_for_table_overlay_to_clear` | `except Exception:` |
-| `src\tawreed\matching\tawreed_timing.py:63` | `wait_for_dialog_to_clear` | `except Exception:` |
-| `src\tawreed\matching\tawreed_timing.py:71` | `wait_for_row_to_settle` | `except Exception:` |
-| `src\tawreed\order\tawreed_order_match.py:73` | `_manual_review_cache_for_items` | `except Exception:` |
-| `src\tawreed\order\tawreed_order_match.py:134` | `_process_single_match_only_item` | `except Exception as error:` |
-| `src\tawreed\order\tawreed_order_placement.py:59` | `_save_api_contract_capture` | `except Exception:` |
-| `src\tawreed\order\tawreed_order_placement.py:152` | `_process_single_item` | `except Exception as error:` |
-| `src\tawreed\order\tawreed_order_placement.py:164` | `_manual_review_cache_for_items` | `except Exception:` |
-| `src\tawreed\order\tawreed_order_processing.py:77` | `pick_configured_search_result` | `except Exception:` |
-| `src\tawreed\order\tawreed_order_processing.py:121` | `wait_for_legacy_add_completion` | `except Exception:` |
-| `src\tawreed\order\tawreed_order_processing.py:130` | `wait_for_warehouse_selection` | `except Exception:` |
-| `src\tawreed\order\tawreed_order_processing.py:144` | `order_surface_ready` | `except Exception:` |
-| `src\tawreed\products\product_export_api.py:30` | `post_product_export_json` | `except Exception as error:` |
-| `src\tawreed\products\product_export_headers.py:24` | `capture_product_search_headers` | `except Exception:` |
-| `src\tawreed\products\product_export_headers.py:62` | `_request_body` | `except Exception:` |
-| `src\tawreed\products\tawreed_match_only_metadata.py:19` | `record_match_only_store_metadata` | `except Exception:` |
-| `src\tawreed\products\tawreed_product_search.py:73` | `_submit_product_search_with_api` | `except Exception:` |
-| `src\tawreed\products\tawreed_product_search.py:145` | `_ready_product_rows` | `except Exception:` |
-| `src\tawreed\products\tawreed_products_flow.py:243` | `_cart_enabled` | `except Exception:` |
-| `src\tawreed\products\tawreed_products_flow.py:106` | `search_visible_products_table` | `except Exception:` |
-| `src\tawreed\products\tawreed_products_flow.py:228` | `open_stores_dialog` | `except Exception:` |
-| `src\tawreed\store\tawreed_pricing.py:37` | `_calculate_discount_from_prices` | `except Exception:` |
-| `src\tawreed\store\tawreed_pricing.py:55` | `format_discount_percent` | `except Exception:` |
-| `src\tawreed\store\tawreed_pricing.py:67` | `discount_value_as_percent` | `except Exception: return -1.0` |
-| `src\tawreed\tawreed_dialogs.py:31` | `close_visible_dialogs` | `except Exception:` |
-| `src\tawreed\tawreed_dialogs.py:47` | `close_visible_overlay_panels` | `except Exception:` |
-| `src\tawreed\tawreed_dialogs.py:61` | `_wait_for_overlay_panels_to_clear` | `except Exception:` |
-| `src\tawreed\tawreed_dialogs.py:76` | `_append_visible_count` | `except Exception as error:` |
-| `src\tawreed\tawreed_dom.py:68` | `_badge_int` | `except Exception:` |
-| `src\tawreed\tawreed_dom.py:97` | `_inner_text` | `except Exception:` |
-| `src\tawreed\tawreed_dom.py:113` | `_row_unavailable_message` | `except Exception:` |
-| `src\tawreed\tawreed_dom.py:157` | `_row_name_lines` | `except Exception:` |
-| `src\tawreed\tawreed_login_detection.py:33` | `is_logged_in_marker_visible` | `except Exception:` |
-| `src\tawreed\tawreed_login_detection.py:62` | `selector_visible` | `except Exception:` |
-| `src\tawreed\tawreed_navigation.py:25` | `go_to_orders` | `except Exception:` |
-| `src\tawreed\tawreed_navigation.py:34` | `open_products_link_fallback` | `except Exception:` |
-| `src\tawreed\tawreed_navigation.py:55` | `_wait_for_ready_selector` | `except Exception:` |
-| `src\tawreed\tawreed_navigation.py:37` | `open_products_link_fallback` | `except Exception:` |
-| `src\tawreed\tawreed_ui.py:41` | `bounded_requested_quantity` | `except Exception:` |
-| `src\tawreed\tawreed_ui.py:74` | `is_no_results_row` | `except Exception: return False` |
-| `src\ui\auth\streamlit_headless_auth.py:77` | `secret_string` | `except Exception:  # noqa: BLE001` |
+| `src\tawreed\cart\tawreed_cart_removal.py:113` | `resolve_cart_removal_targets` | `except Exception as e:` |
 | `src\ui\order\streamlit_order_process.py:185` | `close_order_process_output` | `except Exception:` |
-| `src\ui\streamlit_default_state.py:59` | `streamlit_secret_value` | `except Exception:  # noqa: BLE001` |
 | `src\ui\streamlit_remove_cart.py:207` | `close_remove_cart_process_output` | `except Exception:` |
 | `src\ui\views\streamlit_product_matching.py:174` | `close_order_process_output` | `except Exception:` |
 
@@ -152,3 +40,7 @@ These files are explicitly excluded — broad `except` is reviewed and intention
 | File | Reason |
 |------|--------|
 | `src/ui/views/streamlit_process.py` | streamlit subprocess wrapper — UI-facing failure capture |
+| `src/cli/logging_setup.py` | logging handler teardown — defensive, no recovery possible during interpreter shutdown |
+| `src/ui/order/streamlit_order_process.py` | streamlit output-file close — best-effort teardown |
+| `src/ui/streamlit_remove_cart.py` | streamlit output-file close — best-effort teardown |
+| `src/ui/views/streamlit_product_matching.py` | streamlit output-file close — best-effort teardown |

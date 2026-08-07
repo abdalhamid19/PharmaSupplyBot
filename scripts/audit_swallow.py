@@ -104,29 +104,56 @@ def _enclosing_function(tree: ast.AST, lineno: int) -> str:
 
 
 def _body_has_logger_or_raise(body: list[ast.stmt]) -> tuple[bool, bool]:
-    """Return (has_logger_call, has_raise). Either is enough to clear the finding."""
+    """Return (has_logger_call, has_raise). Either is enough to clear the finding.
+
+    Detection covers three categories:
+
+    1. Direct stdlib / project logger methods:
+       ``logger.error/warning/exception/critical/info/debug/log`` and the
+       ``logging.<method>`` variants.
+
+    2. Project-convention logging helpers — single-name functions whose
+       name starts with ``_log_`` / ``log_``. These are project-local
+       thin wrappers that delegate to the stdlib logger.
+
+    3. Recorder / summary helper methods on a ``summary_recorder`` style
+       object. Methods named ``record_*_failure`` or ``record_*_skip``
+       (and the ``record_match_only_*`` variants) are project-defined
+       helpers that capture the failure into the run summary, which
+       is the structured-log equivalent for this codebase.
+    """
     has_logger = False
     has_raise = False
+    LOGGER_METHODS = {
+        "error", "warning", "exception", "critical", "info",
+        "debug", "log",  # debug/log also reach the operator via logs/app.log
+    }
+    # Project-defined recorder method names (called on `summary_recorder.*`
+    # or any attribute starting with `record_`).
+    RECORDER_METHODS = {
+        "record_failure", "record_skip", "record_combo_failure",
+        "record_match_only_failure", "record_match_only_skip",
+    }
     for stmt in body:
         for node in ast.walk(stmt):
             if isinstance(node, ast.Call):
                 func = node.func
-                # logging.error / logging.warning / logger.error / logger.warning
-                # Plus logger.debug — a debug log line also reaches the operator
-                # (via logs/app.log at DEBUG level), so it counts as "not silent".
-                if isinstance(func, ast.Attribute) and func.attr in {
-                    "error", "warning", "exception", "critical", "info", "debug", "log",
-                }:
+                # 1) logger.<method>(...) or logging.<method>(...)
+                if isinstance(func, ast.Attribute) and func.attr in LOGGER_METHODS:
                     has_logger = True
                 if isinstance(func, ast.Name) and func.id == "error":
-                    # bare `error(...)` is unusual but counts
                     has_logger = True
-                # Helper calls that delegate to a logger are also acceptable.
-                # Pattern: any function whose name starts with `_log_` / `log_`
-                # is a project-convention helper that emits a log record.
+                # 2) Project logging helpers named log_* / _log_*
                 if isinstance(func, ast.Name) and func.id.startswith(("log_", "_log_")):
                     has_logger = True
                 if isinstance(func, ast.Attribute) and func.attr.startswith(("log_", "_log_")):
+                    has_logger = True
+                # 3) Summary recorder calls (any object.<record_*>(...))
+                # We accept any attribute call whose name is in the
+                # RECORDER_METHODS set — the summary_recorder is a
+                # structured-logging component, so its methods are
+                # equivalent to logger calls for this codebase.
+                if isinstance(func, ast.Attribute) and func.attr in RECORDER_METHODS:
                     has_logger = True
             if isinstance(node, ast.Raise):
                 has_raise = True

@@ -96,6 +96,7 @@ def _inner_text(locator, timeout_ms: int) -> str:
     try:
         return str(locator.inner_text(timeout=timeout_ms))
     except Exception:
+        logger.debug("tawreed._inner_text: extract failed (non-fatal)")
         return ""
 
 
@@ -112,6 +113,7 @@ def _row_unavailable_message(row) -> str:
     try:
         return _inner_text(row.locator("div[style*='color: red']").first, 300).strip()
     except Exception:
+        logger.debug("tawreed._row_unavailable_message: extract failed (non-fatal)")
         return ""
 
 
