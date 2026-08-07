@@ -10,28 +10,8 @@ Such handlers silently hide failures from the operator.
 
 | Metric | Count |
 |--------|------:|
-| Swallowed `except Exception` handlers in `src/` | 5 |
+| Swallowed `except Exception` handlers in `src/` | 0 |
 | Files in allowlist (intentional) | 5 |
-
-## Per-file breakdown
-
-| File | Count |
-|------|------:|
-| `src\cli\logging_setup.py` | 1 |
-| `src\tawreed\cart\tawreed_cart_removal.py` | 1 |
-| `src\ui\order\streamlit_order_process.py` | 1 |
-| `src\ui\streamlit_remove_cart.py` | 1 |
-| `src\ui\views\streamlit_product_matching.py` | 1 |
-
-## All occurrences
-
-| File:Line | Function | Snippet |
-|-----------|----------|---------|
-| `src\cli\logging_setup.py:130` | `configure_logging` | `except Exception:  # pragma: no cover - defensive` |
-| `src\tawreed\cart\tawreed_cart_removal.py:113` | `resolve_cart_removal_targets` | `except Exception as e:` |
-| `src\ui\order\streamlit_order_process.py:185` | `close_order_process_output` | `except Exception:` |
-| `src\ui\streamlit_remove_cart.py:207` | `close_remove_cart_process_output` | `except Exception:` |
-| `src\ui\views\streamlit_product_matching.py:174` | `close_order_process_output` | `except Exception:` |
 
 ## Allowlist
 

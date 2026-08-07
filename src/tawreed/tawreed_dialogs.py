@@ -77,6 +77,7 @@ def _append_visible_count(lines: list[str], label: str, selector: str, page: Pag
     try:
         count = page.locator(selector).count()
     except Exception as error:
+        logger.debug("tawreed._append_visible_count: count append failed (non-fatal)")
         lines.append(f"{label}=unavailable ({type(error).__name__}: {error})")
         return
     lines.append(f"{label}={count}")

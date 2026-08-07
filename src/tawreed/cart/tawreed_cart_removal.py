@@ -168,6 +168,7 @@ def _process_removal_target(bot, page, target):
             f"Removed {count} matching row(s)." if count else "No matching rows found."
         )
     except Exception as error:
+        logger.debug("cart._process_removal_target: removal failed (non-fatal): %s", error)
         count, status, reason = 0, "failed", str(error)
     append_cart_removal_summary(
         bot.profile_key,
@@ -213,9 +214,9 @@ def _delete_cart_row(page, row_index: int, selectors: CartRemovalSelectors) -> i
     except Exception:
         logger.debug("cart._process_removal_target: removal failed (non-fatal)")
         return count, status, reason
-        if page.locator(selectors.cart_rows).count() < before_count:
-            return 1
-        raise
+    if page.locator(selectors.cart_rows).count() < before_count:
+        return 1
+    raise
 
 
 __all__ = [

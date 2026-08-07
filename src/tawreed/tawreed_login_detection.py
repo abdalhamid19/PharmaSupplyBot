@@ -61,4 +61,5 @@ def selector_visible(page: Page, selector: str) -> bool:
     try:
         return bool(page.locator(selector).first.is_visible(timeout=250))
     except Exception:
+        logger.debug("tawreed.selector_visible: selector check failed (non-fatal)")
         return False

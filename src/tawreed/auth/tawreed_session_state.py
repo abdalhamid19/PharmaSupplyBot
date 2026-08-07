@@ -104,6 +104,7 @@ def save_session_state(context, state_path: Path, is_intermediate: bool) -> None
                 extra={"state_path": str(state_path)},
             )
     except Exception:
+        logger.debug("tawreed_session_state.save_session_state: best-effort state save failed")
         pass
 
 
