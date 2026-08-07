@@ -51,6 +51,9 @@ AUDIT_SCRIPT = SCRIPTS_DIR / "audit_swallow.py"
 SWALLOW_ALLOWLIST: dict[str, str] = {
     "src/ui/views/streamlit_process.py": "streamlit subprocess wrapper — UI-facing failure capture",
     "src/cli/logging_setup.py": "logging handler teardown — defensive, no recovery possible during interpreter shutdown",
+    "src/ui/order/streamlit_order_process.py": "streamlit output-file close — best-effort teardown",
+    "src/ui/streamlit_remove_cart.py": "streamlit output-file close — best-effort teardown",
+    "src/ui/views/streamlit_product_matching.py": "streamlit output-file close — best-effort teardown",
 }
 
 EXCLUDE_DIRS = {"__pycache__", ".venv", "venv"}

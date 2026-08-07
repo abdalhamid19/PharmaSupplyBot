@@ -53,6 +53,14 @@ SWALLOW_ALLOWLIST: dict[str, str] = {
     # exiting anyway. Catching here is the documented Python pattern for
     # ``__exit__``-style defensive code.
     "src/cli/logging_setup.py": "logging handler teardown — defensive, no recovery possible during interpreter shutdown",
+    # Output-file close in Streamlit subprocess view code. The subprocess
+    # has already finished by this point; if close() fails (file already
+    # closed by GC, OS handle race), the next refresh of the Streamlit
+    # page will reopen it. Logging the error would spam the log every
+    # page render.
+    "src/ui/order/streamlit_order_process.py": "streamlit output-file close — best-effort teardown",
+    "src/ui/streamlit_remove_cart.py": "streamlit output-file close — best-effort teardown",
+    "src/ui/views/streamlit_product_matching.py": "streamlit output-file close — best-effort teardown",
 }
 
 

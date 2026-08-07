@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
 import streamlit as st
 
 from ..views.streamlit_process import render_command_result, run_cli_subprocess
+
+logger = logging.getLogger(__name__)
 
 
 def render_headless_auth(app_config, config_path: Path) -> None:
@@ -74,5 +77,6 @@ def secret_string(key: str) -> str:
     """Return one Streamlit secret as a string or an empty fallback."""
     try:
         return str(st.secrets.get(key, "")).strip()
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - st.secrets may raise if secrets.toml is absent
+        logger.debug("streamlit_headless_auth.secret_string: no secret for %s", key)
         return ""
