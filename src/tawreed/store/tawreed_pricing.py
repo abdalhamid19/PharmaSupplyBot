@@ -1,6 +1,9 @@
 """Pricing and discount parsing logic for Tawreed API payloads."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 import re
 from typing import Any
 from ..tawreed_constants import DISCOUNT_KEYS, NESTED_STORE_KEYS
