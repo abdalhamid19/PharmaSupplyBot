@@ -1,6 +1,9 @@
 """Products-page search and add-to-cart flow for Tawreed ordering."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 import re
 import time
@@ -104,6 +107,7 @@ def search_visible_products_table(bot, page: Page, query: str) -> list[dict[str,
             payload = resp.value.json()
             return list(payload.get("data", []) or [])
         except Exception:
+            logger.debug("products.search_visible_products_table: search failed (non-fatal)")
             return dom_search_results(page, query)
 
 
@@ -226,6 +230,7 @@ def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
         try:
             return stores_from_payload(resp.value.json())
         except Exception:
+            logger.debug("products.open_stores_dialog: open failed (non-fatal)")
             return []
 
 
@@ -241,6 +246,7 @@ def _cart_enabled(row) -> bool:
     try:
         return cart_button(row).is_enabled()
     except Exception:
+        logger.debug("products._cart_enabled: check failed (non-fatal)")
         return False
 
 

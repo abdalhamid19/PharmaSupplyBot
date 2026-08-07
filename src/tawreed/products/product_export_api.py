@@ -1,9 +1,13 @@
 """Tawreed product export API helpers with retry logic."""
 
 from __future__ import annotations
+import logging
 
 import time
 from typing import TYPE_CHECKING, Any
+
+logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -28,6 +32,7 @@ def post_product_export_json(
         try:
             return _post_once(request_context, url, body, headers)
         except Exception as error:
+            logger.debug("products.export_api: attempt failed: %s", error)
             last_error = error
             if attempt == EXPORT_API_RETRY_ATTEMPTS - 1:
                 break

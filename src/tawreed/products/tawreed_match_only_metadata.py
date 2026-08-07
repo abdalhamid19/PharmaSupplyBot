@@ -1,6 +1,9 @@
 """Browser match-only store metadata helpers."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 from src.core.matching_types import SearchMatch
 
@@ -17,6 +20,7 @@ def record_match_only_store_metadata(
     try:
         choice = match_only_store_choice(bot, page, match, active_query)
     except Exception:
+        logger.debug("products.match_only_metadata: write failed (non-fatal)")
         return
     if choice:
         record_single_store(bot, choice.store)
