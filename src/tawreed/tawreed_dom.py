@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 from .tawreed_constants import MAX_DOM_SEARCH_ROWS
 from .tawreed_ui import is_no_results_row, visible_product_rows
+
+logger = logging.getLogger(__name__)
 
 _NUMERIC_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?")
 _OCR_ZERO_RE = re.compile(r"(?<=\d)[Oo](?=\b|[^A-Za-z0-9])")

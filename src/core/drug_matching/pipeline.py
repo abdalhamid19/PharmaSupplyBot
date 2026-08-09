@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+import pandas as pd
+
 from .config import MatchingConfig, APIConfig, Paths, load_env
 from .indexing.indexer import DrugIndex
 from .tracing.trace_log import MatchTraceLog
@@ -162,7 +164,8 @@ class MatchPipeline:
         return await self._ai.run_ai_review()
 
     async def run_full(
-        self, drugs_path: str | None = None,
+        self,
+        drugs_path: str | None = None,
         tawreed_path: str | None = None,
         output_path: str | None = None,
         skip_ai: bool = False,
@@ -170,10 +173,20 @@ class MatchPipeline:
         """Run the complete pipeline."""
         self.load_data(drugs_path, tawreed_path)
         self.run_matching()
+        # Sync matching results to AI pipeline so AI steps can mutate them.
+        if self._ai is not None and self._matching is not None:
+            self._ai._results = self._matching._results
         if not skip_ai:
             await self.run_ai_verification()
             await self.run_ai_search_unmatched()
             await self.run_ai_review()
+            # Sync AI-updated results back to matching so save() uses the final state.
+            if (
+                self._matching is not None
+                and self._ai is not None
+                and self._ai._results is not None
+            ):
+                self._matching._results = self._ai._results
         saved_path = self.save(output_path)
         self.save_manual_review(_manual_review_path(saved_path))
         self.print_stats()

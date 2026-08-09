@@ -157,7 +157,38 @@ Windows PowerShell:
 py run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
 ```
 
-### 9. تشغيل واجهة Streamlit
+### 9. فحص نماذج الذكاء الاصطناعي (test-models)
+
+يبعت طلبًا حقيقيًا واحدًا لكل `(provider, model)` معرّف في إعدادات `ai.providers.*` ويطبع تقريرًا فيه:
+حالة كل نموذج (OK/FAIL)، تصنيف الصحة (working / quota-limited / permission-failed / model-not-accessible / degraded)،
+زمن الاستجابة (latency) بالثواني، كود HTTP، وسبب الفشل بالضبط (نوع الخطأ + رسالة الـ API).
+كما يحفظ التقرير الكامل في `output/api_model_tests/ai_models_test_<timestamp>.csv` و`.json`.
+
+قائمة النماذج المفحوصة تُقرأ من أول ملف موجود بالترتيب:
+`state/config.yaml` (الملف النشط وقت التشغيل) ثم `config.yaml` ثم `config.example.yaml`.
+مزوّد مكتوب فيه `models: []` (قائمة فارغة) يُتخطّى تمامًا — فلو فضّيت مزوّدًا من `state/config.yaml` لن يدخل في الفحص.
+مزوّد بدون مفاتيح API صالحة في `.env` يُتخطّى أيضًا.
+
+Windows PowerShell:
+```powershell
+py run.py test-models
+```
+
+Linux / macOS (bash):
+```bash
+python3 run.py test-models
+```
+
+خيارات مفيدة:
+- `--provider google,mistral` — فحص مزوّدات محددة فقط (افتراضيًا: الكل).
+- `--all-keys` — فحص كل مفتاح API × كل نموذج (افتراضيًا: أول مفتاح لكل نموذج).
+- `--timeout 30` / `--concurrency 6` / `--max-tokens 64` — ضبط مهلة الطلب والتوازي وحجم الرد.
+- `--format json|plain` — إخراج آلي بدل الجدول.
+- الخروج بكود `0` لو في نموذج واحد على الأقل شغال، و`1` لو كله فاشل.
+
+> ملاحظة: الفحص يستهلك quota — طلب واحد لكل نموذج.
+
+### 10. تشغيل واجهة Streamlit
 
 الرابط الأونلاين:
 ```text

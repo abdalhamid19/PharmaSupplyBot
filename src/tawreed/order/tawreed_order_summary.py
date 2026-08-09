@@ -93,7 +93,7 @@ class OrderSummaryRecorderSuccessMixin:
             extra={
                 "profile": self.bot.profile_key,
                 "code": item.code,
-                "name": item.name,
+                "item_name": item.name,
                 "reason": reason,
             },
         )
@@ -142,7 +142,7 @@ class OrderSummaryRecorderFailureMixin:
             extra={
                 "profile": self.bot.profile_key,
                 "code": item.code,
-                "name": item.name,
+                "item_name": item.name,
                 "reason": reason,
             },
         )
@@ -179,7 +179,7 @@ class OrderSummaryRecorderFailureMixin:
             extra={
                 "profile": self.bot.profile_key,
                 "code": item.code,
-                "name": item.name,
+                "item_name": item.name,
                 "reason": str(error),
             },
         )

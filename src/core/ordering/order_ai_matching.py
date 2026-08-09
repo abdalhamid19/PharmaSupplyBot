@@ -63,7 +63,13 @@ class OrderAiDecisionService:
 
     async def _resolve_async(self, item: Item, decision: MatchDecision) -> OrderAiOutcome:
         from ..order_ai_flow import resolve_order_ai
-        verifier = self._verifier_factory(self._settings.api_config, max_concurrent=self._settings.concurrency)
+        verifier = None
+        try:
+            verifier = self._verifier_factory(self._settings.api_config, max_concurrent=self._settings.concurrency)
+        except Exception:
+            # If we cannot build a verifier (no key, bad config), degrade to no-AI outcome
+            # instead of letting an unbuilt verifier leak into the close path.
+            return _no_verifier_outcome(decision)
         try:
             return await resolve_order_ai(self._settings, verifier, item, decision)
         finally:
@@ -88,11 +94,24 @@ def _run_async(coro):
 
 
 async def _close_verifier(verifier) -> None:
-    close = getattr(verifier, "close", None)
-    if close:
-        await close()
-    elif hasattr(verifier, "_session"):
-        await verifier._session.close()
+    if verifier is None:
+        return
+    try:
+        close = getattr(verifier, "close", None)
+        if close:
+            await close()
+        elif hasattr(verifier, "_session"):
+            session = verifier._session
+            if session is not None:
+                await session.close()
+    except Exception:
+        # Closing must never fail the order flow.
+        pass
+
+
+def _no_verifier_outcome(decision):
+    manual = not decision.best_match
+    return OrderAiOutcome(decision, "ai_skipped", "no_verifier", 0.0, manual)
 
 
 # Outcome builders

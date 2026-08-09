@@ -1,6 +1,10 @@
 """UI locator and dialog helpers for Tawreed Playwright automation."""
 from __future__ import annotations
+
+import logging
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page

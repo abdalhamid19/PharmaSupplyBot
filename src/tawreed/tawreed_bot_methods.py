@@ -50,7 +50,7 @@ class TawreedBotMethods:
             return False
         logger.info(
             "stop requested before item",
-            extra={"profile": self.profile_key, "code": item.code, "name": item.name},
+            extra={"profile": self.profile_key, "code": item.code, "item_name": item.name},
         )
         return True
 
