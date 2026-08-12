@@ -125,8 +125,8 @@ class RequestPlanner:
     def __init__(self, cfg, semaphore):
         self._cfg = cfg
         self._semaphore = semaphore
-        self._failed_combos: set[tuple[str, str]] = set()
-        self._combo_failures: dict[tuple[str, str], int] = {}
+        self._failed_combos: set[tuple] = set()
+        self._combo_failures: dict[tuple, int] = {}
         self._rotation_cursors: dict[str, int] = {}
         self._fallback_log: list[str] = []
         self._rotation_manager = RotationManager(self)
@@ -140,31 +140,59 @@ class RequestPlanner:
         return log
 
     def build_attempt_plan(self, model: str) -> list[tuple[str, str]]:
-        """Build ordered list of (api_key, model) to try, skipping failed combos.
-        Order: primary key + primary model -> other keys + primary model -> fallback
-        models + all keys."""
+        """Build ordered list of (api_key, model) for the primary endpoint only.
+
+        Fallback models are resolved separately in :meth:`build_request_plan`
+        so each model uses its owning provider's keys and base URL.
+        """
         keys = self._cfg.api_keys if self._cfg.api_keys else (self._cfg.api_key,)
-        models = [model] + list(self._cfg.fallback_models)
         healthy = set(self._cfg.healthy_combos or ())
         plan = []
         for key in keys:
-            combo = (key[-6:], models[0])
+            if not key:
+                continue
+            combo = self.combo_key(key, model)
             if combo not in self._failed_combos and (not healthy or combo in healthy):
-                plan.append((key, models[0]))
-        for mdl in models[1:]:
-            for key in keys:
-                combo = (key[-6:], mdl)
-                if combo not in self._failed_combos and (not healthy or combo in healthy):
-                    plan.append((key, mdl))
+                plan.append((key, model))
         return plan
 
     def build_request_plan(self, model: str) -> list[dict[str, Any]]:
         if self._cfg.attempt_plan:
             return self._rotation_manager.rotation_request_plan(model)
-        return [
-            {"provider": "default", "base_url": self._cfg.base_url, "key": key, "model": mdl}
+        plan: list[dict[str, Any]] = [
+            {
+                "provider": "default",
+                "base_url": self._cfg.base_url,
+                "key": key,
+                "model": mdl,
+            }
             for key, mdl in self.build_attempt_plan(model)
         ]
+        seen_models = {model}
+        for fallback_model in self._cfg.fallback_models:
+            if not fallback_model or fallback_model in seen_models:
+                continue
+            seen_models.add(fallback_model)
+            plan.extend(self._fallback_request_items(fallback_model))
+        return plan
+
+    def _fallback_request_items(self, model: str) -> list[dict[str, Any]]:
+        """Build plan items for a fallback model on its owning provider."""
+        from ..config.config_helpers import resolve_model_endpoints
+
+        healthy = set(self._cfg.healthy_combos or ())
+        items: list[dict[str, Any]] = []
+        for endpoint in resolve_model_endpoints(model):
+            key = endpoint["key"]
+            provider = endpoint["provider"]
+            combo = self.combo_key(key, model, provider)
+            healthy_combo = (key[-6:], model)
+            if combo in self._failed_combos:
+                continue
+            if healthy and healthy_combo not in healthy and combo not in healthy:
+                continue
+            items.append(endpoint)
+        return items
 
     def record_rotation_used(self, item: dict[str, Any]) -> None:
         self._rotation_manager.record_rotation_used(item)

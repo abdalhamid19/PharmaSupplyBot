@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import unittest
+from typing import Any
 
 from src.core.drug_matching.config import APIConfig
 from src.core.matching_types import (
@@ -11,7 +13,12 @@ from src.core.matching_types import (
     MatchScoreBreakdown,
     SearchMatch,
 )
-from src.core.ordering.order_ai_matching import OrderAiDecisionService, OrderAiSettings
+from src.core.ordering.order_ai_matching import (
+    OrderAiDecisionService,
+    OrderAiSettings,
+    _close_verifier,
+    _no_verifier_outcome,
+)
 from src.core.utils.excel import Item
 
 
@@ -221,6 +228,209 @@ class OrderAiMatchingTests(unittest.TestCase):
             "_query": "Panadol",
             "_row_index": 0,
         }
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for the NoneType-session crash encountered during the
+# SMALL_TEST bench run (opencode/big-pickle). The original code did:
+#     await verifier._session.close()
+# unconditionally in the close path, which raised AttributeError whenever the
+# verifier had no session (factory failure, missing API key, bad config). The
+# fixed module makes _close_verifier safe for every shape and degrades the
+# service to ai_skipped when the verifier cannot be built.
+# ---------------------------------------------------------------------------
+
+
+class _RecordingSession:
+    """Async context manager-ish session that records close() calls."""
+
+    def __init__(self) -> None:
+        self.close_calls = 0
+
+    async def close(self) -> None:
+        self.close_calls += 1
+
+
+class _VerifierWithSession:
+    """Verifier exposing a real, closeable _session attribute."""
+
+    def __init__(self) -> None:
+        self._session = _RecordingSession()
+
+
+class _VerifierWithSessionNone:
+    """Verifier whose _session attribute exists but is None (no key)."""
+
+    _session = None
+
+
+class _VerifierRaisingClose:
+    """Verifier whose async close() raises; _close_verifier must swallow."""
+
+    _session = None
+
+    async def close(self) -> None:
+        raise RuntimeError("boom from close()")
+
+
+class _VerifierWithBrokenSession:
+    """Verifier whose _session.close() raises — must not crash the flow."""
+
+    def __init__(self) -> None:
+        class _Broken:
+            async def close(self) -> None:
+                raise RuntimeError("session boom")
+
+        self._session = _Broken()
+
+
+class CloseVerifierTests(unittest.IsolatedAsyncioTestCase):
+    """_close_verifier must never propagate exceptions from cleanup."""
+
+    async def test_close_verifier_with_none_is_safe(self) -> None:
+        """None verifier must be a no-op (regression: was crashing the flow)."""
+        # If this raises, the test fails. There is no observable side-effect to assert.
+        await _close_verifier(None)
+
+    async def test_close_verifier_with_session_none_is_safe(self) -> None:
+        """verifier._session == None must not crash close_verifier."""
+        await _close_verifier(_VerifierWithSessionNone())
+
+    async def test_close_verifier_swallows_close_exception(self) -> None:
+        """An exception from verifier.close() must not escape the finally block."""
+        await _close_verifier(_VerifierRaisingClose())
+
+    async def test_close_verifier_closes_real_session(self) -> None:
+        """When _session is a real closeable, close_verifier must call session.close()."""
+        verifier = _VerifierWithSession()
+        await _close_verifier(verifier)
+        self.assertEqual(verifier._session.close_calls, 1)
+
+    async def test_close_verifier_prefers_explicit_close_method(self) -> None:
+        """If the verifier defines its own async close(), that wins over _session."""
+
+        class _VerifierWithOwnClose:
+            def __init__(self) -> None:
+                self._session = _RecordingSession()
+                self.close_calls = 0
+
+            async def close(self) -> None:
+                self.close_calls += 1
+
+        verifier = _VerifierWithOwnClose()
+        await _close_verifier(verifier)
+        self.assertEqual(verifier.close_calls, 1)
+        # _session.close() must NOT have been called because close() won.
+        self.assertEqual(verifier._session.close_calls, 0)
+
+    async def test_close_verifier_swallows_session_close_exception(self) -> None:
+        """If _session.close() raises, the flow must still continue."""
+        await _close_verifier(_VerifierWithBrokenSession())
+
+
+class NoVerifierOutcomeTests(unittest.TestCase):
+    """_no_verifier_outcome should degrade gracefully."""
+
+    def test_no_verifier_outcome_with_no_best_match_marks_manual_review(self) -> None:
+        decision = MatchDecision(best_match=None, diagnostics=[], final_reason="api_match")
+        outcome = _no_verifier_outcome(decision)
+        self.assertEqual(outcome.status, "ai_skipped")
+        self.assertEqual(outcome.reason, "no_verifier")
+        self.assertTrue(outcome.manual_review)
+        self.assertEqual(outcome.confidence, 0.0)
+
+    def test_no_verifier_outcome_with_existing_match_is_not_manual_review(self) -> None:
+        match = SearchMatch("Panadol", 0, 92.0, {"storeProductId": "s1"})
+        decision = MatchDecision(best_match=match, diagnostics=[], final_reason="api_match")
+        outcome = _no_verifier_outcome(decision)
+        self.assertEqual(outcome.status, "ai_skipped")
+        self.assertEqual(outcome.reason, "no_verifier")
+        self.assertFalse(outcome.manual_review)
+
+
+class ServiceNoVerifierFactoryTests(unittest.TestCase):
+    """OrderAiDecisionService.resolve must not raise when the verifier factory fails."""
+
+    def test_factory_raises_returns_ai_skipped_outcome(self) -> None:
+        """If the factory cannot build a verifier, resolve() returns ai_skipped/no_verifier."""
+
+        def _bad_factory(*_args: Any, **_kwargs: Any) -> Any:
+            raise RuntimeError("no api key / config invalid")
+
+        settings = OrderAiSettings(
+            enabled=True,
+            api_config=APIConfig(api_key="key", api_keys=("key",)),
+        )
+        service = OrderAiDecisionService(settings, _bad_factory)
+        decision = MatchDecision(best_match=None, diagnostics=[], final_reason="api_match")
+        outcome = service.resolve(item=None, decision=decision)  # type: ignore[arg-type]
+        self.assertEqual(outcome.status, "ai_skipped")
+        self.assertEqual(outcome.reason, "no_verifier")
+        self.assertTrue(outcome.manual_review)
+
+    def test_factory_raises_with_existing_match_keeps_decision(self) -> None:
+        """When factory raises but the decision already has a best_match, do not flip to manual review."""
+
+        def _bad_factory(*_args: Any, **_kwargs: Any) -> Any:
+            raise RuntimeError("factory boom")
+
+        settings = OrderAiSettings(
+            enabled=True,
+            api_config=APIConfig(api_key="key", api_keys=("key",)),
+        )
+        service = OrderAiDecisionService(settings, _bad_factory)
+        match = SearchMatch("Panadol", 0, 92.0, {"storeProductId": "s1"})
+        decision = MatchDecision(best_match=match, diagnostics=[], final_reason="api_match")
+        outcome = service.resolve(item=None, decision=decision)  # type: ignore[arg-type]
+        self.assertEqual(outcome.status, "ai_skipped")
+        self.assertEqual(outcome.reason, "no_verifier")
+        # Existing deterministic match must stay usable (not forced to manual review).
+        self.assertFalse(outcome.manual_review)
+        self.assertIsNotNone(outcome.decision.best_match)
+
+
+class ServiceResolveAsyncCleanupTests(unittest.IsolatedAsyncioTestCase):
+    """The async resolve path must call _close_verifier on every code path."""
+
+    async def test_resolve_order_ai_failure_closes_verifier_anyway(self) -> None:
+        """Even if resolve_order_ai raises, the verifier must be closed."""
+        close_calls = {"n": 0}
+
+        class _V:
+            def __init__(self, *a: Any, **k: Any) -> None:
+                pass
+
+            async def close(self) -> None:
+                close_calls["n"] += 1
+
+        # Build a service whose resolve_order_ai raises.
+        from src.core import order_ai_flow as flow_mod
+
+        original = flow_mod.resolve_order_ai
+
+        async def _boom(*_a: Any, **_k: Any) -> Any:
+            raise RuntimeError("resolve_order_ai boom")
+
+        flow_mod.resolve_order_ai = _boom  # type: ignore[assignment]
+        try:
+            settings = OrderAiSettings(
+                enabled=True,
+                api_config=APIConfig(api_key="key", api_keys=("key",)),
+            )
+            service = OrderAiDecisionService(settings, _V)
+            decision = MatchDecision(best_match=None, diagnostics=[], final_reason="api_match")
+            # resolve() runs the async path inside _run_async; we expect the
+            # exception to be re-raised by _run_async, but the verifier must
+            # still have been closed during the finally block.
+            with self.assertRaises(RuntimeError):
+                service.resolve(item=None, decision=decision)  # type: ignore[arg-type]
+            self.assertEqual(
+                close_calls["n"],
+                1,
+                "verifier.close() must run exactly once even when resolve_order_ai raises",
+            )
+        finally:
+            flow_mod.resolve_order_ai = original  # type: ignore[assignment]
 
 
 if __name__ == "__main__":

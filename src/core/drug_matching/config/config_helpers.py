@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 
 from .config_models import AIConfig, Paths, get_provider_metadata
-from .config_providers import PROVIDERS
+from .config_providers import PROVIDERS, provider_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -139,10 +139,90 @@ def _dedupe(values) -> tuple[str, ...]:
     )
 
 
+def resolve_model_endpoints(model: str) -> list[dict]:
+    """Map ``model`` to concrete provider endpoints that own it.
+
+    Looks up which ``ai.providers.*`` pool lists ``model``, then returns
+    one endpoint dict per configured API key for that provider:
+
+    ``{"provider", "base_url", "key", "model"}``.
+
+    Returns an empty list when the model is unknown or the owning
+    provider has no usable credentials / base URL. Callers must not
+    fall back to a different provider's keys — that produces
+    ``Model ... is not supported`` 401s.
+    """
+    model = (model or "").strip()
+    if not model:
+        return []
+    provider_name = _provider_name_for_model(model)
+    if not provider_name:
+        return []
+    meta = get_provider_metadata(provider_name)
+    if meta is None:
+        return []
+    keys = _configured_keys_for(meta.env_keys)
+    if not keys:
+        return []
+    base_url = _endpoint_base_url(provider_name, meta)
+    if not base_url:
+        return []
+    return [
+        {
+            "provider": provider_name,
+            "base_url": base_url,
+            "key": key,
+            "model": model,
+        }
+        for key in keys
+    ]
+
+
+def _provider_name_for_model(model: str) -> str:
+    """Return the YAML provider that lists ``model``, or empty string."""
+    ai = AIConfig.from_sources()
+    for pool in ai.providers:
+        if model == pool.default_model or model in pool.models:
+            return pool.name
+    # OpenRouter-style ids often appear only as fallback_models strings.
+    if "/" in model and not model.startswith("models/"):
+        if get_provider_metadata("openrouter") is not None:
+            return "openrouter"
+    if model.startswith("models/"):
+        if get_provider_metadata("google") is not None:
+            return "google"
+    if model.startswith("mistral") or model.startswith("open-mistral") or model.startswith("open-mixtral"):
+        if get_provider_metadata("mistral") is not None:
+            return "mistral"
+    return ""
+
+
+def _endpoint_base_url(provider_name: str, meta) -> str:
+    """Resolve a usable base URL for ``provider_name``."""
+    if provider_name == "cloudflare":
+        from .config_providers import cloudflare_base_url
+
+        account_id = ""
+        if meta.account_id_env:
+            account_id = os.getenv(meta.account_id_env, "").strip()
+        if not account_id:
+            account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+        return cloudflare_base_url(account_id) if account_id else ""
+    if meta.base_url:
+        return meta.base_url
+    return provider_base_url(
+        {
+            "base_url": meta.base_url,
+            "account_id_env": meta.account_id_env,
+        }
+    )
+
+
 __all__ = [
     "setup_logging",
     "load_env",
     "resolve_api_config",
+    "resolve_model_endpoints",
     "_provider_api_config",
     "_load_env_line",
     "_configured_env_key_values",
