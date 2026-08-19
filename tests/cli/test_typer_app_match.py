@@ -16,9 +16,7 @@ def test_match_products_help_lists_flags() -> None:
     assert "--excel" in result.stdout
     assert "--tawreed-csv" in result.stdout
     assert "--output" in result.stdout
-    assert "--no-ai" in result.stdout
     assert "--threshold" in result.stdout
-    assert "--ai-verify-policy" in result.stdout
     assert "--format" in result.stdout
 
 

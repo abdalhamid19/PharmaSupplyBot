@@ -237,14 +237,12 @@ def reject_prevented_excel_as_order_source(
 
 def order_bot_options(args) -> dict[str, object]:
     """Extract bot options from CLI arguments."""
-    from .cli_order import order_ai_settings
     stop_flag = getattr(args, "stop_flag", None)
     return {
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "stop_flag_path": Path(stop_flag) if stop_flag else None,
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": match_only(args),
-        "order_ai_settings": order_ai_settings(args),
         "execution_mode": str(getattr(args, "execution_mode", "auto")),
         "matching_risk_policy": str(getattr(args, "matching_risk_policy", "safe")),
         "flagged_match_action": str(

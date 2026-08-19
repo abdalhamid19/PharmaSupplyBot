@@ -191,32 +191,6 @@ def test_order_accepts_matching_risk_policy() -> None:
     assert captured["flagged_match_action"] == "add-to-cart"
 
 
-def test_order_accepts_ai_matching_flags() -> None:
-    captured: dict = {
-        "ai": None,
-        "provider": None,
-        "review_model": None,
-        "ai_accept_confidence": None,
-    }
-    result = _invoke(
-        [
-            "order",
-            "--excel", "data.xlsx",
-            "--profile", "wardany",
-            "--ai",
-            "--provider", "rotation",
-            "--review-model", "rotation",
-            "--ai-accept-confidence", "0.93",
-        ],
-        captured,
-    )
-    assert result.exit_code == 0
-    assert captured["ai"] is True
-    assert captured["provider"] == "rotation"
-    assert captured["review_model"] == "rotation"
-    assert captured["ai_accept_confidence"] == 0.93
-
-
 def test_order_accepts_prevented_items_excel_override() -> None:
     captured: dict = {"prevented_items_excel": None}
     result = _invoke(
@@ -386,13 +360,8 @@ def test_export_products_accepts_output_options() -> None:
 # ─────────────────────────── match-products ───────────────────────────
 
 
-def test_match_products_accepts_ai_and_trace_options() -> None:
-    captured: dict = {
-        "trace": None,
-        "no_ai": None,
-        "provider": None,
-        "concurrency": None,
-    }
+def test_match_products_accepts_trace_options() -> None:
+    captured: dict = {"trace": None}
     result = _invoke(
         [
             "match-products",
@@ -400,15 +369,8 @@ def test_match_products_accepts_ai_and_trace_options() -> None:
             "--excel", "data/input/order_items/ddd.xlsx",
             "--limit", "5",
             "--trace",
-            "--no-ai",
-            "--provider", "rotation",
-            "--review-model", "rotation",
-            "--concurrency", "4",
         ],
         captured,
     )
     assert result.exit_code == 0
     assert captured["trace"] is True
-    assert captured["no_ai"] is True
-    assert captured["provider"] == "rotation"
-    assert captured["concurrency"] == 4

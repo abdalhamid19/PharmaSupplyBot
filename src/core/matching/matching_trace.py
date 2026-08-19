@@ -1,4 +1,4 @@
-"""Shared structured tracing helpers for matching and AI decisions."""
+"""Shared structured tracing helpers for local matching decisions."""
 
 from __future__ import annotations
 

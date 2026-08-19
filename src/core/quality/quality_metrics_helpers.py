@@ -40,8 +40,6 @@ def _process_row_metrics(row: dict, metrics) -> None:
     if deterministic_found:
         metrics.deterministic_matched += 1
 
-    _update_ai_metrics(_cell(row, "ai_status"), metrics)
-
 
 def _update_manual_review_metrics(row, metrics, manual_review):
     """Update manual review metrics."""
@@ -62,19 +60,6 @@ def _update_status_metrics(status: str, metrics) -> None:
         metrics.not_orderable += 1
 
 
-def _update_ai_metrics(ai_status: str, metrics) -> None:
-    """Update AI-specific metrics."""
-    if ai_status == "ai_verified":
-        metrics.ai_verified += 1
-    elif ai_status == "ai_search_accepted":
-        metrics.ai_searched += 1
-    elif ai_status == "ai_review_rejected":
-        metrics.ai_reviewed += 1
-    elif ai_status == "ai_rejected":
-        metrics.ai_rejected += 1
-    elif ai_status == "ai_low_confidence":
-        metrics.ai_low_confidence += 1
-
 
 __all__ = [
     "_read_csv_rows",
@@ -83,5 +68,4 @@ __all__ = [
     "_process_row_metrics",
     "_update_manual_review_metrics",
     "_update_status_metrics",
-    "_update_ai_metrics",
 ]

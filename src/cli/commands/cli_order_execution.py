@@ -15,7 +15,7 @@ from src.tawreed.artifacts.order_worker_artifact_merger import merge_order_worke
 from src.tawreed.tawreed import TawreedBot
 from src.tawreed.api.tawreed_api_client import TawreedApiUnavailable
 from src.tawreed.auth.tawreed_session import SessionInvalidError
-from .cli_order import order_ai_settings, order_bot
+from .cli_order import order_bot
 from .cli_order_items import match_only, summary_label
 from ..cli_shared import raise_api_unavailable, raise_invalid_session
 from .item_worker import report_worker_results, run_order_chunk
@@ -136,7 +136,7 @@ def merge_order_worker_outputs(profile_key: str, args) -> None:
     """Merge all order worker output partitions for the active run."""
     merge_worker_summaries(profile_key, summary_label(args))
     merge_order_worker_artifacts(
-        profile_key, ("order_item_summary", "order_ai_trace", "manual_review")
+        profile_key, ("order_item_summary", "manual_review")
     )
 
 
@@ -167,7 +167,6 @@ def worker_options(args, auth_lock=None) -> dict[str, Any]:
     return {
         "artifact_command": run.command if run else "",
         "artifact_run_id": run.run_id if run else "",
-        "order_ai_settings": order_ai_settings(args),
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": match_only(args),

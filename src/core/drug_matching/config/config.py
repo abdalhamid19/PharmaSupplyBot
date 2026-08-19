@@ -1,46 +1,6 @@
-"""Configuration models for component-aware drug matching and AI review."""
+"""Public configuration API for deterministic drug matching."""
 
-from __future__ import annotations
+from .config_helpers import setup_logging
+from .config_models import ROOT_DIR, MatchingConfig, Paths, _default_output_csv
 
-from .config_models import (
-    ROOT_DIR,
-    MatchingConfig,
-    APIConfig,
-    AIConfig,
-    ProviderPool,
-    ProviderMetadata,
-    get_provider_metadata,
-    Paths,
-    _default_output_csv,
-)
-from .config_providers import PROVIDERS, provider_base_url, cloudflare_base_url
-from .config_helpers import (
-    setup_logging,
-    load_env,
-    resolve_api_config,
-    _provider_api_config,
-    _load_env_line,
-    _configured_env_key_values,
-    _configured_keys_for,
-    _dedupe,
-)
-
-
-__all__ = [
-    "ROOT_DIR",
-    "MatchingConfig",
-    "APIConfig",
-    "Paths",
-    "PROVIDERS",
-    "provider_base_url",
-    "cloudflare_base_url",
-    "setup_logging",
-    "load_env",
-    "resolve_api_config",
-    "_default_output_csv",
-    "_provider_api_config",
-    "_load_env_line",
-    "_configured_env_key_values",
-    "_configured_keys_for",
-    "_dedupe",
-]
+__all__ = ["ROOT_DIR", "MatchingConfig", "Paths", "setup_logging", "_default_output_csv"]

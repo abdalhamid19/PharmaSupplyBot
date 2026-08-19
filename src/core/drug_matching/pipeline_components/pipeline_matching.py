@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 _RESULT_COLS = [
     "code", "drug_name", "matched_product_name_en",
     "matched_product_name_ar", "matched_store_product_id",
-    "match_score", "verified", "match_method", "ai_confidence", "ai_review_confidence",
+    "match_score", "verified", "match_method",
 ]
 
 
@@ -75,7 +75,7 @@ class PipelineMatching:
             results.append(self._make_row(row, rec, score, method, stats))
         self._results = pd.DataFrame(results, columns=_RESULT_COLS if not results else None)
         # Allow mixed str/float in numeric-optional columns
-        for col in ("match_score", "ai_confidence", "ai_review_confidence"):
+        for col in ("match_score",):
             if col in self._results.columns:
                 self._results[col] = self._results[col].astype(object)
         logger.info(f"Phase 1 done: {stats}")
@@ -121,8 +121,6 @@ class PipelineMatching:
                 "match_score": 0.0,
                 "verified": "",
                 "match_method": method,
-                "ai_confidence": "",
-                "ai_review_confidence": "",
             }
         return {
             "code": row.code,
@@ -133,8 +131,6 @@ class PipelineMatching:
             "match_score": score,
             "verified": "",
             "match_method": method,
-            "ai_confidence": "",
-            "ai_review_confidence": "",
         }
 
 

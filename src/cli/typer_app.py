@@ -31,7 +31,6 @@ from src.cli.logging_setup import LoggingConfig, configure_logging
 from src.cli.presenter import FormatFlags
 from src.cli.registry import get_command
 from src.core.config.config import load_config
-from src.core.drug_matching.config import AIConfig
 from src.core.errors import PharmaSupplyError
 
 
@@ -157,9 +156,6 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
     ns = apply_preset(None, ns, getattr(ns, "preset", None))  # type: ignore[arg-type]
     ns = inject_defaults(None, ns)  # type: ignore[arg-type]
 
-    # 3b. Overlay ``ai:`` config.yaml defaults onto the namespace.
-    ns = _apply_ai_defaults(ns, ctx)
-
     # 4. Load config + dispatch (full wrap so PharmaSupplyError always logs).
     fmt = FormatFlags.resolve(explicit="json" if obj.get("json_logs") else None)
     try:
@@ -201,59 +197,6 @@ def _collect_defaults(ctx: Context) -> dict[str, Any]:
         if name is not None:
             defaults[name] = param.default
     return defaults
-
-
-def _apply_ai_defaults(ns: Any, ctx: Context) -> Any:
-    """Overlay ``ai:`` config.yaml values onto the parsed ``Namespace``.
-
-    For each AI-related field (``model`` / ``review_model`` /
-    ``ai_review_threshold``), this:
-
-    1. Skips override when the user explicitly passed the CLI flag
-       (detected by comparing against the declared default).
-    2. Otherwise, leaves ``os.environ``-driven resolution to
-       :class:`AIConfig` (env wins over YAML).
-
-    Streamlit-driven flows run their own resolution in
-    :func:`src.ui.order.streamlit_order_command._order_ai_threshold_args`
-    and never reach this code path, so the change is CLI-only.
-    """
-    declared = _collect_defaults(ctx)
-    ai_defaults = AIConfig.from_sources(config_path=Path(getattr(ns, "config", "config.yaml")))
-
-    # Mapping: (namespace attr, ai_defaults attr, expected declared default).
-    overlays: tuple[tuple[str, str, Any], ...] = (
-        ("model", "primary_model", None),
-        ("review_model", "review_model", None),
-        ("ai_review_threshold", "review_threshold", 0.95),
-    )
-    for attr, ai_attr, _expected_default in overlays:
-        declared_default = declared.get(attr)
-        current = getattr(ns, attr, None)
-        if _was_passed_for(declared_default, current):
-            continue
-        setattr(ns, attr, getattr(ai_defaults, ai_attr))
-    return ns
-
-
-def _was_passed_for(declared_default: Any, current: Any) -> bool:
-    """Heuristic: did the user pass this option on the CLI?
-
-    Mirrors the logic in :func:`src.cli.cli_config._was_passed` but is
-    scoped to a single attribute so the post-process step does not need
-    a reference to the original parser.
-    """
-    if declared_default is None:
-        # ``typer.Option(None, ...)`` — only treat as "passed" when the
-        # user provided a non-empty value.
-        if current is None:
-            return False
-        if isinstance(current, str) and not current.strip():
-            return False
-        return True
-    if isinstance(declared_default, float):
-        return bool(current is not None and current != declared_default)
-    return bool(current is not None and current != declared_default)
 
 
 # ─────────────────────────── One stub subcommand (auth) ────────────────
@@ -324,31 +267,7 @@ def match_products_cmd(
     end: int | None = typer.Option(None, "--end", help="End item index."),
     resume: bool = typer.Option(False, "--resume", help="Resume from saved state."),
     trace: bool = typer.Option(False, "--trace", help="Trace mode."),
-    no_ai: bool = typer.Option(False, "--no-ai", help="Disable AI matching."),
     threshold: int = typer.Option(80, "--threshold", help="Score threshold."),
-    ai_threshold: float = typer.Option(90.0, "--ai-threshold", help="AI score threshold."),
-    ai_verify_policy: str = typer.Option(
-        "score", "--ai-verify-policy",
-        help="AI verify policy: score, fuzzy, all-non-exact, all.",
-    ),
-    ai_search_policy: str = typer.Option(
-        "review-candidates", "--ai-search-policy",
-        help="AI search policy: safe, review-candidates, expanded, aggressive.",
-    ),
-    provider: str | None = typer.Option(None, "--provider", help="AI provider."),
-    model: str | None = typer.Option(None, "--model", help="AI model."),
-    api_key: str | None = typer.Option(None, "--api-key", help="AI API key."),
-    review_model: str | None = typer.Option(None, "--review-model", help="AI review model."),
-    concurrency: int | None = typer.Option(None, "--concurrency", help="AI concurrency."),
-    ai_search_limit: int | None = typer.Option(
-        None, "--ai-search-limit", help="Limit AI search results."
-    ),
-    no_ai_preflight: bool = typer.Option(
-        False, "--no-ai-preflight", help="Skip AI preflight check."
-    ),
-    rotation_preflight_policy: str = typer.Option(
-        "smart", "--rotation-preflight-policy", help="API-rotation preflight policy."
-    ),
     format: str | None = typer.Option(
         None, "--format",
         help="Output format: human (default, TTY-only), json, or plain.",
@@ -356,60 +275,6 @@ def match_products_cmd(
 ) -> None:
     """Match an inventory Excel/CSV file against exported Tawreed products."""
     raise typer.Exit(_run_registered(ctx, "match-products"))
-
-
-@app.command("list-models")
-def list_models_cmd(
-    ctx: Context,
-    config: str = typer.Option(
-        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
-    ),
-    provider: str | None = typer.Option(
-        None, "--provider", "-p",
-        help="Comma-separated provider names to probe (default: all).",
-    ),
-    timeout: float = typer.Option(
-        20.0, "--timeout", help="Per-request timeout (seconds)."
-    ),
-    format: str | None = typer.Option(
-        None, "--format",
-        help="Output format: human (default, TTY-only), json, or plain.",
-    ),
-) -> None:
-    """List AI models available per provider by probing live /models endpoints."""
-    raise typer.Exit(_run_registered(ctx, "list-models"))
-
-
-@app.command("test-models")
-def test_models_cmd(
-    ctx: Context,
-    config: str = typer.Option(
-        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
-    ),
-    provider: str | None = typer.Option(
-        None, "--provider", "-p",
-        help="Comma-separated provider names to test (default: all).",
-    ),
-    timeout: float = typer.Option(
-        25.0, "--timeout", help="Per-request timeout (seconds)."
-    ),
-    max_tokens: int = typer.Option(
-        64, "--max-tokens", help="Max tokens for the probe request."
-    ),
-    concurrency: int = typer.Option(
-        6, "--concurrency", help="Parallel probe requests."
-    ),
-    all_keys: bool = typer.Option(
-        False, "--all-keys",
-        help="Probe every API key x model (default: first key per model).",
-    ),
-    format: str | None = typer.Option(
-        None, "--format",
-        help="Output format: human (default, TTY-only), json, or plain.",
-    ),
-) -> None:
-    """Live-test all configured AI models: status, latency, and exact failure cause."""
-    raise typer.Exit(_run_registered(ctx, "test-models"))
 
 
 @app.command("remove-cart")
@@ -510,37 +375,6 @@ def order_cmd(
     flagged_match_action: str = typer.Option(
         "manual-review-only", "--flagged-match-action",
         help="Action for flagged matches: manual-review-only or add-to-cart.",
-    ),
-    # AI
-    ai: bool = typer.Option(False, "--ai", help="Enable active AI matching."),
-    provider: str | None = typer.Option(None, "--provider", help="AI provider."),
-    model: str | None = typer.Option(None, "--model", help="AI model."),
-    api_key: str | None = typer.Option(None, "--api-key", help="AI API key."),
-    review_model: str | None = typer.Option(None, "--review-model", help="AI review model."),
-    concurrency: int | None = typer.Option(None, "--concurrency", help="AI concurrency."),
-    ai_verify_policy: str = typer.Option(
-        "score", "--ai-verify-policy",
-        help="AI verify policy: score, fuzzy, all-non-exact, all.",
-    ),
-    ai_search_policy: str = typer.Option(
-        "review-candidates", "--ai-search-policy",
-        help="AI search policy: safe, review-candidates, expanded, aggressive.",
-    ),
-    ai_accept_confidence: float = typer.Option(
-        0.9, "--ai-accept-confidence", help="AI auto-accept confidence."
-    ),
-    ai_verify_soft_accept_confidence: float = typer.Option(
-        0.8, "--ai-verify-soft-accept-confidence",
-        help="AI soft-accept confidence for verify policy.",
-    ),
-    ai_review_threshold: float = typer.Option(
-        0.95, "--ai-review-threshold", help="Threshold to flag for manual review."
-    ),
-    no_ai_preflight: bool = typer.Option(
-        False, "--no-ai-preflight", help="Skip AI preflight check."
-    ),
-    rotation_preflight_policy: str = typer.Option(
-        "smart", "--rotation-preflight-policy", help="API-rotation preflight policy."
     ),
     # Filter
     warehouse_mode: str | None = typer.Option(

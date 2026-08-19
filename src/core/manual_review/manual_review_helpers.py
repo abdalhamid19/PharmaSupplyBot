@@ -133,7 +133,7 @@ def _find_name_match_in_candidates(
     
     # البحث عن تطابق الاسم داخل قائمة المرشحين
     """
-    from ..ordering.order_ai_matching import candidate_name, candidate_ar
+    from .manual_review_candidates import candidate_name, candidate_ar
     from ..matching.candidate_identity import candidate_store_product_id
     from ..matching_types import SearchMatch, MatchDecision
     
@@ -247,7 +247,7 @@ def _validate_name_consistency(
     if not saved_name:
         return True, "No saved name to validate"
     
-    from ..ordering.order_ai_matching import candidate_name
+    from .manual_review_candidates import candidate_name
     current_name = candidate_name(candidate).lower()
     
     if saved_name.lower() != current_name:
@@ -277,7 +277,7 @@ def _extract_candidate_manufacturer(candidate: dict) -> str | None:
     # استخراج الشركة المصنعة من بيانات المرشح
     """
     from ..identity.manufacturer_identity import extract_manufacturer_from_candidate
-    from ..ordering.order_ai_matching import candidate_name
+    from .manual_review_candidates import candidate_name
     
     company_name = candidate.get("companyName") or candidate.get("company_name")
     supplier_name = candidate.get("supplierName") or candidate.get("supplier_name")

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from .tawreed_bot_core import TawreedBotCore
 from .tawreed_bot_api import TawreedBotApi
-from .tawreed_bot_order_ai import TawreedBotOrderAi
 from .tawreed_bot_methods import TawreedBotMethods
 from .tawreed_dialogs import close_visible_dialogs
 from .matching.tawreed_search_logic import require_product_match
@@ -16,7 +15,7 @@ def sync_playwright():
     return _sync_playwright
 
 
-class TawreedBot(TawreedBotCore, TawreedBotApi, TawreedBotOrderAi, TawreedBotMethods):
+class TawreedBot(TawreedBotCore, TawreedBotApi, TawreedBotMethods):
     """Coordinate Tawreed authentication, product matching, and order placement."""
     pass
 

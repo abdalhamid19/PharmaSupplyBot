@@ -14,7 +14,6 @@ from ..tawreed_summary import (
     _item_error_label, _item_error_details, _artifact_details
 )
 from .tawreed_order_summary_build import (
-    append_order_ai_trace_artifacts,
     append_order_item_artifacts,
     append_manual_review_artifacts,
     _preserve_existing_decision,
@@ -241,7 +240,6 @@ class OrderSummaryRecorderBuildersMixin:
             item,
             summary,
             self.bot.last_match_decision,
-            self.bot.last_order_ai_outcome,
             self.bot.summary_label_suffix,
             self.bot.config.matching,
         )
@@ -263,7 +261,6 @@ class OrderSummaryRecorder(
 
 __all__ = [
     "OrderSummaryRecorder",
-    "append_order_ai_trace_artifacts",
     "append_order_item_artifacts",
     "append_manual_review_artifacts",
     "_preserve_existing_decision",

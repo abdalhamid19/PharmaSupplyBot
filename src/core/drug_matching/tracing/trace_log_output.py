@@ -6,11 +6,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from .trace_log_output_writers import (
-    StepWriters,
-    TraceCSVWriter,
-    TraceTXTWriter,
-)
+from .trace_log_output_writers import TraceCSVWriter, TraceTXTWriter
 from .trace_log_summary import SummaryWriter
 
 
@@ -43,7 +39,6 @@ class TraceOutputWriter:
 
 
 __all__ = [
-    "StepWriters",
     "TraceCSVWriter",
     "TraceTXTWriter",
     "TraceOutputWriter",

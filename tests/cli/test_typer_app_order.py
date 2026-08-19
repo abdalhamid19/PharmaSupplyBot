@@ -27,12 +27,7 @@ def test_order_help_lists_all_flag_groups() -> None:
     # Risk
     assert "--matching-risk-policy" in result.stdout
     assert "--flagged-match-action" in result.stdout
-    # AI
-    assert "--ai" in result.stdout
-    assert "--provider" in result.stdout
-    assert "--ai-verify-policy" in result.stdout
-    assert "--ai-accept-confidence" in result.stdout
-    # Filter
+    # Store filters
     assert "--warehouse-mode" in result.stdout
     assert "--min-discount-percent" in result.stdout
     assert "--prevented-items-excel" in result.stdout
@@ -57,8 +52,6 @@ def test_order_invokes_handler_with_all_flag_groups() -> None:
                 "--profile", "wardany",
                 "--match-only",
                 "--execution-mode", "api",
-                "--ai",
-                "--ai-verify-policy", "all",
                 "--warehouse-mode", "max_discount",
                 "--min-discount-percent", "10",
                 "--format", "json",

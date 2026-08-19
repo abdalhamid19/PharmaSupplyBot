@@ -6,8 +6,6 @@ from src.core.artifact_run import current_artifact_run
 from src.core.manual_review.manual_review_candidate_store import append_review_candidates
 from src.core.manual_review.manual_review_candidates import review_candidate_options
 from src.core.manual_review.manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
-from src.core.ordering.order_ai_artifacts import order_ai_trace_rows
-from src.core.ordering.order_ai_matching import candidate_ar, candidate_name
 from src.core.ordering.order_run_artifact_rows import manual_review_required, manual_review_row, order_item_summary_row
 from src.core.utils.excel import Item
 from src.core.matching.candidate_identity import candidate_store_product_id
@@ -15,44 +13,29 @@ from ..artifacts.tawreed_artifacts import append_csv_artifact, append_text_artif
 from ..matching.tawreed_match_logs import OrderResultSummary
 
 
-def append_order_ai_trace_artifacts(
-    profile_key: str, item: Item, outcome, label_suffix: str | None = None
-) -> None:
-    """Append detailed AI trace rows to CSV and TXT artifacts."""
-    from .tawreed_order_summary_format import _text_rows
-
-    rows = order_ai_trace_rows(item, outcome)
-    if not rows:
-        return
-    append_csv_artifact(profile_key, "order_ai_trace", rows, label_suffix)
-    append_text_artifact(
-        profile_key, "order_ai_trace", _text_rows("ai_trace", rows), label_suffix
-    )
-
-
 def append_order_item_artifacts(
-    profile_key: str, item: Item, summary: OrderResultSummary, decision, outcome,
+    profile_key: str, item: Item, summary: OrderResultSummary, decision,
     label_suffix: str | None = None, matching_config=None
 ) -> None:
     """Append one item summary row and optional manual-review row."""
     from .tawreed_order_summary_format import _append_item_summary_row, _append_final_trace_row
 
-    row = order_item_summary_row(item, summary, decision, outcome, matching_config)
+    row = order_item_summary_row(item, summary, decision, matching_config)
     _append_item_summary_row(profile_key, row, label_suffix)
     _append_final_trace_row(profile_key, row, label_suffix)
     _handle_manual_review_or_auto_save(
-        profile_key, item, summary, decision, outcome, label_suffix, matching_config
+        profile_key, item, summary, decision, label_suffix, matching_config
     )
 
 
 def _handle_manual_review_or_auto_save(
-    profile_key, item, summary, decision, outcome, label_suffix, matching_config
+    profile_key, item, summary, decision, label_suffix, matching_config
 ) -> None:
     """Handle manual review or auto-save based on config."""
-    requires_review = manual_review_required(item, summary.status, outcome, matching_config)
+    requires_review = manual_review_required(item, summary.status, matching_config)
     if requires_review:
         append_manual_review_artifacts(
-            profile_key, item, summary, decision, outcome, label_suffix, matching_config
+            profile_key, item, summary, decision, label_suffix, matching_config
         )
     elif matching_config and matching_config.enable_auto_save_verified_match:
         _auto_save_verified_match(item, decision)
@@ -82,8 +65,8 @@ def _auto_save_verified_match(item: Item, decision) -> None:
 def _create_and_save_decision(item, match, store) -> None:
     """Create and save auto-matched decision."""
     store_id = candidate_store_product_id(match.data)
-    name_en = candidate_name(match.data)
-    name_ar = candidate_ar(match.data)
+    name_en = str(match.data.get("productNameEn") or match.data.get("productNameEnFallback") or "")
+    name_ar = str(match.data.get("productName") or "")
 
     run = current_artifact_run()
     run_id = run.directory.name if run else ""
@@ -103,13 +86,13 @@ def _preserve_existing_decision(existing) -> bool:
 
 
 def append_manual_review_artifacts(
-    profile_key: str, item: Item, summary: OrderResultSummary, decision, outcome,
+    profile_key: str, item: Item, summary: OrderResultSummary, decision,
     label_suffix: str | None = None, matching_config=None
 ) -> None:
     """Append one manual-review row to CSV and TXT artifacts, and candidates to JSONL."""
     from src.core.ordering.order_run_artifact_rows import text_block
 
-    row = manual_review_row(item, summary, decision, outcome, matching_config)
+    row = manual_review_row(item, summary, decision, matching_config)
     append_csv_artifact(profile_key, "manual_review", [row], label_suffix)
     append_text_artifact(
         profile_key, "manual_review", text_block("manual_review", row), label_suffix
@@ -134,7 +117,6 @@ def _review_candidate_limit(matching_config=None) -> int:
 
 
 __all__ = [
-    "append_order_ai_trace_artifacts",
     "append_order_item_artifacts",
     "append_manual_review_artifacts",
     "_preserve_existing_decision",

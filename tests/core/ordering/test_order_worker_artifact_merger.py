@@ -29,43 +29,42 @@ class MergeOrderWorkerArtifactsTests(unittest.TestCase):
 
     def test_merges_csv_and_text_worker_partitions(self) -> None:
         """Worker CSV and TXT files are merged then removed."""
-        self._write_csv("order_ai_trace_worker_0.csv", "verify")
-        self._write_csv("order_ai_trace_worker_1.csv", "review")
-        (self.artifacts_dir / "order_ai_trace_worker_0.txt").write_text(
+        self._write_csv("order_matching_trace_worker_0.csv", "local_match")
+        self._write_csv("order_matching_trace_worker_1.csv", "manual_review")
+        (self.artifacts_dir / "order_matching_trace_worker_0.txt").write_text(
             "worker0\n", encoding="utf-8"
         )
-        (self.artifacts_dir / "order_ai_trace_worker_1.txt").write_text(
+        (self.artifacts_dir / "order_matching_trace_worker_1.txt").write_text(
             "worker1\n", encoding="utf-8"
         )
 
-        merge_order_worker_artifacts("wardany", ("order_ai_trace",))
+        merge_order_worker_artifacts("wardany", ("order_matching_trace",))
 
-        rows = self._read_csv("order_ai_trace.csv")
-        self.assertEqual([row["phase"] for row in rows], ["verify", "review"])
+        rows = self._read_csv("order_matching_trace.csv")
+        self.assertEqual([row["phase"] for row in rows], ["local_match", "manual_review"])
         self.assertEqual(
-            (self.artifacts_dir / "order_ai_trace.txt").read_text(encoding="utf-8"),
+            (self.artifacts_dir / "order_matching_trace.txt").read_text(encoding="utf-8"),
             "worker0\nworker1\n",
         )
-        self.assertFalse(list(self.artifacts_dir.glob("order_ai_trace_worker_*.*")))
+        self.assertFalse(list(self.artifacts_dir.glob("order_matching_trace_worker_*.*")))
 
     def test_merges_worker_partitions_with_union_schema(self) -> None:
-        """Worker CSV files can contain different AI attempt metadata columns."""
+        """Worker CSV files can contain different local matching columns."""
         self._write_rows(
-            "order_ai_trace_worker_0.csv",
-            [{"phase": "ai_verify", "provider": "groq"}],
+            "order_matching_trace_worker_0.csv",
+            [{"phase": "local_match", "score": "94"}],
         )
         self._write_rows(
-            "order_ai_trace_worker_1.csv",
-            [{"phase": "api_attempt_review", "model": "m1", "error_code": "429"}],
+            "order_matching_trace_worker_1.csv",
+            [{"phase": "manual_review", "reason": "low_score"}],
         )
 
-        merge_order_worker_artifacts("wardany", ("order_ai_trace",))
+        merge_order_worker_artifacts("wardany", ("order_matching_trace",))
 
-        rows = self._read_csv("order_ai_trace.csv")
-        self.assertEqual(rows[0]["provider"], "groq")
-        self.assertEqual(rows[0]["model"], "")
-        self.assertEqual(rows[1]["model"], "m1")
-        self.assertEqual(rows[1]["error_code"], "429")
+        rows = self._read_csv("order_matching_trace.csv")
+        self.assertEqual(rows[0]["score"], "94")
+        self.assertEqual(rows[0]["reason"], "")
+        self.assertEqual(rows[1]["reason"], "low_score")
 
     def _write_csv(self, name: str, phase: str) -> None:
         self._write_rows(name, [{"phase": phase}])

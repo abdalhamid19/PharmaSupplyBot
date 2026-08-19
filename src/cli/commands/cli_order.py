@@ -9,68 +9,12 @@ from pathlib import Path
 
 from src.core.artifact_run import artifact_run
 from src.core.config.config_models import AppConfig, ProfileConfig
-from src.core.drug_matching.ai.ai_rotation import configured_attempts
-from src.core.drug_matching.config import APIConfig, load_env, resolve_api_config
-from src.core.ordering.order_ai_matching import OrderAiSettings
 from src.tawreed.tawreed import TawreedBot
 from ..cli_shared import build_bot
 from .cli_order_items import order_bot_options
 from ..registry import register
 
 logger = logging.getLogger(__name__)
-
-
-# ============ AI Settings ============
-
-
-def order_ai_settings(args: argparse.Namespace) -> OrderAiSettings:
-    """Build live-order AI settings from CLI flags."""
-    concurrency = max(1, int(getattr(args, "concurrency", None) or 5))
-    return OrderAiSettings(
-        enabled=bool(getattr(args, "ai", False)),
-        api_config=order_api_config(args),
-        concurrency=concurrency,
-        accept_confidence=float(getattr(args, "ai_accept_confidence", 0.9)),
-        verify_soft_accept_confidence=float(
-            getattr(args, "ai_verify_soft_accept_confidence", 0.8)
-        ),
-        review_threshold=float(getattr(args, "ai_review_threshold", 0.95)),
-        verify_policy=str(getattr(args, "ai_verify_policy", "score")),
-        search_policy=str(getattr(args, "ai_search_policy", "review-candidates")),
-    )
-
-
-def order_api_config(args: argparse.Namespace) -> APIConfig:
-    """Resolve AI API settings for live-order matching."""
-    if getattr(args, "provider", None) == "rotation":
-        return _rotation_api_config(args)
-    resolved = resolve_api_config(
-        getattr(args, "provider", None) or "",
-        getattr(args, "model", None) or "",
-        getattr(args, "api_key", None) or "",
-    )
-    return APIConfig(
-        api_key=resolved["api_key"],
-        api_keys=resolved.get("api_keys", ()),
-        base_url=resolved["base_url"],
-        model=resolved["model"],
-        fallback_models=resolved.get("fallback_models", ()),
-        review_model=getattr(args, "review_model", None) or "",
-    )
-
-
-def _rotation_api_config(args: argparse.Namespace) -> APIConfig:
-    """Build API config for rotation-based provider selection."""
-    attempts = configured_attempts("auto")
-    first = attempts[0] if attempts else None
-    return APIConfig(
-        api_key=first.api_key if first else "",
-        api_keys=(first.api_key,) if first else (),
-        base_url=first.base_url if first else "",
-        model=first.model if first else "",
-        review_model=getattr(args, "review_model", None) or "",
-        attempt_plan=attempts,
-    )
 
 
 # ============ Configuration ============
@@ -129,7 +73,6 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         print_command_summary,
     )
 
-    load_env()
     apply_order_overrides(app_config, args)
     profiles = app_config.profiles_to_run(
         profile=args.profile, all_profiles=args.all_profiles
@@ -156,8 +99,8 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         # We only count ``order_item_summary_*.csv`` — that file has
         # one row per INPUT item, which is what the operator means
         # by "processed". The ``match_only_summary_*.csv`` file has
-        # one row per CANDIDATE (many candidates per item when AI
-        # runs), so we deliberately exclude it to avoid inflating
+        # one row per CANDIDATE (many candidates per item can be recorded),
+        # so we deliberately exclude it to avoid inflating
         # the counter.
         for d in run_directories:
             for path in d.glob("order_item_summary_*.csv"):
@@ -282,9 +225,6 @@ def run_parallel_profiles(
 
 
 __all__ = [
-    # AI Settings
-    "order_ai_settings",
-    "order_api_config",
     # Configuration
     "apply_order_overrides",
     "resolve_max_workers",
