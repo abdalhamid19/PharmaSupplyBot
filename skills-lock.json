@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "Pytest Testing": {
+      "source": "pluginagentmarketplace/custom-plugin-python",
+      "sourceType": "github",
+      "skillPath": "skills/pytest-testing/SKILL.md",
+      "computedHash": "4866a177efbeae4ebca8104a3f7870bd21ab8f729f872b54e3ae7a58aa317bdc"
+    },
     "addressing-pr-review-comments": {
       "source": "streamlit/streamlit",
       "sourceType": "github",
@@ -73,6 +79,12 @@
       "skillPath": "skills/next-cache-components-optimizer/SKILL.md",
       "computedHash": "a45e680bcb933982e8d71e3b3f45b500ab1edc1aa94b1fbd95d8601776e19bed"
     },
+    "playwright": {
+      "source": "oakoss/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/playwright/SKILL.md",
+      "computedHash": "179b5f5fbdac8388b6992baa8211fa50b87d02f207175e3ff7c1869999867423"
+    },
     "portless": {
       "source": "vercel-labs/portless",
       "sourceType": "github",
@@ -91,11 +103,23 @@
       "skillPath": "template/SKILL.md",
       "computedHash": "daf176f2cd0030d321982d3e813fd1a794a0b4744c5a92d2931a37001bb40fb9"
     },
+    "typer": {
+      "source": "fastapi/typer",
+      "sourceType": "github",
+      "skillPath": "typer/.agents/skills/typer/SKILL.md",
+      "computedHash": "985e1078fae0bbb4acf314c34862229c84a52bfff8f761c95495ca66db3bf251"
+    },
     "understanding-streamlit-architecture": {
       "source": "streamlit/streamlit",
       "sourceType": "github",
       "skillPath": ".claude/skills/understanding-streamlit-architecture/SKILL.md",
       "computedHash": "391e7d469018035b49de284a112eb6facc1d0115ebd078238bab7c1fe64ced07"
+    },
+    "xlsx": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "skillPath": "cli-tool/components/skills/document-processing/xlsx/SKILL.md",
+      "computedHash": "3f00b01ef71a41442310e04d22d6827aa3d020e043ffd8c99f640a7593d69844"
     }
   }
 }
