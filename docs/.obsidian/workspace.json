@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "matching_model_ranking.md",
+                "file": "product_matching_mode.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "matching_model_ranking"
+              "title": "product_matching_mode"
             }
           }
         ]
@@ -190,8 +190,8 @@
   },
   "active": "e7c7824b9bfdea94",
   "lastOpenFiles": [
-    "ai_how_it_works.md",
     "matching_model_ranking.md",
+    "ai_how_it_works.md",
     "reports/ai_model_tiers.md",
     "reports/ai_models_live_check.md",
     "reports",
