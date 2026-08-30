@@ -84,6 +84,43 @@ def _decision(rejection_reason: str = "", score: float = 95.0,
     )
 
 
+def _real_conflict_item() -> Item:
+    """Item naming a curated manufacturer (ORCHIDIA) explicitly."""
+    return Item(code="77777", name="METHYL FOLATE 30 CAP ORCHIDIA", qty=1)
+
+
+def _real_conflict_candidate() -> dict:
+    """Candidate whose explicit companyName is a different curated maker."""
+    return {
+        "storeProductId": "SP-777",
+        "productName": "ميثيل فولات",
+        "productNameEn": "METHYL FOLATE ORA 30 CAPS",
+        "companyName": "ORA",
+    }
+
+
+def _real_conflict_decision() -> MatchDecision:
+    breakdown = MatchScoreBreakdown(
+        sequence_score=0.0, overlap_score=0.0, numeric_overlap=0.0,
+        exact_bonus=0.0, availability_bonus=0.0, critical_penalty=0.0,
+        extra_token_penalty=0.0, semantic_penalty=0.0, total_score=95.0,
+    )
+    diagnostic = CandidateMatchDiagnostic(
+        query="METHYL FOLATE", row_index=0, score=95.0,
+        sort_key=(95.0, 0, 0.0, 0, 0, 0),
+        accepted=True, accepted_reason="high overlap", rejection_reason="",
+        breakdown=breakdown, candidate=_real_conflict_candidate(),
+    )
+    return MatchDecision(
+        best_match=SearchMatch(
+            query="METHYL FOLATE", row_index=0, score=95.0,
+            data=_real_conflict_candidate(),
+        ),
+        diagnostics=[diagnostic],
+        final_reason="Accepted best candidate because high overlap.",
+    )
+
+
 class PostFixAutoMatchedSavingTests(unittest.TestCase):
     """Full save-path verification after the tuple-unpacking + gating fix."""
 
@@ -99,10 +136,10 @@ class PostFixAutoMatchedSavingTests(unittest.TestCase):
     def _restore_db(self) -> None:
         build.DEFAULT_MANUAL_REVIEW_DB = self._original_db
 
-    def _run_flow(self, decision, config=None, summary=None) -> None:
+    def _run_flow(self, decision, config=None, summary=None, item=None) -> None:
         build.append_order_item_artifacts(
             profile_key="wardany",
-            item=_item(),
+            item=item or _item(),
             summary=summary or _SummaryStub(),
             decision=decision,
             matching_config=config if config is not None else MatchingConfig(),
@@ -127,10 +164,28 @@ class PostFixAutoMatchedSavingTests(unittest.TestCase):
         )
         self.assertEqual(len(self.store.list_decisions()), 0)
 
-    def test_3_manufacturer_flag_opt_in_blocks_save(self) -> None:
+    def test_3_manufacturer_flag_opt_in_blocks_real_conflict(self) -> None:
+        """Opt-in check blocks a genuine curated-vs-explicit maker conflict.
+
+        ORCHIDIA (named in the item) vs companyName 'ORA' — both are curated
+        manufacturers, so this is a real conflict, not a phantom one.
+        """
+        config = MatchingConfig(enable_manufacturer_check=True)
+        self._run_flow(
+            _real_conflict_decision(), config=config, item=_real_conflict_item()
+        )
+        self.assertEqual(len(self.store.list_decisions()), 0)
+
+    def test_3b_manufacturer_flag_on_does_not_block_phantom_conflict(self) -> None:
+        """'PANADOL EXTRA' no longer yields a phantom 'EXTRA' manufacturer.
+
+        Before the explicit-fields-only fix, enabling the check blocked this
+        healthy match because 'EXTRA' was read as the item's manufacturer and
+        compared against companyName 'GSK'.
+        """
         config = MatchingConfig(enable_manufacturer_check=True)
         self._run_flow(_decision(), config=config)
-        self.assertEqual(len(self.store.list_decisions()), 0)
+        self.assertEqual(len(self._auto_rows()), 1)
 
     def test_4_human_approved_match_survives(self) -> None:
         self.store.upsert(
