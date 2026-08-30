@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "product_matching_mode.md",
+                "file": "skills docs/best-skills-report.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "product_matching_mode"
+              "title": "best-skills-report"
             }
           }
         ]
@@ -188,8 +188,9 @@
       "bases:Create new base": false
     }
   },
-  "active": "e7c7824b9bfdea94",
+  "active": "94197ea5af438342",
   "lastOpenFiles": [
+    "product_matching_mode.md",
     "matching_model_ranking.md",
     "ai_how_it_works.md",
     "reports/ai_model_tiers.md",

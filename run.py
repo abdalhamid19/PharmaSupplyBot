@@ -20,8 +20,33 @@ from src.cli import cli_commands  # noqa: F401
 from src.cli.typer_app import app
 
 
+def _force_utf8_stdio() -> None:
+    """Reconfigure stdout/stderr to UTF-8 before anything prints.
+
+    On Windows the console defaults to a legacy code page (e.g.
+    cp1252) which cannot encode symbols like ``✅``/``❌`` used in the
+    command summaries, crashing the CLI *after* the work is done.
+    ``errors="replace"`` guarantees no ``UnicodeEncodeError`` can ever
+    escape a ``print()`` call, even if reconfiguration itself is
+    unavailable (non-standard stream objects, odd test harnesses).
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            # Stream already closed or is not a real text stream —
+            # print_command_summary has its own fallback, so this is
+            # safe to ignore.
+            pass
+
+
 def main() -> int:
     """Run the CLI command requested by the user (Typer entry point)."""
+    load_dotenv()
+    _force_utf8_stdio()
     load_dotenv()
     try:
         # Typer's ``app()`` raises ``SystemExit`` on completion; we

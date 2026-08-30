@@ -49,6 +49,12 @@
       "skillPath": "developing-with-streamlit/SKILL.md",
       "computedHash": "128c0acf5db60266b0fb0440c4064fccb7adba0a90d07259b4adddf0e4f39c78"
     },
+    "executing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/executing-plans/SKILL.md",
+      "computedHash": "78a07800ee99a5861ae10be59d79fad085fdca10444e8aaeb2691597e357cff8"
+    },
     "finalizing-pr": {
       "source": "streamlit/streamlit",
       "sourceType": "github",
@@ -97,6 +103,18 @@
       "skillPath": "skills/skill-creator/SKILL.md",
       "computedHash": "7e3c9cd74e9e2b4828527a857170e86310f2dab5ea8030a9043df2c7e6c88857"
     },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "a2750dfbaed1690da73b120254892c4f926b4576cb82eb16fc877783941fe39b"
+    },
+    "tdd": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "c1ed8cd854c64d4d226097255d3fa662dae4a758a1462fadd63cc10e413d88d7"
+    },
     "template-skill": {
       "source": "anthropics/skills",
       "sourceType": "github",
@@ -114,6 +132,18 @@
       "sourceType": "github",
       "skillPath": ".claude/skills/understanding-streamlit-architecture/SKILL.md",
       "computedHash": "391e7d469018035b49de284a112eb6facc1d0115ebd078238bab7c1fe64ced07"
+    },
+    "webapp-testing": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "computedHash": "3f14af7f5690695209c22fbf8c8d133769a86d64892602c09bb13f135e14e857"
+    },
+    "writing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/writing-plans/SKILL.md",
+      "computedHash": "27c75044e444a4fc68798c3f799dc23eaff3a6bfabff32e6ad75bb20f881c094"
     },
     "xlsx": {
       "source": "davila7/claude-code-templates",
