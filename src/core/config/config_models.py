@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from src.core.errors import ValidationError
@@ -64,6 +64,25 @@ class MatchingConfig:
     reject_extra_brand_token: bool = False
 
 @dataclass(frozen=True)
+class DatabaseConfig:
+    """Local SQLite persistence settings for order-run analytics."""
+
+    order_runs_enabled: bool = True
+    order_runs_path: str = ""
+    store_candidates: bool = False
+
+    def persistence_options(self) -> dict[str, Any]:
+        """Return the options dict consumed by order-run persistence.
+
+        ``path`` is omitted when unset so the persistence layer falls through to
+        its own default resolution instead of treating "" as an off switch.
+        """
+        options: dict[str, Any] = {"enabled": self.order_runs_enabled}
+        if self.order_runs_path:
+            options["path"] = self.order_runs_path
+        return options
+
+@dataclass(frozen=True)
 class AppConfig:
     """Fully parsed application configuration consumed by the bot."""
 
@@ -74,6 +93,7 @@ class AppConfig:
     warehouse_strategy: dict[str, Any]
     matching: MatchingConfig
     runtime: RuntimeConfig
+    database: DatabaseConfig = field(default_factory=DatabaseConfig)
 
     def profiles_to_run(
         self,

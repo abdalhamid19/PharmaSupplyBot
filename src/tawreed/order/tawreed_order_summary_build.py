@@ -9,6 +9,7 @@ from src.core.manual_review.manual_review_candidate_store import append_review_c
 from src.core.manual_review.manual_review_candidates import review_candidate_options
 from src.core.manual_review.manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
 from src.core.ordering.order_run_artifact_rows import manual_review_required, manual_review_row, order_item_summary_row
+from src.core.ordering.order_run_persistence import record_run_item
 from src.core.utils.excel import Item
 from src.core.matching.candidate_identity import candidate_store_product_id
 from ..artifacts.tawreed_artifacts import append_csv_artifact, append_text_artifact
@@ -27,9 +28,16 @@ def append_order_item_artifacts(
     row = order_item_summary_row(item, summary, decision, matching_config)
     _append_item_summary_row(profile_key, row, label_suffix)
     _append_final_trace_row(profile_key, row, label_suffix)
+    record_run_item(_active_order_run_key(), row)
     _handle_manual_review_or_auto_save(
         profile_key, item, summary, decision, label_suffix, matching_config
     )
+
+
+def _active_order_run_key() -> str:
+    """Return the order-run database key for the active artifact run, if any."""
+    run = current_artifact_run()
+    return f"{run.profile_key}/{run.run_id}" if run else ""
 
 
 def _handle_manual_review_or_auto_save(

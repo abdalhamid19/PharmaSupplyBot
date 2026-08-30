@@ -190,6 +190,7 @@
   },
   "active": "94197ea5af438342",
   "lastOpenFiles": [
+    "automatched_bug_report/08_manufacturer_identity_fix.md",
     "automatched_bug_report/07_navigation_timeout_fix.md",
     "automatched_bug_report/06_regression_risk_analysis.md",
     "architecture_review/C8_run_artifact_store.md",
@@ -218,7 +219,6 @@
     "automatched_bug_report/00_master_report.md",
     "automatched_bug_report",
     "order_runs_sqlite",
-    "product_matching_mode.md",
     "reports"
   ]
 }

@@ -9,6 +9,7 @@ import yaml
 
 from .config_factory import (
     DEFAULT_BASE_URL,
+    build_database_config,
     build_excel_config,
     build_matching_config,
     build_profiles,
@@ -31,6 +32,7 @@ def load_config(path: Path) -> AppConfig:
         warehouse_strategy=dict(raw_values.get("warehouse_strategy", {})),
         matching=build_matching_config(raw_values),
         runtime=build_runtime_config(raw_values),
+        database=build_database_config(raw_values),
     )
 
 

@@ -34,10 +34,17 @@ def run_single_profile(
 ) -> None:
     """Prepare and run a single profile order flow."""
     from src.core.artifact_run import artifact_run
+    from .cli_order_run_record import finish_order_run_record, open_order_run_record
 
     with artifact_run("order", profile_key) as run:
         logger.info("artifact run started", extra={"profile": profile_key, "directory": str(run.directory)})
-        run_single_profile_items(app_config, profile_key, profile, args)
+        run_key = open_order_run_record(app_config, profile_key, args, run)
+        try:
+            run_single_profile_items(app_config, profile_key, profile, args)
+        finally:
+            # Runs that crash must still be recorded as finished, otherwise
+            # every failure looks like a run that is still in progress.
+            finish_order_run_record(app_config, run_key)
 
 
 def run_single_profile_items(
