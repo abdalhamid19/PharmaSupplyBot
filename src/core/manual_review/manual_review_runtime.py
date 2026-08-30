@@ -137,6 +137,7 @@ def should_skip_auto_save_verified_match(
     item: Item,
     candidate: dict,
     rejection_reason: str | None = None,
+    enable_manufacturer_check: bool = False,
 ) -> tuple[bool, str]:
     """
     Check if auto-save should be skipped due to conflicts or issues.
@@ -147,10 +148,19 @@ def should_skip_auto_save_verified_match(
     intended for use in _auto_save_verified_match to prevent saving matches
     that have conflicts or were rejected due to conflicts.
     
+    Args:
+        item: The order item being matched.
+        candidate: The winning Tawreed candidate payload.
+        rejection_reason: Upstream rejection reason for the best candidate.
+        enable_manufacturer_check: Gate the heuristic manufacturer-conflict
+            check behind MatchingConfig.enable_manufacturer_check (default off).
+    
     Returns:
         (should_skip, reason) tuple
     """
-    return should_skip_auto_save(item, candidate, rejection_reason)
+    return should_skip_auto_save(
+        item, candidate, rejection_reason, enable_manufacturer_check
+    )
 
 
 __all__ = [

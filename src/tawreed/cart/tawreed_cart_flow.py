@@ -65,7 +65,8 @@ class TawreedCartFlow:
 
     def _prepare_cart_page(self, page) -> None:
         """Open Tawreed's cart page for cart-removal processing."""
-        page.goto(self._cart_page_url(), wait_until="domcontentloaded")
+        from ..auth.tawreed_session import resilient_goto
+        resilient_goto(page, self._cart_page_url(), self.bot.config.runtime.timeout_ms)
         from ..auth.tawreed_auth import ensure_logged_in
         ensure_logged_in(
             page,
@@ -90,7 +91,8 @@ class TawreedCartFlow:
 
     def _prepare_order_page(self, page: Page) -> None:
         """Open the site and navigate to the ordering surface for item processing."""
-        page.goto(self.bot._products_page_url(), wait_until="domcontentloaded")
+        from ..auth.tawreed_session import resilient_goto
+        resilient_goto(page, self.bot._products_page_url(), self.bot.config.runtime.timeout_ms)
         self._ensure_logged_in(page)
         maybe_switch_pharmacy(page, self.bot.profile.pharmacy_switch or {})
 

@@ -313,6 +313,7 @@ def should_skip_auto_save(
     item: Item,
     candidate: dict,
     rejection_reason: str | None = None,
+    enable_manufacturer_check: bool = False,
 ) -> tuple[bool, str]:
     """
     Check if auto-save should be skipped due to conflicts or issues.
@@ -321,6 +322,17 @@ def should_skip_auto_save(
     
     This helper is intended for use in _auto_save_verified_match to prevent
     saving matches that have conflicts or were rejected due to conflicts.
+    
+    Args:
+        item: The order item being matched.
+        candidate: The winning Tawreed candidate payload.
+        rejection_reason: Upstream rejection reason for the best candidate.
+        enable_manufacturer_check: Gate the heuristic manufacturer-conflict
+            check behind the user-facing MatchingConfig flag. The heuristic
+            guesses a manufacturer from the item name's last token, which
+            falsely conflicts for most product names (e.g. 'PANADOL EXTRA'
+            -> 'EXTRA' vs companyName 'GSK'), so it stays off by default
+            exactly like MatchingConfig.enable_manufacturer_check.
     
     Returns:
         (should_skip, reason) tuple
@@ -333,16 +345,18 @@ def should_skip_auto_save(
         if any(keyword in rejection_lower for keyword in conflict_keywords):
             return True, f"Conflict-related rejection: {rejection_reason}"
     
-    # Check for manufacturer conflict - التحقق من تضارب الشركة المصنعة
-    item_manufacturer = _extract_item_manufacturer(item)
-    candidate_manufacturer = _extract_candidate_manufacturer(candidate)
-    
-    if item_manufacturer and candidate_manufacturer:
-        if manufacturer_conflict(item_manufacturer, candidate_manufacturer):
-            return True, (
-                f"Manufacturer conflict detected for auto-save: "
-                f"item '{item_manufacturer}' vs candidate '{candidate_manufacturer}'"
-            )
+    # Heuristic manufacturer conflict — opt-in only (see docstring).
+    # التحقق من تضارب الشركة المصنعة (اختياري لأن الاستخراج تقريبي)
+    if enable_manufacturer_check:
+        item_manufacturer = _extract_item_manufacturer(item)
+        candidate_manufacturer = _extract_candidate_manufacturer(candidate)
+        
+        if item_manufacturer and candidate_manufacturer:
+            if manufacturer_conflict(item_manufacturer, candidate_manufacturer):
+                return True, (
+                    f"Manufacturer conflict detected for auto-save: "
+                    f"item '{item_manufacturer}' vs candidate '{candidate_manufacturer}'"
+                )
     
     return False, "No conflicts detected"
 

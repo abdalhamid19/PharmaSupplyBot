@@ -35,13 +35,43 @@ from .tawreed_session_auth import (
 # Browser operations
 # ============================================================================
 
+# Navigations target a remote SPA over the public internet; the widget-level
+# default timeout (state/config.yaml timeout_ms, commonly 15000) is too tight
+# for cold TCP/TLS handshakes. A transient first-connection stall of 20+ s was
+# observed in the field (TCP connect to seller.tawreed.io took 21 s once, then
+# 0.05 s on retry), so navigations get a floor plus one retry on timeout.
+NAVIGATION_TIMEOUT_FLOOR_MS = 60_000
+
+
+def resilient_goto(page, url: str, timeout_ms: int | None = None) -> None:
+    """Navigate with a navigation-grade timeout and one retry on timeout.
+
+    Playwright raises TimeoutError when a page load exceeds the timeout; one
+    retry absorbs transient network stalls (cold TLS, DNS hiccup) without
+    masking persistent failures (the retry must succeed or the error raises).
+    The effective timeout is the requested/default value raised to a
+    navigation-grade floor (NAVIGATION_TIMEOUT_FLOOR_MS).
+    """
+    from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
+    effective = max(NAVIGATION_TIMEOUT_FLOOR_MS, timeout_ms or 0)
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=effective)
+    except PlaywrightTimeoutError:
+        logger.warning(
+            "navigation timed out; retrying once",
+            extra={"url": url, "timeout_ms": effective},
+        )
+        page.goto(url, wait_until="domcontentloaded", timeout=effective)
+
+
 def open_auth_page(pw, base_url: str, runtime, headless: bool = False) -> tuple[Any, Any, Page]:
     """Create a browser page for one-time authentication."""
     browser = launch_chromium(pw, headless=headless, slow_mo_ms=runtime.slow_mo_ms)
     context = browser.new_context()
     page = context.new_page()
     page.set_default_timeout(runtime.timeout_ms)
-    page.goto(base_url, wait_until="domcontentloaded")
+    resilient_goto(page, base_url, runtime.timeout_ms)
     return browser, context, page
 
 
@@ -134,7 +164,7 @@ def validate_saved_session(
     discard_session_state(temp_state)
     browser, context, page = open_order_page(playwright, runtime, state_path)
     try:
-        page.goto(target_url, wait_until="domcontentloaded")
+        resilient_goto(page, target_url, runtime.timeout_ms)
         if not _has_logged_in_marker(page, logged_in_marker, timeout_ms=5000):
             return False
         if not _ready_surface_visible(page, ready_selector):
@@ -156,6 +186,8 @@ __all__ = [
     # Browser
     "open_auth_page",
     "open_order_page",
+    "resilient_goto",
+    "NAVIGATION_TIMEOUT_FLOOR_MS",
     "close_context",
     "close_browser",
     # Auth

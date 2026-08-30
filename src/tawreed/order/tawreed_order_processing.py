@@ -153,7 +153,8 @@ class OrderItemProcessor:
 
     def prepare_order_page(self, page: Page) -> None:
         """Open the site and navigate to the ordering surface for item processing."""
-        page.goto(self.bot._products_page_url(), wait_until="domcontentloaded")
+        from ..auth.tawreed_session import resilient_goto
+        resilient_goto(page, self.bot._products_page_url(), self.bot.config.runtime.timeout_ms)
         maybe_switch_pharmacy(page, self.bot.profile.pharmacy_switch or {})
         if self.order_surface_ready(page):
             return

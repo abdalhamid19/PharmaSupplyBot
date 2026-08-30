@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from src.core.artifact_run import current_artifact_run
 from src.core.manual_review.manual_review_candidate_store import append_review_candidates
 from src.core.manual_review.manual_review_candidates import review_candidate_options
@@ -11,6 +13,8 @@ from src.core.utils.excel import Item
 from src.core.matching.candidate_identity import candidate_store_product_id
 from ..artifacts.tawreed_artifacts import append_csv_artifact, append_text_artifact
 from ..matching.tawreed_match_logs import OrderResultSummary
+
+logger = logging.getLogger(__name__)
 
 
 def append_order_item_artifacts(
@@ -38,10 +42,10 @@ def _handle_manual_review_or_auto_save(
             profile_key, item, summary, decision, label_suffix, matching_config
         )
     elif matching_config and matching_config.enable_auto_save_verified_match:
-        _auto_save_verified_match(item, decision)
+        _auto_save_verified_match(item, decision, matching_config)
 
 
-def _auto_save_verified_match(item: Item, decision) -> None:
+def _auto_save_verified_match(item: Item, decision, matching_config=None) -> None:
     """Auto-save verified matches to manual review store."""
     if not decision or not decision.best_match:
         return
@@ -50,9 +54,22 @@ def _auto_save_verified_match(item: Item, decision) -> None:
     if match.score == 999.0 and "Approved by saved manual review" in (decision.final_reason or ""):
         return
 
-    # Safety check: skip saving matches that have validation issues
+    # Safety check: skip saving matches that have validation issues.
+    # The helper returns (should_skip, reason); unpack it — the previous
+    # bare `if <tuple>:` was always truthy and blocked every auto-save,
+    # so nothing was ever persisted as auto_matched.
     from src.core.manual_review.manual_review_runtime import should_skip_auto_save_verified_match
-    if should_skip_auto_save_verified_match(item, match.data, getattr(decision, 'rejection_reason', None)):
+    rejection_reason = _decision_rejection_reason(decision)
+    skip, skip_reason = should_skip_auto_save_verified_match(
+        item,
+        match.data,
+        rejection_reason,
+        enable_manufacturer_check=bool(
+            matching_config and matching_config.enable_manufacturer_check
+        ),
+    )
+    if skip:
+        _log_auto_save_skip(item, skip_reason)
         return
 
     store = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB)
@@ -60,6 +77,27 @@ def _auto_save_verified_match(item: Item, decision) -> None:
         return
 
     _create_and_save_decision(item, match, store)
+
+
+def _decision_rejection_reason(decision) -> str | None:
+    """Return the winning diagnostic's rejection reason, when it is negative.
+
+    MatchDecision has no rejection_reason field; the signal lives on the best
+    CandidateMatchDiagnostic. Only a genuine rejection reason is surfaced —
+    an accepted candidate's empty string must not block auto-save.
+    """
+    diagnostics = getattr(decision, "diagnostics", None) or []
+    best = max(diagnostics, key=lambda diagnostic: diagnostic.score, default=None)
+    reason = getattr(best, "rejection_reason", "") if best else ""
+    return reason or None
+
+
+def _log_auto_save_skip(item: Item, reason: str) -> None:
+    """Log why an auto-save was skipped so silent data loss stays visible."""
+    logger.info(
+        "auto-save skipped",
+        extra={"code": item.code, "item_name": item.name, "reason": reason},
+    )
 
 
 def _create_and_save_decision(item, match, store) -> None:
