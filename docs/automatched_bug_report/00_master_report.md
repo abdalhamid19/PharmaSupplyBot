@@ -102,11 +102,22 @@ _handle_manual_review_or_auto_save(...)               :35
 
 ## 5. الملفات المُعدَّلة
 
+### 5.1 إصلاح `auto_matched` (المشكلة الأصلية)
+
 | الملف | التغيير |
 |---|---|
 | `src/tawreed/order/tawreed_order_summary_build.py` | فك الـ tuple، استخراج `rejection_reason` من diagnostics، تمرير `matching_config`، إضافة logging للتخطي |
 | `src/core/manual_review/manual_review_helpers.py` | `should_skip_auto_save()` — فحص الشركة المصنّعة أصبح opt-in عبر `enable_manufacturer_check=False` |
 | `src/core/manual_review/manual_review_runtime.py` | الـ wrapper يمرر الفلاغ الجديد |
+
+### 5.2 إصلاح انهيار مهلة الملاحة (مُكتشَف أثناء التحقق الميداني)
+
+| الملف | التغيير |
+|---|---|
+| `src/tawreed/auth/tawreed_session.py` | `resilient_goto()` جديدة: حد أدنى 60s للملاحة + إعادة محاولة واحدة عند المهلة؛ استُخدمت في `open_auth_page` و `validate_saved_session` |
+| `src/tawreed/cart/tawreed_cart_flow.py` | استبدال `page.goto` بـ `resilient_goto` (صفحتا السلة والطلب) |
+| `src/tawreed/order/tawreed_order_processing.py` | استبدال `page.goto` بـ `resilient_goto` |
+| `state/config.yaml` + `config.example.yaml` | `timeout_ms: 15000` → `45000` (مطابقة لافتراضي الكود) |
 
 ## 6. ملفات الاختبار الجديدة
 
@@ -114,6 +125,7 @@ _handle_manual_review_or_auto_save(...)               :35
 |---|---|
 | `tests/reproduction/test_reproduction_auto_matched_never_saved.py` | إثبات المشكلة (يفشل قبل الإصلاح، ينجح بعده) |
 | `tests/reproduction/test_postfix_auto_matched_saving.py` | 7 سيناريوهات إصلاح شاملة |
+| `tests/reproduction/test_resilient_goto_navigation.py` | 5 اختبارات لمهلة الملاحة وإعادة المحاولة |
 | `tests/hypotheses/automatched/*.py` | 6 فرضيات مع scoring |
 | `tests/solutions/test_solution_comparison_automatched.py` | مقارنة 3 حلول بمعايير مرجّحة |
 
@@ -129,11 +141,12 @@ _handle_manual_review_or_auto_save(...)               :35
 | [04_fix_implementation.md](04_fix_implementation.md) | الكود قبل/بعد لكل ملف + شرح سطر بسطر |
 | [05_test_plan_and_results.md](05_test_plan_and_results.md) | خطة الاختبار الكاملة + النتائج قبل/بعد + baseline |
 | [06_regression_risk_analysis.md](06_regression_risk_analysis.md) | تحليل مخاطر الانحدار + التوصيات المستقبلية |
+| [07_navigation_timeout_fix.md](07_navigation_timeout_fix.md) | انهيار مهلة الملاحة المُكتشَف أثناء التحقق الميداني + قياسات الشبكة + الإصلاح |
 
 ## 8. كيفية التحقق من الإصلاح مستقبلاً
 
 ```powershell
-# 1. اختبار الإصلاح الأساسي
+# 1. اختبار الإصلاح الأساسي (auto_matched + مهلة الملاحة)
 .venv\Scripts\python.exe -m pytest tests/reproduction/ -v
 
 # 2. حرسات الانحدار للفرضيات
@@ -146,4 +159,4 @@ _handle_manual_review_or_auto_save(...)               :35
 .venv\Scripts\python.exe -m pytest tests/ -q
 ```
 
-**النتيجة المتوقعة:** `2 passed` للاختبارات 1+2... في الواقع: **49 passed** لملفات هذا التقرير، و**682 passed** للحزمة الكاملة (نفس baseline).
+**النتائج الفعلية:** **54 passed** لملفات هذا التحقيق (reproduction + solutions + hypotheses)، و**696 passed / 8 failed** للحزمة الكاملة — الإخفاقات الثمانية موروثة من الفرع قبل هذا العمل (أُثبت بـ `git stash`).

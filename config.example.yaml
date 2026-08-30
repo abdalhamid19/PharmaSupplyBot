@@ -99,7 +99,11 @@ matching:
 runtime:
   headless: true
   slow_mo_ms: 0
-  timeout_ms: 15000
+  # Default timeout for element waits (ms). Page navigations use their own
+  # higher floor (see NAVIGATION_TIMEOUT_FLOOR_MS in tawreed_session.py),
+  # because cold TCP/TLS handshakes to Tawreed can exceed 20 s.
+  # مهلة انتظار العناصر؛ تحميل الصفحات له حد أدنى أعلى لأن أول اتصال قد يتجاوز 20 ثانية
+  timeout_ms: 45000
   submit_order: false
   # Item-level parallel workers per profile. 1 = sequential (default).
   # Each extra worker spawns its own Chromium process (~150MB RAM each).

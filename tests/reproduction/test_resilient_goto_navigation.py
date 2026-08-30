@@ -30,20 +30,24 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError  # noqa: 
 
 
 class _FakePage:
-    """Records goto calls; optionally fails N times with TimeoutError."""
+    """Records goto calls; raises the configured error N times, then succeeds.
+
+    Default error is Playwright's TimeoutError (as raised by real navigations).
+    Pass ``error=`` to simulate other navigation failures (e.g. DNS errors).
+    """
 
     def __init__(self, failures: int = 0, error: Exception | None = None):
         self.calls: list[dict] = []
         self._failures = failures
-        self._error = error or PlaywrightTimeoutError(
-            "Page.goto: Timeout 15000ms exceeded."
-        )
+        self._error = error
 
     def goto(self, url, wait_until=None, timeout=None):
         self.calls.append({"url": url, "wait_until": wait_until, "timeout": timeout})
         if self._failures > 0:
             self._failures -= 1
-            raise self._error
+            if self._error is not None:
+                raise self._error
+            raise PlaywrightTimeoutError("Page.goto: Timeout 15000ms exceeded.")
 
 
 class ResilientGotoTests(unittest.TestCase):
@@ -68,7 +72,7 @@ class ResilientGotoTests(unittest.TestCase):
         self.assertEqual(len(page.calls), 2, "no infinite retry loop")
 
     def test_non_timeout_error_propagates_without_retry(self) -> None:
-        page = _FakePage(error=RuntimeError("net::ERR_NAME_NOT_RESOLVED"))
+        page = _FakePage(failures=1, error=RuntimeError("net::ERR_NAME_NOT_RESOLVED"))
         with self.assertRaises(RuntimeError):
             resilient_goto(page, "https://example.test/#/login", timeout_ms=15000)
         self.assertEqual(len(page.calls), 1, "only DNS-level errors are not retried")
