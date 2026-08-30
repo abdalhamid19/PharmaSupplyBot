@@ -48,6 +48,29 @@ _STATUS_ICONS = {
     False: "❌",
 }
 
+# ASCII fallbacks used when the terminal cannot encode the icons
+# (e.g. Windows console stuck on a legacy code page such as cp1252).
+_STATUS_ICONS_ASCII = {
+    True: "[OK]",
+    False: "[FAIL]",
+}
+
+
+def _print_line(line: str, stream: object) -> None:
+    """Print one line, downgrading to ASCII if the stream can't encode it.
+
+    The CLI must never crash *after* its work completes just because
+    the terminal uses a legacy code page (``UnicodeEncodeError`` from
+    ``cp1252`` etc.). First attempt a plain print; on encoding failure
+    retry with non-encodable characters replaced, and finally strip
+    the text down to pure ASCII.
+    """
+    try:
+        print(line, file=stream)  # type: ignore[arg-type]
+    except UnicodeEncodeError:
+        ascii_line = line.encode("ascii", errors="replace").decode("ascii")
+        print(ascii_line, file=stream)  # type: ignore[arg-type]
+
 
 def print_command_summary(
     command: str,
@@ -75,7 +98,15 @@ def print_command_summary(
     line = f"{icon} {command} {status_word}"
     stream = sys.stdout if success else sys.stderr
 
-    print(line, file=stream)
+    # Prefer the icon, but fall back to ASCII when the stream's
+    # encoding cannot represent it (Windows cp1252 consoles).
+    try:
+        line.encode(stream.encoding or "utf-8")  # type: ignore[union-attr]
+    except (UnicodeEncodeError, LookupError, AttributeError):
+        icon = _STATUS_ICONS_ASCII[success]
+        line = f"{icon} {command} {status_word}"
+
+    _print_line(line, stream)
     if not fields:
         return
     # Compute a fixed column width so the values line up under the
@@ -87,7 +118,7 @@ def print_command_summary(
         # giant lists dumped to terminal). For Path objects we use
         # ``str`` so it shows as a clean POSIX path.
         rendered = _render_field(value)
-        print(f"   - {label:<12} {rendered}", file=stream)
+        _print_line(f"   - {label:<12} {rendered}", stream)
 
 
 def _render_field(value: object) -> str:

@@ -47,7 +47,6 @@ def main() -> int:
     """Run the CLI command requested by the user (Typer entry point)."""
     load_dotenv()
     _force_utf8_stdio()
-    load_dotenv()
     try:
         # Typer's ``app()`` raises ``SystemExit`` on completion; we
         # normalise the exit code so ``raise SystemExit(main())`` in
