@@ -190,6 +190,18 @@
   },
   "active": "94197ea5af438342",
   "lastOpenFiles": [
+    "automatched_bug_report/07_navigation_timeout_fix.md",
+    "automatched_bug_report/06_regression_risk_analysis.md",
+    "architecture_review/C8_run_artifact_store.md",
+    "architecture_review/C7_one_config_surface.md",
+    "architecture_review/C6_collapse_manual_review_wrappers.md",
+    "architecture_review/C5_runspec_runmonitor.md",
+    "architecture_review/C4_typed_decision_source.md",
+    "architecture_review/C3_unify_match_loop.md",
+    "architecture_review/C2_delete_duplicate_api_match_flow.md",
+    "architecture_review/C1_tawreed_bot_god_object.md",
+    "architecture_review/README.md",
+    "architecture_review",
     "order_runs_sqlite/07_risks_and_decisions.md",
     "order_runs_sqlite/06_implementation_plan.md",
     "order_runs_sqlite/05_queries_and_use_cases.md",
@@ -207,12 +219,6 @@
     "automatched_bug_report",
     "order_runs_sqlite",
     "product_matching_mode.md",
-    "matching_model_ranking.md",
-    "ai_how_it_works.md",
-    "reports/ai_model_tiers.md",
-    "reports/ai_models_live_check.md",
-    "reports",
-    "swallow_audit_stage1_guide.md",
-    "DEVELOPMENT_HISTORY.md"
+    "reports"
   ]
 }

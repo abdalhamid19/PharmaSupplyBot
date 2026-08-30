@@ -110,6 +110,18 @@
   Runtime learning uses `src/core/manual_review_store.py` with a local SQLite
   file ignored by git, and `src/core/manual_review_runtime.py` applies saved
   queries or approved `storeProductId` choices before normal matching.
+- Order-run analytics persistence lives in `src/core/database/order_runs_*.py`
+  against a **separate** SQLite file `state/order_runs.db` (override via
+  `ORDER_RUNS_DB_PATH`). Schema DDL is split across `order_runs_tables.py`
+  (dimensions), `order_runs_facts.py` (`run_items`, `run_item_stores`,
+  `run_candidates`, indexes), and `order_runs_views.py`; `order_runs_schema.py`
+  owns `SCHEMA_VERSION` and bootstrap order, `order_runs_store.py` is the
+  facade. Design documents live in `docs/order_runs_sqlite/`.
+- Store-level identity for persistence stays in
+  `src/core/ordering/store_identity.py`. It deliberately excludes
+  `storeProductId` (a product-in-store id) so the `stores` dimension is not
+  forked once per product; `tawreed_store_selection._store_identity` keeps
+  using `storeProductId` for its own de-duplication purpose.
 - Manual-review corrected-item search is implemented in
   `src/core/manual_review_corrections.py`, CLI wiring in
   `src/cli/cli_parser_manual_review_search.py`, and Streamlit launch helpers in
