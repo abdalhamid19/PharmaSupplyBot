@@ -37,7 +37,8 @@ CREATE_V_RUN_SUMMARY = """
 create view if not exists v_run_summary as
 select r.run_key, r.run_id, r.profile_key, r.started_at, r.finished_at, r.mode,
        count(*)                                                     as items,
-       sum(ri.matched)                                              as matched,
+       sum(case when ri.status != 'not-orderable'
+                then ri.matched else 0 end)                         as matched,
        sum(ri.manual_review_required)                               as flagged,
        sum(case when ri.status = 'no-results'   then 1 else 0 end)   as no_results,
        sum(case when ri.status = 'added-to-cart' then 1 else 0 end)  as added_to_cart,

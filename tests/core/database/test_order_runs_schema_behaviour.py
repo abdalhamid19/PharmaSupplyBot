@@ -119,6 +119,57 @@ class OrderRunsSchemaBehaviourTests(unittest.TestCase):
             )
         self.assertEqual(tuple(int(value) for value in rows[0]), (1, 1, 1, 10))
 
+    def test_run_summary_view_excludes_not_orderable_from_matched(self) -> None:
+        """Catalog matches that cannot be ordered are not 'matched' outcomes."""
+        with TemporaryDirectory() as temp:
+            store = OrderRunsStore(Path(temp) / "order_runs.db")
+            _seed(store)
+            with store.db.get_connection() as conn:
+                conn.execute(
+                    "insert into items (item_key, item_code, item_name,"
+                    " first_seen_at, last_seen_at) values ('6789::HAEMOJET',"
+                    " '6789', 'HAEMOJET AMP', ?, ?)",
+                    (_NOW, _NOW),
+                )
+                conn.execute(
+                    "insert into run_items (run_key, item_key, requested_qty,"
+                    " ordered_qty, status, matched)"
+                    " values ('wardany/20260830_1809', '6789::HAEMOJET', 1, 0,"
+                    " 'not-orderable', 1)"
+                )
+                conn.commit()
+            rows = store.db.execute_query(
+                "select items, matched from v_run_summary"
+            )
+        self.assertEqual(tuple(int(value) for value in rows[0]), (2, 1))
+
+    def test_bootstrap_recreates_stale_views_from_older_schema(self) -> None:
+        """A v1 database must get the v2 view definition on first open."""
+        with TemporaryDirectory() as temp:
+            path = Path(temp) / "order_runs.db"
+            store = OrderRunsStore(path)
+            _seed(store)
+            with store.db.get_connection() as conn:
+                conn.execute("drop view v_run_summary")
+                conn.execute(
+                    "create view v_run_summary as"
+                    " select run_key, sum(ri.matched) as matched"
+                    " from run_items ri group by run_key"
+                )
+                conn.execute(
+                    "update schema_meta set value = '1'"
+                    " where key = 'schema_version'"
+                )
+                conn.commit()
+            store.db.close()
+            OrderRunsStore._bootstrapped_paths.clear()
+            reopened = OrderRunsStore(path)
+            columns = reopened.column_names("v_run_summary")
+            version = reopened.schema_version()
+            reopened.db.close()
+        self.assertIn("added_to_cart", columns)
+        self.assertEqual(version, 2)
+
     def test_best_discount_view_uses_precomputed_rank(self) -> None:
         """rank_by_discount avoids a window function in every query."""
         with TemporaryDirectory() as temp:

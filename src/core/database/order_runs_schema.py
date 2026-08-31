@@ -22,8 +22,16 @@ from .order_runs_tables import (
 )
 from .order_runs_views import ALL_VIEWS
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA_VERSION_KEY = "schema_version"
+
+# Views referenced by name in ALL_DDL use ``if not exists`` so concurrent
+# workers stay safe, but a stored view keeps its original definition forever.
+# When a view definition changes between schema versions the migration below
+# drops the stale object so bootstrap recreates it with the current SQL.
+STALE_VIEWS_BY_VERSION = {
+    1: ("v_run_summary",),
+}
 
 # Order matters: dimensions before facts so foreign keys resolve, indexes and
 # views last so they can reference every table.
@@ -50,6 +58,7 @@ SELECT_SCHEMA_VERSION = "select value from schema_meta where key = ?"
 __all__ = [
     "SCHEMA_VERSION",
     "SCHEMA_VERSION_KEY",
+    "STALE_VIEWS_BY_VERSION",
     "CREATE_TABLES",
     "ALL_DDL",
     "UPSERT_SCHEMA_VERSION",

@@ -17,6 +17,7 @@ from .order_runs_schema import (
     SCHEMA_VERSION,
     SCHEMA_VERSION_KEY,
     SELECT_SCHEMA_VERSION,
+    STALE_VIEWS_BY_VERSION,
     UPSERT_SCHEMA_VERSION,
 )
 from .order_runs_snapshot_writer import OrderRunsSnapshotMixin
@@ -61,12 +62,29 @@ class OrderRunsStore(
     def _create_schema(self) -> None:
         """Execute the full DDL and record the schema version atomically."""
         with self.db.get_connection() as conn:
+            self._drop_stale_views(conn)
             for statement in ALL_DDL:
                 conn.execute(statement)
             conn.execute(
                 UPSERT_SCHEMA_VERSION, (SCHEMA_VERSION_KEY, str(SCHEMA_VERSION))
             )
             conn.commit()
+
+    def _drop_stale_views(self, conn) -> None:
+        """Drop views whose definitions changed since the stored schema version."""
+        meta = conn.execute(
+            "select 1 from sqlite_master where name = 'schema_meta'"
+        ).fetchall()
+        if not meta:
+            return
+        rows = conn.execute(SELECT_SCHEMA_VERSION, (SCHEMA_VERSION_KEY,)).fetchall()
+        try:
+            stored = int(rows[0][0]) if rows else 0
+        except (TypeError, ValueError):
+            return
+        for version in range(stored, SCHEMA_VERSION):
+            for view in STALE_VIEWS_BY_VERSION.get(version, ()):
+                conn.execute(f"drop view if exists {view}")
 
 
 def order_runs_store(path: str | Path | None = None) -> OrderRunsStore:
