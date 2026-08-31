@@ -1,6 +1,9 @@
 """Browser match-only store metadata helpers."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 from src.core.matching_types import SearchMatch
 
@@ -10,16 +13,31 @@ def record_match_only_store_metadata(
 ) -> None:
     """Record the store that match-only would choose without touching the cart."""
     from ..store.tawreed_store_summary import record_single_store
+    from ..store.tawreed_store_match_only import (
+        record_match_only_choice,
+        record_single_store_match_only_choice,
+    )
 
     record_single_store(bot, match.data)
     if int(match.data.get("productsCount") or 0) <= 0:
+        record_single_store_match_only_choice(bot, match.data)
         return
+    _record_multi_store_metadata(bot, page, match, active_query)
+
+
+def _record_multi_store_metadata(bot, page, match, active_query) -> None:
+    """Record the browser strategy choice for a multi-store product."""
+    from ..store.tawreed_store_summary import record_single_store
+    from ..store.tawreed_store_match_only import record_match_only_choice
+
     try:
         choice = match_only_store_choice(bot, page, match, active_query)
     except Exception:
+        logger.debug("products.match_only_metadata: write failed (non-fatal)")
         return
     if choice:
         record_single_store(bot, choice.store)
+    record_match_only_choice(bot, choice)
 
 
 def match_only_store_choice(bot, page, match: SearchMatch, active_query: str | None):

@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .config_models import ExcelConfig, MatchingConfig, ProfileConfig, RuntimeConfig
+from .config_models import (
+    DatabaseConfig,
+    ExcelConfig,
+    MatchingConfig,
+    ProfileConfig,
+    RuntimeConfig,
+)
 
 DEFAULT_BASE_URL = "https://seller.tawreed.io/#/login"
 DEFAULT_CODE_COLUMN = "كود"
@@ -60,6 +66,30 @@ def build_runtime_config(raw_values: dict[str, Any]) -> RuntimeConfig:
         max_workers=int(runtime_values.get("max_workers", 1)),
         item_workers=int(runtime_values.get("item_workers", 1)),
     )
+
+
+def build_database_config(raw_values: dict[str, Any]) -> DatabaseConfig:
+    """Build local SQLite settings from the optional YAML section."""
+    values = dict(raw_values.get("database", {}))
+    defaults = DatabaseConfig()
+    return DatabaseConfig(
+        order_runs_enabled=_as_bool(
+            values.get("order_runs_enabled"), defaults.order_runs_enabled
+        ),
+        order_runs_path=str(values.get("order_runs_path", defaults.order_runs_path)),
+        store_candidates=_as_bool(
+            values.get("store_candidates"), defaults.store_candidates
+        ),
+    )
+
+
+def _as_bool(value: Any, default: bool) -> bool:
+    """Coerce YAML values to bool, treating quoted 'false' as false."""
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes", "y", "on"}
+    return bool(value)
 
 
 def build_matching_config(raw_values: dict[str, Any]) -> MatchingConfig:

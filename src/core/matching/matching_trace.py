@@ -1,11 +1,9 @@
-"""Shared structured tracing helpers for matching and AI decisions."""
+"""Shared structured tracing helpers for local matching decisions."""
 
 from __future__ import annotations
 
 import logging
-import queue
 from contextlib import contextmanager
-from logging.handlers import QueueHandler, QueueListener
 from typing import Any
 
 from .candidate_identity import candidate_store_product_id
@@ -15,28 +13,39 @@ from ..utils.excel import Item
 MAX_TRACE_CANDIDATE_ROWS = 25
 
 
-def configure_async_logging(level: str = "INFO") -> tuple[logging.Logger, QueueListener]:
-    """Configure a simple queue-backed logger for matching workflows."""
-    log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
-    listener = QueueListener(log_queue, handler)
-    listener.start()
-    logger = logging.getLogger("pharmasupplybot.matching")
-    logger.handlers = [QueueHandler(log_queue)]
+def configure_async_logging(level: str = "INFO") -> tuple[logging.Logger, "QueueListener | None"]:
+    """Return the matching logger; QueueListener kept for back-compat only.
+
+    .. deprecated::
+        The matching workflow now flows through the unified logging
+        configured by :func:`src.cli.logging_setup.configure_logging`.
+        This function is preserved so existing callers do not break,
+        but it no longer installs its own ``QueueHandler`` chain.
+
+    The returned ``listener`` is always ``None`` — there is nothing to
+    stop. Callers that did ``listener.stop()`` in a ``finally`` block
+    will harmlessly call ``None.stop()`` (which would AttributeError);
+    the recommended replacement is to drop the try/finally entirely.
+    """
+    logger = logging.getLogger(__name__)
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    logger.propagate = False
-    return logger, listener
+    # The unified logging_setup in run.main() has already attached the
+    # right handlers to the root logger, so this child logger inherits
+    # them automatically via propagate=True (the default).
+    return logger, None
 
 
 @contextmanager
 def async_matching_logging(level: str = "INFO"):
-    """Run matching logging with a queue listener that is always stopped."""
-    logger, listener = configure_async_logging(level)
-    try:
-        yield logger
-    finally:
-        listener.stop()
+    """Yield the matching logger; no queue listener is started.
+
+    .. deprecated::
+        No-op context manager kept for back-compat. The unified logger
+        configured in :func:`src.cli.logging_setup.configure_logging`
+        already covers matching output.
+    """
+    logger, _ = configure_async_logging(level)
+    yield logger
 
 def decision_trace_rows(
     item: Item,

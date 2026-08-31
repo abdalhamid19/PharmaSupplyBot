@@ -1,6 +1,9 @@
 """Pricing and discount parsing logic for Tawreed API payloads."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 import re
 from typing import Any
 from ..tawreed_constants import DISCOUNT_KEYS, NESTED_STORE_KEYS
@@ -35,6 +38,7 @@ def _calculate_discount_from_prices(source):
         if pub_price > 0 and sale_price > 0 and sale_price < pub_price:
             return round(((pub_price - sale_price) / pub_price) * 100, 2)
     except Exception:
+        logger.debug("pricing._calculate_discount_from_prices: parse failed (non-fatal)")
         pass
     return ""
 
@@ -53,6 +57,7 @@ def format_discount_percent(value: Any) -> str:
     try:
         return _format_discount_number(float(value))
     except Exception:
+        logger.debug("pricing.format_discount_percent: format failed (non-fatal)")
         return str(value).strip()
 
 def discount_value_as_percent(value: Any) -> float:
@@ -64,7 +69,9 @@ def discount_value_as_percent(value: Any) -> float:
         value = float(match.group(0).replace(",", "."))
     try:
         num = float(value)
-    except Exception: return -1.0
+    except Exception:
+        logger.debug("pricing.discount_value_as_percent: parse failed (non-fatal)")
+        return -1.0
     return num * 100 if 0 < num < 1 else num
 
 def _format_discount_number(value: float) -> str:

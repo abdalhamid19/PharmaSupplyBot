@@ -23,7 +23,7 @@ from ..streamlit_shared import ARTIFACTS_DIR, load_csv_rows
 def render_manual_review_tab(app_config=None) -> None:
     """Render the full manual review workflow with candidate options."""
     st.title("Manual Review")
-    st.markdown("Select an artifact run to evaluate AI matches and correct them.")
+    st.markdown("Select an artifact run to evaluate matches and correct them.")
     if render_running_remove_cart_controls("manual_review") or render_running_search_controls():
         return
     runs = _available_runs_with_candidates()

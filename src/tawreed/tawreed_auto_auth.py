@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from .auth.tawreed_auth import is_token_expired
 from .auth.tawreed_headless_auth_refresh import run_headless_auth_refresh
+
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_AUTO_AUTH_WAIT_SECONDS = 120
@@ -44,13 +48,19 @@ def _refresh_single_worker(base_url, state_path, runtime_config, selectors, prof
 def _refresh_multi_worker(base_url, state_path, runtime_config, selectors, profile_key, auth_lock, worker_id):
     """Refresh auth in multi-worker mode with lock coordination."""
     worker_label = f"Worker {worker_id}" if worker_id is not None else "Worker"
-    
+
     with auth_lock:
         if not is_token_expired(state_path):
-            print(f"[{profile_key}] {worker_label} using refreshed session from another worker")
+            logger.info(
+                "using refreshed session from another worker",
+                extra={"profile": profile_key, "worker": worker_label},
+            )
             return
-        
-        print(f"[{profile_key}] {worker_label} refreshing session...")
+
+        logger.info(
+            "refreshing session (multi-worker lock acquired)",
+            extra={"profile": profile_key, "worker": worker_label},
+        )
         run_headless_auth_refresh(
             base_url, state_path, runtime_config, selectors, profile_key,
             wait_seconds=DEFAULT_AUTO_AUTH_WAIT_SECONDS

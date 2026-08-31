@@ -6,11 +6,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from .trace_log_output_writers import (
-    StepWriters,
-    TraceCSVWriter,
-    TraceTXTWriter,
-)
+from .trace_log_output_writers import TraceCSVWriter, TraceTXTWriter
 from .trace_log_summary import SummaryWriter
 
 
@@ -35,7 +31,7 @@ class TraceOutputWriter:
         self._txt_writer.save_txt(txt_path)
         summary_writer = SummaryWriter(self._parent)
         summary_writer.save_summary(summary_path)
-        logger = logging.getLogger("pharmasupplybot.matching")
+        logger = logging.getLogger(__name__)
         logger.info(
             f"Trace saved: {csv_path} + {txt_path} + {summary_path}",
         )
@@ -43,7 +39,6 @@ class TraceOutputWriter:
 
 
 __all__ = [
-    "StepWriters",
     "TraceCSVWriter",
     "TraceTXTWriter",
     "TraceOutputWriter",

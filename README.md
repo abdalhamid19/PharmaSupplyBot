@@ -1,293 +1,104 @@
 # PharmaSupplyBot
 
-بوت لأتمتة إدخال أصناف من ملف Excel على `seller.tawreed.io` وإنشاء الطلبيات لكل صيدلية بعد حفظ جلسة تسجيل الدخول مرة واحدة.
+أداة محلية لإدارة مطابقة أصناف المخزون مع منتجات Tawreed، وتجهيز الطلبات،
+ومراجعة الحالات التي تحتاج قرارًا بشريًا.
 
 ## المتطلبات
 
-- Python 3.10 أو أحدث
-- Bash (Linux/macOS) أو Windows PowerShell
+- Python 3.11 أو أحدث
+- متصفح Chromium عند تشغيل تدفقات المتصفح
+- بيانات الدخول وإعدادات Tawreed في ملف البيئة المحلي
 
 ## التثبيت
 
 ### Windows PowerShell
+
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 py -m pip install -r requirements.txt
-py -m playwright install
+Copy-Item .env.example .env
+Copy-Item config.example.yaml state/config.yaml
 ```
 
-### Linux / macOS (bash)
+### Linux / macOS
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python3 -m pip install -r requirements.txt
-python3 -m playwright install
+python -m pip install -r requirements.txt
+cp .env.example .env
+cp config.example.yaml state/config.yaml
 ```
 
 ## الإعداد
 
-انسخ ملف الإعدادات:
+راجع `state/config.yaml` واضبط:
 
-### Windows PowerShell
-```powershell
-Copy-Item config.example.yaml config.yaml
-```
+- أعمدة ملف Excel تحت `excel`.
+- الصيدليات تحت `profiles`.
+- محددات الواجهة تحت `selectors` عند تغير موقع Tawreed.
+- سياسة اختيار المخازن تحت `warehouse_strategy`.
+- حدود المطابقة المحلية وخيارات حفظ المراجعة اليدوية تحت `matching`.
 
-### Linux / macOS (bash)
-```bash
-cp config.example.yaml config.yaml
-```
-
-إذا أردت استخدام البريد وكلمة المرور من البيئة:
-
-### Windows PowerShell
-```powershell
-Copy-Item .env.example .env
-```
-
-### Linux / macOS (bash)
-```bash
-cp .env.example .env
-```
+ضع بيانات الاتصال المحلية المطلوبة في `.env`. لا تضع أسرارًا في ملفات YAML أو في المستودع.
 
 ## أوامر الطرفية
 
-### 1. تسجيل الدخول وحفظ الجلسة
-يفتح المتصفح بشكل مرئي، وبعد تسجيل الدخول تُحفظ الجلسة في `state/<profile>.json`.
-
-Windows PowerShell:
-```powershell
+```bash
+# تسجيل الدخول وحفظ الجلسة
 py run.py auth --profile wardany
+
+# تصدير كتالوج المنتجات
+py run.py export-products --profile wardany
+
+# مطابقة ملف مخزون محليًا
+py run.py match-products --profile wardany --excel data/input/inventory.xlsx \
+  --tawreed-csv artifacts/wardany/tawreed_products.csv --trace
+
+# تنفيذ المطابقة فقط، من دون إضافة أصناف إلى السلة
+py run.py order --profile wardany --excel data/input/order.xlsx --match-only
+
+# إنشاء طلب
+py run.py order --profile wardany --excel data/input/order.xlsx
+
+# حذف أصناف محددة من السلة
+py run.py remove-cart --profile wardany --excel data/input/items.xlsx
 ```
 
-Linux / macOS (bash):
-```bash
-python3 run.py auth --profile wardany
-```
-
-### 2. تشغيل الطلب من ملف Excel
-
-Windows PowerShell:
-```powershell
-py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
-```
-
-Linux / macOS (bash):
-```bash
-python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany
-```
-
-### 3. تشغيل عدد محدود من الأصناف
-
-Windows PowerShell:
-```powershell
-py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
-```
-
-Linux / macOS (bash):
-```bash
-python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --limit 5
-```
-
-### 4. تشغيل البحث السريع
-
-يستخدم `--fast-search` أول مطابقة مقبولة بدل تجربة صيغ بحث إضافية، وهذا يقلل زمن إضافة الصنف عندما تكون نتائج Tawreed واضحة.
-
-Windows PowerShell:
-```powershell
-py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --fast-search
-```
-
-Linux / macOS (bash):
-```bash
-python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --fast-search
-```
-
-### 5. تشغيل كل الصيدليات المعرفة في `config.yaml`
-
-Windows PowerShell:
-```powershell
-py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
-```
-
-Linux / macOS (bash):
-```bash
-python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --all-profiles
-```
-
-### 6. فتح المتصفح أثناء التشغيل للتشخيص
-
-Windows PowerShell:
-```powershell
-py run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
-```
-
-Linux / macOS (bash):
-```bash
-python3 run.py order --excel "data/input/order_items/shortage_report_total_20260422.xlsx" --profile wardany --debug-browser
-```
-
-### 7. تشغيل أكثر من worker للأصناف داخل نفس الصيدلية
-
-استخدم `--item-workers N` لتقسيم ملف Excel الواحد على أكثر من عملية Chromium معزولة لنفس الـ profile. القيمة الافتراضية `1`، ويمكن ضبطها أيضًا من `runtime.item_workers` داخل `config.yaml`. ابدأ بقيمة صغيرة مثل `2`، ولا ترفعها كثيرًا لأن كل worker يفتح Chromium مستقل ويستخدم نفس جلسة `state/<profile>.json` للقراءة فقط.
-
-Windows PowerShell:
-```powershell
-py run.py order --excel "data/input/order_items/shortage_report_total_20260502.xlsx" --profile wardany --limit 10 --item-workers 2 --debug-browser
-```
-
-Linux / macOS (bash):
-```bash
-python3 run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany --item-workers 2
-```
-
-### 8. حذف أصناف من سلة المشتريات
-
-ضع ملف الحذف داخل `data/input/remove_items/` ويجب أن يحتوي على الأعمدة:
-`كود` و`إسم الصنف`.
-
-Linux / macOS (bash):
-```bash
-python3 run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
-```
-
-Windows PowerShell:
-```powershell
-py run.py remove-cart --excel "data/input/remove_items/remove.xlsx" --profile wardany
-```
-
-### 9. تشغيل واجهة Streamlit
-
-الرابط الأونلاين:
-```text
-https://mahrouspharmacies-pharmasupplybot.streamlit.app/
-```
-
-لتشغيلها محليًا:
-
-Windows PowerShell:
-```powershell
-.\.venv\Scripts\Activate.ps1
-.\.venv\Scripts\python -m streamlit run streamlit_app.py
-```
-
-Linux / macOS (bash):
-```bash
-source .venv/bin/activate
-python3 -m streamlit run streamlit_app.py
-```
-
-## فحص الكود محليًا
-
-تشغيل فحص القواعد المحلي:
-
-Windows PowerShell:
-```powershell
-.\.venv\Scripts\python tools\rule_audit.py
-```
-
-Linux / macOS (bash):
-```bash
-python3 tools/rule_audit.py
-```
-
-إذا كان كل شيء سليمًا فسيظهر:
-
-```text
-rule_audit_ok
-```
-
-قبل كل `push` نفّذ:
+استخدم `--help` مع أي أمر لعرض خياراته. مثال:
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -q
-.venv/bin/python tools/rule_audit.py
+py run.py order --help
 ```
 
-ملاحظة:
-- `rule_audit.py` يمنع المخالفات الجديدة، ويسمح بخفض المخالفات القديمة تدريجيًا أثناء refactor.
-- GitHub Actions يشغل نفس الفحوصات تلقائيًا بعد كل `push` و`pull request`.
+## المراجعة اليدوية والمخرجات
 
-## سلوك التنفيذ الحالي
+الحالات غير المحسومة أو منخفضة النتيجة تبقى للمراجعة اليدوية؛ لا تُضاف تلقائيًا إلى السلة ضمن السياسة الآمنة. ينشئ كل تشغيل ملفات مخرجات تشمل عادةً:
 
-- افتراضيًا البوت يضيف الأصناف إلى السلة فقط.
-- استخدم `--fast-search` لتقليل زمن البحث عن الصنف؛ يتوقف عند أول نتيجة مطابقة مقبولة بدل تجربة صيغ إضافية.
-- استخدم `--item-workers N` لتشغيل order/remove-cart بالتوازي داخل profile واحد. عند التوازي تُكتب ملخصات مؤقتة بصيغة `*.worker_<id>.*` ثم تُدمج في الملخص الأساسي بعد انتهاء workers.
-- اعتماد الطلبية النهائي لا يتم تلقائيًا إلا إذا كان:
-  - `runtime.submit_order: true` داخل `config.yaml`
-- إذا كانت الجلسة منتهية أو غير صالحة، سيطلب منك البرنامج إعادة تنفيذ:
+- `order_item_summary_*.csv`: نتيجة كل صنف.
+- `manual_review_*.csv` و`manual_review_candidates_*.jsonl`: الحالات والبدائل المقترحة محليًا.
+- `order_matching_trace_*.csv`: أثر قرار المطابقة المحلي.
 
-```powershell
-py run.py auth --profile wardany
+يمكن تشغيل الواجهة الرسومية لمراجعة هذه النتائج:
+
+```bash
+py -m streamlit run streamlit_app.py
 ```
 
-## ملفات مهمة
+## التحقق محليًا
 
-- `config.yaml`
-  إعدادات التشغيل الفعلية
-- `config.example.yaml`
-  مثال جاهز لهيكل الإعدادات
-- `state/<profile>.json`
-  جلسة Playwright المحفوظة لكل صيدلية
-- `data/input/order_items/`
-  ملفات Excel التي تحتوي الأصناف المطلوب رفعها/طلبها على موقع توريد
-- `data/input/prevented_items/`
-  ملفات Excel الخاصة بالأصناف الممنوعة من الطلب، والافتراضي `drugprevented.xlsx`
-- `data/input/remove_items/`
-  ملفات Excel التي تحتوي الأصناف المطلوب حذفها من سلة مشتريات توريد
-- `artifacts/<profile>/`
-  صور وHTML وlogs تشخيصية عند الفشل
-- `artifacts/<profile>/match_log_all.txt`
-  سجل نصي لكل مرشحي المطابقة
-- `artifacts/<profile>/match_log_all.csv`
-  سجل CSV لكل مرشحي المطابقة
-- `artifacts/<profile>/order_result_summary.csv`
-  الملخص الأساسي لنتائج التشغيل، وهو المصدر الأحدث المعتمد للتحليل
-- `artifacts/<profile>/order_result_summary.xlsx`
-  نسخة Excel من ملخص النتائج إذا كانت موجودة
-- `streamlit_app.py`
-  واجهة Streamlit لتشغيل `auth` و`order` ومراجعة النتائج
+```bash
+.\.venv\Scripts\python.exe -m unittest discover -s tests -q
+.\.venv\Scripts\python.exe -m compileall -q src tests run.py streamlit_app.py
+```
 
-## ملاحظات
+على Linux/macOS استبدل مسار مفسر Windows بـ `.venv/bin/python`.
 
-- محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
-- المطابقة بين اسم Excel ونتائج Tawreed تعتمد على الاسم فقط، وليس على كود الصنف الداخلي للصيدلية.
-- عند فشل صنف تقنيًا، تُحفظ artifacts داخل `artifacts/<profile>/`.
+## هيكل مختصر
 
-
-في تبويب `Results`:
-- يتم عرض `CSV` و`XLSX` في تبويبين منفصلين
-- إذا كان `order_result_summary.xlsx` أقدم من `order_result_summary.csv` ستظهر ملاحظة بذلك داخل الواجهة
-
-عند استخدام النسخة الأونلاين:
-- شغّل `py run.py auth --profile <profile>` محليًا مرة واحدة
-- ثم ارفع ملف `state/<profile>.json` داخل تبويب `Order`
-- إذا لم ترفع الملف، فستستخدم الواجهة أي default state مهيأ على الخادم لنفس الـ profile إذا كان موجودًا
-
-## هيكل المشروع (للتحسين والصيانة)
-
-تم تنظيم الكود البرمجي في حزم منفصلة لزيادة الوضوح:
-- `src/tawreed/`: منطق العمل الخاص بموقع توريد (تسجيل الدخول، الطلب، الحذف).
-- `src/ui/`: منطق واجهة Streamlit.
-- `src/cli/`: منطق أوامر الطرفية (CLI).
-- `src/core/`: النماذج (Models) والأدوات الأساسية المشتركة.
-  - `src/core/config/`: معالجة ملفات الإعدادات.
-  - `src/core/utils/`: أدوات معالجة Excel والمتصفح.
-
-## ملفات مهمة
-
-- `config.yaml`: إعدادات التشغيل الفعلية (معدلات المطابقة، الروابط، الحسابات).
-- `config.example.yaml`: مثال مرجعي للإعدادات.
-- `streamlit_app.py`: نقطة انطلاق واجهة الويب.
-- `run.py`: نقطة انطلاق أوامر الطرفية.
-- `data/input/`: المجلد الرئيسي لملفات Excel المدخلة.
-- `state/<profile>.json`: ملفات حفظ الجلسة.
-- `artifacts/<profile>/`: نتائج التشغيل (Summaries, Screenshots, Logs).
-
-## ملاحظات إضافية
-
-- محددات العناصر `selectors` قابلة للتعديل من `config.yaml` إذا تغيّرت واجهة Tawreed.
-- المطابقة تعتمد على خوارزميات نصية مرنة (Fuzzy matching) يمكن ضبط معاملاتها من الإعدادات.
-- البرنامج يدعم الاستكمال (Resume) حيث يتخطى الأصناف التي تم طلبها بنجاح في نفس اليوم.
-
+- `src/core/drug_matching/`: الفهرسة، التطبيع، والتسجيل المحلي للمطابقة.
+- `src/tawreed/`: التكامل مع Tawreed وتدفق الطلبات.
+- `src/core/manual_review/`: قواعد وملفات المراجعة اليدوية.
+- `src/ui/`: واجهة Streamlit.
+- `tests/`: اختبارات الوحدة والتكامل المحلي.

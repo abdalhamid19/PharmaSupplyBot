@@ -1,6 +1,7 @@
 """Small helpers for per-item Tawreed runtime timings and UI waits."""
 
 from __future__ import annotations
+import logging
 
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,9 @@ if TYPE_CHECKING:
 
 from ..tawreed_constants import DIALOG_MASK_SELECTOR
 from ..tawreed_ui import cart_button
+
+logger = logging.getLogger(__name__)
+
 
 
 TIMING_KEYS = (
@@ -53,6 +57,7 @@ def wait_for_table_overlay_to_clear(page: Page) -> None:
     try:
         page.locator(".p-datatable-loading-overlay").first.wait_for(state="hidden", timeout=2000)
     except Exception:
+        logger.debug("tawreed_timing.wait_for_table_overlay_to_clear: table overlay wait failed (non-fatal)")
         pass
 
 
@@ -61,6 +66,7 @@ def wait_for_dialog_to_clear(page: Page) -> None:
     try:
         page.locator(DIALOG_MASK_SELECTOR).first.wait_for(state="hidden", timeout=1500)
     except Exception:
+        logger.debug("tawreed_timing.wait_for_dialog_to_clear: dialog wait failed (non-fatal)")
         pass
 
 
@@ -69,6 +75,7 @@ def wait_for_row_to_settle(row) -> None:
     try:
         cart_button(row).wait_for(timeout=1500)
     except Exception:
+        logger.debug("tawreed_timing.wait_for_row_to_settle: row settle wait failed (non-fatal)")
         pass
 
 

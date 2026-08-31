@@ -110,6 +110,34 @@
   Runtime learning uses `src/core/manual_review_store.py` with a local SQLite
   file ignored by git, and `src/core/manual_review_runtime.py` applies saved
   queries or approved `storeProductId` choices before normal matching.
+- Order-run analytics persistence lives in `src/core/database/order_runs_*.py`
+  against a **separate** SQLite file `state/order_runs.db` (override via
+  `ORDER_RUNS_DB_PATH` or `database.order_runs_path` in config). Schema DDL is
+  split across `order_runs_tables.py` (dimensions), `order_runs_facts.py`
+  (`run_items`, `run_item_stores`, `run_candidates`, indexes), and
+  `order_runs_views.py`; `order_runs_schema.py` owns `SCHEMA_VERSION` and
+  bootstrap order, `order_runs_store.py` is the facade,
+  `order_runs_writer.py` owns transactions, and `order_runs_keys.py` /
+  `order_runs_rows.py` / `order_runs_meta.py` / `order_runs_values.py` own the
+  object-to-row mapping. Design documents live in `docs/order_runs_sqlite/`.
+- The failure boundary is `src/core/ordering/order_run_persistence.py`: every
+  database call is wrapped so a SQLite error is logged at WARNING and the order
+  run continues. CSV artifacts under `artifacts/` remain the complete source of
+  record, so a lost row is recoverable.
+- Run lifecycle wiring stays in `src/cli/commands/cli_order_run_record.py`, and
+  `run_single_profile` closes the run in a `finally` block so a crashed run is
+  still recorded as finished. Per-item facts are written from
+  `tawreed_order_summary_build.append_order_item_artifacts`, the single point
+  every order mode (order/match-only, api/browser, serial/parallel) passes
+  through.
+- `database:` in `config.yaml` controls persistence (`order_runs_enabled`,
+  `order_runs_path`, `store_candidates`); parsed by `build_database_config`
+  into `DatabaseConfig`.
+- Store-level identity for persistence stays in
+  `src/core/ordering/store_identity.py`. It deliberately excludes
+  `storeProductId` (a product-in-store id) so the `stores` dimension is not
+  forked once per product; `tawreed_store_selection._store_identity` keeps
+  using `storeProductId` for its own de-duplication purpose.
 - Manual-review corrected-item search is implemented in
   `src/core/manual_review_corrections.py`, CLI wiring in
   `src/cli/cli_parser_manual_review_search.py`, and Streamlit launch helpers in

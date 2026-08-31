@@ -6,8 +6,12 @@ import csv
 import itertools
 from pathlib import Path
 from typing import Iterable
+import logging
 
 from src.core.artifact_run import current_artifact_run
+
+logger = logging.getLogger(__name__)
+from src.core.errors import ValidationError
 from src.core.manual_review.manual_review_corrections import corrected_items_from_manual_review_csv
 from src.core.ordering.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
@@ -141,7 +145,7 @@ def ensure_non_empty_items(
     try:
         first_item = next(probe_iter)
     except StopIteration:
-        print(f"[{profile_key}] No remaining items to process.")
+        logger.info("no remaining items", extra={"profile": profile_key})
         return None
     return itertools.chain([first_item], probe_iter)
 
@@ -188,7 +192,10 @@ def manual_review_correction_items(args) -> Iterable[Item] | None:
 def require_order_excel(args) -> None:
     """Validate that an Excel file was provided for order processing."""
     if not getattr(args, "excel", None):
-        raise SystemExit("Provide --excel or --from-manual-review-corrections.")
+        raise ValidationError(
+            "Provide --excel or --from-manual-review-corrections.",
+            hint="Re-run with one of these flags.",
+        )
 
 
 def load_items_for_order_mode(
@@ -219,7 +226,10 @@ def reject_prevented_excel_as_order_source(
 ) -> None:
     """Stop accidental ordering from the prevented-items management file."""
     if prevented_path and is_prevented_items_excel_path(excel_path, prevented_path):
-        raise SystemExit("Order Excel cannot be the prevented-items Excel file.")
+        raise ValidationError(
+            "Order Excel cannot be the prevented-items Excel file.",
+            hint="Use a different --excel path.",
+        )
 
 
 # ============ Bot Options ============
@@ -227,14 +237,12 @@ def reject_prevented_excel_as_order_source(
 
 def order_bot_options(args) -> dict[str, object]:
     """Extract bot options from CLI arguments."""
-    from .cli_order import order_ai_settings
     stop_flag = getattr(args, "stop_flag", None)
     return {
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "stop_flag_path": Path(stop_flag) if stop_flag else None,
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": match_only(args),
-        "order_ai_settings": order_ai_settings(args),
         "execution_mode": str(getattr(args, "execution_mode", "auto")),
         "matching_risk_policy": str(getattr(args, "matching_risk_policy", "safe")),
         "flagged_match_action": str(

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from src.core.matching.matching_risk import aggressive_review_decision
-from src.core.ordering.order_ai_matching import OrderAiOutcome
 from src.core.utils.excel import Item
 
 
@@ -31,11 +30,7 @@ def aggressive_review_result(bot, item: Item, decision, require_available: bool)
 
 
 def _record_flagged_decision(bot, decision) -> None:
-    match = decision.best_match
     bot.last_match_decision = decision
-    bot.last_order_ai_outcome = OrderAiOutcome(
-        decision, "aggressive_review_required", decision.final_reason, match.score, True,
-    )
 
 
 def _reject_unavailable_flagged_match(

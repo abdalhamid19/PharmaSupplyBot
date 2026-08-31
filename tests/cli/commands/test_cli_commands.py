@@ -18,7 +18,8 @@ from src.cli.commands.cli_order_execution import (
     run_profile_order,
     run_single_profile,
 )
-from src.cli.cli_shared import invalid_session_exit
+from src.cli.cli_shared import raise_invalid_session
+from src.core.errors import AuthError
 from src.core.utils.excel import Item
 from src.tawreed.api.tawreed_api_client import TawreedApiUnavailable
 
@@ -168,12 +169,12 @@ class CliCommandsTests(unittest.TestCase):
     ) -> None:
         error: Any = SimpleNamespace()
 
-        exit_error = invalid_session_exit(
-            "https://seller.tawreed.io", "wardany", error
-        )
+        with self.assertRaises(AuthError) as ctx:
+            raise_invalid_session("wardany", error)
 
-        self.assertIsInstance(exit_error, SystemExit)
-        self.assertIn("py run.py auth --profile wardany", str(exit_error))
+        self.assertIn("py run.py auth --profile wardany", str(ctx.exception))
+        self.assertEqual(ctx.exception.profile, "wardany")
+        self.assertEqual(ctx.exception.exit_code, 3)
 
     def test_run_remove_cart_command_invokes_bot_for_selected_profile(self) -> None:
         # Skip this test as it requires complex auth setup

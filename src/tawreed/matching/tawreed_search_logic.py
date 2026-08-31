@@ -67,9 +67,7 @@ def _append_search_result(bot, page, query, queries, results, query_cache) -> No
 
 def _handle_no_match(bot, item, queries, results, require_available, review_decision):
     """Record and raise a descriptive error when all search attempts fail."""
-    decision = bot.resolve_order_ai_decision(
-        item, _match_decision(bot, item, results, review_decision)
-    )
+    decision = _match_decision(bot, item, results, review_decision)
     write_match_log(bot, item, decision)
     if decision.best_match:
         return accepted_no_match_result(bot, item, decision, require_available)
@@ -111,7 +109,7 @@ def _match_decision(bot, item: Item, results: list[tuple[str, list]], review_dec
 # ============================================================================
 
 def accepted_no_match_result(bot, item: Item, decision, require_available: bool):
-    """Return an AI-selected match from the no-match path after stock checks."""
+    """Return a locally selected match from the no-match path after stock checks."""
     match = decision.best_match
     if require_available and available_quantity(match.data) <= 0:
         raise bot.skip_item_exception(

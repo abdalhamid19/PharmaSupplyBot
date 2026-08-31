@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 
 from src.core.utils.excel import Item
@@ -10,10 +11,9 @@ from ..tawreed_dialogs import visible_overlay_diagnostics
 from ..matching.tawreed_match_logs import OrderResultSummary
 from ..tawreed_summary import (
     SummaryBuilder, SummaryDialogHandler, SummaryStatus,
-    _item_error_label, _item_error_details, _console_safe, _artifact_details
+    _item_error_label, _item_error_details, _artifact_details
 )
 from .tawreed_order_summary_build import (
-    append_order_ai_trace_artifacts,
     append_order_item_artifacts,
     append_manual_review_artifacts,
     _preserve_existing_decision,
@@ -24,6 +24,9 @@ from .tawreed_order_summary_format import (
     _append_final_trace_row,
     _text_rows,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -84,10 +87,14 @@ class OrderSummaryRecorderSuccessMixin:
             time.perf_counter() - started_at,
             self.bot.last_match_elapsed_seconds,
         )
-        print(
-            _console_safe(
-                f"[{self.bot.profile_key}] Skipped item {item.code} / {item.name}: {error}"
-            )
+        logger.info(
+            "skipped item",
+            extra={
+                "profile": self.bot.profile_key,
+                "code": item.code,
+                "item_name": item.name,
+                "reason": reason,
+            },
         )
 
 
@@ -129,10 +136,14 @@ class OrderSummaryRecorderFailureMixin:
             elapsed_seconds=time.perf_counter() - started_at,
             match_elapsed_seconds=self.bot.last_match_elapsed_seconds,
         )
-        print(
-            _console_safe(
-                f"[{self.bot.profile_key}] Skipped item {item.code} / {item.name}: {error}"
-            )
+        logger.info(
+            "skipped item",
+            extra={
+                "profile": self.bot.profile_key,
+                "code": item.code,
+                "item_name": item.name,
+                "reason": reason,
+            },
         )
 
     def record_failure(
@@ -161,9 +172,16 @@ class OrderSummaryRecorderFailureMixin:
         )
 
     def print_failed_item(self, item: Item, error: Exception) -> None:
-        """Print one console-safe failed item message."""
-        message = f"[{self.bot.profile_key}] Failed item {item.code} / {item.name}: {error}"
-        print(_console_safe(message))
+        """Log a single failed-item diagnostic via the structured logger."""
+        logger.warning(
+            "failed item",
+            extra={
+                "profile": self.bot.profile_key,
+                "code": item.code,
+                "item_name": item.name,
+                "reason": str(error),
+            },
+        )
 
 
 # ============================================================================
@@ -217,14 +235,20 @@ class OrderSummaryRecorderBuildersMixin:
 
     def record_order_run_artifacts(self, item: Item, summary: OrderResultSummary) -> None:
         """Append per-item summary and manual-review artifacts for this run."""
+        from ..store.tawreed_store_run_payload import (
+            persistence_options,
+            store_snapshot_payload,
+        )
+
         append_order_item_artifacts(
             self.bot.profile_key,
             item,
             summary,
             self.bot.last_match_decision,
-            self.bot.last_order_ai_outcome,
             self.bot.summary_label_suffix,
             self.bot.config.matching,
+            store_snapshot=store_snapshot_payload(self.bot),
+            database_options=persistence_options(self.bot),
         )
 
 
@@ -244,7 +268,6 @@ class OrderSummaryRecorder(
 
 __all__ = [
     "OrderSummaryRecorder",
-    "append_order_ai_trace_artifacts",
     "append_order_item_artifacts",
     "append_manual_review_artifacts",
     "_preserve_existing_decision",

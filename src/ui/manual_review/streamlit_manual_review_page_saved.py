@@ -120,7 +120,7 @@ def _show_saved_instructions():
     st.info(
         "💡 You can delete rows directly from the table below. Select a row "
         "and press Delete (or click the trash icon) to revoke the decision "
-        "and return the item to AI matching."
+        "and return the item to local matching."
     )
     st.info(
         "💡 You can check the 'تحديد (Select)' box to select 'auto_matched' "

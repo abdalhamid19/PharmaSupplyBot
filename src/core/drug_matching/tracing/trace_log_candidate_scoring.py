@@ -57,7 +57,7 @@ class CandidateEventLogger:
             row["selection_reason"] = (
                 f"brand={brand} len={len(brand)} (need >=3)"
             )
-            row["ai_result"] = "no_hits"
+            row["decision"] = "no_hits"
             self._parent._rows.append(row)
             return
         for rank, (idx, score) in enumerate(hits, start=1):

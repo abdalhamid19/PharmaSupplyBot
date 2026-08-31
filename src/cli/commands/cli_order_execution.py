@@ -1,6 +1,7 @@
 """Order execution logic for single and parallel profile runs."""
 
 from __future__ import annotations
+import logging
 
 import multiprocessing
 from pathlib import Path
@@ -14,10 +15,12 @@ from src.tawreed.artifacts.order_worker_artifact_merger import merge_order_worke
 from src.tawreed.tawreed import TawreedBot
 from src.tawreed.api.tawreed_api_client import TawreedApiUnavailable
 from src.tawreed.auth.tawreed_session import SessionInvalidError
-from .cli_order import order_ai_settings, order_bot
+from .cli_order import order_bot
 from .cli_order_items import match_only, summary_label
-from ..cli_shared import api_unavailable_exit, invalid_session_exit
+from ..cli_shared import raise_api_unavailable, raise_invalid_session
 from .item_worker import report_worker_results, run_order_chunk
+
+logger = logging.getLogger(__name__)
 
 
 # ============ Single Profile Execution ============
@@ -31,10 +34,17 @@ def run_single_profile(
 ) -> None:
     """Prepare and run a single profile order flow."""
     from src.core.artifact_run import artifact_run
+    from .cli_order_run_record import finish_order_run_record, open_order_run_record
 
     with artifact_run("order", profile_key) as run:
-        print(f"[{profile_key}] Artifact run: {run.directory}")
-        run_single_profile_items(app_config, profile_key, profile, args)
+        logger.info("artifact run started", extra={"profile": profile_key, "directory": str(run.directory)})
+        run_key = open_order_run_record(app_config, profile_key, args, run)
+        try:
+            run_single_profile_items(app_config, profile_key, profile, args)
+        finally:
+            # Runs that crash must still be recorded as finished, otherwise
+            # every failure looks like a run that is still in progress.
+            finish_order_run_record(app_config, run_key)
 
 
 def run_single_profile_items(
@@ -80,9 +90,9 @@ def run_profile_order(
     try:
         bot.place_order_from_items(items)
     except TawreedApiUnavailable as error:
-        raise api_unavailable_exit(profile_key, error) from error
+        raise_api_unavailable(profile_key, error)
     except SessionInvalidError as error:
-        raise invalid_session_exit(base_url, profile_key, error) from error
+        raise_invalid_session(profile_key, error)
 
 
 def run_profile_match_only(
@@ -92,9 +102,9 @@ def run_profile_match_only(
     try:
         bot.match_items_only(items)
     except TawreedApiUnavailable as error:
-        raise api_unavailable_exit(profile_key, error) from error
+        raise_api_unavailable(profile_key, error)
     except SessionInvalidError as error:
-        raise invalid_session_exit(base_url, profile_key, error) from error
+        raise_invalid_session(profile_key, error)
 
 
 # ============ Parallel Order Execution ============
@@ -123,7 +133,7 @@ def run_parallel_order(
 
 def execute_order_workers(profile_key, chunks, payloads):
     """Execute order workers in parallel."""
-    print(f"[{profile_key}] Launching {len(chunks)} parallel item workers...")
+    logger.info("launching parallel workers", extra={"profile": profile_key, "workers": len(chunks)})
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
         return pool.map(run_order_chunk, payloads)
@@ -133,7 +143,7 @@ def merge_order_worker_outputs(profile_key: str, args) -> None:
     """Merge all order worker output partitions for the active run."""
     merge_worker_summaries(profile_key, summary_label(args))
     merge_order_worker_artifacts(
-        profile_key, ("order_item_summary", "order_ai_trace", "manual_review")
+        profile_key, ("order_item_summary", "manual_review")
     )
 
 
@@ -164,7 +174,6 @@ def worker_options(args, auth_lock=None) -> dict[str, Any]:
     return {
         "artifact_command": run.command if run else "",
         "artifact_run_id": run.run_id if run else "",
-        "order_ai_settings": order_ai_settings(args),
         "debug_browser": bool(getattr(args, "debug_browser", False)),
         "fast_search": bool(getattr(args, "fast_search", False)),
         "match_only": match_only(args),

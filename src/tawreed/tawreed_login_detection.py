@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -31,6 +34,7 @@ def is_logged_in_marker_visible(page: Page, logged_in_marker: str, timeout_ms: i
         page.locator(logged_in_marker).first.wait_for(timeout=timeout_ms)
         return True
     except Exception:
+        logger.debug("tawreed.selector_visible: selector check failed (non-fatal)")
         return False
 
 
@@ -60,4 +64,5 @@ def selector_visible(page: Page, selector: str) -> bool:
     try:
         return bool(page.locator(selector).first.is_visible(timeout=250))
     except Exception:
+        logger.debug("tawreed.selector_visible: selector check failed (non-fatal)")
         return False

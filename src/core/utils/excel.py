@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, cast
@@ -9,6 +10,9 @@ from typing import Any, Iterable, cast
 import openpyxl
 
 from ..config.config_models import ExcelConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,7 @@ def _to_int(x: Any) -> int:
     try:
         return int(round(float(x)))
     except Exception:
+        logger.debug("excel._to_int: non-numeric cell %r, falling back to string parse", x)
         s = str(x).strip()
         if not s:
             return 0

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+
+from src.core.errors import ValidationError
 
 @dataclass(frozen=True)
 class ExcelConfig:
@@ -62,6 +64,25 @@ class MatchingConfig:
     reject_extra_brand_token: bool = False
 
 @dataclass(frozen=True)
+class DatabaseConfig:
+    """Local SQLite persistence settings for order-run analytics."""
+
+    order_runs_enabled: bool = True
+    order_runs_path: str = ""
+    store_candidates: bool = False
+
+    def persistence_options(self) -> dict[str, Any]:
+        """Return the options dict consumed by order-run persistence.
+
+        ``path`` is omitted when unset so the persistence layer falls through to
+        its own default resolution instead of treating "" as an off switch.
+        """
+        options: dict[str, Any] = {"enabled": self.order_runs_enabled}
+        if self.order_runs_path:
+            options["path"] = self.order_runs_path
+        return options
+
+@dataclass(frozen=True)
 class AppConfig:
     """Fully parsed application configuration consumed by the bot."""
 
@@ -72,6 +93,7 @@ class AppConfig:
     warehouse_strategy: dict[str, Any]
     matching: MatchingConfig
     runtime: RuntimeConfig
+    database: DatabaseConfig = field(default_factory=DatabaseConfig)
 
     def profiles_to_run(
         self,
@@ -86,13 +108,17 @@ class AppConfig:
         if len(self.profiles) == 1:
             profile_key = next(iter(self.profiles.keys()))
             return [(profile_key, self.profiles[profile_key])]
-        raise SystemExit("Please provide --profile <name> or use --all-profiles")
+        raise ValidationError(
+            "Please provide --profile <name> or use --all-profiles",
+            hint="Re-run the command with one of these flags.",
+        )
 
     def _selected_profile(self, profile: str) -> list[tuple[str, ProfileConfig]]:
         """Return one explicitly selected profile or raise a descriptive error."""
         if profile not in self.profiles:
             available_profiles = ", ".join(self.profiles.keys())
-            raise KeyError(
-                f"Unknown profile '{profile}'. Available: {available_profiles}"
+            raise ValidationError(
+                f"Unknown profile '{profile}'. Available: {available_profiles}",
+                            hint="Re-run with one of the available profile names.",
             )
         return [(profile, self.profiles[profile])]

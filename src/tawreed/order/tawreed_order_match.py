@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 from src.core.manual_review.manual_review_runtime import (
@@ -15,6 +16,9 @@ from .tawreed_order_processing import OrderItemProcessor
 from .tawreed_order_summary import OrderSummaryRecorder
 from ..auth.tawreed_session import close_browser, close_context, open_order_page
 from .tawreed_order_placement import _SkipItem, _artifact_details, _save_api_contract_capture
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -67,6 +71,7 @@ class MatchOnlyFlow:
         try:
             context = manual_review_cache_context(preload_manual_review_decisions(items))
         except Exception:
+            logger.debug("order._manual_review_cache_for_items: cache failed (non-fatal)")
             return nullcontext()
         self.bot._record_pending_item_timing(
             "manual_review_lookup_seconds", time.perf_counter() - started_at
@@ -91,10 +96,14 @@ class MatchOnlyFlow:
         self.item_processor.prepare_order_page(page)
         completed = self._process_match_only_items(page, items)
         if completed and not self.bot._stop_requested():
-            print(f"[{self.bot.profile_key}] Match-only run completed. Cart was unchanged.")
+            logger.info(
+                "match-only run completed (cart was unchanged)",
+                extra={"profile": self.bot.profile_key},
+            )
         else:
-            print(
-                f"[{self.bot.profile_key}] Stop requested or incomplete. Matching stopped."
+            logger.warning(
+                "match-only run incomplete or stopped",
+                extra={"profile": self.bot.profile_key},
             )
 
     def _process_match_only_items(self, page, items: Iterable[Item]) -> bool:

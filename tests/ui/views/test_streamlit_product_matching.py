@@ -24,8 +24,6 @@ class StreamlitProductMatchingTests(unittest.TestCase):
 
         self.assertIn("match-products", command)
         self.assertIn("--trace", command)
-        self.assertIn("--no-ai", command)
-        self.assertIn("rotation", command)
 
 
 if __name__ == "__main__":

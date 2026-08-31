@@ -1,6 +1,9 @@
 """Merge per-worker summary artifacts into the canonical profile summary."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 import csv
 import re
@@ -116,4 +119,5 @@ def _remove_worker_files(artifacts_dir: Path, base_label: str) -> None:
             try:
                 path.unlink()
             except Exception:
-                pass
+                logger.debug("artifacts._remove_worker_files: cleanup failed (non-fatal)")
+            pass

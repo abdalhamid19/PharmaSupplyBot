@@ -10,7 +10,6 @@ from ...core.ordering.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     is_prevented_items_excel_path,
 )
-from ..fields.streamlit_ai_fields import ai_matching_fields
 from ..fields.streamlit_excel_fields import excel_source_fields
 from ..fields.streamlit_profile_fields import profile_run_fields_with_workers, OrderRunFields
 from ..streamlit_shared import (
@@ -38,13 +37,6 @@ def _float_form_value(
 ) -> float:
     """Return one float form value with a safe fallback."""
     return float(str(form_values.get(key, default) or default))
-
-
-def _append_optional_ai_text(args: list[str], flag: str, value: object) -> None:
-    """Append an optional text CLI flag."""
-    text = str(value or "").strip()
-    if text:
-        args.extend([flag, text])
 
 
 # ============================================================================
@@ -161,7 +153,6 @@ def order_form_fields(
         item_workers,
         prevented_items_path,
     )
-    values.update(ai_matching_fields())
     return values
 
 
@@ -225,7 +216,6 @@ def _extended_order_run_values(
 __all__ = [
     "_int_form_value",
     "_float_form_value",
-    "_append_optional_ai_text",
     "order_output_path",
     "order_stop_flag_path",
     "run_control_dir",

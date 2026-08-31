@@ -16,7 +16,6 @@ from ..streamlit_uploads import resolve_excel_path
 from .streamlit_order_form import (
     _int_form_value,
     _float_form_value,
-    _append_optional_ai_text,
     order_output_path,
     order_stop_flag_path,
     run_control_dir,
@@ -44,9 +43,6 @@ from .streamlit_order_command import (
     _order_item_range_args,
     _matching_risk_command_args,
     _order_execution_mode,
-    _order_ai_command_args,
-    _order_ai_provider_args,
-    _order_ai_threshold_args,
 )
 from .streamlit_order_process import (
     render_running_order_controls,
@@ -170,7 +166,6 @@ __all__ = [
     # Re-exports from form module
     "_int_form_value",
     "_float_form_value",
-    "_append_optional_ai_text",
     "order_output_path",
     "order_stop_flag_path",
     "run_control_dir",
@@ -197,9 +192,6 @@ __all__ = [
     "_order_item_range_args",
     "_matching_risk_command_args",
     "_order_execution_mode",
-    "_order_ai_command_args",
-    "_order_ai_provider_args",
-    "_order_ai_threshold_args",
     # Re-exports from process module
     "render_running_order_controls",
     "_render_running_order",

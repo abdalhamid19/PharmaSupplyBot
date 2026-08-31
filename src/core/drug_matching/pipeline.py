@@ -1,10 +1,12 @@
-"""Full matching pipeline with optional AI verification - re-exports from split modules."""
+"""Deterministic product-matching pipeline."""
 
 from __future__ import annotations
 
 import logging
 
-from .config import MatchingConfig, APIConfig, Paths, load_env
+import pandas as pd
+
+from .config import MatchingConfig, Paths
 from .indexing.indexer import DrugIndex
 from .tracing.trace_log import MatchTraceLog
 
@@ -22,7 +24,7 @@ from .pipeline_components.pipeline_matching import (
     PipelineMatching,
 )
 
-logger = logging.getLogger("pharmasupplybot.matching")
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -30,24 +32,21 @@ logger = logging.getLogger("pharmasupplybot.matching")
 # ============================================================================
 
 class MatchPipeline:
-    """Full matching pipeline with optional AI verification."""
+    """Full deterministic matching pipeline."""
 
     __slots__ = (
-        "_cfg", "_api_cfg", "_index", "_limit", "_start", "_end", "_trace",
-        "_io", "_matching", "_ai",
+        "_cfg", "_index", "_limit", "_start", "_end", "_trace",
+        "_io", "_matching",
     )
 
     def __init__(
         self,
         cfg: MatchingConfig | None = None,
-        api_cfg: APIConfig | None = None,
         limit: int | None = None,
         start: int | None = None,
         end: int | None = None,
     ):
-        load_env()
         self._cfg = cfg or MatchingConfig()
-        self._api_cfg = api_cfg or APIConfig()
         self._limit = limit
         self._start = start
         self._end = end
@@ -55,7 +54,6 @@ class MatchPipeline:
         self._trace: MatchTraceLog | None = None
         self._io = PipelineIO(self._cfg)
         self._matching = None
-        self._ai = None
 
     def load_data(self, drugs_path: str | None = None, tawreed_path: str | None = None):
         """Load and prepare data sources."""
@@ -66,9 +64,6 @@ class MatchPipeline:
             self._index = DrugIndex(tawreed, self._cfg)
         self._matching = PipelineMatching(self._cfg, self._index, self._trace, self._io)
         self._matching.load_data(drugs_path, tawreed_path, self._limit, self._start, self._end)
-        if self._ai is None:
-            from .pipeline_components.pipeline_ai import PipelineAI
-            self._ai = PipelineAI(self._cfg, self._api_cfg, self._index, self._trace)
 
     def run_matching(self) -> pd.DataFrame:
         """Algorithmic matching using brand index + fuzzy search."""
@@ -143,37 +138,15 @@ class MatchPipeline:
             logger.info(f"  {label}: {count}")
         logger.info(f"  <70: {(scores < 70).sum()}")
 
-    async def run_ai_verification(self) -> pd.DataFrame:
-        """AI verification of matches below threshold."""
-        if self._ai is None:
-            raise RuntimeError("Call load_data() first")
-        return await self._ai.run_ai_verification()
-
-    async def run_ai_search_unmatched(self) -> pd.DataFrame:
-        """AI searches for matches among unmatched items."""
-        if self._ai is None:
-            raise RuntimeError("Call load_data() first")
-        return await self._ai.run_ai_search_unmatched()
-
-    async def run_ai_review(self) -> pd.DataFrame:
-        """AI review: second model cross-verifies low-confidence AI decisions."""
-        if self._ai is None:
-            raise RuntimeError("Call load_data() first")
-        return await self._ai.run_ai_review()
-
-    async def run_full(
-        self, drugs_path: str | None = None,
+    def run_full(
+        self,
+        drugs_path: str | None = None,
         tawreed_path: str | None = None,
         output_path: str | None = None,
-        skip_ai: bool = False,
     ) -> pd.DataFrame:
-        """Run the complete pipeline."""
+        """Run the complete deterministic pipeline."""
         self.load_data(drugs_path, tawreed_path)
         self.run_matching()
-        if not skip_ai:
-            await self.run_ai_verification()
-            await self.run_ai_search_unmatched()
-            await self.run_ai_review()
         saved_path = self.save(output_path)
         self.save_manual_review(_manual_review_path(saved_path))
         self.print_stats()

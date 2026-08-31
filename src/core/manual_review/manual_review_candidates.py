@@ -7,7 +7,18 @@ from typing import Any
 
 from ..matching.candidate_identity import candidate_store_product_id
 from ..matching_types import MatchDecision
-from ..ordering.order_ai_matching import candidate_ar, candidate_name, candidate_price
+
+
+def candidate_name(candidate: dict) -> str:
+    return str(candidate.get("productNameEn") or candidate.get("productNameEnFallback") or candidate.get("productName") or "")
+
+
+def candidate_ar(candidate: dict) -> str:
+    return str(candidate.get("productName") or "")
+
+
+def candidate_price(candidate: dict) -> object:
+    return candidate.get("retailPrice") or candidate.get("publicPrice") or candidate.get("price") or candidate.get("sellingPrice") or ""
 @dataclass(frozen=True)
 class ReviewCandidateOption:
     """One available candidate choice for a manual review."""

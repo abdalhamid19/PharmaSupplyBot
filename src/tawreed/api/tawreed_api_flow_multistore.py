@@ -10,10 +10,12 @@ def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, rec
     """Order from multiple stores natively using the API payload."""
     from ..store.tawreed_store_selection import choose_next_store_for_remaining_quantity
     from ..products.tawreed_products_flow import _wh_mode, _min_disc, _preferred_warehouses
+    from ..store.tawreed_store_snapshot import SOURCE_STORE_DETAILS, record_store_rows
     
     store_rows = api.get_store_details(match.data.get("productId") or match.data.get("id"))
     if not store_rows:
         raise bot.skip_item_exception("API multi-store returned no stores.")
+    record_store_rows(bot, store_rows, SOURCE_STORE_DETAILS)
     
     mode = _wh_mode(bot)
     max_discount_value = _validate_max_discount_if_needed(bot, mode, store_rows)

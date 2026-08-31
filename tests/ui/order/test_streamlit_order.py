@@ -119,7 +119,7 @@ class StreamlitOrderTests(unittest.TestCase):
         self.assertEqual(command[command.index("--matching-risk-policy") + 1], "aggressive")
         self.assertEqual(command[command.index("--flagged-match-action") + 1], "add-to-cart")
 
-    def test_order_command_adds_ai_flags(self) -> None:
+    def test_order_command_builds_local_matching_run(self) -> None:
         command = order_command(
             Path("config.yaml"),
             {
@@ -130,22 +130,12 @@ class StreamlitOrderTests(unittest.TestCase):
                 "resume": False,
                 "highest_discount": False,
                 "min_discount_percent": 0,
-                "enable_order_ai": True,
-                "ai_provider": "rotation",
-                "ai_review_model": "rotation",
-                "ai_concurrency": 2,
-                "ai_verify_policy": "score",
-                "ai_search_policy": "safe",
-                "ai_accept_confidence": 0.93,
-                "ai_review_threshold": 0.97,
             },
             Path("data/input/order_items/ddd.xlsx"),
         )
 
-        self.assertIn("--ai", command)
-        self.assertEqual(command[command.index("--provider") + 1], "rotation")
-        self.assertEqual(command[command.index("--review-model") + 1], "rotation")
-        self.assertEqual(command[command.index("--ai-accept-confidence") + 1], "0.93")
+        self.assertIn("--profile", command)
+        self.assertIn("--limit", command)
 
     def test_order_run_summary_path_uses_match_only_summary(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -335,7 +325,6 @@ class StreamlitOrderTests(unittest.TestCase):
                     1,
                 ),
             ),
-            patch("src.ui.fields.streamlit_ai_fields.ai_matching_fields", return_value={}),
         ):
             app_config = SimpleNamespace(profiles={"wardany": object()})
             values = order_form_fields(app_config)
