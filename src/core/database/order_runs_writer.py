@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from .order_runs_keys import item_dimension_row
-from .order_runs_rows import run_item_row
 from .order_runs_sql import (
     FINISH_RUN,
     SELECT_RUN_EXISTS,
@@ -21,6 +19,7 @@ from .order_runs_sql import (
     UPSERT_RUN_ITEM,
 )
 from .order_runs_time import utc_now
+from .order_runs_write_plan import item_write_plan
 
 
 class OrderRunsWriterMixin:
@@ -41,15 +40,16 @@ class OrderRunsWriterMixin:
         run_key: str,
         summary: dict[str, Any],
         now: str | None = None,
-        **fact_fields: Any,
+        **fields: Any,
     ) -> None:
-        """Persist one item's dimension and fact rows in a single transaction."""
-        timestamp = now or utc_now()
-        item = item_dimension_row(
-            summary.get("item_code"), summary.get("item_name"), timestamp
-        )
-        fact = run_item_row(run_key, summary, **fact_fields)
-        self._write(lambda conn: _write_item(conn, item, fact))
+        """Persist one item, its dimensions, and its offering stores atomically.
+
+        Keeping the snapshot in the same transaction as the item fact means
+        ``stores_offering`` can never disagree with the rows it counts.
+        """
+        snapshot = {key: fields.pop(key, None) for key in _SNAPSHOT_KEYS}
+        plan = item_write_plan(run_key, summary, now or utc_now(), snapshot, fields)
+        self._write(lambda conn: self._write_plan(conn, plan))
 
     def count_run_items(self, run_key: str) -> int:
         """Return how many item facts are stored for one run."""
@@ -59,6 +59,12 @@ class OrderRunsWriterMixin:
     def run_exists(self, run_key: str) -> bool:
         """Return whether a run record has already been opened."""
         return bool(self.db.execute_query(SELECT_RUN_EXISTS, (run_key,)))
+
+    def _write_plan(self, conn, plan) -> None:
+        """Write item dimension, item fact, then the offering-store snapshot."""
+        conn.execute(UPSERT_ITEM, plan.item_row)
+        conn.execute(UPSERT_RUN_ITEM, plan.fact_row)
+        self._write_store_snapshot(conn, plan)
 
     def _write(self, operation) -> None:
         """Run one write inside a short immediate transaction."""
@@ -72,10 +78,6 @@ class OrderRunsWriterMixin:
                 raise
 
 
-def _write_item(conn, item: dict[str, Any], fact: dict[str, Any]) -> None:
-    """Insert the item dimension before the fact row that references it."""
-    conn.execute(UPSERT_ITEM, item)
-    conn.execute(UPSERT_RUN_ITEM, fact)
-
+_SNAPSHOT_KEYS = ("stores", "store_selections", "store_source")
 
 __all__ = ["OrderRunsWriterMixin"]

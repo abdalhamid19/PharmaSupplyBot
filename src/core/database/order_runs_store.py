@@ -19,10 +19,13 @@ from .order_runs_schema import (
     SELECT_SCHEMA_VERSION,
     UPSERT_SCHEMA_VERSION,
 )
+from .order_runs_snapshot_writer import OrderRunsSnapshotMixin
 from .order_runs_writer import OrderRunsWriterMixin
 
 
-class OrderRunsStore(OrderRunsIntrospectMixin, OrderRunsWriterMixin):
+class OrderRunsStore(
+    OrderRunsIntrospectMixin, OrderRunsSnapshotMixin, OrderRunsWriterMixin
+):
     """Read/write facade for the order-runs database."""
 
     _bootstrapped_paths: set[str] = set()

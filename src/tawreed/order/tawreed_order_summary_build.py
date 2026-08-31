@@ -14,30 +14,38 @@ from src.core.utils.excel import Item
 from src.core.matching.candidate_identity import candidate_store_product_id
 from ..artifacts.tawreed_artifacts import append_csv_artifact, append_text_artifact
 from ..matching.tawreed_match_logs import OrderResultSummary
+from ..store.tawreed_store_run_payload import active_order_run_key
 
 logger = logging.getLogger(__name__)
 
 
 def append_order_item_artifacts(
     profile_key: str, item: Item, summary: OrderResultSummary, decision,
-    label_suffix: str | None = None, matching_config=None
+    label_suffix: str | None = None, matching_config=None,
+    store_snapshot: dict | None = None, database_options: dict | None = None,
 ) -> None:
-    """Append one item summary row and optional manual-review row."""
+    """Append one item summary row and optional manual-review row.
+
+    ``store_snapshot`` carries the item's offering stores so they are persisted
+    in the same transaction as the item fact. It is optional so existing callers
+    keep working; without it only the item-level facts are stored.
+    """
     from .tawreed_order_summary_format import _append_item_summary_row, _append_final_trace_row
 
     row = order_item_summary_row(item, summary, decision, matching_config)
     _append_item_summary_row(profile_key, row, label_suffix)
     _append_final_trace_row(profile_key, row, label_suffix)
-    record_run_item(_active_order_run_key(), row)
+    _persist_order_run_item(row, store_snapshot, database_options)
     _handle_manual_review_or_auto_save(
         profile_key, item, summary, decision, label_suffix, matching_config
     )
 
 
-def _active_order_run_key() -> str:
-    """Return the order-run database key for the active artifact run, if any."""
-    run = current_artifact_run()
-    return f"{run.profile_key}/{run.run_id}" if run else ""
+def _persist_order_run_item(row, store_snapshot, database_options) -> None:
+    """Write one item and its offering stores to the order-runs database."""
+    record_run_item(
+        active_order_run_key(), row, database_options, **(store_snapshot or {})
+    )
 
 
 def _handle_manual_review_or_auto_save(

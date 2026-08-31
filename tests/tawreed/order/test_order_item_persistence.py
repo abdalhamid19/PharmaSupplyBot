@@ -82,6 +82,69 @@ class OrderItemPersistenceWiringTests(unittest.TestCase):
             append_order_item_artifacts("wardany", self.item, _summary(), None)
         self.assertEqual(record.call_args.args[0], "")
 
+    def test_store_snapshot_is_forwarded_to_persistence(self) -> None:
+        """The offering stores must reach the same write as the item fact."""
+        target = "src.tawreed.order.tawreed_order_summary_build.record_run_item"
+        snapshot = {
+            "stores": [{"storeId": 1, "storeProductId": 77}],
+            "store_selections": [({"storeId": 1, "storeProductId": 77}, 10)],
+            "store_source": "store_details",
+        }
+        with mock.patch(target) as record:
+            with artifact_run("order", "wardany", "20260830_1809", self.root):
+                append_order_item_artifacts(
+                    "wardany", self.item, _summary(), None, store_snapshot=snapshot
+                )
+        self.assertEqual(record.call_args.kwargs["store_source"], "store_details")
+        self.assertEqual(len(record.call_args.kwargs["stores"]), 1)
+
+    def test_absent_snapshot_still_writes_item_facts(self) -> None:
+        """Callers without a snapshot (and old tests) must keep working."""
+        target = "src.tawreed.order.tawreed_order_summary_build.record_run_item"
+        with mock.patch(target) as record:
+            self._append()
+        self.assertNotIn("stores", record.call_args.kwargs)
+
+
+class SummaryRecorderSnapshotTests(unittest.TestCase):
+    """The recorder must pull the snapshot off the bot automatically."""
+
+    def test_recorder_forwards_bot_store_snapshot(self) -> None:
+        """This is the wiring that makes captured stores reach the database."""
+        from src.core.config.config_models import DatabaseConfig, MatchingConfig
+        from src.tawreed.order.tawreed_order_summary import OrderSummaryRecorder
+        from src.tawreed.store.tawreed_store_snapshot import (
+            record_store_rows,
+            record_store_selections,
+        )
+
+        store_row = {"storeId": 1, "storeProductId": 77}
+        bot = SimpleNamespace(
+            profile_key="wardany",
+            summary_label_suffix=None,
+            last_match_decision=None,
+            config=SimpleNamespace(
+                matching=MatchingConfig(), database=DatabaseConfig()
+            ),
+        )
+        record_store_rows(bot, [store_row], "store_details")
+        record_store_selections(bot, [(store_row, 10)])
+        recorder = OrderSummaryRecorder.__new__(OrderSummaryRecorder)
+        recorder.bot = bot
+
+        target = (
+            "src.tawreed.order.tawreed_order_summary.append_order_item_artifacts"
+        )
+        with mock.patch(target) as append:
+            recorder.record_order_run_artifacts(
+                Item(code="12345", name="CAL MAG", qty=10), _summary()
+            )
+        snapshot = append.call_args.kwargs["store_snapshot"]
+        self.assertEqual(snapshot["stores"], [store_row])
+        self.assertEqual(snapshot["store_selections"], [(store_row, 10)])
+        self.assertEqual(snapshot["store_source"], "store_details")
+        self.assertTrue(append.call_args.kwargs["database_options"]["enabled"])
+
 
 if __name__ == "__main__":
     unittest.main()

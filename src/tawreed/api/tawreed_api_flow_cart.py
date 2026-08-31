@@ -35,17 +35,34 @@ def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> b
 def _add_single_api_item(bot, api, item, record_timing):
     """Add a single item via API."""
     from .tawreed_api_flow_matching import require_api_match
-    from ..store.tawreed_store_summary import record_single_store
-    
+
     match = require_api_match(bot, api, item, True)
     has_product_id = bool(match.data.get("productId") or match.data.get("id"))
     is_multi = int(match.data.get("productsCount") or 0) > 0 and has_product_id
     if is_multi:
         from .tawreed_api_flow_multistore import _add_multi_store_item_api
         _add_multi_store_item_api(bot, api, match, item, record_timing)
-    else:
-        _add_single_item_to_cart(bot, api, match, item, record_timing)
-        record_single_store(bot, match.data)
+        return
+    _add_single_item_to_cart(bot, api, match, item, record_timing)
+    _record_single_store_item(bot, match, item)
+
+
+def _record_single_store_item(bot, match, item) -> None:
+    """Record store metadata for a product supplied by exactly one store.
+
+    Single-store products never open the stores dialog, so the search row is the
+    only record of the store that supplied them.
+    """
+    from ..store.tawreed_store_summary import record_single_store
+    from ..store.tawreed_store_snapshot import (
+        SOURCE_SEARCH_ROW,
+        record_store_rows,
+        record_store_selections,
+    )
+
+    record_single_store(bot, match.data)
+    record_store_rows(bot, [match.data], SOURCE_SEARCH_ROW)
+    record_store_selections(bot, [(match.data, int(item.qty))])
 
 
 def _add_single_item_to_cart(bot, api, match, item, record_timing):
@@ -107,5 +124,6 @@ __all__ = [
     "_add_api_order_items",
     "_add_single_api_item",
     "_add_single_item_to_cart",
+    "_record_single_store_item",
     "_submit_order_if_enabled",
 ]

@@ -72,6 +72,8 @@ class TawreedBotCore:
 
     def _reset_last_item_state(self) -> None:
         """Reset internal state tracking for the next item to be processed."""
+        from .store.tawreed_store_snapshot import clear_store_snapshot
+
         pending_timings = getattr(self, "_pending_item_timings", {})
         self.last_match_decision: MatchDecision | None = None
         self.last_match_elapsed_seconds = 0.0
@@ -81,6 +83,9 @@ class TawreedBotCore:
         self.last_ordered_total_qty = 0
         self.last_item_timings: dict[str, float] = dict(pending_timings)
         self._pending_item_timings = {}
+        # Offering-store rows are per-item; leaking them into the next item
+        # would silently attribute the wrong warehouses to it.
+        clear_store_snapshot(self)
 
     def log(self, message: str) -> None:
         """Record a profile-scoped diagnostic message via the unified logger."""

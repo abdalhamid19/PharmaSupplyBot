@@ -235,6 +235,11 @@ class OrderSummaryRecorderBuildersMixin:
 
     def record_order_run_artifacts(self, item: Item, summary: OrderResultSummary) -> None:
         """Append per-item summary and manual-review artifacts for this run."""
+        from ..store.tawreed_store_run_payload import (
+            persistence_options,
+            store_snapshot_payload,
+        )
+
         append_order_item_artifacts(
             self.bot.profile_key,
             item,
@@ -242,6 +247,8 @@ class OrderSummaryRecorderBuildersMixin:
             self.bot.last_match_decision,
             self.bot.summary_label_suffix,
             self.bot.config.matching,
+            store_snapshot=store_snapshot_payload(self.bot),
+            database_options=persistence_options(self.bot),
         )
 
 
