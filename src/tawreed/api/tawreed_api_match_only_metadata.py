@@ -16,10 +16,24 @@ def record_api_match_only_store_metadata(bot, api, match) -> None:
 
     data = getattr(match, "data", {})
     record_single_store(bot, data)
-    if int(data.get("productsCount") or 0) <= 0:
+    if not _can_fetch_store_details(data):
+        # Search rows with productsCount > 0 but no productId have their only
+        # store embedded in the row itself (same rule the order flow uses).
         record_single_store_match_only_choice(bot, data)
         return
     _record_api_multi_store_metadata(bot, api, data)
+
+
+def _can_fetch_store_details(data: dict) -> bool:
+    """Return whether store details can be fetched for this search row.
+
+    Mirrors the order flow: productsCount > 0 alone is not enough, the row must
+    also carry the productId/id needed to call the store-details endpoint.
+    """
+    has_product_id = bool(data.get("productId") or data.get("id"))
+    if not has_product_id:
+        return False
+    return int(data.get("productsCount") or 0) > 0
 
 
 def _record_api_multi_store_metadata(bot, api, data) -> None:
