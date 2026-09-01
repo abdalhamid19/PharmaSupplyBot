@@ -54,7 +54,7 @@ def _make_app_config(profiles=("wardany",), excel_targets=("alnasr",)) -> Simple
 
 
 class StreamlitRunTargetTests(unittest.TestCase):
-    """Tests covering the new multiselect + excel-target wire-up."""
+    """Tests covering the new checkbox + excel-target wire-up."""
 
     def test_order_run_fields_has_selected_targets(self) -> None:
         """The named tuple must include ``selected_targets``."""
@@ -164,6 +164,19 @@ class StreamlitRunTargetTests(unittest.TestCase):
         self.assertEqual(selected_excel_targets(form_values), ["alnasr", "bakkah"])
 
 
+class StreamlitRunTargetSmokeTests(unittest.TestCase):
+    """Smoke-test that the widget builder does not raise on minimal config."""
+
+    def test_profile_run_fields_returns_named_tuple(self) -> None:
+        """The widget builder must return the OrderRunFields tuple."""
+        from src.ui.fields.streamlit_profile_fields import (
+            profile_run_fields as public_profile_run_fields,
+        )
+        fields, item_workers = profile_run_fields_with_workers(_make_app_config())
+        self.assertIsInstance(fields, OrderRunFields)
+        self.assertIsInstance(item_workers, int)
+
+
 class StreamlitExcelTargetUploadTests(unittest.TestCase):
     """Cover the upload + existing-file modes for Excel targets."""
 
@@ -227,42 +240,7 @@ class StreamlitExcelTargetUploadTests(unittest.TestCase):
                 self.assertTrue(persisted_path.exists(), f"missing {persisted_path}")
                 self.assertEqual(persisted_path.read_bytes(), b"fake-bytes")
 
-
-class ExcelTargetConfigDisplayNameTests(unittest.TestCase):
-    """Guard against the AttributeError that hid the upload widgets."""
-
-    def test_excel_target_config_supports_display_name(self) -> None:
-        """ExcelTargetConfig must expose ``display_name`` for the GUI label."""
-        from src.core.config.config_models import ExcelTargetConfig
-
-        cfg = ExcelTargetConfig(
-            name_col="صنف",
-            price_col="سعر",
-            discount_col="الخصم",
-            display_name="Alnasr Pharmacy",
-        )
-        self.assertEqual(cfg.display_name, "Alnasr Pharmacy")
-
-    def test_excel_target_config_display_name_defaults_to_empty(self) -> None:
-        """When the YAML omits ``display_name``, it defaults to empty string."""
-        from src.core.config.config_models import ExcelTargetConfig
-
-        cfg = ExcelTargetConfig(name_col="صنف", price_col="سعر", discount_col="الخصم")
-        self.assertEqual(cfg.display_name, "")
-
-    def test_build_excel_target_reads_display_name(self) -> None:
-        """``build_excel_target`` must parse the YAML ``display_name`` key."""
-        from src.core.config.config_factory import build_excel_target
-
-        cfg = build_excel_target(
-            {
-                "name_col": "صنف",
-                "price_col": "سعر",
-                "discount_col": "الخصم",
-                "display_name": "صيدلية النصر",
-            }
-        )
-        self.assertEqual(cfg.display_name, "صيدلية النصر")
+    def test_order_command_emits_excel_target_path_override(self) -> None:
         """End-to-end: ``order_command`` should emit ``--excel-target-path``."""
         upload = SimpleNamespace(name="alnasr.xlsx", getvalue=lambda: b"more-bytes")
         with TemporaryDirectory() as temp_dir:
@@ -305,20 +283,112 @@ class ExcelTargetConfigDisplayNameTests(unittest.TestCase):
         self.assertTrue(path_arg.startswith("alnasr="))
 
 
-class StreamlitRunTargetSmokeTests(unittest.TestCase):
-    """Smoke-test that the widget builder does not raise on minimal config."""
+class ExcelTargetConfigDisplayNameTests(unittest.TestCase):
+    """Guard against the AttributeError that hid the upload widgets."""
 
-    def test_profile_run_fields_returns_named_tuple(self) -> None:
-        """The widget builder must return the OrderRunFields tuple."""
-        from src.ui.fields.streamlit_profile_fields import (
-            profile_run_fields as public_profile_run_fields,
+    def test_excel_target_config_supports_display_name(self) -> None:
+        """ExcelTargetConfig must expose ``display_name`` for the GUI label."""
+        from src.core.config.config_models import ExcelTargetConfig
+
+        cfg = ExcelTargetConfig(
+            name_col="صنف",
+            price_col="سعر",
+            discount_col="الخصم",
+            display_name="Alnasr Pharmacy",
         )
-        fields, item_workers, uploads = profile_run_fields_with_workers(
-            _make_app_config()
+        self.assertEqual(cfg.display_name, "Alnasr Pharmacy")
+
+    def test_excel_target_config_display_name_defaults_to_empty(self) -> None:
+        """When the YAML omits ``display_name``, it defaults to empty string."""
+        from src.core.config.config_models import ExcelTargetConfig
+
+        cfg = ExcelTargetConfig(name_col="صنف", price_col="سعر", discount_col="الخصم")
+        self.assertEqual(cfg.display_name, "")
+
+    def test_build_excel_target_reads_display_name(self) -> None:
+        """``build_excel_target`` must parse the YAML ``display_name`` key."""
+        from src.core.config.config_factory import build_excel_target
+
+        cfg = build_excel_target(
+            {
+                "name_col": "صنف",
+                "price_col": "سعر",
+                "discount_col": "الخصم",
+                "display_name": "صيدلية النصر",
+            }
         )
-        self.assertIsInstance(fields, OrderRunFields)
-        self.assertIsInstance(item_workers, int)
-        self.assertIsInstance(uploads, dict)
+        self.assertEqual(cfg.display_name, "صيدلية النصر")
+
+
+class ExcelTargetCheckboxWidgetTests(unittest.TestCase):
+    """Cover the checkbox-group redesign of the target picker."""
+
+    FIXTURE = Path(__file__).resolve().parent / "order_tab_fixture.py"
+
+    def test_excel_target_checkbox_appears_even_when_unticked(self) -> None:
+        """The Excel-target checkbox is visible without any user action."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        at.session_state["excel_target_selected_targets"] = ()
+        at.run()
+
+        labels = [str(c.label) for c in at.main.checkbox]
+        self.assertTrue(
+            any("Excel target" in label and "alnasr" in label for label in labels),
+            f"alnasr checkbox must be visible by default; got {labels}",
+        )
+
+    def test_ticking_alnasr_renders_source_radio(self) -> None:
+        """Ticking the alnasr checkbox must render the source radio panel."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        at.session_state["excel_target_selected_targets"] = ()
+        at.run()
+
+        alnasr_box = next(
+            (c for c in at.main.checkbox if c.label and "alnasr" in str(c.label)),
+            None,
+        )
+        self.assertIsNotNone(alnasr_box)
+        alnasr_box.set_value(True).run()
+
+        source_radio = next(
+            (r for r in at.main.radio if r.label == "Source"), None
+        )
+        self.assertIsNotNone(source_radio)
+        self.assertEqual(
+            [str(o) for o in source_radio.options],
+            ["Configured", "Existing file", "Upload file"],
+        )
+
+    def test_upload_file_mode_renders_file_uploader(self) -> None:
+        """Upload-file mode must render a file uploader widget."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        at.session_state["excel_target_selected_targets"] = ()
+        at.run()
+
+        alnasr_box = next(
+            (c for c in at.main.checkbox if c.label and "alnasr" in str(c.label)),
+            None,
+        )
+        self.assertIsNotNone(alnasr_box)
+        alnasr_box.set_value(True).run()
+
+        source_radio = next(
+            (r for r in at.main.radio if r.label == "Source"), None
+        )
+        self.assertIsNotNone(source_radio)
+        source_radio.set_value("Upload file").run()
+
+        uploaders = list(at.main.file_uploader)
+        self.assertTrue(
+            any(u.label == "Upload catalog" for u in uploaders),
+            f"upload widget missing; got {[u.label for u in uploaders]}",
+        )
 
 
 if __name__ == "__main__":

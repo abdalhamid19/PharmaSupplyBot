@@ -324,7 +324,6 @@ class StreamlitOrderTests(unittest.TestCase):
                         0,
                     ),
                     1,
-                    {},
                 ),
             ),
         ):

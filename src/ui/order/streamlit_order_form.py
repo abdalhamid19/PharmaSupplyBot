@@ -11,7 +11,11 @@ from ...core.ordering.prevented_items import (
     is_prevented_items_excel_path,
 )
 from ..fields.streamlit_excel_fields import excel_source_fields
-from ..fields.streamlit_profile_fields import profile_run_fields_with_workers, OrderRunFields
+from ..fields.streamlit_profile_fields import (
+    profile_run_fields_with_workers,
+    render_excel_target_sources,
+    OrderRunFields,
+)
 from ..streamlit_shared import (
     ARTIFACTS_DIR,
     csv_row_count,
@@ -155,6 +159,13 @@ def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
     with st.form("order_form"):
         values = order_form_fields(app_config, DEFAULT_PREVENTED_ITEMS_PATH)
         submitted = st.form_submit_button("Run Order")
+    # The Excel-target source controls live outside the form so the operator
+    # can interact with the radio + file uploader independently of the form
+    # rerun cycle. We layer them on top of the dict the form returned so the
+    # rest of the pipeline sees a single source of truth.
+    uploads = render_excel_target_sources(app_config)
+    if uploads:
+        values["excel_target_uploads"] = uploads
     return bool(submitted), values
 
 
@@ -163,9 +174,7 @@ def order_form_fields(
 ) -> dict[str, object]:
     """Return the order form field values."""
     input_mode, excel_path_str, upload = excel_source_fields()
-    run_fields, item_workers, excel_target_uploads = profile_run_fields_with_workers(
-        app_config
-    )
+    run_fields, item_workers = profile_run_fields_with_workers(app_config)
     values = _order_form_values(
         input_mode,
         excel_path_str,
@@ -173,7 +182,6 @@ def order_form_fields(
         run_fields,
         item_workers,
         prevented_items_path,
-        excel_target_uploads,
     )
     return values
 
