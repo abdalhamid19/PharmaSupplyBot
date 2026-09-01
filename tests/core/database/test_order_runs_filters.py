@@ -1,7 +1,9 @@
 """Tests for the KPI-card drilldown filter read functions.
 
 Each test seeds one run with items spanning every filter category so the
-returned rows can be asserted against a known shape.
+returned rows can be asserted against a known shape. The cache tests
+clear the ``@st.cache_data`` layer between calls so each test sees a
+fresh database.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from pathlib import Path
 
 from src.core.database.order_runs_meta import run_meta_row
 from src.core.database.order_runs_read_filters import (
+    clear_filter_cache,
     fetch_run_items_flagged,
     fetch_run_items_matched,
     fetch_run_items_not_orderable,
@@ -82,9 +85,11 @@ class OrderRunsFiltersTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.store = OrderRunsStore(Path(self._tmp.name) / "runs.db")
         self.run_key = _seed_run(self.store)
+        clear_filter_cache()
 
     def tearDown(self) -> None:
-        """Remove the temporary database directory."""
+        """Remove the temporary database directory and clear cached rows."""
+        clear_filter_cache()
         self.store.db.close()
         self._tmp.cleanup()
 
@@ -127,6 +132,42 @@ class OrderRunsFiltersTests(unittest.TestCase):
         self.assertEqual(row["item_name"], "ORDERED")
         self.assertEqual(row["item_code"], "O1")
         self.assertGreater(row["ordered_qty"], 0)
+
+
+class OrderRunsFilterCacheTests(unittest.TestCase):
+    """``@st.cache_data`` should round-trip the same rows on a second call."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.store = OrderRunsStore(Path(self._tmp.name) / "runs.db")
+        _seed_run(self.store)
+        clear_filter_cache()
+
+    def tearDown(self) -> None:
+        clear_filter_cache()
+        self.store.db.close()
+        self._tmp.cleanup()
+
+    def test_matched_caches_result_for_same_args(self) -> None:
+        """Second call with same args should return identical rows (cache hit)."""
+        first = fetch_run_items_matched(RUN_KEY, db=self.store.db.path)
+        second = fetch_run_items_matched(RUN_KEY, db=self.store.db.path)
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 3)
+
+    def test_clear_filter_cache_invalidates_entries(self) -> None:
+        """Adding a row and clearing the cache should expose it on next call."""
+        before = fetch_run_items_matched(RUN_KEY, db=self.store.db.path)
+        self.assertEqual(len(before), 3)
+        self.store.upsert_run_item(
+            RUN_KEY,
+            _summary("M2", "MATCHED-TWO"),
+        )
+        cached = fetch_run_items_matched(RUN_KEY, db=self.store.db.path)
+        self.assertEqual(len(cached), 3, "Cache should still serve stale rows")
+        clear_filter_cache()
+        refreshed = fetch_run_items_matched(RUN_KEY, db=self.store.db.path)
+        self.assertEqual(len(refreshed), 4)
 
 
 if __name__ == "__main__":

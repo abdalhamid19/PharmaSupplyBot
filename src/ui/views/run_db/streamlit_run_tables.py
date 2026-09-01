@@ -18,12 +18,12 @@ STATUS_LABELS = {
 }
 
 
-def render_run_items_table(items: list[dict[str, Any]]) -> None:
+def render_run_items_table(items: list[dict[str, Any]], *, caption: str = "items") -> None:
     """Render the per-item fact table with friendly status labels."""
-    st.markdown("**Items**")
+    st.markdown(f"**{caption.capitalize()}**")
     frame = pd.DataFrame(items)
     if frame.empty:
-        st.info("No item facts stored for this run.")
+        st.info(f"No {caption} stored for this run.")
         return
     frame["status"] = frame["status"].map(
         lambda s: STATUS_LABELS.get(s, s)

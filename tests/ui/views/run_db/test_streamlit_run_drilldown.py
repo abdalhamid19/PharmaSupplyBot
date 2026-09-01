@@ -1,15 +1,12 @@
-"""AppTest coverage for KPI drill-down buttons on the Run Results tab.
+"""AppTest coverage for the in-page KPI filter bar on the Run Results tab.
 
 These tests boot :func:`render_run_db_tab` under ``streamlit.testing.v1.AppTest``
 without launching a real Streamlit server or opening the order-runs SQLite
-database. Every read function the tab (and its drilldown dialogs) calls is
-replaced by deterministic in-memory data so the assertions stay stable.
+database. Every read function the tab calls is replaced by deterministic
+in-memory data so the assertions stay stable.
 
-The ``build_app_test`` helper in :mod:`conftest` wires the mocks and exposes
-one ``AppTest`` instance per test. Each click-based test runs the page once,
-then clicks the relevant button and runs again — ``AppTest`` lets the
-dialog's fragment content reach ``at.dataframe`` even though ``st.dialog``
-itself is not a first-class element on the testing API.
+The helpers in :mod:`conftest` build a fully-wired AppTest; click tests
+press a KPI button, run again, and assert the items table swaps rows.
 """
 
 from __future__ import annotations
@@ -17,9 +14,7 @@ from __future__ import annotations
 import unittest
 
 from .conftest import (
-    RUN_KEY,
     build_app_test,
-    build_dialog_app_test,
     item_row,
     run_row,
     stop_app_test_patches,
@@ -27,36 +22,35 @@ from .conftest import (
 
 
 def _button_labels(app) -> list[str]:
-    """Return the labels of every drilldown button currently rendered."""
+    """Return the labels of every KPI bar button currently rendered."""
     return [button.label for button in app.button]
 
 
-def _drilldown_button(app, label_prefix: str):
-    """Return the first drilldown button whose label starts with ``prefix``."""
+def _kpi_button(app, label_prefix: str):
+    """Return the first KPI button whose label starts with ``prefix``."""
     for index, button in enumerate(app.button):
         if button.label.startswith(label_prefix):
             return index, button
     raise AssertionError(
-        f"No drilldown button found starting with {label_prefix!r}; "
+        f"No KPI button found starting with {label_prefix!r}; "
         f"rendered labels were {_button_labels(app)!r}"
     )
 
 
-def _dialog_dataframe_shape(app) -> tuple[int, ...]:
-    """Return the shape of the last dataframe rendered (the dialog table)."""
+def _items_dataframe_rows(app) -> int:
+    """Return the row count of the last dataframe (the items table)."""
     if not app.dataframe:
-        raise AssertionError(
-            "No dataframes rendered; expected the dialog to add at least one"
-        )
-    return tuple(app.dataframe[-1].value.shape)
+        return 0
+    return app.dataframe[-1].value.shape[0]
 
 
-class DrilldownButtonRenderingTests(unittest.TestCase):
-    """KPI drilldown buttons must disappear when their count is zero."""
+class KpiFilterBarRenderingTests(unittest.TestCase):
+    """KPI cards always render, even when their count is zero."""
 
     def setUp(self) -> None:
         self._app = build_app_test(
-            run=run_row(matched=0, flagged=0, total_ordered=0, store_count=0),
+            run=run_row(matched=0, flagged=0, total_ordered=0,
+                        not_orderable=0, store_count=0),
             items=[],
         )
         self._app.run()
@@ -64,193 +58,88 @@ class DrilldownButtonRenderingTests(unittest.TestCase):
     def tearDown(self) -> None:
         stop_app_test_patches(self._app)
 
-    def test_drilldown_buttons_hidden_when_count_is_zero(self) -> None:
-        """Every KPI button is skipped when its count field is 0."""
+    def test_kpi_filter_bar_renders_every_card_even_when_zero(self) -> None:
+        """Every KPI card is visible; zero cards are disabled, not hidden."""
         self.assertEqual(self._app.exception, [])
         labels = _button_labels(self._app)
-        self.assertEqual(
-            labels,
-            [],
-            f"Expected zero KPI buttons, got {labels!r}",
-        )
+        self.assertIn("Matched · 0", labels)
+        self.assertIn("Flagged · 0", labels)
+        self.assertIn("Not-orderable · 0", labels)
+        self.assertIn("Ordered qty · 0", labels)
+        self.assertIn("Show all · 0", labels)
+
+    def test_zero_count_buttons_are_disabled(self) -> None:
+        """Buttons with a zero count must be disabled in AppTest state."""
+        self.assertEqual(self._app.exception, [])
+        for label in ("Matched · 0", "Flagged · 0", "Not-orderable · 0",
+                      "Ordered qty · 0", "Show all · 0"):
+            _, button = _kpi_button(self._app, label)
+            self.assertTrue(
+                button.disabled,
+                f"{label!r} should be disabled at zero count",
+            )
 
 
-class DrilldownDialogClickTests(unittest.TestCase):
-    """Clicking each drilldown button should open its filtered dialog."""
+class KpiFilterBarClickTests(unittest.TestCase):
+    """Clicking a KPI card toggles the items table to the filtered rows."""
 
     def tearDown(self) -> None:
         stop_app_test_patches(getattr(self, "_app", None))
 
-    def test_drilldown_matched_button_opens_dialog(self) -> None:
-        matched_rows = [
-            item_row(i, status="matched-only", matched=1)
-            for i in range(17)
-        ]
+    def _fresh_app(self, run_kwargs, **kwargs):
+        full_items = [item_row(i, item_name=f"ITEM-{i}") for i in range(5)]
         self._app = build_app_test(
-            run=run_row(matched=17),
-            matched=matched_rows,
-        )
-        self._app.run()
-        self.assertEqual(self._app.exception, [])
-
-        index, button = _drilldown_button(self._app, "Matched")
-        self.assertEqual(index, 1, "Matched button should appear after Items")
-
-        baseline = len(self._app.dataframe)
-        button.click()
-        self._app.run()
-        self.assertEqual(self._app.exception, [])
-
-        self.assertGreater(
-            len(self._app.dataframe),
-            baseline,
-            "Matched click should add the dialog dataframe",
-        )
-        self.assertEqual(
-            _dialog_dataframe_shape(self._app)[0],
-            17,
-            "Matched dialog should show 17 rows",
-        )
-
-    def test_drilldown_flagged_button_opens_dialog(self) -> None:
-        flagged_rows = [
-            item_row(
-                i,
-                status="manual-review",
-                matched=0,
-                manual_review_required=1,
-            )
-            for i in range(5)
-        ]
-        self._app = build_app_test(
-            run=run_row(matched=0, flagged=5),
-            flagged=flagged_rows,
-        )
-        self._app.run()
-        self.assertEqual(self._app.exception, [])
-
-        index, button = _drilldown_button(self._app, "Flagged")
-        self.assertEqual(index, 1, "Flagged button should be the second button")
-
-        baseline = len(self._app.dataframe)
-        button.click()
-        self._app.run()
-        self.assertEqual(self._app.exception, [])
-
-        self.assertGreater(
-            len(self._app.dataframe),
-            baseline,
-            "Flagged click should add the dialog dataframe",
-        )
-        self.assertEqual(
-            _dialog_dataframe_shape(self._app)[0],
-            5,
-            "Flagged dialog should show 5 rows",
-        )
-
-    def test_drilldown_ordered_button_opens_dialog(self) -> None:
-        ordered_rows = [
-            item_row(
-                i,
-                status="added-to-cart",
-                matched=1,
-                ordered_qty=2,
-            )
-            for i in range(8)
-        ]
-        self._app = build_app_test(
-            run=run_row(matched=0, flagged=0, total_ordered=8),
-            items=[],
-            ordered=ordered_rows,
-        )
-        self._app.run()
-        self.assertEqual(self._app.exception, [])
-
-        index, button = _drilldown_button(self._app, "Ordered qty")
-        self.assertEqual(
-            index,
-            0,
-            "Ordered qty should be the only visible button when other counts are 0",
-        )
-
-        baseline = len(self._app.dataframe)
-        button.click()
-        self._app.run()
-        self.assertEqual(self._app.exception, [])
-
-        self.assertGreater(
-            len(self._app.dataframe),
-            baseline,
-            "Ordered click should add the dialog dataframe",
-        )
-        self.assertEqual(
-            _dialog_dataframe_shape(self._app)[0],
-            8,
-            "Ordered dialog should show 8 rows",
-        )
-
-    def test_drilldown_items_button_opens_full_table(self) -> None:
-        """Items drilldown should show the unfiltered item table."""
-        full_items = [item_row(i, item_name=f"ITEM-{i}") for i in range(4)]
-        self._app = build_app_test(
-            run=run_row(matched=0, flagged=0, total_ordered=0, items=4),
+            run=run_row(**run_kwargs),
             items=full_items,
+            **kwargs,
         )
         self._app.run()
         self.assertEqual(self._app.exception, [])
+        return full_items
 
-        index, button = _drilldown_button(self._app, "Items")
-        self.assertEqual(index, 0, "Items button should be the first button")
+    def test_click_matched_card_filters_items_table(self) -> None:
+        """Matched click should leave only matched rows in the items table."""
+        matched_rows = [item_row(0, status="matched-only", matched=1)]
+        self._fresh_app({"matched": 1, "items": 5}, matched=matched_rows)
+        baseline = _items_dataframe_rows(self._app)
+        self.assertEqual(baseline, 5)
 
-        baseline = len(self._app.dataframe)
+        _, button = _kpi_button(self._app, "Matched")
         button.click()
         self._app.run()
         self.assertEqual(self._app.exception, [])
 
-        self.assertGreater(
-            len(self._app.dataframe),
-            baseline,
-            "Items click should add the dialog dataframe",
-        )
-        self.assertEqual(
-            _dialog_dataframe_shape(self._app)[0],
-            4,
-            "Items dialog should show all 4 rows",
-        )
+        self.assertEqual(_items_dataframe_rows(self._app), 1)
 
+    def test_click_show_all_clears_filter(self) -> None:
+        """Show all should restore the unfiltered items table."""
+        flagged_rows = [item_row(0, status="manual-review", matched=0,
+                                 manual_review_required=1)]
+        self._fresh_app({"flagged": 1, "items": 5}, flagged=flagged_rows)
+        _, button = _kpi_button(self._app, "Flagged")
+        button.click()
+        self._app.run()
+        self.assertEqual(_items_dataframe_rows(self._app), 1)
 
-class DrilldownNotOrderableDialogTests(unittest.TestCase):
-    """``show_not_orderable_dialog`` is not reachable from a KPI button.
+        _, show_all = _kpi_button(self._app, "Show all")
+        show_all.click()
+        self._app.run()
+        self.assertEqual(self._app.exception, [])
+        self.assertEqual(_items_dataframe_rows(self._app), 5)
 
-    The current :mod:`streamlit_run_drilldown` file only exposes buttons
-    for Items, Matched, Flagged, Offering stores, and Ordered qty — Not-
-    orderable has a dialog but no button. To still cover the dialog's
-    contract the test boots a small AppTest that calls the dialog directly
-    and asserts the rendered dataframe matches the canned filter rows.
-    """
+    def test_clicking_same_active_card_clears_filter(self) -> None:
+        """Pressing the already-active card again toggles back to all items."""
+        matched_rows = [item_row(0, status="matched-only", matched=1)]
+        self._fresh_app({"matched": 1, "items": 5}, matched=matched_rows)
+        _, matched_button = _kpi_button(self._app, "Matched")
+        matched_button.click()
+        self._app.run()
+        self.assertEqual(_items_dataframe_rows(self._app), 1)
 
-    def test_drilldown_not_orderable_dialog_renders_filtered_rows(self) -> None:
-        rows = [
-            item_row(
-                i,
-                item_name=f"BLOCKED-{i}",
-                status="not-orderable",
-                matched=0,
-            )
-            for i in range(4)
-        ]
-        app = build_dialog_app_test(
-            dialog="show_not_orderable_dialog",
-            run_key=RUN_KEY,
-            rows=rows,
-        )
-        app.run()
-        self.assertEqual(app.exception, [])
-        self.assertEqual(
-            _dialog_dataframe_shape(app)[0],
-            4,
-            "Not-orderable dialog should show 4 rows",
-        )
+        matched_button = _kpi_button(self._app, "Matched")[1]
+        matched_button.click()
+        self._app.run()
+        self.assertEqual(_items_dataframe_rows(self._app), 5)
 
 
 if __name__ == "__main__":
