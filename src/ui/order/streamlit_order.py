@@ -23,6 +23,7 @@ from .streamlit_order_form import (
     _latest_order_summary_path,
     prepare_order_state_files,
     target_profile_keys,
+    selected_excel_targets,
     _profile_key_for_state,
     _completed_summary_path,
     _completed_previous_count,
@@ -35,7 +36,7 @@ from .streamlit_order_form import (
 from .streamlit_order_command import (
     order_command,
     _order_base_command,
-    _order_profile_args,
+    _order_target_args,
     _order_debug_args,
     _order_execution_args,
     _order_worker_args,
@@ -65,13 +66,20 @@ def render_order_tab(
 ) -> None:
     """Render order execution controls and fresh-run analysis."""
     st.subheader("Run Order")
-    if not default_profile:
-        st.warning("No profiles found in config.")
+    if not default_profile and not app_config.enabled_excel_targets():
+        st.warning(
+            "No profiles and no Excel targets found in config. "
+            "Add at least one `profiles.<name>` or `excel_targets.<name>` entry."
+        )
         return
     if render_running_order_controls():
         return
     submitted, form_values = order_form_values(app_config)
     if not submitted:
+        return
+    selected = list(form_values.get("selected_targets") or ())
+    if not selected:
+        st.error("Pick at least one Run target (Tawreed profile or Excel target).")
         return
     excel_path = resolve_excel_path(
         form_values["excel_path_str"], form_values["upload"]
@@ -88,6 +96,7 @@ def render_order_tab(
             "Please choose the shortage/order Excel file."
         )
         return
+    form_values["_config_path"] = str(config_path)
     run_order_submission(
         app_config, default_profile, config_path, form_values, excel_path
     )
@@ -173,6 +182,7 @@ __all__ = [
     "_latest_order_summary_path",
     "prepare_order_state_files",
     "target_profile_keys",
+    "selected_excel_targets",
     "_profile_key_for_state",
     "_completed_summary_path",
     "_completed_previous_count",
@@ -184,7 +194,7 @@ __all__ = [
     # Re-exports from command module
     "order_command",
     "_order_base_command",
-    "_order_profile_args",
+    "_order_target_args",
     "_order_debug_args",
     "_order_execution_args",
     "_order_worker_args",

@@ -1,8 +1,29 @@
-"""Profile and run configuration fields for Streamlit order form."""
+"""Profile, Excel-target, and run configuration fields for Streamlit order form."""
+
+from __future__ import annotations
+
+from typing import NamedTuple
 
 import streamlit as st
 
-OrderRunFields = tuple[str, str, int, bool, bool, bool, str, bool, float, int, int]
+from src.core.config.config_models import AppConfig
+
+
+class OrderRunFields(NamedTuple):
+    """Order form fields covering both Tawreed profiles and Excel targets."""
+
+    profile_mode: str
+    selected_targets: tuple[str, ...]
+    profile_key: str
+    limit: int
+    debug_browser: bool
+    resume: bool
+    match_only: bool
+    execution_mode: str
+    highest_discount: bool
+    min_discount_percent: float
+    start_item: int
+    end_item: int
 
 
 def profile_run_fields(app_config) -> OrderRunFields:
@@ -12,18 +33,88 @@ def profile_run_fields(app_config) -> OrderRunFields:
 
 
 def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
-    """Return the order form fields and item workers count."""
-    profile_mode = st.radio("Run target", ["Single profile", "All profiles"], horizontal=True)
-    profile_key = st.selectbox("Profile", list(app_config.profiles.keys()), index=0)
+    """Return the order form fields and item workers count.
+
+    The "Run target" selector combines Tawreed profiles and Excel targets
+    into one multiselect so an operator can run matching against any
+    combination of live Tawreed profiles and offline Excel catalogs in
+    the same submission.
+    """
+    profile_keys = list(app_config.profiles.keys())
+    excel_target_keys = list(app_config.enabled_excel_targets().keys())
+    target_options = [
+        _format_target_label(key, kind, app_config)
+        for kind, keys in (("profile", profile_keys), ("excel-target", excel_target_keys))
+        for key in keys
+    ]
+    target_value_by_label = {
+        _format_target_label(key, kind, app_config): (kind, key)
+        for kind, keys in (
+            ("profile", profile_keys),
+            ("excel-target", excel_target_keys),
+        )
+        for key in keys
+    }
+
+    selected_labels = st.multiselect(
+        "Run target",
+        options=target_options,
+        default=target_options[: min(1, len(target_options))],
+        help=(
+            "Pick any mix of Tawreed profiles and Excel-target catalogs. "
+            "Each one is matched independently against the order Excel."
+        ),
+    )
+    selected_pairs = [target_value_by_label[label] for label in selected_labels]
+
+    if any(kind == "profile" for kind, _ in selected_pairs):
+        profile_mode = "Single profile" if len(selected_pairs) == 1 else "Multi"
+    else:
+        profile_mode = "Excel targets only"
+    primary_profile = next(
+        (key for kind, key in selected_pairs if kind == "profile"),
+        profile_keys[0] if profile_keys else "",
+    )
+
+    profile_key = st.selectbox(
+        "Primary profile (for resume/preview only)",
+        options=profile_keys or [""],
+        index=0,
+        disabled=not profile_keys,
+        help=(
+            "Used to scope resume and the watched summary CSV. "
+            "Excel-target runs do not need this — pick any profile."
+        ),
+    )
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=1500)
 
     advanced_options = _render_advanced_options(app_config)
-    
-    fields = (
-        str(profile_mode), str(profile_key), int(limit),
-        *advanced_options[:-1]
+    fields = OrderRunFields(
+        profile_mode=str(profile_mode),
+        selected_targets=tuple(
+            f"{kind}:{key}" for kind, key in selected_pairs
+        ),
+        profile_key=str(primary_profile or profile_key),
+        limit=int(limit),
+        debug_browser=bool(advanced_options[0]),
+        resume=bool(advanced_options[1]),
+        match_only=bool(advanced_options[2]),
+        execution_mode=str(advanced_options[3]),
+        highest_discount=bool(advanced_options[4]),
+        min_discount_percent=float(advanced_options[5]),
+        start_item=int(advanced_options[6]),
+        end_item=int(advanced_options[7]),
     )
-    return fields, advanced_options[-1]
+    return fields, int(advanced_options[-1])
+
+
+def _format_target_label(key: str, kind: str, app_config: AppConfig) -> str:
+    """Return one human-friendly label for a profile or excel-target."""
+    if kind == "profile":
+        profile = app_config.profiles.get(key)
+        display = profile.display_name if profile else key
+        return f"👤 Tawreed profile — {display} ({key})"
+    return f"📊 Excel target — {key}"
 
 
 def _render_advanced_options(app_config):
@@ -38,7 +129,7 @@ def _render_advanced_options(app_config):
         item_workers = item_workers_field(app_config)
         highest_discount = st.checkbox("Highest discount only", value=False)
         min_discount = st.number_input("Minimum discount percent", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
-    
+
     return (bool(debug_browser), bool(resume), bool(match_only), str(execution_mode), bool(highest_discount), float(min_discount), int(start_item), int(end_item), int(item_workers))
 
 
@@ -55,3 +146,11 @@ def item_workers_field(app_config) -> int:
             help="Split this Excel file across isolated Chromium workers for one profile.",
         )
     )
+
+
+__all__ = [
+    "OrderRunFields",
+    "profile_run_fields",
+    "profile_run_fields_with_workers",
+    "item_workers_field",
+]

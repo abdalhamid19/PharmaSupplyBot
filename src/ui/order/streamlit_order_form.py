@@ -99,10 +99,29 @@ def prepare_order_state_files(app_config, form_values: dict[str, object]) -> boo
 
 
 def target_profile_keys(app_config, form_values: dict[str, object]) -> list[str]:
-    """Return the profiles targeted by one order submission."""
-    if form_values["profile_mode"] == "Single profile":
-        return [str(form_values["profile_key"])]
+    """Return the Tawreed profile keys targeted by one order submission."""
+    selected_targets = form_values.get("selected_targets") or ()
+    profile_keys = [
+        token.split(":", 1)[1]
+        for token in selected_targets
+        if isinstance(token, str) and token.startswith("profile:")
+    ]
+    if profile_keys:
+        return profile_keys
+    profile_key = str(form_values.get("profile_key") or "")
+    if profile_key:
+        return [profile_key]
     return list(app_config.profiles.keys())
+
+
+def selected_excel_targets(form_values: dict[str, object]) -> list[str]:
+    """Return the Excel-target keys targeted by one order submission."""
+    selected_targets = form_values.get("selected_targets") or ()
+    return [
+        token.split(":", 1)[1]
+        for token in selected_targets
+        if isinstance(token, str) and token.startswith("excel-target:")
+    ]
 
 
 def _profile_key_for_state(form_values: dict[str, object]) -> str:
@@ -180,21 +199,20 @@ def _order_form_values(
 
 def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
     """Build values related to the selected order run target/options."""
-    profile_mode, profile_key, limit, debug_browser, resume, match_only = run_fields[:6]
-    extended_vals = _extended_order_run_values(run_fields)
-    execution_mode, high_disc, min_disc, start_item, end_item = extended_vals
+    selected_targets = tuple(run_fields.selected_targets)
     return {
-        "profile_mode": profile_mode,
-        "profile_key": profile_key,
-        "limit": int(limit),
-        "debug_browser": bool(debug_browser),
-        "resume": bool(resume),
-        "match_only": bool(match_only),
-        "execution_mode": str(execution_mode),
-        "highest_discount": bool(high_disc),
-        "min_discount_percent": float(min_disc),
-        "start_item": int(start_item),
-        "end_item": int(end_item),
+        "profile_mode": str(run_fields.profile_mode),
+        "selected_targets": selected_targets,
+        "profile_key": str(run_fields.profile_key),
+        "limit": int(run_fields.limit),
+        "debug_browser": bool(run_fields.debug_browser),
+        "resume": bool(run_fields.resume),
+        "match_only": bool(run_fields.match_only),
+        "execution_mode": str(run_fields.execution_mode),
+        "highest_discount": bool(run_fields.highest_discount),
+        "min_discount_percent": float(run_fields.min_discount_percent),
+        "start_item": int(run_fields.start_item),
+        "end_item": int(run_fields.end_item),
     }
 
 
@@ -202,15 +220,13 @@ def _extended_order_run_values(
     run_fields: OrderRunFields,
 ) -> tuple[str, bool, float, int, int]:
     """Return execution mode and discount controls with compatibility."""
-    tail = run_fields[6:]
-    if len(tail) == 2:
-        high_disc, min_disc = tail
-        return "auto", bool(high_disc), float(min_disc), 1, 0
-    if len(tail) == 3:
-        execution_mode, high_disc, min_disc = tail
-        return str(execution_mode), bool(high_disc), float(min_disc), 1, 0
-    execution_mode, high_disc, min_disc, start_item, end_item = tail
-    return str(execution_mode), bool(high_disc), float(min_disc), int(start_item), int(end_item)
+    return (
+        str(run_fields.execution_mode),
+        bool(run_fields.highest_discount),
+        float(run_fields.min_discount_percent),
+        int(run_fields.start_item),
+        int(run_fields.end_item),
+    )
 
 
 __all__ = [
@@ -223,6 +239,7 @@ __all__ = [
     "_latest_order_summary_path",
     "prepare_order_state_files",
     "target_profile_keys",
+    "selected_excel_targets",
     "_profile_key_for_state",
     "_completed_summary_path",
     "_completed_previous_count",

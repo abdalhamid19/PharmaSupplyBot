@@ -110,6 +110,26 @@ runtime:
   # Keep at or below 4 to avoid triggering Tawreed concurrent-session limits.
   item_workers: 1
 
+# Excel target catalogs (alternative match surface beside Tawreed profiles).
+# Each entry is a vendor/pharmacy pricelist in ``data/input/excel target/<key>.xlsx``
+# (override the path with ``--excel-target-path key=path``). The matching
+# algorithm is the same one used on Tawreed — only the search surface
+# changes from HTTP/API/Playwright to an in-memory catalog scan.
+#
+# Same artifact flow:
+#   * ``--match-only`` writes per-target CSVs and records the result in the
+#     same ``state/manual_review_decisions.db`` and ``state/order_runs.db``.
+#   * Manual review on Excel-target matches behaves exactly like Tawreed.
+excel_targets:
+  alnasr:
+    display_name: "صيدلية النصر"
+    name_col: "صنف"
+    price_col: "سعر"
+    discount_col: "الخصم"
+    sheet: ""
+    header_row: 0
+    enabled: true
+
 # Local SQLite persistence for order-run analytics.
 # قاعدة بيانات محلية لتحليل نتائج الطلبات عبر الزمن
 database:

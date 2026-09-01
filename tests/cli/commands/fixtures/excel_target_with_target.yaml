@@ -1,0 +1,15 @@
+site:
+  base_url: "https://example.test"
+excel:
+  code_col: "كود"
+  name_col: "إسم الصنف"
+  qty_col: "كمية النقص"
+profiles:
+  wardany:
+    display_name: "Wardany"
+excel_targets:
+  alnasr:
+    display_name: "Alnasr"
+    name_col: "صنف"
+    price_col: "سعر"
+    discount_col: "الخصم"

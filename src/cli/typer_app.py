@@ -305,6 +305,19 @@ def order_cmd(
         None, "--excel", "-x",
         help="Path to order Excel file, usually under data/input/order_items/.",
     ),
+    # Excel target source (secondary match surface beside Tawreed profiles)
+    excel_target: str | None = typer.Option(
+        None, "--excel-target", "-t",
+        help="Excel target catalog key (from config.yaml excel_targets).",
+    ),
+    all_excel_targets: bool = typer.Option(
+        False, "--all-excel-targets",
+        help="Match against every configured Excel target catalog.",
+    ),
+    excel_target_path: str | None = typer.Option(
+        None, "--excel-target-path",
+        help="Override the Excel target XLSX path (repeatable via comma).",
+    ),
     # Runtime
     limit: int = typer.Option(0, "--limit", "-n", help="Limit items (0 = no limit)."),
     debug_browser: bool = typer.Option(

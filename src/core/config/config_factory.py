@@ -7,6 +7,7 @@ from typing import Any
 from .config_models import (
     DatabaseConfig,
     ExcelConfig,
+    ExcelTargetConfig,
     MatchingConfig,
     ProfileConfig,
     RuntimeConfig,
@@ -16,6 +17,9 @@ DEFAULT_BASE_URL = "https://seller.tawreed.io/#/login"
 DEFAULT_CODE_COLUMN = "كود"
 DEFAULT_NAME_COLUMN = "إسم الصنف"
 DEFAULT_QUANTITY_COLUMN = "كمية النقص"
+DEFAULT_TARGET_NAME_COLUMN = "صنف"
+DEFAULT_TARGET_PRICE_COLUMN = "سعر"
+DEFAULT_TARGET_DISCOUNT_COLUMN = "الخصم"
 MATCHING_BOOL_KEYS = {"exact_match_accept", "require_identity_token_for_flag",
     "enable_auto_save_verified_match", "enable_auto_match_re_review_on_fail",
     "enable_approved_match_re_review_on_fail", "enable_manufacturer_check",
@@ -31,6 +35,30 @@ def build_excel_config(excel_values: dict[str, Any]) -> ExcelConfig:
         qty_col=str(excel_values.get("qty_col", DEFAULT_QUANTITY_COLUMN)),
         min_qty=int(excel_values.get("min_qty", 1)),
         max_qty=int(excel_values.get("max_qty", 10**9)),
+    )
+
+
+def build_excel_targets(
+    excel_targets_values: dict[str, Any],
+) -> dict[str, ExcelTargetConfig]:
+    """Build Excel target catalog settings from the raw YAML dictionary."""
+    targets: dict[str, ExcelTargetConfig] = {}
+    for target_key, raw in excel_targets_values.items():
+        targets[str(target_key)] = build_excel_target(raw)
+    return targets
+
+
+def build_excel_target(raw_values: Any) -> ExcelTargetConfig:
+    """Build one Excel target config from its raw YAML dictionary."""
+    values = dict(raw_values or {})
+    return ExcelTargetConfig(
+        name_col=str(values.get("name_col", DEFAULT_TARGET_NAME_COLUMN)),
+        price_col=str(values.get("price_col", DEFAULT_TARGET_PRICE_COLUMN)),
+        discount_col=str(values.get("discount_col", DEFAULT_TARGET_DISCOUNT_COLUMN)),
+        code_col=str(values.get("code_col", "")),
+        sheet=str(values.get("sheet", "")),
+        header_row=int(values.get("header_row", 0)),
+        enabled=_as_bool(values.get("enabled"), True),
     )
 
 

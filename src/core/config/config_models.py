@@ -17,6 +17,32 @@ class ExcelConfig:
     min_qty: int = 1
     max_qty: int = 10**9
 
+
+@dataclass(frozen=True)
+class ExcelTargetConfig:
+    """Excel catalog columns used as a secondary match source.
+
+    The Excel target source behaves like a Tawreed profile: each configured
+    target is a pharmacy/vendor catalog (``name`` + ``price`` + ``discount``)
+    that the matching engine searches in addition to the live Tawreed
+    profiles. The matching algorithm is identical; only the search surface
+    changes (in-memory catalog scan instead of HTTP/API/Playwright).
+    """
+
+    name_col: str
+    price_col: str
+    discount_col: str
+    code_col: str = ""
+    sheet: str = ""
+    header_row: int = 0
+    enabled: bool = True
+
+    @property
+    def requires_code(self) -> bool:
+        """Return whether the catalog needs an explicit code column."""
+        return bool(self.code_col)
+
+
 @dataclass(frozen=True)
 class ProfileConfig:
     """One pharmacy profile plus its optional pharmacy-switch settings."""
@@ -94,6 +120,7 @@ class AppConfig:
     matching: MatchingConfig
     runtime: RuntimeConfig
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
+    excel_targets: dict[str, ExcelTargetConfig] = field(default_factory=dict)
 
     def profiles_to_run(
         self,
@@ -122,3 +149,28 @@ class AppConfig:
                             hint="Re-run with one of the available profile names.",
             )
         return [(profile, self.profiles[profile])]
+
+    def enabled_excel_targets(self) -> dict[str, ExcelTargetConfig]:
+        """Return every configured Excel target that is enabled."""
+        return {
+            key: cfg for key, cfg in self.excel_targets.items() if cfg.enabled
+        }
+
+    def excel_targets_to_run(
+        self,
+        excel_target: str | None,
+        all_excel_targets: bool,
+    ) -> list[tuple[str, ExcelTargetConfig]]:
+        """Return the configured excel targets requested by the CLI arguments."""
+        enabled = self.enabled_excel_targets()
+        if all_excel_targets:
+            return list(enabled.items())
+        if excel_target:
+            if excel_target not in enabled:
+                available = ", ".join(enabled.keys()) or "<none>"
+                raise ValidationError(
+                    f"Unknown excel-target '{excel_target}'. Available: {available}",
+                    hint="Re-run with one of the available excel-target names.",
+                )
+            return [(excel_target, enabled[excel_target])]
+        return []

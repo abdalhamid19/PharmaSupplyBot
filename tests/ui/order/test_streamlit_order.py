@@ -311,6 +311,7 @@ class StreamlitOrderTests(unittest.TestCase):
                 return_value=(
                     (
                         "Single profile",
+                        ("profile:wardany",),
                         "wardany",
                         5,
                         False,
@@ -326,7 +327,10 @@ class StreamlitOrderTests(unittest.TestCase):
                 ),
             ),
         ):
-            app_config = SimpleNamespace(profiles={"wardany": object()})
+            app_config = SimpleNamespace(
+                profiles={"wardany": SimpleNamespace(display_name="Wardany")},
+                enabled_excel_targets=lambda: {},
+            )
             values = order_form_fields(app_config)
 
         self.assertEqual(

@@ -17,7 +17,7 @@ def order_command(
 ) -> list[str]:
     """Return the CLI command arguments for one order run."""
     command = _order_base_command(config_path, excel_path, form_values)
-    command.extend(_order_profile_args(form_values))
+    command.extend(_order_target_args(form_values))
     command.extend(_order_debug_args(form_values))
     command.extend(_order_execution_args(form_values))
     command.extend(_order_worker_args(form_values))
@@ -36,11 +36,75 @@ def _order_base_command(
     return command
 
 
-def _order_profile_args(form_values: dict[str, object]) -> list[str]:
-    """Return profile-related CLI arguments."""
-    if form_values["profile_mode"] == "Single profile":
-        return ["--profile", str(form_values["profile_key"])]
-    return ["--all-profiles"]
+def _order_target_args(form_values: dict[str, object]) -> list[str]:
+    """Return CLI arguments describing Tawreed profiles and Excel targets.
+
+    Picks one of ``--profile``, ``--all-profiles``, ``--excel-target`` or
+    ``--all-excel-targets`` depending on what the operator selected in the
+    Run target multiselect. Multi-target selections fan out to repeated
+    ``--excel-target`` flags plus ``--all-profiles`` when the operator asked
+    for every Tawreed profile in addition to Excel targets.
+    """
+    selected_targets = list(form_values.get("selected_targets") or ())
+    if not selected_targets:
+        return _legacy_target_args(form_values)
+
+    profile_keys = [
+        token.split(":", 1)[1]
+        for token in selected_targets
+        if isinstance(token, str) and token.startswith("profile:")
+    ]
+    excel_target_keys = [
+        token.split(":", 1)[1]
+        for token in selected_targets
+        if isinstance(token, str) and token.startswith("excel-target:")
+    ]
+
+    args: list[str] = []
+    if profile_keys:
+        all_profiles = len(profile_keys) == len(_configured_profiles(form_values))
+        if all_profiles:
+            args.append("--all-profiles")
+        else:
+            args.extend(["--profile", profile_keys[0]])
+    if excel_target_keys:
+        if len(excel_target_keys) > 1:
+            args.append("--all-excel-targets")
+            for key in excel_target_keys:
+                args.extend(["--excel-target", str(key)])
+        else:
+            args.extend(["--excel-target", excel_target_keys[0]])
+    return args
+
+
+def _legacy_target_args(form_values: dict[str, object]) -> list[str]:
+    """Translate the legacy ``profile_mode``/``profile_key`` form values.
+
+    Older callers (and a number of existing tests) submit form values
+    built before the multiselect. They pass ``profile_mode`` of either
+    ``Single profile`` or ``All profiles`` along with a ``profile_key``;
+    we honour that shape verbatim.
+    """
+    if form_values.get("profile_mode") == "All profiles":
+        return ["--all-profiles"]
+    profile_key = str(form_values.get("profile_key") or "")
+    if profile_key:
+        return ["--profile", profile_key]
+    return []
+
+
+def _configured_profiles(form_values: dict[str, object]) -> list[str]:
+    """Return the list of profiles known to the Streamlit session."""
+    config_path = str(form_values.get("_config_path") or "state/config.yaml")
+    try:
+        from src.core.config.config import load_config
+    except Exception:
+        return []
+    try:
+        app_config = load_config(Path(config_path))
+    except Exception:
+        return []
+    return list(app_config.profiles.keys())
 
 
 def _order_debug_args(form_values: dict[str, object]) -> list[str]:

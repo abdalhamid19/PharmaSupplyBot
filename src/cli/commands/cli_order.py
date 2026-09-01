@@ -9,9 +9,15 @@ from pathlib import Path
 
 from src.core.artifact_run import artifact_run
 from src.core.config.config_models import AppConfig, ProfileConfig
+from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
 from ..cli_shared import build_bot
 from .cli_order_items import order_bot_options
+from .cli_order_excel_target import (
+    load_target_catalogs,
+    run_excel_target_match_only_multi,
+    selected_excel_target_configs,
+)
 from ..registry import register
 
 logger = logging.getLogger(__name__)
@@ -74,6 +80,32 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     )
 
     apply_order_overrides(app_config, args)
+
+    selected_targets = selected_excel_target_configs(app_config, args)
+    target_catalogs = (
+        load_target_catalogs(selected_targets, app_config) if selected_targets else {}
+    )
+
+    target_items = _load_target_items(app_config, args)
+
+    if selected_targets and target_items is not None:
+        from src.core.artifact_run import current_artifact_run
+
+        summary_path = (
+            current_artifact_run().directory / "excel_target_summary.csv"
+            if current_artifact_run()
+            else Path("artifacts") / "excel_target_summary.csv"
+        )
+        excel_target_totals = run_excel_target_match_only_multi(
+            app_config,
+            selected_targets,
+            target_catalogs,
+            target_items,
+            summary_path,
+        )
+    else:
+        excel_target_totals = None
+
     profiles = app_config.profiles_to_run(
         profile=args.profile, all_profiles=args.all_profiles
     )
@@ -114,19 +146,44 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     # artifacts without guessing.
     primary_dir = run_directories[0] if run_directories else None
 
+    summary_payload = {
+        "processed": processed,
+        "matched": matched,
+        "flagged": flagged,
+        "duration": format_duration(timer.seconds),
+        "summary": primary_dir,
+    }
+    if excel_target_totals:
+        summary_payload["excel_targets"] = excel_target_totals
+
     print_command_summary(
         "order",
-        {
-            "processed": processed,
-            "matched": matched,
-            "flagged": flagged,
-            "duration": format_duration(timer.seconds),
-            "summary": primary_dir,
-        },
+        summary_payload,
         success=True,
         quiet=is_quiet(args),
     )
     return 0
+
+
+def _load_target_items(
+    app_config: AppConfig, args: argparse.Namespace
+) -> list[Item] | None:
+    """Load items from the configured Excel when Excel targets are selected.
+
+    Excel-target runs reuse the existing shortage Excel format (code/name/qty).
+    When ``--excel`` is missing and no manual-review-corrections path is set,
+    the Excel-target flow is skipped (the Tawreed profiles will still run).
+    """
+    if not getattr(args, "excel", None):
+        return None
+    from .cli_order_items import load_regular_order_items
+
+    try:
+        items = list(load_regular_order_items(app_config, args))
+    except Exception as exc:
+        logger.warning("excel target item load failed: %s", exc)
+        return None
+    return items
 
 
 def _newest_run_dirs(profile_key: str) -> list[Path]:

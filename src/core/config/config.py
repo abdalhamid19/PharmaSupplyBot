@@ -11,6 +11,7 @@ from .config_factory import (
     DEFAULT_BASE_URL,
     build_database_config,
     build_excel_config,
+    build_excel_targets,
     build_matching_config,
     build_profiles,
     build_runtime_config,
@@ -24,6 +25,7 @@ def load_config(path: Path) -> AppConfig:
     site_values = _require(raw_values, "site")
     excel_values = _require(raw_values, "excel")
     profiles_values = _require(raw_values, "profiles")
+    excel_targets_values = raw_values.get("excel_targets", {}) or {}
     return AppConfig(
         base_url=str(site_values.get("base_url", DEFAULT_BASE_URL)),
         excel=build_excel_config(excel_values),
@@ -33,6 +35,7 @@ def load_config(path: Path) -> AppConfig:
         matching=build_matching_config(raw_values),
         runtime=build_runtime_config(raw_values),
         database=build_database_config(raw_values),
+        excel_targets=build_excel_targets(excel_targets_values),
     )
 
 
