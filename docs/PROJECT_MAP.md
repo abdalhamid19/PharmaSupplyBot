@@ -44,13 +44,8 @@
   artifact writers keep a union CSV schema so retry/status columns are preserved.
 - `run.py export-products` exports Tawreed catalog rows into
   `artifacts/export-products/<profile>/<run_id>/`.
-- `run.py match-products` matches an inventory Excel/CSV against an exported
-  Tawreed CSV. `--profile wardany` resolves to the newest exported Tawreed
-  catalog from the new layout or legacy fallback; `--tawreed-csv` overrides it.
-- Standalone product matching runs algorithmic matching first, then optional AI
-  verification, AI search, and AI review when API keys are configured.
-- Streamlit exposes the same product matching command in the `Product Matching`
-  tab and runs it through the existing isolated subprocess runner.
+- Standalone `match-products` was removed (CLI + GUI tab + engine). Order-time
+  matching lives in `src/core/matching/` and `src/tawreed/matching/`.
 - Streamlit Order exposes the same order AI flags and browses command/profile/run
   artifact folders.
 - Streamlit Order exposes the matching risk policy and flagged-match action used
@@ -232,9 +227,9 @@
 - `.venv/bin/python tools/rule_audit.py`: `rule_audit_ok`,
   `baseline_violations_remaining:161`.
 - CLI help checks succeeded for `run.py`, `order`, `remove-cart`,
-  `export-products`, and `match-products`.
-- Smoke run succeeded:
-  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke_after_schema_fix.csv`.
+  and `export-products`.
+- Smoke run succeeded (historical, command since removed):
+  `run.py match-products --profile wardany ... --output artifacts/wardany/match_products_smoke_after_schema_fix.csv`.
 - Streamlit started locally on `http://127.0.0.1:8502` and returned HTTP 200.
 - Safe live smoke succeeded without changing the cart:
   `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search`.
@@ -285,7 +280,7 @@
   compileall and rule audit after syncing `PROJECT_MAP.md`.
 - Phase 20 validation succeeded:
   `.venv/bin/python tools/phase_validation.py --smoke` ran 262 unit tests,
-  compileall, rule audit, CLI help checks, and `match-products --trace`.
+  compileall, rule audit, and CLI help checks (`match-products --trace` since removed).
 - Phase 20 live-safe checks succeeded:
   `.venv/bin/python run.py order --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 1 --match-only --fast-search --ai --provider custom --api-key ''`
   accepted the first item without changing the cart, and
@@ -296,8 +291,8 @@
   and rule audit.
 - Latest CLI/API-mode smoke succeeded: `order --help` and `remove-cart --help`
   expose `--execution-mode {auto,api,browser}`.
-- Latest product matching smoke succeeded:
-  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 5 --no-ai --trace --output artifacts/wardany/match_products_smoke_execution_mode.csv`.
+- Latest product matching smoke succeeded (historical, command since removed):
+  `run.py match-products --profile wardany ... --output artifacts/wardany/match_products_smoke_execution_mode.csv`.
 - Latest live-safe Tawreed checks succeeded without final submit:
   `order --limit 1 --match-only --execution-mode auto` matched KENACOMB with
   browser fallback, `order --limit 1 --execution-mode auto` added one KENACOMB
@@ -311,8 +306,8 @@
   `.venv/bin/python run.py export-products --profile wardany --limit 50`
   wrote 50 unique rows to
   `artifacts/export-products/wardany/20260514_1621_2/`.
-- Limit-50 standalone matching succeeded:
-  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 50 --no-ai --trace`
+- Limit-50 standalone matching succeeded (historical, command since removed):
+  `run.py match-products --profile wardany ... --limit 50 --no-ai --trace`
   wrote `artifacts/match-products/wardany/20260514_1621/`; the limited 50-row
   export catalog did not cover the first 50 shortage rows, so all 50 required
   manual review in that standalone catalog comparison.
@@ -343,13 +338,13 @@
 - Latest no-results remediation validation succeeded on 2026-05-14:
   `.venv/bin/python tools/phase_validation.py` ran compileall, 309 unit tests,
   and rule audit. CLI help succeeded for `run.py`, `order`, `remove-cart`,
-  `export-products`, and `match-products`.
+  and `export-products`.
 - Limit-30 export succeeded:
   `.venv/bin/python run.py export-products --profile wardany --limit 30`
   wrote 30 unique rows to
   `artifacts/export-products/wardany/20260514_2047_2/`.
-- Limit-30 standalone catalog matching succeeded:
-  `.venv/bin/python run.py match-products --profile wardany --excel data/input/order_items/shortage_report_total_20260502.xlsx --limit 30 --no-ai --trace`
+- Limit-30 standalone catalog matching succeeded (historical, command since removed):
+  `run.py match-products --profile wardany ... --limit 30 --no-ai --trace`
   wrote `artifacts/match-products/wardany/20260514_2047/`; the deliberately
   limited 30-row export catalog did not cover the shortage rows, so standalone
   catalog matching stayed at 0/30.
@@ -381,7 +376,7 @@
   current-run Manual Review removal action, and order AI/API trace summaries.
 - Latest validation succeeded:
   `.venv/bin/python tools/phase_validation.py --smoke` ran compileall, 323 unit
-  tests, rule audit, CLI help checks, and a match-products smoke. Streamlit
+  tests, rule audit, and CLI help checks. Streamlit
   started on `http://127.0.0.1:8765` and returned HTTP 200.
 - Order AI/API/manual-review remediation validation succeeded:
   `.venv/bin/python -m pytest tests/test_order_ai_matching.py
@@ -393,14 +388,16 @@
   wiring.
 - Final rule-audit cleanup split long helpers in
   `src/core/drug_matching/verifier.py` and
-  `src/core/drug_matching/pipeline.py` with focused conflict tests passing:
+  `src/core/drug_matching/pipeline.py` (both since removed) with focused
+  conflict tests passing:
   `.venv/bin/python -m pytest tests/test_ai_decision_conflicts.py -q`.
 - Latest final validation succeeded:
   `.venv/bin/python tools/phase_validation.py --smoke` ran compileall, 352 unit
-  tests, rule audit (`baseline_violations_remaining:160`), CLI help checks, and
-  a `match-products --trace` smoke.
+  tests, rule audit (`baseline_violations_remaining:160`), and CLI help checks
+  (`match-products --trace` smoke since removed).
 - Follow-up CLI parser cleanup split order runtime arguments and match-products
-  argument/API-config helpers without changing command options.
+  argument/API-config helpers (match-products since removed) without changing
+  command options.
 - **July 1, 2026 - File Organization & Root Cleanup:**
   - Completed FILE_ORGANIZATION_PLAN.md refactoring (domain-driven sub-packages)
   - Reorganized 54 test files into 21 domain-driven subdirectories

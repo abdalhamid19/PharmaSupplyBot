@@ -37,28 +37,11 @@ def _base_commands() -> list[list[str]]:
 
 def _smoke_commands() -> list[list[str]]:
     python = sys.executable
-    excel = "data/input/order_items/shortage_report_total_20260502.xlsx"
     return [
         [python, "run.py", "--help"],
         [python, "run.py", "order", "--help"],
         [python, "run.py", "remove-cart", "--help"],
         [python, "run.py", "export-products", "--help"],
-        [python, "run.py", "match-products", "--help"],
-        [
-            python,
-            "run.py",
-            "match-products",
-            "--profile",
-            "wardany",
-            "--excel",
-            excel,
-            "--limit",
-            "5",
-            "--no-ai",
-            "--trace",
-            "--output",
-            "artifacts/wardany/phase_validation_match_products.csv",
-        ],
     ]
 
 

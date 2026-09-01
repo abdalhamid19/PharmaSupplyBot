@@ -165,34 +165,11 @@
       <pre>python run.py export-products --profile wardany --limit 100</pre>
     </div>
 
-    <div class="card">
-      <h3>أمر <code>match-products</code></h3>
-      <span class="pill">الغرض</span>
-      <p>مقارنة ملف المخزون مع منتجات Tawreed وإنتاج ملف CSV مدمج.</p>
-      <span class="pill">الخيارات</span>
-      <ul>
-        <li><code>--excel</code>: ملف Excel/CSV للمخزون.</li>
-        <li><code>--tawreed-csv</code>: ملف منتجات Tawreed بصيغة CSV.</li>
-        <li><code>--output</code>: مسار ملف الإخراج.</li>
-        <li><code>--limit</code> / <code>--start</code> / <code>--end</code>: نطاق المعالجة.</li>
-        <li><code>--resume</code> و <code>--trace</code>.</li>
-        <li><code>--no-ai</code>: تعطيل الذكاء الاصطناعي.</li>
-        <li><code>--threshold</code> و <code>--ai-threshold</code>: حدود الثقة.</li>
-        <li><code>--ai-verify-policy</code>: <code>score</code> / <code>fuzzy</code> / <code>all-non-exact</code> / <code>all</code>.</li>
-        <li><code>--ai-search-policy</code>: <code>safe</code> / <code>review-candidates</code> / <code>expanded</code> / <code>aggressive</code>.</li>
-        <li><code>--provider</code> / <code>--model</code> / <code>--api-key</code> / <code>--review-model</code>.</li>
-        <li><code>--concurrency</code> / <code>--ai-search-limit</code>.</li>
-        <li><code>--no-ai-preflight</code> و <code>--rotation-preflight-policy</code>.</li>
-      </ul>
-      <pre>python run.py match-products --excel data/input/inventory.xlsx --output artifacts/output/matches.csv</pre>
-    </div>
-
     <h2>4) أمثلة عملية</h2>
     <div class="card">
       <pre>python run.py auth --headless</pre>
       <pre>python run.py order --excel data/input/order_items/orders.xlsx --profile wardany --limit 20 --execution-mode auto</pre>
       <pre>python run.py export-products --profile wardany --output-dir artifacts/{profile} --limit 500</pre>
-      <pre>python run.py match-products --excel data/input/inventory.xlsx --output artifacts/output/results.csv --resume --trace</pre>
     </div>
 
     <h2>5) ملاحظات مهمة</h2>
