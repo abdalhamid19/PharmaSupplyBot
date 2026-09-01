@@ -18,36 +18,48 @@ def _render_rows(rows: list[dict[str, Any]]) -> None:
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
-@st.dialog("Matched items")
 def show_matched_dialog(run_key: str) -> None:
-    """Show every matched item for ``run_key``."""
-    from ....core.database.order_runs_read import fetch_run_items_matched
+    """Show every matched item for ``run_key`` inside a modal."""
+    from ....core.database.order_runs_read_filters import fetch_run_items_matched
 
-    _render_rows(fetch_run_items_matched(run_key))
+    @st.dialog("Matched items")
+    def _dialog() -> None:
+        _render_rows(fetch_run_items_matched(run_key))
+
+    _dialog()
 
 
-@st.dialog("Flagged items")
 def show_flagged_dialog(run_key: str) -> None:
-    """Show every flagged item for ``run_key``."""
-    from ....core.database.order_runs_read import fetch_run_items_flagged
+    """Show every flagged item for ``run_key`` inside a modal."""
+    from ....core.database.order_runs_read_filters import fetch_run_items_flagged
 
-    _render_rows(fetch_run_items_flagged(run_key))
+    @st.dialog("Flagged items")
+    def _dialog() -> None:
+        _render_rows(fetch_run_items_flagged(run_key))
+
+    _dialog()
 
 
-@st.dialog("Not-orderable items")
 def show_not_orderable_dialog(run_key: str) -> None:
-    """Show every not-orderable item for ``run_key``."""
-    from ....core.database.order_runs_read import fetch_run_items_not_orderable
+    """Show every not-orderable item for ``run_key`` inside a modal."""
+    from ....core.database.order_runs_read_filters import fetch_run_items_not_orderable
 
-    _render_rows(fetch_run_items_not_orderable(run_key))
+    @st.dialog("Not-orderable items")
+    def _dialog() -> None:
+        _render_rows(fetch_run_items_not_orderable(run_key))
+
+    _dialog()
 
 
-@st.dialog("Ordered items")
 def show_ordered_dialog(run_key: str) -> None:
-    """Show every ordered item for ``run_key``."""
-    from ....core.database.order_runs_read import fetch_run_items_ordered
+    """Show every ordered item for ``run_key`` inside a modal."""
+    from ....core.database.order_runs_read_filters import fetch_run_items_ordered
 
-    _render_rows(fetch_run_items_ordered(run_key))
+    @st.dialog("Ordered items")
+    def _dialog() -> None:
+        _render_rows(fetch_run_items_ordered(run_key))
+
+    _dialog()
 
 
 def show_all_items_dialog(items: list[dict[str, Any]]) -> None:

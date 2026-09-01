@@ -14,6 +14,7 @@ from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
 from src.core.database import order_runs_read as _read_module
+from src.core.database import order_runs_read_filters as _filter_module
 
 
 _DIALOG_FILTER_FOR_FUNCTION = {
@@ -30,6 +31,10 @@ def _seed_filter_helpers(matched, flagged, not_orderable, ordered) -> None:
     _read_module.fetch_run_items_flagged = lambda run_key: list(flagged)
     _read_module.fetch_run_items_not_orderable = lambda rk: list(not_orderable)
     _read_module.fetch_run_items_ordered = lambda run_key: list(ordered)
+    _filter_module.fetch_run_items_matched = lambda run_key: list(matched)
+    _filter_module.fetch_run_items_flagged = lambda run_key: list(flagged)
+    _filter_module.fetch_run_items_not_orderable = lambda rk: list(not_orderable)
+    _filter_module.fetch_run_items_ordered = lambda run_key: list(ordered)
 
 
 def _build_patchers(run, items, store_row_count, item_stores, missed_discounts):
@@ -129,12 +134,12 @@ def build_dialog_app_test(*, dialog: str, run_key: str,
     script = (
         "import sys\n"
         "from unittest.mock import patch\n"
-        "import src.core.database.order_runs_read as read_mod\n"
+        "import src.core.database.order_runs_read_filters as read_mod\n"
         "read_mod.fetch_run_items_matched = lambda rk: []\n"
         "read_mod.fetch_run_items_flagged = lambda rk: []\n"
         "read_mod.fetch_run_items_not_orderable = lambda rk: []\n"
         "read_mod.fetch_run_items_ordered = lambda rk: []\n"
-        f"with patch('src.core.database.order_runs_read.{dialog_filter}',"
+        f"with patch('src.core.database.order_runs_read_filters.{dialog_filter}',"
         f" return_value={rows!r}):\n"
         "    from src.ui.views.run_db.streamlit_run_drilldown_dialogs import "
         f"{dialog}\n"
