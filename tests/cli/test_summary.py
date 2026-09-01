@@ -248,7 +248,7 @@ def test_is_quiet_accepts_plain_object() -> None:
 
 def test_summary_format_for_each_subcommand() -> None:
     """Every subcommand produces the same header shape regardless of fields."""
-    for cmd in ("auth", "order", "remove-cart", "export-products", "match-products"):
+    for cmd in ("auth", "order", "remove-cart", "export-products"):
         buf = io.StringIO()
         with patch.object(sys, "stdout", buf):
             print_command_summary(cmd, {"duration": "0s"})

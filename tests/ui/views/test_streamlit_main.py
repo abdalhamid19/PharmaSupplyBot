@@ -14,14 +14,13 @@ class _FakeTab:
 
 class StreamlitMainTests(unittest.TestCase):
     def test_main_tabs_include_prevented_items_page(self) -> None:
-        created_tabs = [_FakeTab() for _ in range(9)]
+        created_tabs = [_FakeTab() for _ in range(8)]
         app_config = object()
         with (
             patch("src.ui.streamlit_main.st.tabs", return_value=created_tabs) as tabs,
             patch("src.ui.streamlit_main.render_overview"),
             patch("src.ui.streamlit_main.render_auth_tab"),
             patch("src.ui.streamlit_main.render_order_tab"),
-            patch("src.ui.streamlit_main.render_product_matching_tab"),
             patch("src.ui.streamlit_main.render_prevented_items_manager") as prevented_tab,
             patch("src.ui.streamlit_main.render_remove_cart_tab") as remove_cart_tab,
             patch("src.ui.streamlit_main.render_results_tab"),
@@ -32,7 +31,7 @@ class StreamlitMainTests(unittest.TestCase):
 
         tabs.assert_called_once_with(
             [
-                "Overview", "Auth", "Order", "Product Matching",
+                "Overview", "Auth", "Order",
                 "Prevented items", "Remove cart items", "Results", "Run DB",
                 "Manual Review"
             ]

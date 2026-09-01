@@ -355,22 +355,3 @@ def test_export_products_accepts_output_options() -> None:
     assert captured["page_size"] == 50
     assert captured["limit"] == 5
     assert captured["debug_browser"] is True
-
-
-# ─────────────────────────── match-products ───────────────────────────
-
-
-def test_match_products_accepts_trace_options() -> None:
-    captured: dict = {"trace": None}
-    result = _invoke(
-        [
-            "match-products",
-            "--profile", "wardany",
-            "--excel", "data/input/order_items/ddd.xlsx",
-            "--limit", "5",
-            "--trace",
-        ],
-        captured,
-    )
-    assert result.exit_code == 0
-    assert captured["trace"] is True

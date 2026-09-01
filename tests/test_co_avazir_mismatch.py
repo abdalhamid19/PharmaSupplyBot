@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import unittest
 
-from src.core.drug_matching.normalization.normalizer import parse_drug
-from src.core.drug_matching.normalization.normalizer_matching_core import (
+from src.core.normalization.normalizer import parse_drug
+from src.core.normalization.normalizer_matching_core import (
     components_match,
 )
 from src.core.matching.product_matching import explain_best_product_match
