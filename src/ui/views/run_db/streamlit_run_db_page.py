@@ -10,7 +10,8 @@ from ....core.database.order_runs_read import (
     fetch_runs,
 )
 from .streamlit_missed_discount import render_missed_discount_panel
-from .streamlit_run_kpis import render_run_header, render_run_kpis
+from .streamlit_run_drilldown import render_drilldown_buttons
+from .streamlit_run_kpis import render_run_header
 from .streamlit_run_tables import render_item_stores_expander
 from .streamlit_run_tables import render_run_items_table
 
@@ -51,7 +52,7 @@ def _render_selected_run(run: dict) -> None:
     """Render KPIs, item facts, store snapshots, and missed discounts."""
     render_run_header(run)
     items = fetch_run_items(run["run_key"])
-    render_run_kpis(run, items)
+    render_drilldown_buttons(run, items)
     render_run_items_table(items)
     render_item_stores_expander(items, run["run_key"])
     st.divider()
