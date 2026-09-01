@@ -56,20 +56,17 @@ _STATUS_ICONS_ASCII = {
 }
 
 
-def _print_line(line: str, stream: object) -> None:
-    """Print one line, downgrading to ASCII if the stream can't encode it.
+logger = logging.getLogger(__name__)
 
-    The CLI must never crash *after* its work completes just because
-    the terminal uses a legacy code page (``UnicodeEncodeError`` from
-    ``cp1252`` etc.). First attempt a plain print; on encoding failure
-    retry with non-encodable characters replaced, and finally strip
-    the text down to pure ASCII.
-    """
+
+def _print_line(line: str, stream: object) -> None:
     try:
-        print(line, file=stream)  # type: ignore[arg-type]
+        stream.write(line + "\n")  # type: ignore[union-attr]
     except UnicodeEncodeError:
         ascii_line = line.encode("ascii", errors="replace").decode("ascii")
-        print(ascii_line, file=stream)  # type: ignore[arg-type]
+        stream.write(ascii_line + "\n")  # type: ignore[union-attr]
+    except Exception:
+        logger.debug("_print_line: failed to write to stream")
 
 
 def print_command_summary(
