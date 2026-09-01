@@ -74,7 +74,51 @@ def _order_target_args(form_values: dict[str, object]) -> list[str]:
                 args.extend(["--excel-target", str(key)])
         else:
             args.extend(["--excel-target", excel_target_keys[0]])
+    args.extend(_excel_target_path_overrides(form_values, excel_target_keys))
     return args
+
+
+def _excel_target_path_overrides(
+    form_values: dict[str, object], excel_target_keys: list[str]
+) -> list[str]:
+    """Emit ``--excel-target-path key=value`` for each non-default upload."""
+    uploads = form_values.get("excel_target_uploads") or {}
+    if not isinstance(uploads, dict) or not uploads:
+        return []
+    overrides: list[tuple[str, str]] = []
+    for target_key in excel_target_keys:
+        entry = uploads.get(target_key) or {}
+        mode = str(entry.get("mode") or "Configured")
+        if mode == "Configured":
+            continue
+        path = _resolve_excel_target_upload_path(target_key, entry)
+        if path:
+            overrides.append((target_key, str(path)))
+    if not overrides:
+        return []
+    args: list[str] = []
+    for key, path in overrides:
+        args.extend(["--excel-target-path", f"{key}={path}"])
+    return args
+
+
+def _resolve_excel_target_upload_path(
+    target_key: str, entry: dict[str, object]
+) -> str | None:
+    """Return the on-disk catalog path for one Excel target upload entry."""
+    mode = str(entry.get("mode") or "Configured")
+    if mode == "Existing file":
+        path = str(entry.get("path") or "").strip()
+        return path or None
+    if mode == "Upload file":
+        from ..streamlit_uploads import uploaded_excel_target_path
+
+        upload = entry.get("upload")
+        if upload is None:
+            return None
+        persisted = uploaded_excel_target_path(target_key, upload)
+        return str(persisted)
+    return None
 
 
 def _legacy_target_args(form_values: dict[str, object]) -> list[str]:

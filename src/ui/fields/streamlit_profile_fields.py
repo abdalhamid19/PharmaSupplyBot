@@ -7,6 +7,7 @@ from typing import NamedTuple
 import streamlit as st
 
 from src.core.config.config_models import AppConfig
+from ..streamlit_uploads import available_excel_target_options
 
 
 class OrderRunFields(NamedTuple):
@@ -88,6 +89,10 @@ def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
     )
     limit = st.number_input("Item limit", min_value=0, max_value=100000, value=1500)
 
+    excel_target_uploads = _render_excel_target_upload_widgets(
+        selected_pairs, app_config
+    )
+
     advanced_options = _render_advanced_options(app_config)
     fields = OrderRunFields(
         profile_mode=str(profile_mode),
@@ -105,7 +110,80 @@ def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
         start_item=int(advanced_options[6]),
         end_item=int(advanced_options[7]),
     )
-    return fields, int(advanced_options[-1])
+    return fields, int(advanced_options[-1]), excel_target_uploads
+
+
+def _render_excel_target_upload_widgets(
+    selected_pairs: list[tuple[str, str]],
+    app_config: AppConfig,
+) -> dict[str, dict[str, object]]:
+    """Render one Excel target source selector per selected target.
+
+    Each enabled Excel target in the selection exposes three modes:
+
+    * ``Configured`` — use the catalog path the GUI resolves from
+      ``data/input/excel target/<key>.xlsx`` (the existing default).
+    * ``Existing file`` — pick another ``.xlsx`` already on disk under
+      ``data/input/excel target/``.
+    * ``Upload file`` — upload a brand-new catalog from the operator's
+      machine. The uploaded bytes are written to
+      ``artifacts/uploaded-excel-targets/<key>.xlsx`` so the subprocess
+      can read them through ``--excel-target-path key=<path>``.
+
+    The returned mapping is ``{target_key: {"mode": ..., "path": ..., "upload": ...}}``.
+    """
+    uploads: dict[str, dict[str, object]] = {}
+    excel_target_keys = [
+        key for kind, key in selected_pairs if kind == "excel-target"
+    ]
+    if not excel_target_keys:
+        return uploads
+    excel_options = available_excel_target_options()
+    st.markdown("##### Excel target source")
+    for target_key in excel_target_keys:
+        target_cfg = app_config.excel_targets.get(target_key)
+        label = target_cfg.display_name if target_cfg else target_key
+        cols = st.columns([2, 3])
+        with cols[0]:
+            mode = st.radio(
+                f"Source for {label} ({target_key})",
+                ["Configured", "Existing file", "Upload file"],
+                key=f"excel_target_source_{target_key}",
+                horizontal=True,
+                help=(
+                    "Configured = the catalog that ships with config.yaml. "
+                    "Existing file = another .xlsx under data/input/excel target/. "
+                    "Upload file = drag-and-drop a fresh catalog."
+                ),
+            )
+        path = ""
+        upload = None
+        if mode == "Existing file":
+            with cols[1]:
+                if excel_options:
+                    path = str(
+                        st.selectbox(
+                            f"Catalog path for {target_key}",
+                            excel_options,
+                            key=f"excel_target_path_{target_key}",
+                        )
+                    )
+                else:
+                    path = str(
+                        st.text_input(
+                            f"Catalog path for {target_key}",
+                            key=f"excel_target_path_text_{target_key}",
+                        )
+                    )
+        elif mode == "Upload file":
+            with cols[1]:
+                upload = st.file_uploader(
+                    f"Upload catalog for {target_key}",
+                    type=["xlsx"],
+                    key=f"excel_target_upload_{target_key}",
+                )
+        uploads[target_key] = {"mode": mode, "path": path, "upload": upload}
+    return uploads
 
 
 def _format_target_label(key: str, kind: str, app_config: AppConfig) -> str:

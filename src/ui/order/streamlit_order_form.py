@@ -163,7 +163,9 @@ def order_form_fields(
 ) -> dict[str, object]:
     """Return the order form field values."""
     input_mode, excel_path_str, upload = excel_source_fields()
-    run_fields, item_workers = profile_run_fields_with_workers(app_config)
+    run_fields, item_workers, excel_target_uploads = profile_run_fields_with_workers(
+        app_config
+    )
     values = _order_form_values(
         input_mode,
         excel_path_str,
@@ -171,6 +173,7 @@ def order_form_fields(
         run_fields,
         item_workers,
         prevented_items_path,
+        excel_target_uploads,
     )
     return values
 
@@ -182,6 +185,7 @@ def _order_form_values(
     run_fields: OrderRunFields,
     item_workers: int,
     prevented_items_path: Path | None,
+    excel_target_uploads: dict[str, dict[str, object]] | None = None,
 ) -> dict[str, object]:
     """Build serializable order form values from collected widget fields."""
     values = {
@@ -192,6 +196,7 @@ def _order_form_values(
         "prevented_items_excel": str(
             prevented_items_path or DEFAULT_PREVENTED_ITEMS_PATH
         ),
+        "excel_target_uploads": dict(excel_target_uploads or {}),
     }
     values.update(_order_run_values(run_fields))
     return values

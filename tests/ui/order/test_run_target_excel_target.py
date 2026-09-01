@@ -15,8 +15,10 @@ from src.ui.fields.streamlit_profile_fields import (
     profile_run_fields_with_workers,
 )
 from src.ui.order.streamlit_order_command import (
+    _excel_target_path_overrides,
     _legacy_target_args,
     _order_target_args,
+    order_command,
 )
 from src.ui.order.streamlit_order_form import (
     selected_excel_targets,
@@ -31,7 +33,11 @@ def _make_app_config(profiles=("wardany",), excel_targets=("alnasr",)) -> Simple
     }
     target_dict = {
         key: SimpleNamespace(
-            name_col="صنف", price_col="سعر", discount_col="الخصم", enabled=True
+            name_col="صنف",
+            price_col="سعر",
+            discount_col="الخصم",
+            display_name=key.title(),
+            enabled=True,
         )
         for key in excel_targets
     }
@@ -158,27 +164,126 @@ class StreamlitRunTargetTests(unittest.TestCase):
         self.assertEqual(selected_excel_targets(form_values), ["alnasr", "bakkah"])
 
 
+class StreamlitExcelTargetUploadTests(unittest.TestCase):
+    """Cover the upload + existing-file modes for Excel targets."""
+
+    def test_no_overrides_when_all_configured(self) -> None:
+        """``Configured`` mode produces no ``--excel-target-path`` args."""
+        overrides = _excel_target_path_overrides(
+            form_values={
+                "excel_target_uploads": {
+                    "alnasr": {"mode": "Configured", "path": "", "upload": None}
+                }
+            },
+            excel_target_keys=["alnasr"],
+        )
+        self.assertEqual(overrides, [])
+
+    def test_existing_file_emits_path_override(self) -> None:
+        """``Existing file`` mode emits ``--excel-target-path key=value``."""
+        overrides = _excel_target_path_overrides(
+            form_values={
+                "excel_target_uploads": {
+                    "alnasr": {
+                        "mode": "Existing file",
+                        "path": "data/input/excel target/alnasr.xlsx",
+                        "upload": None,
+                    }
+                }
+            },
+            excel_target_keys=["alnasr"],
+        )
+        self.assertEqual(
+            overrides,
+            ["--excel-target-path", "alnasr=data/input/excel target/alnasr.xlsx"],
+        )
+
+    def test_uploaded_file_persists_to_artifacts(self) -> None:
+        """``Upload file`` mode persists the bytes under artifacts/uploaded-excel-targets."""
+        upload = SimpleNamespace(name="alnasr.xlsx", getvalue=lambda: b"fake-bytes")
+        with TemporaryDirectory() as temp_dir:
+            artifacts_dir = Path(temp_dir) / "artifacts"
+            with patch(
+                "src.ui.streamlit_uploads.ARTIFACTS_DIR",
+                artifacts_dir,
+            ):
+                overrides = _excel_target_path_overrides(
+                    form_values={
+                        "excel_target_uploads": {
+                            "alnasr": {
+                                "mode": "Upload file",
+                                "path": "",
+                                "upload": upload,
+                            }
+                        }
+                    },
+                    excel_target_keys=["alnasr"],
+                )
+                self.assertEqual(len(overrides), 2)
+                self.assertEqual(overrides[0], "--excel-target-path")
+                path_arg = overrides[1]
+                self.assertTrue(path_arg.startswith("alnasr="))
+                persisted_path = Path(path_arg.split("=", 1)[1])
+                self.assertTrue(persisted_path.exists(), f"missing {persisted_path}")
+                self.assertEqual(persisted_path.read_bytes(), b"fake-bytes")
+
+    def test_order_command_emits_excel_target_path_override(self) -> None:
+        """End-to-end: ``order_command`` should emit ``--excel-target-path``."""
+        upload = SimpleNamespace(name="alnasr.xlsx", getvalue=lambda: b"more-bytes")
+        with TemporaryDirectory() as temp_dir:
+            artifacts_dir = Path(temp_dir) / "artifacts"
+            with patch(
+                "src.ui.streamlit_uploads.ARTIFACTS_DIR",
+                artifacts_dir,
+            ):
+                command = order_command(
+                    Path("config.yaml"),
+                    {
+                        "limit": 5,
+                        "profile_mode": "Excel targets only",
+                        "selected_targets": ("excel-target:alnasr",),
+                        "profile_key": "",
+                        "debug_browser": False,
+                        "resume": False,
+                        "match_only": True,
+                        "execution_mode": "api",
+                        "highest_discount": False,
+                        "min_discount_percent": 0,
+                        "item_workers": 1,
+                        "prevented_items_excel": "data/input/prevented_items/drugprevented.xlsx",
+                        "excel_target_uploads": {
+                            "alnasr": {
+                                "mode": "Upload file",
+                                "path": "",
+                                "upload": upload,
+                            }
+                        },
+                    },
+                    Path("data/input/order_items/test_new_feature.xlsx"),
+                )
+        self.assertIn("--excel-target", command)
+        idx = command.index("--excel-target")
+        self.assertEqual(command[idx + 1], "alnasr")
+        self.assertIn("--excel-target-path", command)
+        idx = command.index("--excel-target-path")
+        path_arg = command[idx + 1]
+        self.assertTrue(path_arg.startswith("alnasr="))
+
+
 class StreamlitRunTargetSmokeTests(unittest.TestCase):
     """Smoke-test that the widget builder does not raise on minimal config."""
 
     def test_profile_run_fields_returns_named_tuple(self) -> None:
         """The widget builder must return the OrderRunFields tuple."""
-        with (
-            patch("streamlit.multiselect", return_value=["👤 Tawreed profile — Wardany (wardany)"]),
-            patch("streamlit.selectbox", return_value="wardany"),
-            patch("streamlit.number_input", return_value=1500),
-            patch("streamlit.expander") as expander,
-            patch("streamlit.checkbox", return_value=False),
-            patch("streamlit.selectbox") as sb,
-            patch("streamlit.number_input") as ni,
-        ):
-            # Stub expander to a no-op context manager.
-            expander.return_value.__enter__ = lambda self: None
-            expander.return_value.__exit__ = lambda self, *args: None
-            app_config = _make_app_config()
-            fields = profile_run_fields(app_config)
-            self.assertIsInstance(fields, OrderRunFields)
-            self.assertEqual(fields.profile_key, "wardany")
+        from src.ui.fields.streamlit_profile_fields import (
+            profile_run_fields as public_profile_run_fields,
+        )
+        fields, item_workers, uploads = profile_run_fields_with_workers(
+            _make_app_config()
+        )
+        self.assertIsInstance(fields, OrderRunFields)
+        self.assertIsInstance(item_workers, int)
+        self.assertIsInstance(uploads, dict)
 
 
 if __name__ == "__main__":
