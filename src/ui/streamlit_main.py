@@ -12,7 +12,6 @@ from .views.streamlit_overview import render_overview
 from .views.streamlit_prevented_items import render_prevented_items_manager
 from .views.streamlit_product_matching import render_product_matching_tab
 from .streamlit_remove_cart import render_remove_cart_tab
-from .views.streamlit_results import render_results_tab
 from .streamlit_shared import APP_TITLE, FALLBACK_CONFIG_PATH, inject_custom_css, resolved_streamlit_config_path, sidebar_config_path
 
 
@@ -84,7 +83,7 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
     )
     (
         overview_tab, auth_tab, order_tab, matching_tab,
-        prevented_items_tab, remove_cart_tab, results_tab, run_db_tab,
+        prevented_items_tab, remove_cart_tab, run_db_tab,
         manual_review_tab
     ) = tabs
     with overview_tab:
@@ -99,8 +98,6 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
         render_prevented_items_manager()
     with remove_cart_tab:
         render_remove_cart_tab(app_config, default_profile, config_path)
-    with results_tab:
-        render_results_tab(default_profile)
     with run_db_tab:
         render_run_db_tab()
     with manual_review_tab:
@@ -111,6 +108,6 @@ def _main_tab_labels() -> list[str]:
     """Return Streamlit main tab labels."""
     return [
         "Overview", "Auth", "Order", "Product Matching",
-        "Prevented items", "Remove cart items", "Results", "Run DB",
+        "Prevented items", "Remove cart items", "Run DB",
         "Manual Review"
     ]

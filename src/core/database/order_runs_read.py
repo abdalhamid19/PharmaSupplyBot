@@ -7,10 +7,13 @@ statements live in :mod:`src.core.database.order_runs_read_sql`.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from .database import get_db_manager
+
+logger = logging.getLogger(__name__)
 from .order_runs_paths import default_order_runs_db
 from .order_runs_read_sql import (
     ITEM_STORES,
@@ -95,5 +98,6 @@ def database_is_ready(db=None) -> bool:
             "select 1 from schema_meta limit 1", ()
         )
         return bool(rows)
-    except Exception:
+    except Exception as exc:
+        logger.debug("database_is_ready: %s", exc)
         return False
