@@ -126,6 +126,14 @@ py -m streamlit run streamlit_app.py
 يجمع Tawreed profiles و Excel targets في مكان واحد؛ يمكن اختيار أي توليفة
 (profile فقط، Excel target فقط، أو الاتنين معًا) في نفس التشغيل.
 
+لكل Excel target محدد في الـ multiselect، يمكن اختيار المصدر:
+
+- **Configured** — الكتالوج الافتراضي `data/input/excel target/<key>.xlsx`.
+- **Existing file** — ملف آخر `.xlsx` تحت `data/input/excel target/`.
+- **Upload file** — رفع ملف جديد من الجهاز. يُحفظ في
+  `artifacts/uploaded-excel-targets/<key>.xlsx` ويُمرَّر للـ CLI عبر
+  `--excel-target-path key=path`.
+
 ## التحقق محليًا
 
 ```bash
