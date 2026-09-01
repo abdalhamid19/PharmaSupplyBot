@@ -32,6 +32,7 @@ class ExcelTargetConfig:
     name_col: str
     price_col: str
     discount_col: str
+    display_name: str = ""
     code_col: str = ""
     sheet: str = ""
     header_row: int = 0

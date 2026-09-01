@@ -142,7 +142,7 @@ def _render_excel_target_upload_widgets(
     st.markdown("##### Excel target source")
     for target_key in excel_target_keys:
         target_cfg = app_config.excel_targets.get(target_key)
-        label = target_cfg.display_name if target_cfg else target_key
+        label = getattr(target_cfg, "display_name", "") or target_key
         cols = st.columns([2, 3])
         with cols[0]:
             mode = st.radio(

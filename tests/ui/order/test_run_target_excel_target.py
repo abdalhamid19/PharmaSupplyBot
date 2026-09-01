@@ -227,7 +227,42 @@ class StreamlitExcelTargetUploadTests(unittest.TestCase):
                 self.assertTrue(persisted_path.exists(), f"missing {persisted_path}")
                 self.assertEqual(persisted_path.read_bytes(), b"fake-bytes")
 
-    def test_order_command_emits_excel_target_path_override(self) -> None:
+
+class ExcelTargetConfigDisplayNameTests(unittest.TestCase):
+    """Guard against the AttributeError that hid the upload widgets."""
+
+    def test_excel_target_config_supports_display_name(self) -> None:
+        """ExcelTargetConfig must expose ``display_name`` for the GUI label."""
+        from src.core.config.config_models import ExcelTargetConfig
+
+        cfg = ExcelTargetConfig(
+            name_col="صنف",
+            price_col="سعر",
+            discount_col="الخصم",
+            display_name="Alnasr Pharmacy",
+        )
+        self.assertEqual(cfg.display_name, "Alnasr Pharmacy")
+
+    def test_excel_target_config_display_name_defaults_to_empty(self) -> None:
+        """When the YAML omits ``display_name``, it defaults to empty string."""
+        from src.core.config.config_models import ExcelTargetConfig
+
+        cfg = ExcelTargetConfig(name_col="صنف", price_col="سعر", discount_col="الخصم")
+        self.assertEqual(cfg.display_name, "")
+
+    def test_build_excel_target_reads_display_name(self) -> None:
+        """``build_excel_target`` must parse the YAML ``display_name`` key."""
+        from src.core.config.config_factory import build_excel_target
+
+        cfg = build_excel_target(
+            {
+                "name_col": "صنف",
+                "price_col": "سعر",
+                "discount_col": "الخصم",
+                "display_name": "صيدلية النصر",
+            }
+        )
+        self.assertEqual(cfg.display_name, "صيدلية النصر")
         """End-to-end: ``order_command`` should emit ``--excel-target-path``."""
         upload = SimpleNamespace(name="alnasr.xlsx", getvalue=lambda: b"more-bytes")
         with TemporaryDirectory() as temp_dir:

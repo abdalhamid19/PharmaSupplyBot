@@ -55,6 +55,7 @@ def build_excel_target(raw_values: Any) -> ExcelTargetConfig:
         name_col=str(values.get("name_col", DEFAULT_TARGET_NAME_COLUMN)),
         price_col=str(values.get("price_col", DEFAULT_TARGET_PRICE_COLUMN)),
         discount_col=str(values.get("discount_col", DEFAULT_TARGET_DISCOUNT_COLUMN)),
+        display_name=str(values.get("display_name", "")),
         code_col=str(values.get("code_col", "")),
         sheet=str(values.get("sheet", "")),
         header_row=int(values.get("header_row", 0)),
