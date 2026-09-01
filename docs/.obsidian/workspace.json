@@ -11,14 +11,10 @@
             "id": "e7c7824b9bfdea94",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "skills docs/best-skills-report.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "best-skills-report"
+              "title": "New tab"
             }
           }
         ]
@@ -188,37 +184,38 @@
       "bases:Create new base": false
     }
   },
-  "active": "94197ea5af438342",
+  "active": "e7c7824b9bfdea94",
   "lastOpenFiles": [
+    "opencode-omniroute-models.md",
+    "matching_model_ranking.md",
+    "logging_system.md",
+    "audit_baseline.md",
+    "audit_logging.md",
+    "audit_swallow.md",
     "automatched_bug_report/08_manufacturer_identity_fix.md",
     "automatched_bug_report/07_navigation_timeout_fix.md",
     "automatched_bug_report/06_regression_risk_analysis.md",
-    "architecture_review/C8_run_artifact_store.md",
-    "architecture_review/C7_one_config_surface.md",
-    "architecture_review/C6_collapse_manual_review_wrappers.md",
-    "architecture_review/C5_runspec_runmonitor.md",
-    "architecture_review/C4_typed_decision_source.md",
-    "architecture_review/C3_unify_match_loop.md",
-    "architecture_review/C2_delete_duplicate_api_match_flow.md",
-    "architecture_review/C1_tawreed_bot_god_object.md",
-    "architecture_review/README.md",
-    "architecture_review",
+    "automatched_bug_report/05_test_plan_and_results.md",
+    "automatched_bug_report/04_fix_implementation.md",
+    "automatched_bug_report/03_solution_comparison.md",
+    "automatched_bug_report/02_hypothesis_scoring.md",
+    "automatched_bug_report/01_investigation_process.md",
+    "automatched_bug_report/00_master_report.md",
+    "automatched_bug_report",
+    "swallow_audit_stage1_guide.md",
+    "skills docs/best-skills-report.md",
+    "skills docs",
+    "product_matching_mode.md",
+    "order_runs_sqlite/README.md",
     "order_runs_sqlite/07_risks_and_decisions.md",
     "order_runs_sqlite/06_implementation_plan.md",
     "order_runs_sqlite/05_queries_and_use_cases.md",
     "order_runs_sqlite/04_write_strategy.md",
-    "automatched_bug_report/05_test_plan_and_results.md",
     "order_runs_sqlite/03_capture_points.md",
-    "automatched_bug_report/04_fix_implementation.md",
-    "order_runs_sqlite/02_data_model.md",
-    "automatched_bug_report/03_solution_comparison.md",
-    "automatched_bug_report/02_hypothesis_scoring.md",
     "order_runs_sqlite/01_current_state.md",
-    "automatched_bug_report/01_investigation_process.md",
-    "order_runs_sqlite/README.md",
-    "automatched_bug_report/00_master_report.md",
-    "automatched_bug_report",
+    "order_runs_sqlite/02_data_model.md",
     "order_runs_sqlite",
+    "architecture_review",
     "reports"
   ]
 }
