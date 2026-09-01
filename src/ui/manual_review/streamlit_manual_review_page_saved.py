@@ -161,7 +161,7 @@ def _trigger_search(decisions: list) -> None:
         {"item_code": d.item_code, "item_name": d.item_name}
         for d in decisions if d.manual_decision in valid_status
     ]
-    dummy_run_dir = ARTIFACTS_DIR / "match-products" / "manual_research"
+    dummy_run_dir = ARTIFACTS_DIR / "order" / "manual_research"
     dummy_run_dir.mkdir(parents=True, exist_ok=True)
     start_corrected_item_search(fake_rows, dummy_run_dir, st)
     st.success("Started corrected item search!")

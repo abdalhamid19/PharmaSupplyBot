@@ -26,7 +26,7 @@ from .streamlit_timing_view import render_timing_metrics
 
 def command_options() -> list[str]:
     """Return artifact commands that have run folders."""
-    names = ["order", "match-products", "export-products", "remove-cart"]
+    names = ["order", "export-products", "remove-cart"]
     return [name for name in names if (ARTIFACTS_DIR / name).is_dir()]
 
 
