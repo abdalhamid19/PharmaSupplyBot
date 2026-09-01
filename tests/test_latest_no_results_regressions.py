@@ -187,7 +187,7 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
 
     def test_phase3_units_normalized_to_iu(self) -> None:
         """'UNITS' should be normalized to 'IU' for dosage parsing."""
-        from src.core.drug_matching.normalization.normalizer import parse_drug, components_match
+        from src.core.normalization.normalizer import parse_drug, components_match
         r = parse_drug("LANTUS 100 UNITS 5 CARTRIDGES")
         o = parse_drug("LANTUS 100 I.U. / ML 5 CARTRIDGES")
         compat, _ = components_match(r, o)

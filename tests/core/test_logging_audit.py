@@ -183,11 +183,6 @@ def _is_setup_module(path: Path) -> bool:
     return path.name == "logging_setup.py"
 
 
-_PACKAGE_ROOT_NAMES = (
-    "src.core.drug_matching",
-)
-
-
 def _is_allowed_logger_call(rel_path, call) -> bool:
     """Return True if this getLogger(...) call follows the project convention.
 
@@ -195,8 +190,6 @@ def _is_allowed_logger_call(rel_path, call) -> bool:
     * ``logging.getLogger()`` (no args, root logger) — anywhere except
       logging_setup.py.
     * ``logging.getLogger(__name__)`` (module-scoped) — anywhere.
-    * ``logging.getLogger("src.core.drug_matching")`` (package-root) —
-      only allowed from config_helpers.py.
     * Inside ``src/cli/logging_setup.py`` we run the root logger and
       expose a pass-through ``get_logger(name)`` helper for consumers.
     """
@@ -205,15 +198,6 @@ def _is_allowed_logger_call(rel_path, call) -> bool:
     # root logger and exposes a pass-through helper.
     if rel == "src/cli/logging_setup.py":
         return True
-    # config_helpers.py is allowed to grab the matching package root.
-    if rel == "src/core/drug_matching/config/config_helpers.py":
-        if (
-            len(call.args) == 1
-            and isinstance(call.args[0], ast.Constant)
-            and isinstance(call.args[0].value, str)
-            and call.args[0].value in _PACKAGE_ROOT_NAMES
-        ):
-            return True
     if len(call.args) == 0:
         return True
     if (

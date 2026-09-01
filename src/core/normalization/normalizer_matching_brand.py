@@ -12,7 +12,7 @@ def _brand_match_check(d: DrugComponents, m: DrugComponents, brand_prefix_min: i
     if d.manufacturer and m.manufacturer:
         # Both have manufacturers - they must match
         if d.manufacturer != m.manufacturer:
-            from ...identity.manufacturer_identity import manufacturer_conflict
+            from ..identity.manufacturer_identity import manufacturer_conflict
             if manufacturer_conflict(d.manufacturer, m.manufacturer, threshold=0.85):
                 return False, f"different_manufacturer: {d.manufacturer} vs {m.manufacturer}"
     

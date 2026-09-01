@@ -10,8 +10,8 @@ import unittest
 
 from rapidfuzz import fuzz
 
-from src.core.drug_matching.normalization.normalizer import parse_drug
-from src.core.drug_matching.normalization.normalizer_matching_brand import (
+from src.core.normalization.normalizer import parse_drug
+from src.core.normalization.normalizer_matching_brand import (
     _brand_match_check,
 )
 

@@ -52,10 +52,6 @@ py run.py auth --profile wardany
 # تصدير كتالوج المنتجات
 py run.py export-products --profile wardany
 
-# مطابقة ملف مخزون محليًا
-py run.py match-products --profile wardany --excel data/input/inventory.xlsx \
-  --tawreed-csv artifacts/wardany/tawreed_products.csv --trace
-
 # تنفيذ المطابقة فقط، من دون إضافة أصناف إلى السلة
 py run.py order --profile wardany --excel data/input/order.xlsx --match-only
 
