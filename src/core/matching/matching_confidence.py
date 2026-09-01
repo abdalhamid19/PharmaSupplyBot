@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from ..drug_matching.normalization.normalizer import components_match, parse_drug
+from ..normalization.normalizer import components_match, parse_drug
 from ..identity.manufacturer_identity import (
     extract_manufacturer_from_candidate,
     extract_manufacturer_from_name,
