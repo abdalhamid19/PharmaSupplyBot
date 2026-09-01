@@ -213,7 +213,9 @@ def _delete_cart_row(page, row_index: int, selectors: CartRemovalSelectors) -> i
         return 1
     except Exception:
         logger.debug("cart._process_removal_target: removal failed (non-fatal)")
-        return count, status, reason
+        if page.locator(selectors.cart_rows).count() < before_count:
+            return 1
+        return 0
     if page.locator(selectors.cart_rows).count() < before_count:
         return 1
     raise
