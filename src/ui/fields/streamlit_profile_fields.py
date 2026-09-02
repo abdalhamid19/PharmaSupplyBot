@@ -31,7 +31,6 @@ from ..streamlit_uploads import available_excel_target_options
 from .streamlit_excel_target_manager_widgets import (
     maybe_open_add_dialog,
     render_add_excel_target_button,
-    render_excel_target_removal_buttons,
 )
 
 
@@ -154,38 +153,59 @@ def _render_target_checkboxes(
     excel_target_keys: list[str],
     config_path: Path | None = None,
 ) -> list[tuple[str, str]]:
-    """Render one ``st.checkbox`` per configured target so every option is visible."""
+    """Render one ``st.checkbox`` per configured target so every option is visible.
+
+    Tawreed profiles share a 2-column grid (compact). Excel targets get
+    their own row with a trailing trash button so the operator can see
+    which catalogs are removable without scrolling past the source panel.
+    """
     selected_pairs: list[tuple[str, str]] = []
     st.markdown("##### What to run against?")
-    cols = st.columns(2) if profile_keys or excel_target_keys else [st]
-    col_idx = 0
-    for key in profile_keys:
-        with cols[col_idx % len(cols)]:
-            profile = app_config.profiles.get(key)
-            display = profile.display_name if profile else key
-            if st.checkbox(
-                f"👤 Tawreed profile — {display} ({key})",
-                value=True,
-                key=f"run_target_profile_{key}",
-            ):
-                selected_pairs.append(("profile", key))
-        col_idx += 1
-    for key in excel_target_keys:
-        with cols[col_idx % len(cols)]:
-            if st.checkbox(
-                f"📊 Excel target ({key})",
-                value=False,
-                key=f"run_target_excel_{key}",
-                help=(
-                    "Tick to also match against this Excel target catalog. "
-                    "The upload widget appears below after ticking."
-                ),
-            ):
-                selected_pairs.append(("excel-target", key))
-        col_idx += 1
+    user_added: set[str] = set()
+    if config_path is not None:
+        from .streamlit_excel_target_manager_widgets import user_added_targets
+        user_added = set(user_added_targets(config_path))
+    if profile_keys:
+        cols = st.columns(2)
+        col_idx = 0
+        for key in profile_keys:
+            with cols[col_idx % len(cols)]:
+                profile = app_config.profiles.get(key)
+                display = profile.display_name if profile else key
+                if st.checkbox(
+                    f"👤 Tawreed profile — {display} ({key})",
+                    value=True,
+                    key=f"run_target_profile_{key}",
+                ):
+                    selected_pairs.append(("profile", key))
+            col_idx += 1
+    if excel_target_keys:
+        st.caption("📊 Excel target catalog")
+        for key in excel_target_keys:
+            checkbox_col, action_col = st.columns([0.92, 0.08])
+            with checkbox_col:
+                if st.checkbox(
+                    f"📊 Excel target ({key})",
+                    value=False,
+                    key=f"run_target_excel_{key}",
+                    help=(
+                        "Tick to also match against this Excel target catalog. "
+                        "The upload widget appears below after ticking."
+                    ),
+                ):
+                    selected_pairs.append(("excel-target", key))
+            with action_col:
+                if key in user_added:
+                    if st.button(
+                        "🗑",
+                        key=f"excel_target_remove_{key}",
+                        help=f"Remove user-added target `{key}` from the config.",
+                    ):
+                        st.session_state["excel_target_remove_pending"] = key
+                        st.rerun()
     if config_path is not None:
         render_add_excel_target_button(config_path)
-        render_excel_target_removal_buttons(config_path, excel_target_keys)
+        render_remove_confirmation_panel(config_path, excel_target_keys, user_added)
         maybe_open_add_dialog(config_path)
     if not selected_pairs:
         st.warning("Tick at least one target above to enable the Run Order button.")
@@ -193,6 +213,36 @@ def _render_target_checkboxes(
         f"{kind}:{key}" for kind, key in selected_pairs
     )
     return selected_pairs
+
+
+def render_remove_confirmation_panel(
+    config_path: Path,
+    excel_target_keys: list[str],
+    user_added: set[str],
+) -> None:
+    """Show the Yes/Cancel confirmation when the operator pressed 🗑."""
+    from .streamlit_excel_target_manager_widgets import remove_excel_target
+
+    pending = st.session_state.pop("excel_target_remove_pending", None)
+    if not pending or pending not in excel_target_keys or pending not in user_added:
+        if st.session_state.pop("excel_target_removed_toast", None):
+            st.success("Excel target removed.")
+        return
+    st.warning(
+        f"Remove user-added target `{pending}`? "
+        "This deletes the config entry; the catalog file is left in place."
+    )
+    confirm, cancel = st.columns(2)
+    if confirm.button(
+        "Yes, remove it",
+        type="primary",
+        key="excel_target_remove_confirm",
+    ):
+        if remove_excel_target(config_path, pending):
+            st.session_state["excel_target_removed_toast"] = True
+            st.rerun()
+    if cancel.button("Cancel", key="excel_target_remove_cancel"):
+        st.rerun()
 
 
 def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:

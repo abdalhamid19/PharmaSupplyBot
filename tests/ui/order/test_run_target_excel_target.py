@@ -456,11 +456,11 @@ class ExcelTargetManagerWidgetTests(unittest.TestCase):
 
         at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
         at.run()
-        remove_buttons = [
-            b for b in at.main.button if b.label and "Remove" in str(b.label)
+        trash_buttons = [
+            b for b in at.main.button if b.label and "🗑" in str(b.label)
         ]
         self.assertEqual(
-            remove_buttons,
+            trash_buttons,
             [],
             "alnasr is hard-coded in the fixture; no trash button expected",
         )
@@ -476,12 +476,12 @@ class ExcelTargetManagerWidgetTests(unittest.TestCase):
             return_value=["alnasr"],
         ):
             at.run()
-        remove_buttons = [
-            b for b in at.main.button if b.label and "Remove" in str(b.label)
+        trash_buttons = [
+            b for b in at.main.button if b.label and "🗑" in str(b.label)
         ]
         self.assertTrue(
-            any("alnasr" in str(b.label) for b in remove_buttons),
-            f"trash button for alnasr expected; got {[b.label for b in remove_buttons]}",
+            any("alnasr" in b.key for b in trash_buttons),
+            f"trash button for alnasr expected; got {[b.key for b in trash_buttons]}",
         )
 
     def test_excel_source_upload_renders_file_uploader_reactively(self) -> None:

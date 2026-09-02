@@ -124,37 +124,14 @@ def render_add_excel_target_button(config_path: Path) -> None:
 def render_excel_target_removal_buttons(
     config_path: Path, excel_target_keys: list[str]
 ) -> None:
-    """Render one trash button per user-added Excel target.
+    """Backwards-compatible wrapper kept for older callers.
 
-    Targets the operator did not add (i.e. entries that came from
-    ``state/config.yaml`` directly) are protected: the operator would
-    otherwise accidentally drop a hard-coded warehouse.
+    The trash buttons are now rendered inline next to each Excel target
+    checkbox in :func:`streamlit_profile_fields._render_target_checkboxes`.
+    This stub stays so external imports do not break; it just renders an
+    empty container.
     """
-    user_added = set(user_added_targets(config_path))
-    removable = [key for key in excel_target_keys if key in user_added]
-    if not removable:
-        return
-    st.caption("Targets you added — click the trash icon to remove them")
-    pending = st.session_state.pop("excel_target_remove_pending", None)
-    if pending and pending in removable:
-        st.warning(
-            f"Remove user-added target `{pending}`? "
-            "This deletes the config entry; the catalog file is left in place."
-        )
-        confirm, cancel = st.columns(2)
-        if confirm.button("Yes, remove it", type="primary", key="excel_target_remove_confirm"):
-            if remove_excel_target(config_path, pending):
-                st.session_state["excel_target_removed_toast"] = True
-                st.rerun()
-        if cancel.button("Cancel", key="excel_target_remove_cancel"):
-            st.rerun()
-    for target_key in removable:
-        label = f"🗑 Remove `{target_key}`"
-        if st.button(label, key=f"excel_target_remove_{target_key}"):
-            st.session_state["excel_target_remove_pending"] = target_key
-            st.rerun()
-    if st.session_state.pop("excel_target_removed_toast", None):
-        st.success("Excel target removed.")
+    return None
 
 
 __all__ = [
