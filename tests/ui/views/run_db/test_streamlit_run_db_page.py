@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, {project_root!r})
 from src.ui.views.run_db.streamlit_run_db_page import render_run_db_tab
 
-render_run_db_tab(None)
+render_run_db_tab()
 """
 
 

@@ -17,11 +17,12 @@ from .streamlit_run_drilldown import (
 )
 from .streamlit_run_kpis import render_run_header
 from .streamlit_run_tables import (
+    render_item_stores_expander,
     render_run_items_table,
 )
 
 
-def render_run_db_tab(app_config=None) -> None:
+def render_run_db_tab() -> None:
     """Render the database-backed results browser."""
     st.title("Run Results (Database)")
     st.markdown(
@@ -37,7 +38,7 @@ def render_run_db_tab(app_config=None) -> None:
         return
     selected = _render_run_selector(runs)
     run = runs[selected]
-    _render_selected_run(run, app_config)
+    _render_selected_run(run)
 
 
 def _render_run_selector(runs: list[dict]) -> int:
@@ -53,38 +54,17 @@ def _render_run_selector(runs: list[dict]) -> int:
     )
 
 
-def _render_selected_run(run: dict, app_config=None) -> None:
-    """Render KPIs, item facts, and missed discounts."""
+def _render_selected_run(run: dict) -> None:
+    """Render KPIs, item facts, store snapshots, and missed discounts."""
     render_run_header(run)
     items = fetch_run_items(run["run_key"])
     render_kpi_filter_bar(run, items)
     active = get_active_filter(run["run_key"])
     rows, caption = resolve_filtered_rows(run["run_key"], active, items)
-    resolver = _build_source_label_resolver(app_config)
-    render_run_items_table(rows, caption=caption, source_label_resolver=resolver)
+    render_run_items_table(rows, caption=caption)
+    render_item_stores_expander(items, run["run_key"])
     st.divider()
     render_missed_discount_panel(run["run_key"])
-
-
-def _build_source_label_resolver(app_config):
-    """Return a ``(kind, key) -> display_name`` resolver from the app config."""
-    if app_config is None:
-        return None
-
-    def _resolve(kind: str, key: str) -> str:
-        if kind == "tawreed":
-            profile = app_config.profiles.get(key)
-            if profile is not None and getattr(profile, "display_name", ""):
-                return str(profile.display_name)
-            return key
-        if kind == "excel-target":
-            target = app_config.excel_targets.get(key)
-            if target is not None and getattr(target, "display_name", ""):
-                return str(target.display_name)
-            return key
-        return key
-
-    return _resolve
 
 
 def _render_missing_database() -> None:

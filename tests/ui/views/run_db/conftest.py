@@ -85,7 +85,7 @@ with patch('src.ui.views.run_db.streamlit_run_db_page.fetch_runs', return_value=
      patch('src.core.database.order_runs_read_filters.fetch_run_items_not_orderable', return_value=NOT_ORDERABLE), \\
      patch('src.core.database.order_runs_read_filters.fetch_run_items_ordered', return_value=ORDERED):
     from src.ui.views.run_db.streamlit_run_db_page import render_run_db_tab
-    render_run_db_tab(None)
+    render_run_db_tab()
 """
 
 
