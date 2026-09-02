@@ -55,7 +55,10 @@ def render_item_stores_expander(items: list[dict[str, Any]], run_key: str) -> No
     so a Tawreed + Excel target shared run produces duplicate ``item_key``
     entries. The expander dedupes by ``item_key`` and shows the combined
     snapshot from ``run_item_stores`` (which already aggregates both
-    sources) underneath.
+    sources) underneath. The store count shown next to each item name
+    is the actual row count in ``run_item_stores`` for that item, not
+    the per-source ``run_items.stores_offering`` field, because the
+    latter only counts one source.
     """
     seen: set[str] = set()
     unique_items: list[dict[str, Any]] = []
@@ -72,9 +75,16 @@ def render_item_stores_expander(items: list[dict[str, Any]], run_key: str) -> No
         return
     st.markdown("**Offering stores per item**")
     for item in unique_items:
+        snapshot_rows = fetch_item_stores(run_key, item["item_key"])
+        store_count = len(snapshot_rows) if snapshot_rows else 0
+        if store_count == 0 and item.get("stores_offering"):
+            # Fall back to the per-source count when the snapshot was
+            # pruned (e.g. older runs) so the label still shows a
+            # non-zero number that matches what the user can see.
+            store_count = int(item["stores_offering"])
         label = (
             f"{item['item_name'] or item['item_code']} — "
-            f"{item['stores_offering']} store(s)"
+            f"{store_count} store(s)"
         )
         with st.expander(label):
             _render_store_table(run_key, item["item_key"])
