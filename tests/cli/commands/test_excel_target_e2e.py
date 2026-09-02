@@ -103,6 +103,69 @@ excel_targets:
         catalogs = load_target_catalogs(selected, self.app_config)
         self.assertEqual(catalogs["alnasr"], [])
 
+    def test_run_excel_target_match_only_persists_run_item_stores(self) -> None:
+        """When a run_key is supplied, the match result is written to both
+        ``run_items`` (fact) and ``run_item_stores`` (offering snapshot) so
+        the Run Results tab can show the Excel candidate alongside any
+        Tawreed rows for the same item.
+        """
+        import sqlite3
+
+        from src.core.database.order_runs_paths import default_order_runs_db
+        from src.core.database.order_runs_store import OrderRunsStore
+
+        args = argparse.Namespace(
+            excel_target="alnasr",
+            all_excel_targets=False,
+            excel_target_path=[f"alnasr={ALNASR_PATH}"],
+        )
+        selected = selected_excel_target_configs(self.app_config, args)
+        catalogs = load_target_catalogs(selected, self.app_config)
+        items = [Item(code="75865", name="DECLOPHEN GEL30GM.", qty=1)]
+        run_key = "test/excel-target-store-rows"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            summary_path = Path(temp_dir) / "summary.csv"
+            try:
+                run_excel_target_match_only(
+                    self.app_config,
+                    "alnasr",
+                    items,
+                    catalogs["alnasr"],
+                    summary_path=summary_path,
+                    run_key=run_key,
+                )
+                db = OrderRunsStore(default_order_runs_db()).db
+                conn = sqlite3.connect(str(default_order_runs_db()))
+                try:
+                    fact_rows = conn.execute(
+                        "select source_kind, source_label, status from run_items "
+                        "where run_key=?",
+                        (run_key,),
+                    ).fetchall()
+                    self.assertEqual(len(fact_rows), 1)
+                    fact = fact_rows[0]
+                    self.assertEqual(fact[0], "excel-target")
+                    self.assertTrue(fact[1].startswith("alnasr@"))
+                    self.assertEqual(fact[2], "matched-only")
+
+                    store_rows = conn.execute(
+                        "select store_product_id, discount_percent, "
+                        "purchase_price, is_winner, source "
+                        "from run_item_stores where run_key=?",
+                        (run_key,),
+                    ).fetchall()
+                    self.assertGreaterEqual(len(store_rows), 1)
+                    for row in store_rows:
+                        self.assertEqual(row[4], "excel_target")
+                finally:
+                    conn.execute("delete from run_item_stores where run_key=?", (run_key,))
+                    conn.execute("delete from run_items where run_key=?", (run_key,))
+                    conn.execute("delete from runs where run_key=?", (run_key,))
+                    conn.commit()
+                    conn.close()
+            finally:
+                pass
+
     def test_run_excel_target_match_only_writes_summary(self) -> None:
         args = argparse.Namespace(
             excel_target="alnasr",

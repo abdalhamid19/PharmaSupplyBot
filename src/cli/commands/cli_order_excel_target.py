@@ -130,12 +130,18 @@ def run_excel_target_match_only(
     When ``run_key`` is provided, each item is also persisted to the
     ``order_runs.db`` with ``source_kind='excel-target'`` and
     ``source_label='<target_key>[@<source_file>]'`` so the Run DB tab can
-    distinguish Excel-target matches from Tawreed ones.
+    distinguish Excel-target matches from Tawreed ones. The matching
+    product is also written to ``run_item_stores`` with
+    ``source='excel_target'`` so the per-item offering-store expander
+    in the Run Results tab shows the Excel candidate alongside any
+    Tawreed rows.
     """
     matched = flagged = 0
     items_list = list(items)
     db_persist = _build_db_persister(run_key, target_key)
-    with artifact_run("excel-target", target_key) as run:
+    provided_run_id = _extract_run_id(run_key) if run_key else None
+    with artifact_run("excel-target", target_key, run_id=provided_run_id) as run:
+        _ensure_run_record(app_config, run_key, run, target_key)
         target_summary = (
             run.directory / f"{MATCH_ONLY_SUMMARY_LABEL}_{target_key}.csv"
         )
@@ -214,6 +220,7 @@ def run_excel_target_match_only(
                         score=float(score or 0),
                         reason=decision.final_reason,
                         source_file="",
+                        best=None,
                     )
                     continue
                 source_file = str(best.data.get("excelTargetSourceFile", ""))
@@ -239,6 +246,7 @@ def run_excel_target_match_only(
                     score=best.score,
                     reason=decision.final_reason,
                     source_file=source_file,
+                    best=best.data,
                     matched_name=str(best.data.get("productNameEn", "")),
                     matched_price=str(best.data.get("salePrice", "")),
                     matched_discount=str(best.data.get("discountPercent", "")),
@@ -251,6 +259,7 @@ def run_excel_target_match_only(
                 "could not mirror excel-target summary", extra={"path": str(summary_path)}
             )
 
+    _finish_run_record(app_config, run_key)
     return {
         "processed": len(items_list),
         "matched": matched,
@@ -292,6 +301,71 @@ __all__ = [
 ]
 
 
+def _extract_run_id(run_key: str | None) -> str | None:
+    """Return the run-id half of a ``profile/run-id`` key, or None."""
+    if not run_key or "/" not in run_key:
+        return None
+    return run_key.split("/", 1)[1] or None
+
+
+def _ensure_run_record(
+    app_config: AppConfig, run_key: str | None, run, target_key: str
+) -> None:
+    """Open the order-runs record for an excel-target match-only run.
+
+    The excel-target flow does not call the Tawreed ``open_run_record``
+    helper because there is no Tawreed profile driving the run. We still
+    need a parent ``runs`` row so the ``run_items`` foreign key resolves
+    and the Run DB tab can show the run in its header.
+    """
+    if not run_key or "/" not in run_key:
+        return
+    from src.core.database.order_runs_store import OrderRunsStore
+    from src.core.ordering.order_run_persistence import open_run_record
+
+    profile_key, _run_id = run_key.split("/", 1)
+    database = getattr(app_config, "database", None)
+    options = database.persistence_options() if database else {}
+    try:
+        store = OrderRunsStore(options.get("path"))
+    except Exception:
+        logger.debug(
+            "could not open OrderRunsStore for excel-target run",
+            extra={"run_key": run_key},
+            exc_info=True,
+        )
+        return
+    if store.run_exists(run_key):
+        return
+    run_options = {
+        "mode": "match-only",
+        "execution_mode": "excel-target",
+        "warehouse_mode": "",
+        "min_discount_pct": None,
+        "matching_risk": "",
+        "excel_source": target_key,
+        "item_workers": 1,
+        "artifact_dir": str(run.directory),
+    }
+    opened = open_run_record(profile_key, run.run_id, run_options, options)
+    if opened is None:
+        logger.debug(
+            "excel-target run record could not be opened",
+            extra={"run_key": run_key, "target": target_key},
+        )
+
+
+def _finish_run_record(app_config: AppConfig, run_key: str | None) -> None:
+    """Mark the excel-target run as finished, swallowing persistence errors."""
+    if not run_key:
+        return
+    from src.core.ordering.order_run_persistence import finish_run_record
+
+    database = getattr(app_config, "database", None)
+    options = database.persistence_options() if database else {}
+    finish_run_record(run_key, options)
+
+
 def _build_db_persister(run_key: str | None, target_key: str):
     """Return a callback that mirrors one match result into order_runs.db.
 
@@ -311,6 +385,7 @@ def _build_db_persister(run_key: str | None, target_key: str):
         score,
         reason,
         source_file,
+        best: dict | None = None,
         matched_name: str = "",
         matched_price: str = "",
         matched_discount: str = "",
@@ -339,11 +414,58 @@ def _build_db_persister(run_key: str | None, target_key: str):
         label = str(target_key or "")
         if source_file:
             label = f"{label}@{source_file}"
-        record_run_item(
-            run_key,
-            summary_row,
-            source_kind="excel-target",
-            source_label=label,
-        )
+        snapshot_kwargs: dict = {"source_kind": "excel-target", "source_label": label}
+        if best is not None:
+            store_dict = _excel_target_store_dict(
+                target_key, source_file, best
+            )
+            snapshot_kwargs.update(
+                {
+                    "stores": [store_dict],
+                    "store_selections": [(store_dict, 0)],
+                    "store_source": "excel_target",
+                }
+            )
+        record_run_item(run_key, summary_row, **snapshot_kwargs)
 
     return _persist
+
+
+def _excel_target_store_dict(
+    target_key: str, source_file: str, best: dict
+) -> dict:
+    """Return a store-row dict for ``run_item_stores`` from one Excel match.
+
+    The shape matches what the Tawreed store-snapshot writer consumes
+    (:func:`usable_store_rows`, :func:`store_price_fields`,
+    :func:`candidate_store_product_id`, :func:`store_identity_key`). Excel
+    catalogs only carry the pharmacy's purchase price + discount + name, so
+    the public/retail price is left empty and the warehouse identity is
+    derived from the target key + source file so the row groups under one
+    entry per catalog.
+    """
+    name = (
+        best.get("productNameEn")
+        or best.get("productName")
+        or best.get("name")
+        or ""
+    )
+    discount = best.get("discountPercent", best.get("discount", 0)) or 0
+    price = best.get("salePrice", best.get("price", 0)) or 0
+    label = f"excel-target:{target_key}"
+    if source_file:
+        label = f"{label}@{source_file}"
+    return {
+        "storeProductId": str(best.get("storeProductId") or best.get("id") or name),
+        "storeName": label,
+        "storeNameEn": label,
+        "companyName": label,
+        "productNameEn": str(name),
+        "productName": str(name),
+        "salePrice": float(price),
+        "sellingPrice": float(price),
+        "discountPercent": float(discount),
+        "availableQuantity": 1,
+        "productsCount": 1,
+        "currency": "",
+    }
