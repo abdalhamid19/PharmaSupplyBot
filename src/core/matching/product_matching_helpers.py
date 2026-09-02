@@ -9,6 +9,11 @@ _NON_ALNUM_RE = re.compile(r"[^A-Z0-9]+")
 _WHITESPACE_RE = re.compile(r"\s+")
 _ARABIC_NON_WORD_RE = re.compile(r"[^\w\u0600-\u06FF]+")
 _ARABIC_WHITESPACE_RE = re.compile(r"\s+")
+# Used by the Arabic-required-token check so an alias like "مل" matches
+# against a candidate product name that mixes Latin and Arabic text
+# (e.g. "B-FRESH MOUTHWASH MINT 250MLاخضر"). The non-Arabic chars are
+# dropped to whitespace so the Arabic marker survives the strip.
+_ARABIC_KEEP_RE = re.compile(r"[^\u0600-\u06FF]+")
 _NUMERIC_PART_RE = re.compile(r"\d+")
 
 MAX_SEARCH_QUERY_VARIANTS = 24

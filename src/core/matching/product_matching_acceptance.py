@@ -10,6 +10,7 @@ from .candidate_identity import candidate_has_store_product_id, candidate_store_
 from ..normalization.normalizer import components_match, parse_drug
 from .matching_penalties import compatibility_rejection_reason
 from .product_matching_helpers import (
+    _ARABIC_KEEP_RE,
     _ARABIC_NON_WORD_RE,
     _ARABIC_REQUIRED_TOKEN_ALIASES,
     _ARABIC_WHITESPACE_RE,
@@ -78,7 +79,7 @@ def _candidate_variant_rejection(query: str, candidate: dict[str, Any]) -> str:
     reasons.extend(_missing_english_identity_reasons(query_tokens, candidate))
     arabic_name = _normalized_arabic_name(candidate)
     if arabic_name:
-        reasons.extend(_missing_arabic_token_reasons(query_tokens, arabic_name))
+        reasons.extend(_missing_arabic_token_reasons(query_tokens, arabic_name, candidate))
         if _vitacid_c_calcium_conflict(query_tokens, arabic_name):
             reasons.append("Arabic name contains calcium for VITACID C query")
     return "; ".join(reasons)
@@ -86,8 +87,14 @@ def _candidate_variant_rejection(query: str, candidate: dict[str, Any]) -> str:
 
 def _normalized_arabic_name(candidate: dict[str, Any]) -> str:
     raw_name = str(candidate.get("productName") or "").strip()
-    spaced_name = _ARABIC_NON_WORD_RE.sub(" ", raw_name)
-    return _ARABIC_WHITESPACE_RE.sub(" ", spaced_name).strip()
+    # Drop every non-Arabic character (Latin letters, digits, punctuation)
+    # so the Arabic-required-token check can find embedded markers like
+    # "مل" inside mixed-script names such as "B-FRESH MOUTHWASH MINT
+    # 250MLاخضر". The public ``normalized_arabic_name`` keeps the full
+    # text; this internal helper keeps only Arabic so the substring
+    # match against the alias table is reliable.
+    arabic_only = _ARABIC_KEEP_RE.sub(" ", raw_name)
+    return _ARABIC_WHITESPACE_RE.sub(" ", arabic_only).strip()
 
 
 def _synthetic_name_rejection_reasons(
@@ -140,7 +147,19 @@ def _identity_tokens(tokens: set[str]) -> set[str]:
     }
 
 
-def _missing_arabic_token_reasons(tokens: set[str], arabic_name: str) -> list[str]:
+def _missing_arabic_token_reasons(
+    tokens: set[str], arabic_name: str, candidate: dict[str, Any] | None = None
+) -> list[str]:
+    """Return rejection reasons for query tokens that need an Arabic marker.
+
+    When ``candidate`` is an Excel target (``excelTarget=True``) the
+    Arabic-name check is skipped entirely: Excel catalogs only carry one
+    product-name column, not a separate Arabic one, so the alias lookup
+    is meaningless and would reject every row that mixes Latin +
+    Arabic in a single cell (e.g. ``250MLاخضر``).
+    """
+    if candidate is not None and candidate.get("excelTarget"):
+        return []
     reasons: list[str] = []
     for token, aliases in _ARABIC_REQUIRED_TOKEN_ALIASES.items():
         if token in tokens and not any(alias in arabic_name for alias in aliases):

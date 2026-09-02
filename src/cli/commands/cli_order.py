@@ -125,6 +125,7 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
             target_items,
             summary_path,
             run_key=excel_run_key,
+            run_id=shared_run_id,
         )
     else:
         excel_target_totals = None

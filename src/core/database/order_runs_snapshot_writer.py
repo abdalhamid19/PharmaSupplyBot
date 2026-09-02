@@ -35,13 +35,21 @@ class OrderRunsSnapshotMixin:
     def _write_store_snapshot(self, conn, plan) -> None:
         """Replace one item's offering-store snapshot inside an open transaction.
 
-        Rows are deleted first so a retry that finds fewer stores leaves no
-        stale ones behind — an UPSERT alone would keep them forever.
+        Rows for the matching ``(run_key, item_key, source)`` are deleted
+        first so a retry that finds fewer stores leaves no stale ones
+        behind — an UPSERT alone would keep them forever. The scope is
+        limited to the current source (``tawreed`` or ``excel_target``) so
+        snapshots from a different source on the same item are not
+        overwritten when the two flows share a run_key.
         """
         usable = usable_store_rows(plan.stores)
         conn.execute(
             DELETE_RUN_ITEM_STORES,
-            {"run_key": plan.run_key, "item_key": plan.item_key},
+            {
+                "run_key": plan.run_key,
+                "item_key": plan.item_key,
+                "source": plan.source,
+            },
         )
         if usable:
             _insert_snapshot(conn, plan, usable)

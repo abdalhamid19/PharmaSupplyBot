@@ -118,6 +118,7 @@ def run_excel_target_match_only(
     catalog: list[TargetProduct],
     summary_path: Path,
     run_key: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, int]:
     """Run match-only for one Excel target and persist a summary CSV.
 
@@ -139,7 +140,9 @@ def run_excel_target_match_only(
     matched = flagged = 0
     items_list = list(items)
     db_persist = _build_db_persister(run_key, target_key)
-    provided_run_id = _extract_run_id(run_key) if run_key else None
+    provided_run_id = run_id or (
+        _extract_run_id(run_key) if run_key else None
+    )
     with artifact_run("excel-target", target_key, run_id=provided_run_id) as run:
         _ensure_run_record(app_config, run_key, run, target_key)
         target_summary = (
@@ -274,8 +277,16 @@ def run_excel_target_match_only_multi(
     items: Iterable[Item],
     summary_path: Path,
     run_key: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, dict[str, int]]:
-    """Run match-only across every Excel target, returning per-target totals."""
+    """Run match-only across every Excel target, returning per-target totals.
+
+    ``run_id`` is the bare timestamp half of ``run_key`` (``<profile>/<run_id>``).
+    Passing it explicitly avoids the artifact directory mismatch that
+    happens when the excel-target flow derives its own minute-stamp from
+    ``unique_run_id("excel-target", target_key)`` (which usually differs by
+    a tick from the Tawreed flow's ``unique_run_id("order", profile_key)``).
+    """
     items_list = list(items)
     totals: dict[str, dict[str, int]] = {}
     for target_key, _xlsx_paths in selected:
@@ -289,6 +300,7 @@ def run_excel_target_match_only_multi(
                 f"{summary_path.stem}_{target_key}{summary_path.suffix}"
             ),
             run_key=run_key,
+            run_id=run_id,
         )
     return totals
 
