@@ -1,4 +1,19 @@
-"""Order form value helpers and rendering for Streamlit."""
+"""Order form value helpers and rendering for Streamlit.
+
+The order form has two distinct kinds of widgets:
+
+* Widgets that should react immediately to operator interaction
+  (file uploaders, target checkboxes, advanced options) — these live
+  outside ``st.form`` so the operator does not have to click "Run Order"
+  for the uploader to even appear.
+* A single submit button that kicks off the subprocess — this is the
+  only thing that must live inside ``st.form`` so a rerun does not
+  immediately trigger a run.
+
+Both groups read/write a single ``st.session_state["order_form_values"]``
+dict so the form value collection reads from one source of truth
+regardless of which group the widget belongs to.
+"""
 
 from __future__ import annotations
 
@@ -10,11 +25,14 @@ from ...core.ordering.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     is_prevented_items_excel_path,
 )
-from ..fields.streamlit_excel_fields import excel_source_fields
+from ..fields.streamlit_excel_fields import (
+    render_excel_source_fields,
+    resolve_order_excel_path,
+    SOURCE_EXISTING,
+)
 from ..fields.streamlit_profile_fields import (
     profile_run_fields_with_workers,
     render_excel_target_sources,
-    OrderRunFields,
 )
 from ..streamlit_shared import (
     ARTIFACTS_DIR,
@@ -23,7 +41,6 @@ from ..streamlit_shared import (
     summary_csv_path,
 )
 from ..streamlit_state import ensure_default_state_files, missing_state_profiles
-from ..streamlit_uploads import resolve_excel_path
 
 
 # ============================================================================
@@ -155,91 +172,75 @@ def _completed_previous_count(state: dict[str, object]) -> int:
 
 
 def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
-    """Return the submitted order form values."""
+    """Return the submitted order form values.
+
+    Every input widget lives outside ``st.form`` so the operator gets
+    immediate feedback. The form block is a thin wrapper that only
+    exposes the "Run Order" submit button.
+    """
+    render_order_inputs(app_config)
+    values = _collect_form_values()
     with st.form("order_form"):
-        values = order_form_fields(app_config, DEFAULT_PREVENTED_ITEMS_PATH)
         submitted = st.form_submit_button("Run Order")
-    # The Excel-target source controls live outside the form so the operator
-    # can interact with the radio + file uploader independently of the form
-    # rerun cycle. We layer them on top of the dict the form returned so the
-    # rest of the pipeline sees a single source of truth.
-    uploads = render_excel_target_sources(app_config)
-    if uploads:
-        values["excel_target_uploads"] = uploads
     return bool(submitted), values
 
 
-def order_form_fields(
-    app_config, prevented_items_path: Path | None = None
-) -> dict[str, object]:
-    """Return the order form field values."""
-    input_mode, excel_path_str, upload = excel_source_fields()
-    run_fields, item_workers = profile_run_fields_with_workers(app_config)
-    values = _order_form_values(
-        input_mode,
-        excel_path_str,
-        upload,
-        run_fields,
-        item_workers,
-        prevented_items_path,
-    )
-    return values
+def render_order_inputs(app_config) -> None:
+    """Render every input widget outside of ``st.form``."""
+    st.subheader("Order inputs")
+    render_excel_source_fields()
+    st.divider()
+    profile_run_fields_with_workers(app_config)
+    excel_target_uploads = render_excel_target_sources(app_config)
+    if excel_target_uploads:
+        st.session_state["order_form_excel_target_uploads"] = excel_target_uploads
+    st.divider()
 
 
-def _order_form_values(
-    input_mode: str,
-    excel_path_str: str,
-    upload: object,
-    run_fields: OrderRunFields,
-    item_workers: int,
-    prevented_items_path: Path | None,
-    excel_target_uploads: dict[str, dict[str, object]] | None = None,
-) -> dict[str, object]:
-    """Build serializable order form values from collected widget fields."""
-    values = {
-        "input_mode": input_mode,
-        "excel_path_str": excel_path_str,
-        "upload": upload,
-        "item_workers": int(item_workers),
-        "prevented_items_excel": str(
-            prevented_items_path or DEFAULT_PREVENTED_ITEMS_PATH
+def _collect_form_values() -> dict[str, object]:
+    """Aggregate widget state from ``st.session_state`` into a flat dict."""
+    selected = st.session_state.get("excel_target_selected_targets") or ()
+    profile_key = next(
+        (
+            token.split(":", 1)[1]
+            for token in selected
+            if isinstance(token, str) and token.startswith("profile:")
         ),
-        "excel_target_uploads": dict(excel_target_uploads or {}),
-    }
-    values.update(_order_run_values(run_fields))
-    return values
-
-
-def _order_run_values(run_fields: OrderRunFields) -> dict[str, object]:
-    """Build values related to the selected order run target/options."""
-    selected_targets = tuple(run_fields.selected_targets)
-    return {
-        "profile_mode": str(run_fields.profile_mode),
-        "selected_targets": selected_targets,
-        "profile_key": str(run_fields.profile_key),
-        "limit": int(run_fields.limit),
-        "debug_browser": bool(run_fields.debug_browser),
-        "resume": bool(run_fields.resume),
-        "match_only": bool(run_fields.match_only),
-        "execution_mode": str(run_fields.execution_mode),
-        "highest_discount": bool(run_fields.highest_discount),
-        "min_discount_percent": float(run_fields.min_discount_percent),
-        "start_item": int(run_fields.start_item),
-        "end_item": int(run_fields.end_item),
-    }
-
-
-def _extended_order_run_values(
-    run_fields: OrderRunFields,
-) -> tuple[str, bool, float, int, int]:
-    """Return execution mode and discount controls with compatibility."""
-    return (
-        str(run_fields.execution_mode),
-        bool(run_fields.highest_discount),
-        float(run_fields.min_discount_percent),
-        int(run_fields.start_item),
-        int(run_fields.end_item),
+        str(st.session_state.get("order_form_primary_profile") or ""),
     )
+    item_workers = st.session_state.get("order_form_item_workers", 1)
+    uploads = st.session_state.get("order_form_excel_target_uploads") or {}
+    advanced = st.session_state.get("order_form_advanced") or {}
+
+    return {
+        "input_mode": st.session_state.get(
+            "order_excel_source_mode", SOURCE_EXISTING
+        ),
+        "excel_path_str": st.session_state.get("order_excel_path", ""),
+        "upload": st.session_state.get("order_excel_upload"),
+        "selected_targets": tuple(selected),
+        "profile_key": profile_key,
+        "profile_mode": _profile_mode(selected),
+        "item_workers": int(item_workers),
+        "limit": int(advanced.get("limit", 0)),
+        "debug_browser": bool(advanced.get("debug_browser", False)),
+        "resume": bool(advanced.get("resume", False)),
+        "match_only": bool(advanced.get("match_only", False)),
+        "execution_mode": str(advanced.get("execution_mode", "auto")),
+        "highest_discount": bool(advanced.get("highest_discount", False)),
+        "min_discount_percent": float(advanced.get("min_discount_percent", 0.0)),
+        "start_item": int(advanced.get("start_item", 1)),
+        "end_item": int(advanced.get("end_item", 0)),
+        "prevented_items_excel": str(DEFAULT_PREVENTED_ITEMS_PATH),
+        "excel_target_uploads": dict(uploads),
+    }
+
+
+def _profile_mode(selected: tuple[str, ...]) -> str:
+    has_profile = any(isinstance(t, str) and t.startswith("profile:") for t in selected)
+    if not has_profile:
+        return "Excel targets only"
+    return "Single profile" if len([t for t in selected if t.startswith("profile:")]) == 1 else "Multi"
 
 
 __all__ = [
@@ -257,8 +258,6 @@ __all__ = [
     "_completed_summary_path",
     "_completed_previous_count",
     "order_form_values",
-    "order_form_fields",
-    "_order_form_values",
-    "_order_run_values",
-    "_extended_order_run_values",
+    "render_order_inputs",
+    "resolve_order_excel_path",
 ]

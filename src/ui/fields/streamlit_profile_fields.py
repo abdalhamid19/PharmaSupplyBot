@@ -49,22 +49,17 @@ def profile_run_fields(app_config) -> OrderRunFields:
 
 
 def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
-    """Return the order form fields and item workers count."""
+    """Render the Run target picker + advanced options and snapshot their state.
+
+    Every widget is rendered outside ``st.form`` and its value is mirrored
+    to ``st.session_state`` so the rest of the page (including the
+    Excel target source panel) can read the latest selection without a
+    submit cycle.
+    """
     profile_keys = list(app_config.profiles.keys())
     excel_target_keys = list(app_config.enabled_excel_targets().keys())
 
-    # Mirror the selection into session_state so the dedicated source
-    # panel below the form can read it without rerendering the form.
-    st.session_state["excel_target_selected_targets"] = tuple(
-        st.session_state.get("excel_target_selected_targets") or ()
-    )
-
     selected_pairs = _render_target_checkboxes(app_config, profile_keys, excel_target_keys)
-
-    if any(kind == "profile" for kind, _ in selected_pairs):
-        profile_mode = "Single profile" if len(selected_pairs) == 1 else "Multi"
-    else:
-        profile_mode = "Excel targets only"
     primary_profile = next(
         (key for kind, key in selected_pairs if kind == "profile"),
         profile_keys[0] if profile_keys else "",
@@ -73,20 +68,48 @@ def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
     profile_key = st.selectbox(
         "Primary profile (for resume/preview only)",
         options=profile_keys or [""],
-        index=0,
+        index=_safe_index(profile_keys, primary_profile),
         disabled=not profile_keys,
         help=(
             "Used to scope resume and the watched summary CSV. "
             "Excel-target runs do not need this — pick any profile."
         ),
+        key="order_form_primary_profile",
     )
-    limit = st.number_input("Item limit", min_value=0, max_value=100000, value=1500)
+    limit = st.number_input(
+        "Item limit",
+        min_value=0,
+        max_value=100000,
+        value=1500,
+        key="order_form_item_limit",
+    )
 
     advanced_options = _render_advanced_options(app_config)
+    if any(kind == "profile" for kind, _ in selected_pairs):
+        profile_mode = "Single profile" if len(selected_pairs) == 1 else "Multi"
+    else:
+        profile_mode = "Excel targets only"
+
+    st.session_state["excel_target_selected_targets"] = tuple(
+        f"{kind}:{key}" for kind, key in selected_pairs
+    )
+    st.session_state["order_form_advanced"] = {
+        "limit": int(advanced_options[0]) if False else int(limit),
+        "debug_browser": bool(advanced_options[0]),
+        "resume": bool(advanced_options[1]),
+        "match_only": bool(advanced_options[2]),
+        "execution_mode": str(advanced_options[3]),
+        "highest_discount": bool(advanced_options[4]),
+        "min_discount_percent": float(advanced_options[5]),
+        "start_item": int(advanced_options[6]),
+        "end_item": int(advanced_options[7]),
+    }
+    st.session_state["order_form_item_workers"] = int(advanced_options[8])
+
     fields = OrderRunFields(
         profile_mode=str(profile_mode),
         selected_targets=tuple(f"{kind}:{key}" for kind, key in selected_pairs),
-        profile_key=str(primary_profile or profile_key),
+        profile_key=str(profile_key or primary_profile),
         limit=int(limit),
         debug_browser=bool(advanced_options[0]),
         resume=bool(advanced_options[1]),
@@ -98,6 +121,14 @@ def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
         end_item=int(advanced_options[7]),
     )
     return fields, int(advanced_options[-1])
+
+
+def _safe_index(options: list[str], value: str) -> int:
+    """Return the index of ``value`` in ``options`` or 0 if missing."""
+    try:
+        return options.index(value)
+    except ValueError:
+        return 0
 
 
 def _render_target_checkboxes(
@@ -154,74 +185,110 @@ def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:
     if not excel_target_keys:
         return uploads
     excel_options = available_excel_target_options()
-    with st.expander("📊 Excel target source", expanded=True):
-        st.caption(
-            "Pick where each selected Excel target catalog comes from. "
-            "Upload file persists the bytes under "
-            "`artifacts/uploaded-excel-targets/<key>.xlsx`."
+    st.markdown("##### 📊 Excel target source")
+    st.caption(
+        "Pick where each selected Excel target catalog comes from. "
+        "Upload file persists the bytes under "
+        "`artifacts/uploaded-excel-targets/<key>.xlsx`."
+    )
+    for target_key in excel_target_keys:
+        target_cfg = app_config.excel_targets.get(target_key)
+        display_name = getattr(target_cfg, "display_name", "") or target_key
+        st.markdown(f"**{display_name}** (`{target_key}`)")
+        mode = st.radio(
+            "Source",
+            ["Configured", "Existing file", "Upload file"],
+            key=f"excel_target_source_{target_key}",
+            horizontal=True,
+            label_visibility="collapsed",
+            help=(
+                "Configured = the catalog that ships with config.yaml. "
+                "Existing file = another .xlsx under data/input/excel target/. "
+                "Upload file = drag-and-drop a fresh catalog."
+            ),
         )
-        for target_key in excel_target_keys:
-            target_cfg = app_config.excel_targets.get(target_key)
-            display_name = getattr(target_cfg, "display_name", "") or target_key
-            st.markdown(f"**{display_name}** (`{target_key}`)")
-            mode = st.radio(
-                "Source",
-                ["Configured", "Existing file", "Upload file"],
-                key=f"excel_target_source_{target_key}",
-                horizontal=True,
-                label_visibility="collapsed",
-                help=(
-                    "Configured = the catalog that ships with config.yaml. "
-                    "Existing file = another .xlsx under data/input/excel target/. "
-                    "Upload file = drag-and-drop a fresh catalog."
-                ),
-            )
-            path = ""
-            upload = None
-            if mode == "Existing file":
-                if excel_options:
-                    path = str(
-                        st.selectbox(
-                            "Catalog path",
-                            excel_options,
-                            key=f"excel_target_path_{target_key}",
-                            label_visibility="collapsed",
-                        )
+        path = ""
+        upload = None
+        if mode == "Existing file":
+            if excel_options:
+                path = str(
+                    st.selectbox(
+                        "Catalog path",
+                        excel_options,
+                        key=f"excel_target_path_{target_key}",
+                        label_visibility="collapsed",
                     )
-                else:
-                    path = str(
-                        st.text_input(
-                            "Catalog path",
-                            key=f"excel_target_path_text_{target_key}",
-                            label_visibility="collapsed",
-                        )
-                    )
-            elif mode == "Upload file":
-                upload = st.file_uploader(
-                    "Upload catalog",
-                    type=["xlsx"],
-                    key=f"excel_target_upload_{target_key}",
-                    label_visibility="collapsed",
                 )
-            st.divider()
-            uploads[target_key] = {"mode": mode, "path": path, "upload": upload}
+            else:
+                path = str(
+                    st.text_input(
+                        "Catalog path",
+                        key=f"excel_target_path_text_{target_key}",
+                        label_visibility="collapsed",
+                    )
+                )
+        elif mode == "Upload file":
+            upload = st.file_uploader(
+                f"Upload catalog for {target_key}",
+                type=["xlsx"],
+                key=f"excel_target_upload_{target_key}",
+                help="Drag-and-drop or browse to upload this Excel target catalog.",
+            )
+        st.divider()
+        uploads[target_key] = {"mode": mode, "path": path, "upload": upload}
     return uploads
 
 
 def _render_advanced_options(app_config):
     """Render advanced options expander."""
     with st.expander("⚙️ Advanced Options", expanded=False):
-        start_item = st.number_input("Start item number", min_value=1, value=1)
-        end_item = st.number_input("End item number (0 for unlimited)", min_value=0, value=0)
-        debug_browser = st.checkbox("Debug browser", value=False)
-        resume = st.checkbox("Resume from previous summary", value=False)
-        match_only = st.checkbox("Match only without adding to cart", value=False)
-        execution_mode = st.selectbox("Execution mode", ["auto", "api", "browser"], index=0, help="auto uses API when a safe contract exists, then falls back to browser.")
+        start_item = st.number_input(
+            "Start item number", min_value=1, value=1, key="order_form_start_item"
+        )
+        end_item = st.number_input(
+            "End item number (0 for unlimited)",
+            min_value=0,
+            value=0,
+            key="order_form_end_item",
+        )
+        debug_browser = st.checkbox("Debug browser", value=False, key="order_form_debug_browser")
+        resume = st.checkbox(
+            "Resume from previous summary", value=False, key="order_form_resume"
+        )
+        match_only = st.checkbox(
+            "Match only without adding to cart", value=False, key="order_form_match_only"
+        )
+        execution_mode = st.selectbox(
+            "Execution mode",
+            ["auto", "api", "browser"],
+            index=0,
+            key="order_form_execution_mode",
+            help="auto uses API when a safe contract exists, then falls back to browser.",
+        )
         item_workers = item_workers_field(app_config)
-        highest_discount = st.checkbox("Highest discount only", value=False)
-        min_discount = st.number_input("Minimum discount percent", min_value=0.0, max_value=100.0, value=0.0, step=1.0)
+        highest_discount = st.checkbox(
+            "Highest discount only", value=False, key="order_form_highest_discount"
+        )
+        min_discount = st.number_input(
+            "Minimum discount percent",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=1.0,
+            key="order_form_min_discount",
+        )
 
-    return (bool(debug_browser), bool(resume), bool(match_only), str(execution_mode), bool(highest_discount), float(min_discount), int(start_item), int(end_item), int(item_workers))
+    return (
+        bool(debug_browser),
+        bool(resume),
+        bool(match_only),
+        str(execution_mode),
+        bool(highest_discount),
+        float(min_discount),
+        int(start_item),
+        int(end_item),
+        int(item_workers),
+    )
 
 
 def item_workers_field(app_config) -> int:
@@ -234,6 +301,7 @@ def item_workers_field(app_config) -> int:
             min_value=1,
             max_value=4,
             value=max(1, min(configured, 4)),
+            key="order_form_item_workers_widget",
             help="Split this Excel file across isolated Chromium workers for one profile.",
         )
     )

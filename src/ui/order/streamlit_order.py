@@ -11,6 +11,7 @@ from ...core.ordering.prevented_items import (
     is_prevented_items_excel_path,
 )
 from ..streamlit_uploads import resolve_excel_path
+from .streamlit_order_form import resolve_order_excel_path
 
 # Re-export from split modules
 from .streamlit_order_form import (
@@ -28,10 +29,7 @@ from .streamlit_order_form import (
     _completed_summary_path,
     _completed_previous_count,
     order_form_values,
-    order_form_fields,
-    _order_form_values,
-    _order_run_values,
-    _extended_order_run_values,
+    render_order_inputs,
 )
 from .streamlit_order_command import (
     order_command,
@@ -81,9 +79,7 @@ def render_order_tab(
     if not selected:
         st.error("Pick at least one Run target (Tawreed profile or Excel target).")
         return
-    excel_path = resolve_excel_path(
-        form_values["excel_path_str"], form_values["upload"]
-    )
+    excel_path = resolve_order_excel_path()
     if excel_path is None:
         st.error("Please choose or upload an Excel file.")
         return

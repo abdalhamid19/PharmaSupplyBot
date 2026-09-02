@@ -386,8 +386,40 @@ class ExcelTargetCheckboxWidgetTests(unittest.TestCase):
 
         uploaders = list(at.main.file_uploader)
         self.assertTrue(
-            any(u.label == "Upload catalog" for u in uploaders),
+            any("Upload catalog" in str(u.label) for u in uploaders),
             f"upload widget missing; got {[u.label for u in uploaders]}",
+        )
+
+    def test_excel_source_upload_renders_file_uploader_reactively(self) -> None:
+        """Toggling the order Excel source to Upload file must show the uploader."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        at.run()
+
+        # Initially: "Existing file" is selected — no uploader for the order Excel.
+        initial_uploaders = [
+            u for u in at.main.file_uploader if "Upload Excel" in str(u.label)
+        ]
+        self.assertEqual(
+            initial_uploaders, [],
+            "Upload Excel should be hidden until the operator picks Upload file",
+        )
+
+        # Flip the order Excel source radio to "Upload file".
+        excel_source = next(
+            (r for r in at.main.radio if r.label == "Excel source"), None
+        )
+        self.assertIsNotNone(excel_source)
+        excel_source.set_value("Upload file").run()
+
+        # The uploader must appear on the SAME rerun — no Run Order click required.
+        uploaders = [
+            u for u in at.main.file_uploader if "Upload Excel" in str(u.label)
+        ]
+        self.assertTrue(
+            uploaders,
+            f"Upload Excel uploader did not appear reactively; got {[u.label for u in at.main.file_uploader]}",
         )
 
 

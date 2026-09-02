@@ -47,9 +47,6 @@ CONFIG = AppConfig(
 
 
 def main() -> None:
-    import streamlit as st
-
-    st.set_page_config(page_title="Order tab fixture", layout="wide")
     render_order_tab(CONFIG, "wardany", Path("state/config.yaml"))
 
 

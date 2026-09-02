@@ -9,7 +9,6 @@ from src.ui.order import streamlit_order
 from src.ui.order.streamlit_order import order_command
 from src.ui.order.streamlit_order import DEFAULT_PREVENTED_ITEMS_PATH
 from src.ui.order.streamlit_order_form import order_output_path
-from src.ui.order.streamlit_order_form import order_form_fields
 from src.ui.order.streamlit_order_form import order_run_summary_csv_path
 from src.ui.fields.streamlit_excel_fields import order_excel_options
 from src.ui.views.streamlit_prevented_items import (
@@ -296,43 +295,33 @@ class StreamlitOrderTests(unittest.TestCase):
 
         self.assertEqual(options, [str(prevented_path)])
 
-    def test_order_form_fields_uses_default_prevented_items_path(self) -> None:
+    def test_order_form_values_uses_default_prevented_items_path(self) -> None:
+        """``order_form_values`` seeds the default prevented items path."""
+        from src.ui.order.streamlit_order_form import order_form_values
+
+        captured: dict[str, object] = {}
+
+        def _fake_render(app_config):
+            captured["rendered"] = True
+            return {"selected_targets": ("profile:wardany",)}
+
         with (
             patch(
-                "src.ui.fields.streamlit_excel_fields.excel_source_fields",
-                return_value=(
-                    "Existing file",
-                    "data/input/order_items/orders.xlsx",
-                    None,
-                ),
+                "src.ui.order.streamlit_order_form.render_order_inputs",
+                side_effect=_fake_render,
             ),
             patch(
-                "src.ui.fields.streamlit_profile_fields.profile_run_fields_with_workers",
-                return_value=(
-                    (
-                        "Single profile",
-                        ("profile:wardany",),
-                        "wardany",
-                        5,
-                        False,
-                        True,
-                        True,
-                        "auto",
-                        False,
-                        0.0,
-                        1,
-                        0,
-                    ),
-                    1,
-                ),
+                "src.ui.order.streamlit_order_form._collect_form_values",
+                return_value={"prevented_items_excel": str(DEFAULT_PREVENTED_ITEMS_PATH)},
             ),
         ):
-            app_config = SimpleNamespace(
-                profiles={"wardany": SimpleNamespace(display_name="Wardany")},
-                enabled_excel_targets=lambda: {},
+            submitted, values = order_form_values(
+                SimpleNamespace(
+                    profiles={"wardany": SimpleNamespace(display_name="Wardany")},
+                    enabled_excel_targets=lambda: {},
+                )
             )
-            values = order_form_fields(app_config)
-
+        self.assertTrue(captured.get("rendered"))
         self.assertEqual(
             values["prevented_items_excel"], str(DEFAULT_PREVENTED_ITEMS_PATH)
         )
