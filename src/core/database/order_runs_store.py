@@ -88,7 +88,12 @@ class OrderRunsStore(
             return 0
 
     def _drop_stale_views(self, conn, stored_version: int) -> None:
-        """Drop views whose definitions changed since the stored schema version."""
+        """Drop views whose definitions changed since the stored schema version.
+
+        Also drops any view that still references the legacy ``run_items_v2``
+        staging table so a half-applied migration from a previous install is
+        self-healing on the next read.
+        """
         meta = conn.execute(
             "select 1 from sqlite_master where name = 'schema_meta'"
         ).fetchall()
@@ -97,6 +102,12 @@ class OrderRunsStore(
         for version in range(stored_version, SCHEMA_VERSION):
             for view in STALE_VIEWS_BY_VERSION.get(version, ()):
                 conn.execute(f"drop view if exists {view}")
+        for row in conn.execute(
+            "select name, sql from sqlite_master where type='view'"
+        ).fetchall():
+            name, sql = row[0], row[1] or ""
+            if "run_items_v2" in sql or "run_items_v3" in sql:
+                conn.execute(f"drop view if exists {name}")
 
 
 def order_runs_store(path: str | Path | None = None) -> OrderRunsStore:

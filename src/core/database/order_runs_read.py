@@ -30,8 +30,17 @@ def order_runs_connection(path: str | Path | None = None):
 
     The GUI only issues SELECTs; schema bootstrap in the manager is idempotent.
     ``path`` exists for tests; production callers use the resolved default.
+
+    Opening the connection also triggers a one-shot schema migration so
+    pre-v3 databases on disk pick up the ``source_kind`` and
+    ``source_label`` columns before the first SELECT runs.
     """
-    return get_db_manager(path if path is not None else default_order_runs_db())
+    resolved = path if path is not None else default_order_runs_db()
+    # Touching the store constructor runs the migration (idempotent).
+    from .order_runs_store import OrderRunsStore
+
+    OrderRunsStore(resolved)
+    return get_db_manager(resolved)
 
 
 def _rows_as_dicts(rows: list, columns: list[str]) -> list[dict[str, Any]]:

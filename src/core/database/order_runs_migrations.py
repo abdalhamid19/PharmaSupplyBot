@@ -46,6 +46,29 @@ def _migrate_v2_to_v3(conn) -> None:
     columns = {row[1] for row in conn.execute("pragma table_info(run_items)").fetchall()}
     if "source_kind" in columns and "source_label" in columns:
         return
+    # Drop every view first: views reference the columns we are about
+    # to remove, and SQLite refuses to drop a table while a view
+    # depends on it. The same view definitions are recreated later by
+    # the ALL_DDL statements.
+    for row in conn.execute(
+        "select name from sqlite_master where type='view'"
+    ).fetchall():
+        conn.execute(f"drop view if exists {row[0]}")
+    if "run_items_v2" in tables:
+        # A previous attempt at this migration left a staging table
+        # behind. Drop the child tables first (they hold FKs to
+        # run_items_v2 after the rename), then drop the staging
+        # table. The child tables are recreated later by ALL_DDL.
+        for child in ("run_item_stores", "run_candidates"):
+            if child in tables:
+                conn.execute(f"drop table if exists {child}")
+        conn.execute("drop table run_items_v2")
+    else:
+        # First-time migration: drop child tables so the rename + create
+        # below does not collide with their FK on the column shape.
+        for child in ("run_item_stores", "run_candidates"):
+            if child in tables:
+                conn.execute(f"drop table if exists {child}")
     conn.execute("alter table run_items rename to run_items_v2")
     conn.execute(
         """

@@ -82,16 +82,9 @@ def render_order_tab(
         from ..fields.streamlit_excel_target_manager_widgets import (
             maybe_open_add_dialog,
             render_add_excel_target_button,
-            user_added_targets,
         )
-        from ..fields.streamlit_profile_fields import render_remove_confirmation_panel
 
         render_add_excel_target_button(config_path)
-        render_remove_confirmation_panel(
-            config_path,
-            list(app_config.excel_targets.keys()),
-            set(user_added_targets(config_path)),
-        )
         maybe_open_add_dialog(config_path)
         return
     if render_running_order_controls():
