@@ -301,7 +301,7 @@ class StreamlitOrderTests(unittest.TestCase):
 
         captured: dict[str, object] = {}
 
-        def _fake_render(app_config):
+        def _fake_render(app_config, config_path=None):
             captured["rendered"] = True
             return {"selected_targets": ("profile:wardany",)}
 

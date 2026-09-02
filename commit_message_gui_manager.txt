@@ -1,0 +1,44 @@
+feat(ui): add/remove Excel target catalogs from the GUI
+
+Operators no longer have to edit state/config.yaml by hand to add a
+new Excel target. The Run Order tab now exposes:
+
+* A "+ Add Excel target" button under "What to run against?". The
+  button opens a dialog with a default name
+  ("المخازن الادويه المباشرة"), a file uploader for the catalog, and
+  editable text inputs for the product/price/discount column names.
+  The bytes are written to artifacts/uploaded-excel-targets/<key>.xlsx
+  and a new entry is appended to the user_added_targets section in
+  state/config.yaml.
+* A "🗑 Remove <key>" button per user-added target. Hard-coded
+  targets (those that already lived in state/config.yaml) are
+  protected — only operator-added entries are removable.
+
+The user_added_targets section is the new source of truth for
+"this catalog was added from the UI, so it is safe to remove from
+the UI". Removing an entry drops the key from excel_targets and
+from user_added_targets. The persisted catalog file is left in
+place under artifacts/ so the operator can keep a backup.
+
+render_order_tab now reloads the AppConfig whenever an add/remove
+toast fires, so the checkbox group, the multiselect, and the trash
+buttons all reflect the new state on the very next rerun.
+
+Files:
+* src/ui/excel_targets_manager.py — read/write state/config.yaml
+  around excel_targets and user_added_targets, write catalog bytes.
+* src/ui/fields/streamlit_excel_target_manager_widgets.py — the
+  dialog, the +Add button, and the per-key trash buttons.
+* streamlit_profile_fields.py — _render_target_checkboxes now
+  threads config_path and renders the management widgets.
+* streamlit_order_form.py + streamlit_order.py — thread config_path
+  through render_order_inputs/order_form_values and reload the
+  config after add/remove.
+* tests/ui/test_excel_targets_manager.py — 12 unit tests for the
+  YAML/file mechanics.
+* tests/ui/order/test_run_target_excel_target.py — covers the
+  +Add button visibility, the trash-button-hidden case for
+  hard-coded targets, and the trash-button-visible case (with a
+  user_added_targets mock).
+* tests/ui/order/test_streamlit_order.py — the legacy
+  _fake_render helper now accepts the new config_path kwarg.

@@ -171,26 +171,28 @@ def _completed_previous_count(state: dict[str, object]) -> int:
 # ============================================================================
 
 
-def order_form_values(app_config) -> tuple[bool, dict[str, object]]:
+def order_form_values(
+    app_config, config_path: Path | None = None
+) -> tuple[bool, dict[str, object]]:
     """Return the submitted order form values.
 
     Every input widget lives outside ``st.form`` so the operator gets
     immediate feedback. The form block is a thin wrapper that only
     exposes the "Run Order" submit button.
     """
-    render_order_inputs(app_config)
+    render_order_inputs(app_config, config_path=config_path)
     values = _collect_form_values()
     with st.form("order_form"):
         submitted = st.form_submit_button("Run Order")
     return bool(submitted), values
 
 
-def render_order_inputs(app_config) -> None:
+def render_order_inputs(app_config, config_path: Path | None = None) -> None:
     """Render every input widget outside of ``st.form``."""
     st.subheader("Order inputs")
     render_excel_source_fields()
     st.divider()
-    profile_run_fields_with_workers(app_config)
+    profile_run_fields_with_workers(app_config, config_path=config_path)
     excel_target_uploads = render_excel_target_sources(app_config)
     if excel_target_uploads:
         st.session_state["order_form_excel_target_uploads"] = excel_target_uploads

@@ -428,6 +428,62 @@ class ExcelTargetCheckboxWidgetTests(unittest.TestCase):
         )
         self.assertIsNotNone(multi, "Catalog files multiselect must be visible")
 
+    def test_add_excel_target_button_is_visible(self) -> None:
+        """The `+ Add Excel target` button is rendered for the operator."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        at.run()
+
+        add_button = next(
+            (
+                b
+                for b in at.main.button
+                if b.label and "Add Excel target" in str(b.label)
+            ),
+            None,
+        )
+        self.assertIsNotNone(add_button, "Add Excel target button must be visible")
+
+
+class ExcelTargetManagerWidgetTests(unittest.TestCase):
+    """The trash button shows up only for user-added targets."""
+
+    FIXTURE = Path(__file__).resolve().parent / "order_tab_fixture.py"
+
+    def test_trash_button_hidden_for_hard_coded_target(self) -> None:
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        at.run()
+        remove_buttons = [
+            b for b in at.main.button if b.label and "Remove" in str(b.label)
+        ]
+        self.assertEqual(
+            remove_buttons,
+            [],
+            "alnasr is hard-coded in the fixture; no trash button expected",
+        )
+
+    def test_trash_button_visible_for_user_added_target(self) -> None:
+        """When the config marks a target as user-added, a trash button appears."""
+        from unittest.mock import patch
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        with patch(
+            "src.ui.fields.streamlit_excel_target_manager_widgets.user_added_targets",
+            return_value=["alnasr"],
+        ):
+            at.run()
+        remove_buttons = [
+            b for b in at.main.button if b.label and "Remove" in str(b.label)
+        ]
+        self.assertTrue(
+            any("alnasr" in str(b.label) for b in remove_buttons),
+            f"trash button for alnasr expected; got {[b.label for b in remove_buttons]}",
+        )
+
     def test_excel_source_upload_renders_file_uploader_reactively(self) -> None:
         """Toggling the order Excel source to Upload file must show the uploader."""
         from streamlit.testing.v1 import AppTest

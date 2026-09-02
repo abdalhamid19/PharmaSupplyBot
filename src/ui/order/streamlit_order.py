@@ -6,6 +6,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from ...core.config.config import load_config
 from ...core.ordering.prevented_items import (
     DEFAULT_PREVENTED_ITEMS_PATH,
     is_prevented_items_excel_path,
@@ -64,15 +65,25 @@ def render_order_tab(
 ) -> None:
     """Render order execution controls and fresh-run analysis."""
     st.subheader("Run Order")
+    if (
+        st.session_state.pop("excel_target_added_toast", None)
+        or st.session_state.pop("excel_target_removed_toast", None)
+    ):
+        try:
+            app_config = load_config(config_path)
+        except Exception as error:  # noqa: BLE001 - surface to the operator
+            st.error(f"Failed to reload config: {error}")
     if not default_profile and not app_config.enabled_excel_targets():
         st.warning(
             "No profiles and no Excel targets found in config. "
-            "Add at least one `profiles.<name>` or `excel_targets.<name>` entry."
+            "Add at least one `profiles.<name>` or `excel_targets.<name>` entry "
+            "via the button below."
         )
+        submitted, _ = order_form_values(app_config, config_path=config_path)
         return
     if render_running_order_controls():
         return
-    submitted, form_values = order_form_values(app_config)
+    submitted, form_values = order_form_values(app_config, config_path=config_path)
     if not submitted:
         return
     selected = list(form_values.get("selected_targets") or ())

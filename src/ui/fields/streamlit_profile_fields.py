@@ -13,16 +13,26 @@ The Run Order form exposes two complementary UI surfaces:
   renders one radio + (optional) file picker per selected Excel target
   catalog. The panel lives outside ``st.form`` so changing the radio
   does not trigger a form rerun.
+
+The operator can also add or remove Excel targets without editing
+``state/config.yaml`` by hand — see
+:mod:`src.ui.fields.streamlit_excel_target_manager_widgets`.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import NamedTuple
 
 import streamlit as st
 
 from src.core.config.config_models import AppConfig
 from ..streamlit_uploads import available_excel_target_options
+from .streamlit_excel_target_manager_widgets import (
+    maybe_open_add_dialog,
+    render_add_excel_target_button,
+    render_excel_target_removal_buttons,
+)
 
 
 class OrderRunFields(NamedTuple):
@@ -42,24 +52,31 @@ class OrderRunFields(NamedTuple):
     end_item: int
 
 
-def profile_run_fields(app_config) -> OrderRunFields:
+def profile_run_fields(app_config, config_path: Path | None = None) -> OrderRunFields:
     """Return the order form fields related to profile execution."""
-    fields, _ = profile_run_fields_with_workers(app_config)
+    fields, _ = profile_run_fields_with_workers(app_config, config_path=config_path)
     return fields
 
 
-def profile_run_fields_with_workers(app_config) -> tuple[OrderRunFields, int]:
+def profile_run_fields_with_workers(
+    app_config, config_path: Path | None = None
+) -> tuple[OrderRunFields, int]:
     """Render the Run target picker + advanced options and snapshot their state.
 
     Every widget is rendered outside ``st.form`` and its value is mirrored
     to ``st.session_state`` so the rest of the page (including the
     Excel target source panel) can read the latest selection without a
     submit cycle.
+
+    ``config_path`` is optional: when supplied, the Excel target
+    checkbox group also exposes the Add / Remove catalog buttons.
     """
     profile_keys = list(app_config.profiles.keys())
     excel_target_keys = list(app_config.enabled_excel_targets().keys())
 
-    selected_pairs = _render_target_checkboxes(app_config, profile_keys, excel_target_keys)
+    selected_pairs = _render_target_checkboxes(
+        app_config, profile_keys, excel_target_keys, config_path
+    )
     primary_profile = next(
         (key for kind, key in selected_pairs if kind == "profile"),
         profile_keys[0] if profile_keys else "",
@@ -132,7 +149,10 @@ def _safe_index(options: list[str], value: str) -> int:
 
 
 def _render_target_checkboxes(
-    app_config: AppConfig, profile_keys: list[str], excel_target_keys: list[str]
+    app_config: AppConfig,
+    profile_keys: list[str],
+    excel_target_keys: list[str],
+    config_path: Path | None = None,
 ) -> list[tuple[str, str]]:
     """Render one ``st.checkbox`` per configured target so every option is visible."""
     selected_pairs: list[tuple[str, str]] = []
@@ -163,6 +183,10 @@ def _render_target_checkboxes(
             ):
                 selected_pairs.append(("excel-target", key))
         col_idx += 1
+    if config_path is not None and excel_target_keys:
+        render_add_excel_target_button(config_path)
+        render_excel_target_removal_buttons(config_path, excel_target_keys)
+        maybe_open_add_dialog(config_path)
     if not selected_pairs:
         st.warning("Tick at least one target above to enable the Run Order button.")
     st.session_state["excel_target_selected_targets"] = tuple(
