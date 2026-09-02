@@ -30,6 +30,7 @@ from src.core.config.config_models import AppConfig
 from ..streamlit_uploads import available_excel_target_options
 from .streamlit_excel_target_manager_widgets import (
     maybe_open_add_dialog,
+    maybe_open_remove_dialog,
     render_add_excel_target_button,
 )
 
@@ -159,11 +160,15 @@ def _render_target_checkboxes(
     their own row with a trailing trash button so the operator can see
     which catalogs are removable without scrolling past the source panel.
     """
+    from .streamlit_excel_target_manager_widgets import (
+        remove_excel_target,
+        user_added_targets,
+    )
+
     selected_pairs: list[tuple[str, str]] = []
     st.markdown("##### What to run against?")
     user_added: set[str] = set()
     if config_path is not None:
-        from .streamlit_excel_target_manager_widgets import user_added_targets
         user_added = set(user_added_targets(config_path))
     if profile_keys:
         cols = st.columns(2)
@@ -182,7 +187,7 @@ def _render_target_checkboxes(
     if excel_target_keys:
         st.caption("📊 Excel target catalog")
         for key in excel_target_keys:
-            checkbox_col, action_col = st.columns([0.92, 0.08])
+            checkbox_col, action_col = st.columns([0.78, 0.22])
             with checkbox_col:
                 if st.checkbox(
                     f"📊 Excel target ({key})",
@@ -196,53 +201,33 @@ def _render_target_checkboxes(
                     selected_pairs.append(("excel-target", key))
             with action_col:
                 if key in user_added:
-                    if st.button(
-                        "🗑",
+
+                    def _enter_remove_confirm(
+                        target_key: str = key,
+                    ) -> None:
+                        st.session_state["excel_target_remove_pending"] = target_key
+
+                    st.button(
+                        "🗑 Remove",
                         key=f"excel_target_remove_{key}",
-                        help=f"Remove user-added target `{key}` from the config.",
-                    ):
-                        st.session_state["excel_target_remove_pending"] = key
-                        st.rerun()
+                        help=(
+                            f"Remove user-added target `{key}` from the config. "
+                            "You will be asked to confirm."
+                        ),
+                        on_click=_enter_remove_confirm,
+                    )
+    if st.session_state.pop("excel_target_removed_toast", None):
+        st.success("Excel target removed.")
     if config_path is not None:
         render_add_excel_target_button(config_path)
-        render_remove_confirmation_panel(config_path, excel_target_keys, user_added)
         maybe_open_add_dialog(config_path)
+        maybe_open_remove_dialog(config_path)
     if not selected_pairs:
         st.warning("Tick at least one target above to enable the Run Order button.")
     st.session_state["excel_target_selected_targets"] = tuple(
         f"{kind}:{key}" for kind, key in selected_pairs
     )
     return selected_pairs
-
-
-def render_remove_confirmation_panel(
-    config_path: Path,
-    excel_target_keys: list[str],
-    user_added: set[str],
-) -> None:
-    """Show the Yes/Cancel confirmation when the operator pressed 🗑."""
-    from .streamlit_excel_target_manager_widgets import remove_excel_target
-
-    pending = st.session_state.pop("excel_target_remove_pending", None)
-    if not pending or pending not in excel_target_keys or pending not in user_added:
-        if st.session_state.pop("excel_target_removed_toast", None):
-            st.success("Excel target removed.")
-        return
-    st.warning(
-        f"Remove user-added target `{pending}`? "
-        "This deletes the config entry; the catalog file is left in place."
-    )
-    confirm, cancel = st.columns(2)
-    if confirm.button(
-        "Yes, remove it",
-        type="primary",
-        key="excel_target_remove_confirm",
-    ):
-        if remove_excel_target(config_path, pending):
-            st.session_state["excel_target_removed_toast"] = True
-            st.rerun()
-    if cancel.button("Cancel", key="excel_target_remove_cancel"):
-        st.rerun()
 
 
 def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:

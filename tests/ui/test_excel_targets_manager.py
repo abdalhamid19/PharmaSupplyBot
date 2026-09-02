@@ -186,5 +186,24 @@ class RemoveExcelTargetTests(unittest.TestCase):
             )
 
 
+class RemoveDialogDispatchTests(unittest.TestCase):
+    """The Yes-button inside the dialog must invoke remove_excel_target."""
+
+    def test_remove_excel_target_drops_user_added_entry(self) -> None:
+        """End-to-end: confirm logic drops the target from config."""
+        with TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "config.yaml"
+            config.write_text(
+                "excel_targets:\n  my_warehouse: {}\nuser_added_targets:\n  - my_warehouse\n",
+                encoding="utf-8",
+            )
+            from src.ui.excel_targets_manager import (
+                remove_excel_target as real_remove,
+            )
+            self.assertTrue(real_remove(config, "my_warehouse"))
+            self.assertEqual(user_added_targets(config), [])
+            self.assertNotIn("my_warehouse:", config.read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

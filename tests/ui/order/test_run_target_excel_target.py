@@ -484,6 +484,39 @@ class ExcelTargetManagerWidgetTests(unittest.TestCase):
             f"trash button for alnasr expected; got {[b.key for b in trash_buttons]}",
         )
 
+    def test_trash_sets_pending_flag(self) -> None:
+        """Pressing 🗑 sets the pending flag the dialog body uses to dispatch."""
+        from unittest.mock import patch
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        with patch(
+            "src.ui.fields.streamlit_excel_target_manager_widgets.user_added_targets",
+            return_value=["alnasr"],
+        ):
+            at.run()
+
+        trash = next(
+            (
+                b
+                for b in at.main.button
+                if b.key and "excel_target_remove_alnasr" in b.key
+            ),
+            None,
+        )
+        self.assertIsNotNone(trash, "trash button must exist for alnasr")
+        trash.click()
+        at.run()
+        self.assertIn(
+            "excel_target_remove_pending",
+            at.session_state,
+            "remove_pending flag must be set after trash click",
+        )
+        self.assertEqual(
+            at.session_state["excel_target_remove_pending"],
+            "alnasr",
+        )
+
     def test_excel_source_upload_renders_file_uploader_reactively(self) -> None:
         """Toggling the order Excel source to Upload file must show the uploader."""
         from streamlit.testing.v1 import AppTest

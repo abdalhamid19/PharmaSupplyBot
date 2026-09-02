@@ -1,0 +1,26 @@
+fix(ui): open a confirm dialog when the trash button is clicked
+
+The previous flow used an inline remove/cancel pair directly under
+the trash button, but the click handler relied on st.rerun() inside
+the if-block. In the running Streamlit app the racy rerun + pop
+sequence meant clicking Yes, remove it did nothing -- the state
+flag was consumed by the wrong rerun and the remove_excel_target
+call never fired.
+
+Replace the inline pair with a st.dialog. Pressing the trash button
+sets excel_target_remove_pending in session_state via an on_click
+callback (so the state is set even when the rerun is racy), and the
+dialog body dispatches remove_excel_target + sets the removed_toast
+on confirmation. The dialog decorator handles the modal lifecycle
+so there is no manual rerun dance to keep in sync.
+
+render_excel_target_removal_buttons is now a no-op stub kept for
+backwards compatibility. The trash buttons are rendered inline next
+to each Excel target checkbox in
+streamlit_profile_fields._render_target_checkboxes.
+
+Tests:
+* test_trash_sets_pending_flag: confirms the trash on_click sets the
+  pending flag in session_state.
+* RemoveDialogDispatchTests: asserts the underlying YAML/manager
+  mechanics the dialog body relies on.

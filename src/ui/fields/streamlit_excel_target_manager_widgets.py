@@ -134,6 +134,38 @@ def render_excel_target_removal_buttons(
     return None
 
 
+@st.dialog("Remove Excel target", width="medium")
+def _confirm_remove_dialog(config_path: Path, target_key: str) -> None:
+    """Show a Yes/No dialog and drop the target on confirmation."""
+    st.warning(
+        f"Remove user-added target `{target_key}`? "
+        "This deletes the config entry; the catalog file is left in place."
+    )
+    confirm, cancel = st.columns(2)
+    if confirm.button(
+        "Yes, remove it",
+        type="primary",
+        key=f"excel_target_dialog_confirm_{target_key}",
+    ):
+        if remove_excel_target(config_path, target_key):
+            st.session_state["excel_target_removed_toast"] = True
+        st.session_state["excel_target_remove_pending"] = None
+        st.rerun()
+    if cancel.button(
+        "Cancel",
+        key=f"excel_target_dialog_cancel_{target_key}",
+    ):
+        st.session_state["excel_target_remove_pending"] = None
+        st.rerun()
+
+
+def maybe_open_remove_dialog(config_path: Path) -> None:
+    """Open the remove confirmation dialog if the operator pressed 🗑."""
+    pending = st.session_state.get("excel_target_remove_pending")
+    if pending:
+        _confirm_remove_dialog(config_path, pending)
+
+
 __all__ = [
     "ADD_DIALOG_KEY",
     "DEFAULT_TARGET_NAME",
