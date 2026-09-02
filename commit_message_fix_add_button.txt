@@ -1,0 +1,16 @@
+fix(ui): show Add Excel target button when no targets are configured
+
+The + Add Excel target button and the trash buttons only rendered
+when at least one Excel target key already existed in the config
+("config_path is not None and excel_target_keys"). The user had
+removed the example alnasr target, so when they opened Run Order
+the buttons were hidden and they could not add a fresh catalog
+from the UI.
+
+Drop the `excel_target_keys` gate: whenever the operator opens Run
+Order, the management buttons are reachable so they can add their
+first Excel target without editing state/config.yaml by hand.
+
+Also render the same buttons in the "no profiles and no targets"
+early-return path of render_order_tab, so a totally empty config
+still offers the Add button.

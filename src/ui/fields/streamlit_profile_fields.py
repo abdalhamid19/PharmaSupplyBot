@@ -183,7 +183,7 @@ def _render_target_checkboxes(
             ):
                 selected_pairs.append(("excel-target", key))
         col_idx += 1
-    if config_path is not None and excel_target_keys:
+    if config_path is not None:
         render_add_excel_target_button(config_path)
         render_excel_target_removal_buttons(config_path, excel_target_keys)
         maybe_open_add_dialog(config_path)

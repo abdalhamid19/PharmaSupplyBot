@@ -79,7 +79,15 @@ def render_order_tab(
             "Add at least one `profiles.<name>` or `excel_targets.<name>` entry "
             "via the button below."
         )
-        submitted, _ = order_form_values(app_config, config_path=config_path)
+        from ..fields.streamlit_excel_target_manager_widgets import (
+            maybe_open_add_dialog,
+            render_add_excel_target_button,
+            render_excel_target_removal_buttons,
+        )
+
+        render_add_excel_target_button(config_path)
+        render_excel_target_removal_buttons(config_path, list(app_config.excel_targets.keys()))
+        maybe_open_add_dialog(config_path)
         return
     if render_running_order_controls():
         return
