@@ -284,10 +284,11 @@ class StreamlitExcelTargetUploadTests(unittest.TestCase):
 
 
 class ExcelTargetConfigDisplayNameTests(unittest.TestCase):
-    """Guard against the AttributeError that hid the upload widgets."""
+    """``display_name`` is kept as optional data (YAML compat) but is no longer
+    surfaced in the GUI. The checkbox label is always ``📊 Excel target (<key>)``
+    and the source panel header is just the key."""
 
     def test_excel_target_config_supports_display_name(self) -> None:
-        """ExcelTargetConfig must expose ``display_name`` for the GUI label."""
         from src.core.config.config_models import ExcelTargetConfig
 
         cfg = ExcelTargetConfig(
@@ -299,14 +300,12 @@ class ExcelTargetConfigDisplayNameTests(unittest.TestCase):
         self.assertEqual(cfg.display_name, "Alnasr Pharmacy")
 
     def test_excel_target_config_display_name_defaults_to_empty(self) -> None:
-        """When the YAML omits ``display_name``, it defaults to empty string."""
         from src.core.config.config_models import ExcelTargetConfig
 
         cfg = ExcelTargetConfig(name_col="صنف", price_col="سعر", discount_col="الخصم")
         self.assertEqual(cfg.display_name, "")
 
     def test_build_excel_target_reads_display_name(self) -> None:
-        """``build_excel_target`` must parse the YAML ``display_name`` key."""
         from src.core.config.config_factory import build_excel_target
 
         cfg = build_excel_target(

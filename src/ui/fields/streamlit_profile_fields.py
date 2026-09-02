@@ -151,11 +151,9 @@ def _render_target_checkboxes(
                 selected_pairs.append(("profile", key))
         col_idx += 1
     for key in excel_target_keys:
-        target_cfg = app_config.excel_targets.get(key)
-        display = getattr(target_cfg, "display_name", "") or key
         with cols[col_idx % len(cols)]:
             if st.checkbox(
-                f"📊 Excel target — {display} ({key})",
+                f"📊 Excel target ({key})",
                 value=False,
                 key=f"run_target_excel_{key}",
                 help=(
@@ -192,9 +190,7 @@ def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:
         "`artifacts/uploaded-excel-targets/<key>.xlsx`."
     )
     for target_key in excel_target_keys:
-        target_cfg = app_config.excel_targets.get(target_key)
-        display_name = getattr(target_cfg, "display_name", "") or target_key
-        st.markdown(f"**{display_name}** (`{target_key}`)")
+        st.markdown(f"**{target_key}**")
         mode = st.radio(
             "Source",
             ["Configured", "Existing file", "Upload file"],
