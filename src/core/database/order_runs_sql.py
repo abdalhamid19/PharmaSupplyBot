@@ -47,18 +47,19 @@ on conflict(item_key) do update set
 
 UPSERT_RUN_ITEM = """
 insert into run_items
- (run_key, item_key, requested_qty, ordered_qty, status, reason, matched,
-  manual_review_required, manual_review_category, matched_query,
-  deterministic_score, winner_store_product_id, winner_store_key,
-  tie_break_reason, candidates_considered, stores_offering,
+ (run_key, item_key, source_kind, source_label, requested_qty, ordered_qty,
+  status, reason, matched, manual_review_required, manual_review_category,
+  matched_query, deterministic_score, winner_store_product_id,
+  winner_store_key, tie_break_reason, candidates_considered, stores_offering,
   elapsed_seconds, match_elapsed_seconds)
 values
- (:run_key, :item_key, :requested_qty, :ordered_qty, :status, :reason, :matched,
-  :manual_review_required, :manual_review_category, :matched_query,
-  :deterministic_score, :winner_store_product_id, :winner_store_key,
-  :tie_break_reason, :candidates_considered, :stores_offering,
-  :elapsed_seconds, :match_elapsed_seconds)
-on conflict(run_key, item_key) do update set
+ (:run_key, :item_key, :source_kind, :source_label, :requested_qty,
+  :ordered_qty, :status, :reason, :matched, :manual_review_required,
+  :manual_review_category, :matched_query, :deterministic_score,
+  :winner_store_product_id, :winner_store_key, :tie_break_reason,
+  :candidates_considered, :stores_offering, :elapsed_seconds,
+  :match_elapsed_seconds)
+on conflict(run_key, item_key, source_kind, source_label) do update set
  requested_qty          = excluded.requested_qty,
  ordered_qty            = excluded.ordered_qty,
  status                 = excluded.status,

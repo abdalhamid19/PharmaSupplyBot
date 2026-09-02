@@ -80,11 +80,14 @@ class OrderRunsSchemaTests(unittest.TestCase):
         self.assertEqual(keys, ["run_key", "item_key", "store_product_id"])
 
     def test_run_items_has_composite_primary_key(self) -> None:
-        """One row per run and item, enforced by the database."""
+        """Schema v3: one row per (run, item, source_kind, source_label)."""
         with TemporaryDirectory() as temp:
             store = OrderRunsStore(Path(temp) / "order_runs.db")
             keys = store.primary_key_columns("run_items")
-        self.assertEqual(keys, ["run_key", "item_key"])
+        self.assertEqual(
+            keys,
+            ["run_key", "item_key", "source_kind", "source_label"],
+        )
 
     def test_price_columns_are_explicitly_named(self) -> None:
         """The CSV artifacts swap these two names; the database must not."""

@@ -117,6 +117,7 @@ def run_excel_target_match_only(
     items: Iterable[Item],
     catalog: list[TargetProduct],
     summary_path: Path,
+    run_key: str | None = None,
 ) -> dict[str, int]:
     """Run match-only for one Excel target and persist a summary CSV.
 
@@ -125,9 +126,15 @@ def run_excel_target_match_only(
     downstream tools (``render_fresh_run_analysis``, ``Run DB``) work without
     changes. When the catalog was built from several files the
     ``source_file`` column records which file the matched row came from.
+
+    When ``run_key`` is provided, each item is also persisted to the
+    ``order_runs.db`` with ``source_kind='excel-target'`` and
+    ``source_label='<target_key>[@<source_file>]'`` so the Run DB tab can
+    distinguish Excel-target matches from Tawreed ones.
     """
     matched = flagged = 0
     items_list = list(items)
+    db_persist = _build_db_persister(run_key, target_key)
     with artifact_run("excel-target", target_key) as run:
         target_summary = (
             run.directory / f"{MATCH_ONLY_SUMMARY_LABEL}_{target_key}.csv"
@@ -169,10 +176,22 @@ def run_excel_target_match_only(
                             "no catalog",
                         ]
                     )
+                    db_persist(
+                        item,
+                        status="no-results",
+                        score=0.0,
+                        reason="no catalog",
+                        source_file="",
+                    )
                     continue
                 decision = result.decision
                 best = decision.best_match
                 if best is None:
+                    score = (
+                        f"{decision.diagnostics[0].score:.2f}"
+                        if decision.diagnostics
+                        else "0"
+                    )
                     writer.writerow(
                         [
                             "excel-target",
@@ -184,11 +203,18 @@ def run_excel_target_match_only(
                             "",
                             "",
                             "no-results",
-                            f"{decision.diagnostics[0].score:.2f}" if decision.diagnostics else "0",
+                            score,
                             decision.final_reason,
                         ]
                     )
                     flagged += 1
+                    db_persist(
+                        item,
+                        status="no-results",
+                        score=float(score or 0),
+                        reason=decision.final_reason,
+                        source_file="",
+                    )
                     continue
                 source_file = str(best.data.get("excelTargetSourceFile", ""))
                 writer.writerow(
@@ -207,6 +233,16 @@ def run_excel_target_match_only(
                     ]
                 )
                 matched += 1
+                db_persist(
+                    item,
+                    status="matched-only",
+                    score=best.score,
+                    reason=decision.final_reason,
+                    source_file=source_file,
+                    matched_name=str(best.data.get("productNameEn", "")),
+                    matched_price=str(best.data.get("salePrice", "")),
+                    matched_discount=str(best.data.get("discountPercent", "")),
+                )
         try:
             summary_path.parent.mkdir(parents=True, exist_ok=True)
             target_summary.replace(summary_path)
@@ -228,6 +264,7 @@ def run_excel_target_match_only_multi(
     catalogs: dict[str, list[TargetProduct]],
     items: Iterable[Item],
     summary_path: Path,
+    run_key: str | None = None,
 ) -> dict[str, dict[str, int]]:
     """Run match-only across every Excel target, returning per-target totals."""
     items_list = list(items)
@@ -242,6 +279,7 @@ def run_excel_target_match_only_multi(
             summary_path=summary_path.with_name(
                 f"{summary_path.stem}_{target_key}{summary_path.suffix}"
             ),
+            run_key=run_key,
         )
     return totals
 
@@ -252,3 +290,60 @@ __all__ = [
     "run_excel_target_match_only",
     "run_excel_target_match_only_multi",
 ]
+
+
+def _build_db_persister(run_key: str | None, target_key: str):
+    """Return a callback that mirrors one match result into order_runs.db.
+
+    When ``run_key`` is None the callback is a no-op so the legacy callers
+    that only want the CSV artifact keep working without a database round
+    trip.
+    """
+    if not run_key:
+        return lambda *args, **kwargs: None
+
+    from src.core.ordering.order_run_persistence import record_run_item
+
+    def _persist(
+        item,
+        *,
+        status,
+        score,
+        reason,
+        source_file,
+        matched_name: str = "",
+        matched_price: str = "",
+        matched_discount: str = "",
+    ) -> None:
+        summary_row = {
+            "item_code": str(item.code or ""),
+            "item_name": str(item.name or ""),
+            "item_qty": int(getattr(item, "qty", 0) or 0),
+            "status": str(status),
+            "reason": str(reason or ""),
+            "matched": 1 if status == "matched-only" else 0,
+            "manual_review_required": 0,
+            "manual_review_category": "",
+            "matched_query": "",
+            "deterministic_score": float(score or 0.0),
+            "winner_store_key": "",
+            "winner_store_product_id": "",
+            "tie_break_reason": "",
+            "ordered_total_qty": 0,
+            "elapsed_seconds": 0.0,
+            "match_elapsed_seconds": 0.0,
+            "matched_name": matched_name,
+            "matched_price": matched_price,
+            "matched_discount": matched_discount,
+        }
+        label = str(target_key or "")
+        if source_file:
+            label = f"{label}@{source_file}"
+        record_run_item(
+            run_key,
+            summary_row,
+            source_kind="excel-target",
+            source_label=label,
+        )
+
+    return _persist

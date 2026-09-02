@@ -61,8 +61,12 @@ class OrderRunsStore(
 
     def _create_schema(self) -> None:
         """Execute the full DDL and record the schema version atomically."""
+        from .order_runs_migrations import apply_migrations
+
         with self.db.get_connection() as conn:
-            self._drop_stale_views(conn)
+            current = self._read_schema_version(conn)
+            self._drop_stale_views(conn, current)
+            apply_migrations(conn, current)
             for statement in ALL_DDL:
                 conn.execute(statement)
             conn.execute(
@@ -70,19 +74,27 @@ class OrderRunsStore(
             )
             conn.commit()
 
-    def _drop_stale_views(self, conn) -> None:
+    def _read_schema_version(self, conn) -> int:
+        """Return the stored schema version, or 0 when unrecorded."""
+        try:
+            row = conn.execute(SELECT_SCHEMA_VERSION, (SCHEMA_VERSION_KEY,)).fetchone()
+        except Exception:
+            return 0
+        if not row:
+            return 0
+        try:
+            return int(row[0])
+        except (TypeError, ValueError):
+            return 0
+
+    def _drop_stale_views(self, conn, stored_version: int) -> None:
         """Drop views whose definitions changed since the stored schema version."""
         meta = conn.execute(
             "select 1 from sqlite_master where name = 'schema_meta'"
         ).fetchall()
         if not meta:
             return
-        rows = conn.execute(SELECT_SCHEMA_VERSION, (SCHEMA_VERSION_KEY,)).fetchall()
-        try:
-            stored = int(rows[0][0]) if rows else 0
-        except (TypeError, ValueError):
-            return
-        for version in range(stored, SCHEMA_VERSION):
+        for version in range(stored_version, SCHEMA_VERSION):
             for view in STALE_VIEWS_BY_VERSION.get(version, ()):
                 conn.execute(f"drop view if exists {view}")
 

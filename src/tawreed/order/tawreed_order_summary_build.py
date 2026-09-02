@@ -43,9 +43,27 @@ def append_order_item_artifacts(
 
 def _persist_order_run_item(row, store_snapshot, database_options) -> None:
     """Write one item and its offering stores to the order-runs database."""
+    snapshot = dict(store_snapshot or {})
+    snapshot.setdefault("source_kind", "tawreed")
+    snapshot.setdefault("source_label", _current_profile_key())
     record_run_item(
-        active_order_run_key(), row, database_options, **(store_snapshot or {})
+        active_order_run_key(), row, database_options, **snapshot
     )
+
+
+def _current_profile_key() -> str:
+    """Return the active Tawreed profile key for the current run.
+
+    Falls back to the empty string when the artifact run has not recorded
+    one (defensive default for tests and dry-runs).
+    """
+    from src.core.artifact_run import current_artifact_run
+
+    run = current_artifact_run()
+    if run is None:
+        return ""
+    label = run.profile_key if hasattr(run, "profile_key") else ""
+    return str(label or "")
 
 
 def _handle_manual_review_or_auto_save(

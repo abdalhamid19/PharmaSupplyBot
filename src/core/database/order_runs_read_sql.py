@@ -23,11 +23,12 @@ RUN_FACTS = """
 select ri.item_key, i.item_code, i.item_name, ri.requested_qty,
        ri.ordered_qty, ri.status, ri.reason, ri.matched,
        ri.manual_review_required, ri.stores_offering,
-       ri.winner_store_key, ri.elapsed_seconds
+       ri.winner_store_key, ri.elapsed_seconds,
+       ri.source_kind, ri.source_label
 from run_items ri
 join items i on i.item_key = ri.item_key
 where ri.run_key = ?
-order by i.item_name, i.item_code
+order by i.item_name, i.item_code, ri.source_kind, ri.source_label
 """
 
 ITEM_STORES = """
@@ -73,6 +74,7 @@ QUERY_COLUMNS = {
         "ordered_qty", "status", "reason", "matched",
         "manual_review_required", "stores_offering",
         "winner_store_key", "elapsed_seconds",
+        "source_kind", "source_label",
     ],
     "stores": [
         "store_product_id", "store_key", "store_name", "available_qty",

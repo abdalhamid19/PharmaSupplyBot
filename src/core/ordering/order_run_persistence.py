@@ -61,13 +61,24 @@ def record_run_item(
     run_key: str,
     summary: dict[str, Any],
     options: dict[str, Any] | None = None,
+    source_kind: str = "",
+    source_label: str = "",
     **fact_fields: Any,
 ) -> None:
-    """Persist one item's facts, or log and continue when the write fails."""
+    """Persist one item's facts, or log and continue when the write fails.
+
+    ``source_kind`` / ``source_label`` identify which search surface produced
+    the match (``tawreed`` vs ``excel-target``). When left empty the row is
+    stored with default empty values, which older read paths can still
+    recognise as Tawreed matches.
+    """
     if not run_key or not persistence_enabled(options):
         return
     try:
-        _store(options).upsert_run_item(run_key, summary, **fact_fields)
+        merged = dict(fact_fields)
+        merged.setdefault("source_kind", source_kind)
+        merged.setdefault("source_label", source_label)
+        _store(options).upsert_run_item(run_key, summary, **merged)
     except Exception:
         log_persistence_warning(
             "could not persist order-run item",

@@ -58,6 +58,7 @@ def _snapshot_parts(snapshot: dict[str, Any]) -> tuple[tuple, tuple, str]:
         str(snapshot.get("store_source") or ""),
     )
 
+
 def _fact_row(
     run_key: str,
     summary: dict[str, Any],
@@ -69,6 +70,25 @@ def _fact_row(
     fields = dict(fact_fields)
     fields.update(snapshot_fact_fields(stores, selections))
     return run_item_row(run_key, summary, **fields)
+
+
+def tawreed_fact_fields(profile_key: str) -> dict[str, str]:
+    """Return the source fields that identify a Tawreed-profile match row."""
+    return {"source_kind": "tawreed", "source_label": str(profile_key or "")}
+
+
+def excel_target_fact_fields(target_key: str, source_file: str = "") -> dict[str, str]:
+    """Return the source fields that identify an Excel-target match row.
+
+    ``source_file`` carries the catalog file name (when the operator picked
+    multiple files in the GUI). The ``source_label`` is stable for the same
+    (target_key, file) tuple, so re-runs replace the row instead of
+    duplicating it.
+    """
+    label = str(target_key or "")
+    if source_file:
+        label = f"{label}@{source_file}"
+    return {"source_kind": "excel-target", "source_label": label}
 
 
 __all__ = ["ItemWritePlan", "item_write_plan"]

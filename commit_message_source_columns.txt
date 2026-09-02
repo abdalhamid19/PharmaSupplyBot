@@ -1,0 +1,52 @@
+feat(db): add source_kind / source_label columns to run_items
+
+The user asked the analytics database to remember where every match
+came from: Tawreed profile vs Excel target, plus the catalog file
+name when the operator picks multiple existing files for the same
+target key.
+
+Schema v3 introduces two new columns on run_items:
+  source_kind  TEXT NOT NULL DEFAULT ''   -- "tawreed" | "excel-target"
+  source_label TEXT NOT NULL DEFAULT ''   -- e.g. "wardany" or "my_warehouse@alnasr.xlsx"
+
+The primary key expands from (run_key, item_key) to (run_key, item_key,
+source_kind, source_label) so one item can have multiple rows when it
+matches in more than one search surface.
+
+Migration:
+* src/core/database/order_runs_migrations.py: forward-only v2 -> v3
+  migration. SQLite cannot alter a primary key, so the migration
+  renames the old table, recreates it with the new shape, and
+  backfills every legacy row with source_kind='tawreed' and
+  source_label=runs.profile_key.
+* src/core/database/order_runs_version.py: SCHEMA_VERSION moved
+  here to break the circular import that would otherwise prevent
+  schema bootstrap from completing.
+* OrderRunsStore._create_schema runs apply_migrations after the
+  stored version is read so the migration runs in the same
+  transaction as the version upsert.
+
+Writes:
+* order_runs_rows.run_item_row / item_write_plan accept source_kind
+  and source_label kwargs.
+* order_run_persistence.record_run_item accepts source_kind /
+  source_label kwargs and threads them into the upsert.
+* Tawreed order summary builder sets
+  source_kind='tawreed', source_label=current profile key.
+* Excel target match-only flow now also writes per-file rows to
+  the database. Each match produces a row with
+  source_kind='excel-target' and
+  source_label='<target_key>[@<file>]'.
+
+Reads:
+* RUN_FACTS and the four KPI filter SQLs now select source_kind and
+  source_label. QUERY_COLUMNS["items"] exposes them so the Streamlit
+  Run Results (Database) tab can render them.
+* streamlit_run_tables.py translates the source codes to
+  '👤 Tawreed' / '📊 Excel target' badges in the items dataframe.
+
+Tests:
+* test_run_items_has_composite_primary_key updated to the new
+  (run_key, item_key, source_kind, source_label) key.
+* test_bootstrap_recreates_stale_views_from_older_schema updated to
+  expect the v3 view definition.

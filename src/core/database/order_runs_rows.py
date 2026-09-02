@@ -26,14 +26,23 @@ def run_item_row(
     stores_offering: int = 0,
     winner_store_key: str | None = None,
     winner_store_product_id: str | None = None,
+    source_kind: str = "",
+    source_label: str = "",
 ) -> dict[str, Any]:
     """Return one ``run_items`` fact row from an order summary row.
 
     ``winner_store_product_id`` overrides the summary value when the caller has
     an offering-store snapshot: that snapshot reflects the store actually
     ordered from, which is more authoritative than the matched candidate.
+
+    ``source_kind`` / ``source_label`` identify which search surface produced
+    this row: ``tawreed:<profile>`` for Tawreed profiles,
+    ``excel-target:<key>[@<file>]`` for Excel target catalogs.
     """
-    row = _identity_fields(run_key, summary, candidates_considered, stores_offering)
+    row = _identity_fields(
+        run_key, summary, candidates_considered, stores_offering,
+        source_kind, source_label,
+    )
     row["winner_store_key"] = as_optional_text(winner_store_key)
     row.update(_quantity_and_status_fields(summary))
     row.update(_match_outcome_fields(summary, winner_store_product_id))
@@ -45,6 +54,8 @@ def _identity_fields(
     summary: dict[str, Any],
     candidates_considered: int,
     stores_offering: int,
+    source_kind: str,
+    source_label: str,
 ) -> dict[str, Any]:
     """Return the keys and diagnostic counts for one run item."""
     return {
@@ -52,6 +63,8 @@ def _identity_fields(
         "item_key": order_run_item_key(
             summary.get("item_code"), summary.get("item_name")
         ),
+        "source_kind": as_text(source_kind),
+        "source_label": as_text(source_label),
         "candidates_considered": as_int(candidates_considered),
         "stores_offering": as_int(stores_offering),
     }

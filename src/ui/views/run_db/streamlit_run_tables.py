@@ -17,6 +17,11 @@ STATUS_LABELS = {
     "manual-review": "⚠️ review",
 }
 
+SOURCE_LABELS = {
+    "tawreed": "👤 Tawreed",
+    "excel-target": "📊 Excel target",
+}
+
 
 def render_run_items_table(items: list[dict[str, Any]], *, caption: str = "items") -> None:
     """Render the per-item fact table with friendly status labels."""
@@ -32,6 +37,14 @@ def render_run_items_table(items: list[dict[str, Any]], *, caption: str = "items
     frame["manual_review_required"] = frame["manual_review_required"].map(
         _check_mark
     )
+    if "source_kind" in frame.columns:
+        frame["source_kind"] = frame["source_kind"].map(
+            lambda kind: SOURCE_LABELS.get(kind, kind) if kind else "—"
+        )
+    if "source_label" in frame.columns:
+        frame["source_label"] = frame["source_label"].map(
+            lambda label: label if label else "—"
+        )
     st.dataframe(frame, use_container_width=True, hide_index=True)
 
 

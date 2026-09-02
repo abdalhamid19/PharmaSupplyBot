@@ -12,6 +12,7 @@ from .order_runs_facts import (
     CREATE_RUN_CANDIDATES,
     CREATE_RUN_ITEM_STORES,
 )
+from .order_runs_migrations import MIGRATIONS
 from .order_runs_tables import (
     CREATE_ITEMS,
     CREATE_PRODUCTS,
@@ -20,10 +21,8 @@ from .order_runs_tables import (
     CREATE_SCHEMA_META,
     CREATE_STORES,
 )
+from .order_runs_version import SCHEMA_VERSION, SCHEMA_VERSION_KEY
 from .order_runs_views import ALL_VIEWS
-
-SCHEMA_VERSION = 2
-SCHEMA_VERSION_KEY = "schema_version"
 
 # Views referenced by name in ALL_DDL use ``if not exists`` so concurrent
 # workers stay safe, but a stored view keeps its original definition forever.
@@ -59,6 +58,7 @@ __all__ = [
     "SCHEMA_VERSION",
     "SCHEMA_VERSION_KEY",
     "STALE_VIEWS_BY_VERSION",
+    "MIGRATIONS",
     "CREATE_TABLES",
     "ALL_DDL",
     "UPSERT_SCHEMA_VERSION",

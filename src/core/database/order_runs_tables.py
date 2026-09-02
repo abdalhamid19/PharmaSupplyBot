@@ -69,6 +69,8 @@ CREATE_RUN_ITEMS = """
 create table if not exists run_items (
     run_key                 TEXT not null references runs(run_key) on delete cascade,
     item_key                TEXT not null references items(item_key),
+    source_kind             TEXT not null default '',
+    source_label            TEXT not null default '',
     requested_qty           INTEGER not null default 0,
     ordered_qty             INTEGER not null default 0,
     status                  TEXT not null default '',
@@ -85,7 +87,7 @@ create table if not exists run_items (
     stores_offering         INTEGER not null default 0,
     elapsed_seconds         REAL not null default 0,
     match_elapsed_seconds   REAL not null default 0,
-    primary key (run_key, item_key)
+    primary key (run_key, item_key, source_kind, source_label)
 )
 """
 
