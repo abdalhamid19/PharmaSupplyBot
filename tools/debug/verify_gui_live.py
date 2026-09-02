@@ -89,7 +89,6 @@ def main() -> int:
             print("\n=== After clicking alnasr checkbox ===")
             print(f"  'Excel target source' present: {'Excel target source' in body_after}")
             print(f"  'Source' radio present: {'Source' in body_after}")
-            print(f"  'Configured' present: {'Configured' in body_after}")
             print(f"  'Existing file' present: {'Existing file' in body_after}")
             print(f"  'Upload file' present: {'Upload file' in body_after}")
             page.screenshot(path="tools/debug/live_after_check.png", full_page=True)

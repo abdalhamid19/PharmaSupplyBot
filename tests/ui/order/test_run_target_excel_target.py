@@ -36,7 +36,6 @@ def _make_app_config(profiles=("wardany",), excel_targets=("alnasr",)) -> Simple
             name_col="صنف",
             price_col="سعر",
             discount_col="الخصم",
-            display_name=key.title(),
             enabled=True,
         )
         for key in excel_targets
@@ -180,18 +179,6 @@ class StreamlitRunTargetSmokeTests(unittest.TestCase):
 class StreamlitExcelTargetUploadTests(unittest.TestCase):
     """Cover the upload + existing-file modes for Excel targets."""
 
-    def test_no_overrides_when_all_configured(self) -> None:
-        """``Configured`` mode produces no ``--excel-target-path`` args."""
-        overrides = _excel_target_path_overrides(
-            form_values={
-                "excel_target_uploads": {
-                    "alnasr": {"mode": "Configured", "path": "", "upload": None}
-                }
-            },
-            excel_target_keys=["alnasr"],
-        )
-        self.assertEqual(overrides, [])
-
     def test_existing_file_emits_path_override(self) -> None:
         """``Existing file`` mode emits ``--excel-target-path key=value``."""
         overrides = _excel_target_path_overrides(
@@ -199,7 +186,7 @@ class StreamlitExcelTargetUploadTests(unittest.TestCase):
                 "excel_target_uploads": {
                     "alnasr": {
                         "mode": "Existing file",
-                        "path": "data/input/excel target/alnasr.xlsx",
+                        "paths": ["data/input/excel target/alnasr.xlsx"],
                         "upload": None,
                     }
                 }
@@ -209,6 +196,33 @@ class StreamlitExcelTargetUploadTests(unittest.TestCase):
         self.assertEqual(
             overrides,
             ["--excel-target-path", "alnasr=data/input/excel target/alnasr.xlsx"],
+        )
+
+    def test_existing_file_multiselect_emits_path_per_file(self) -> None:
+        """Several files in the multiselect must fan out to repeated flags."""
+        overrides = _excel_target_path_overrides(
+            form_values={
+                "excel_target_uploads": {
+                    "alnasr": {
+                        "mode": "Existing file",
+                        "paths": [
+                            "data/input/excel target/alnasr.xlsx",
+                            "data/input/excel target/alnasr_alt.xlsx",
+                        ],
+                        "upload": None,
+                    }
+                }
+            },
+            excel_target_keys=["alnasr"],
+        )
+        self.assertEqual(
+            overrides,
+            [
+                "--excel-target-path",
+                "alnasr=data/input/excel target/alnasr.xlsx",
+                "--excel-target-path",
+                "alnasr=data/input/excel target/alnasr_alt.xlsx",
+            ],
         )
 
     def test_uploaded_file_persists_to_artifacts(self) -> None:
@@ -225,7 +239,7 @@ class StreamlitExcelTargetUploadTests(unittest.TestCase):
                         "excel_target_uploads": {
                             "alnasr": {
                                 "mode": "Upload file",
-                                "path": "",
+                                "paths": [],
                                 "upload": upload,
                             }
                         }
@@ -267,7 +281,7 @@ class StreamlitExcelTargetUploadTests(unittest.TestCase):
                         "excel_target_uploads": {
                             "alnasr": {
                                 "mode": "Upload file",
-                                "path": "",
+                                "paths": [],
                                 "upload": upload,
                             }
                         },
@@ -359,7 +373,7 @@ class ExcelTargetCheckboxWidgetTests(unittest.TestCase):
         self.assertIsNotNone(source_radio)
         self.assertEqual(
             [str(o) for o in source_radio.options],
-            ["Configured", "Existing file", "Upload file"],
+            ["Existing file", "Upload file"],
         )
 
     def test_upload_file_mode_renders_file_uploader(self) -> None:
@@ -388,6 +402,31 @@ class ExcelTargetCheckboxWidgetTests(unittest.TestCase):
             any("Upload catalog" in str(u.label) for u in uploaders),
             f"upload widget missing; got {[u.label for u in uploaders]}",
         )
+
+    def test_existing_file_renders_multiselect_and_select_all(self) -> None:
+        """Existing file mode must render a multiselect + Select all toggle."""
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        at.session_state["excel_target_selected_targets"] = ()
+        at.run()
+
+        alnasr_box = next(
+            (c for c in at.main.checkbox if c.label and "alnasr" in str(c.label)),
+            None,
+        )
+        self.assertIsNotNone(alnasr_box)
+        alnasr_box.set_value(True).run()
+
+        select_all = next(
+            (c for c in at.main.checkbox if c.label == "Select all"), None
+        )
+        self.assertIsNotNone(select_all, "Select all toggle must be visible")
+
+        multi = next(
+            (m for m in at.main.multiselect if m.label == "Catalog files"), None
+        )
+        self.assertIsNotNone(multi, "Catalog files multiselect must be visible")
 
     def test_excel_source_upload_renders_file_uploader_reactively(self) -> None:
         """Toggling the order Excel source to Upload file must show the uploader."""

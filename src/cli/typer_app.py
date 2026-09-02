@@ -314,9 +314,13 @@ def order_cmd(
         False, "--all-excel-targets",
         help="Match against every configured Excel target catalog.",
     ),
-    excel_target_path: str | None = typer.Option(
+    excel_target_path: list[str] = typer.Option(
         None, "--excel-target-path",
-        help="Override the Excel target XLSX path (repeatable via comma).",
+        help=(
+            "Override the Excel target XLSX path. Format: key=path. "
+            "Repeat the flag to point the same key at several files "
+            "(e.g. --excel-target-path k=file1.xlsx --excel-target-path k=file2.xlsx)."
+        ),
     ),
     # Runtime
     limit: int = typer.Option(0, "--limit", "-n", help="Limit items (0 = no limit)."),

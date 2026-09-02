@@ -49,7 +49,7 @@ cp config.example.yaml state/config.yaml
 ### Excel Target Source
 
 قسم `excel_targets` يعرّف كاتالوجات Excel تعمل كمصدر مطابقة بديل أو مكمّل
-لـ Tawreed. كل entry هو ملف XLSX بصيغة vendor/pharmacy pricelist
+لـ Tawreed. كل entry هو ملف XLSX بصيغة vendor pricelist
 (اسم الصنف، السعر، الخصم) ويوضع افتراضيًا في `data/input/excel target/<key>.xlsx`.
 خوارزمية المطابقة واحدة في الحالتين: نفس الـ queries، نفس الـ scoring،
 ونفس قواعد المراجعة اليدوية. الفرق الوحيد أن سطح البحث يكون in-memory
@@ -57,15 +57,18 @@ catalog بدل HTTP/API/Playwright.
 
 ```yaml
 excel_targets:
-  alnasr:
-    display_name: "صيدلية النصر"
-    name_col: "صنف"
-    price_col: "سعر"
-    discount_col: "الخصم"
-    sheet: ""
-    header_row: 0
+  <your_key>:                  # أي اسم وصفي تريده، مثل my_warehouse
+    display_name: ""           # اختياري — يظهر في ملفات CSV/الأرتifacts فقط
+    name_col: "صنف"            # العمود الذي يحتوي اسم الصنف في الكاتالوج
+    price_col: "سعر"           # العمود الذي يحتوي سعر الوحدة
+    discount_col: "الخصم"      # العمود الذي يحتوي نسبة الخصم (0..100)
+    sheet: ""                  # اسم الشيت. فارغ = أول شيت.
+    header_row: 0              # رقم صف الـ header (يبدأ من 0).
     enabled: true
 ```
+
+يمكنك تعريف أي عدد من الـ keys؛ كل key هو مجرد label، ومحرك المطابقة
+يعامل كل key كسطح بحث منفصل.
 
 ## أوامر الطرفية
 
@@ -83,14 +86,14 @@ py run.py order --profile wardany --excel data/input/order.xlsx --match-only
 py run.py order --profile wardany --excel data/input/order.xlsx
 
 # مطابقة على Tawreed profile + Excel target catalog في نفس التشغيل
-py run.py order --profile wardany --excel-target alnasr --excel data/input/order.xlsx --match-only
+py run.py order --profile wardany --excel-target <your_key> --excel data/input/order.xlsx --match-only
 
 # مطابقة على كل الـ Excel targets المعرّفة
 py run.py order --all-excel-targets --excel data/input/order.xlsx --match-only
 
 # تجاوز مسار الكاتالوج لـ Excel target معيّن
-py run.py order --excel-target alnasr \
-    --excel-target-path alnasr=data/input/excel target/alnasr.xlsx \
+py run.py order --excel-target <your_key> \
+    --excel-target-path <your_key>=data/input/excel target/<your_key>.xlsx \
     --excel data/input/order.xlsx --match-only
 
 # حذف أصناف محددة من السلة
@@ -111,6 +114,8 @@ py run.py order --help
 - `manual_review_*.csv` و`manual_review_candidates_*.jsonl`: الحالات والبدائل المقترحة محليًا.
 - `order_matching_trace_*.csv`: أثر قرار المطابقة المحلي.
 - `excel_target_summary_<key>.csv`: نتيجة المطابقة لكل Excel target (نفس بنية `order_item_summary`).
+  عند اختيار عدة ملفات بنفس الـ key عبر Existing/Upload، يحتفظ الـ CSV
+  بعمود `source_file` لتحديد الملف الذي جاء منه كل صف.
 
 النتائج من Tawreed ومن Excel targets تُكتب في نفس قواعد البيانات
 (`state/order_runs.db` و `state/manual_review_decisions.db`)، فتعمل أدوات
@@ -122,14 +127,16 @@ Manual Review و Run DB على المصدرين بدون أي تمييز.
 py -m streamlit run streamlit_app.py
 ```
 
-في تبويب "Run Order"، استبدل "Run target" القديم بمتعدد اختيار (multiselect)
-يجمع Tawreed profiles و Excel targets في مكان واحد؛ يمكن اختيار أي توليفة
+في تبويب "Run Order"، استبدل "Run target" القديم بقائمة checkboxes تجمع
+Tawreed profiles و Excel targets في مكان واحد؛ يمكن اختيار أي توليفة
 (profile فقط، Excel target فقط، أو الاتنين معًا) في نفس التشغيل.
 
-لكل Excel target محدد في الـ multiselect، يمكن اختيار المصدر:
+لكل Excel target مُختار، يوجد اختياران للمصدر:
 
-- **Configured** — الكتالوج الافتراضي `data/input/excel target/<key>.xlsx`.
-- **Existing file** — ملف آخر `.xlsx` تحت `data/input/excel target/`.
+- **Existing file** — multiselect يعرض كل ملفات `.xlsx` تحت
+  `data/input/excel target/`، مع زر "Select all" فوقه لتحديد الكل دفعة
+  واحدة. يمكن اختيار أكثر من ملف في نفس الـ run؛ كل ملف يعمل
+  catalog مستقل بنفس الـ key ويضاف عمود `source_file` إلى CSV.
 - **Upload file** — رفع ملف جديد من الجهاز. يُحفظ في
   `artifacts/uploaded-excel-targets/<key>.xlsx` ويُمرَّر للـ CLI عبر
   `--excel-target-path key=path`.

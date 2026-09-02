@@ -111,7 +111,7 @@ runtime:
   item_workers: 1
 
 # Excel target catalogs (alternative match surface beside Tawreed profiles).
-# Each entry is a vendor/pharmacy pricelist in ``data/input/excel target/<key>.xlsx``
+# Each entry is a vendor pricelist in ``data/input/excel target/<key>.xlsx``
 # (override the path with ``--excel-target-path key=path``). The matching
 # algorithm is the same one used on Tawreed — only the search surface
 # changes from HTTP/API/Playwright to an in-memory catalog scan.
@@ -120,15 +120,18 @@ runtime:
 #   * ``--match-only`` writes per-target CSVs and records the result in the
 #     same ``state/manual_review_decisions.db`` and ``state/order_runs.db``.
 #   * Manual review on Excel-target matches behaves exactly like Tawreed.
+#
+# You can declare as many keys as you like. Each key is just a label; the
+# matching engine treats every key as a separate search surface.
 excel_targets:
-  alnasr:
-    display_name: "صيدلية النصر"
-    name_col: "صنف"
-    price_col: "سعر"
-    discount_col: "الخصم"
-    sheet: ""
-    header_row: 0
-    enabled: true
+  # <your_key>:
+  #   display_name: ""        # Optional. Surfaces in artifacts/CSV only.
+  #   name_col: "صنف"          # Column holding the product name in the catalog.
+  #   price_col: "سعر"         # Column holding the unit price.
+  #   discount_col: "الخصم"    # Column holding the discount percent (0..100).
+  #   sheet: ""                # Sheet name. Empty = first sheet.
+  #   header_row: 0            # Row index of the header (0-based).
+  #   enabled: true
 
 # Local SQLite persistence for order-run analytics.
 # قاعدة بيانات محلية لتحليل نتائج الطلبات عبر الزمن

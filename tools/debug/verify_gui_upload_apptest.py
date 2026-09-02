@@ -47,15 +47,12 @@ def main() -> int:
     print(f"  file_uploaders: {len(file_uploaders2)}")
 
     source_radio = next(
-        (r for r in radios2 if r.label == "Source" and "Configured" in r.options), None
+        (r for r in radios2 if r.label == "Source" and "Existing file" in r.options), None
     )
     if source_radio is None:
         print("FAIL: source radio for alnasr not rendered")
         return 1
 
-    if "Configured" not in source_radio.options:
-        print("FAIL: Configured mode missing")
-        return 1
     if "Existing file" not in source_radio.options:
         print("FAIL: Existing file mode missing")
         return 1

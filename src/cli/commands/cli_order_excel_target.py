@@ -23,29 +23,35 @@ from src.tawreed.matching.tawreed_match_only import MATCH_ONLY_SUMMARY_LABEL
 logger = logging.getLogger(__name__)
 
 
-def selected_excel_target_configs(app_config: AppConfig, args) -> list[tuple[str, Path]]:
+def selected_excel_target_configs(
+    app_config: AppConfig, args
+) -> list[tuple[str, list[Path]]]:
     """Resolve the list of Excel targets the run should match against.
 
     Resolution priority:
     1. ``--excel-target <key>`` (single target by config key)
     2. ``--all-excel-targets`` (every enabled target)
-    3. ``--excel-target-path <path>`` (override one target's XLSX path)
+    3. ``--excel-target-path <key>=<path>[,...]`` (override one or more paths)
 
-    Each resolved entry is ``(target_key, catalog_xlsx_path)``.
+    Each resolved entry is ``(target_key, [catalog_xlsx_paths])``. The list
+    holds a single path for a vanilla ``--excel-target`` run, or several
+    paths when the operator picked multiple files in the GUI.
     """
     enabled = app_config.enabled_excel_targets()
     if not enabled:
         return []
 
-    target_path_overrides: dict[str, str] = {}
-    raw_override = getattr(args, "excel_target_path", None)
-    if raw_override:
+    target_path_overrides: dict[str, list[str]] = {}
+    raw_overrides = getattr(args, "excel_target_path", None) or []
+    if isinstance(raw_overrides, str):
+        raw_overrides = [raw_overrides]
+    for raw_override in raw_overrides:
         for entry in raw_override.split(","):
             entry = entry.strip()
             if not entry or "=" not in entry:
                 continue
             key, _, path = entry.partition("=")
-            target_path_overrides[key.strip()] = path.strip()
+            target_path_overrides.setdefault(key.strip(), []).append(path.strip())
 
     if getattr(args, "excel_target", None):
         key = str(args.excel_target)
@@ -61,34 +67,47 @@ def selected_excel_target_configs(app_config: AppConfig, args) -> list[tuple[str
         return []
 
     default_dir = Path("data/input/excel target")
-    resolved: list[tuple[str, Path]] = []
+    resolved: list[tuple[str, list[Path]]] = []
     for target_key, target_cfg in targets:
         if target_key in target_path_overrides:
-            xlsx_path = Path(target_path_overrides[target_key])
+            xlsx_paths = [Path(p) for p in target_path_overrides[target_key]]
         else:
-            xlsx_path = default_dir / f"{target_key}.xlsx"
-        resolved.append((target_key, xlsx_path))
+            xlsx_paths = [default_dir / f"{target_key}.xlsx"]
+        resolved.append((target_key, xlsx_paths))
     return resolved
 
 
 def load_target_catalogs(
-    selected: list[tuple[str, Path]], app_config: AppConfig
+    selected: list[tuple[str, list[Path]]], app_config: AppConfig
 ) -> dict[str, list[TargetProduct]]:
-    """Read every resolved Excel target catalog into memory."""
+    """Read every resolved Excel target catalog into memory.
+
+    When a target key resolves to several paths (e.g. the operator
+    selected multiple existing files in the GUI), the parsed catalogs are
+    concatenated into a single in-memory list. Each product carries the
+    ``source_file`` label of the file it came from so the summary CSV can
+    keep the provenance.
+    """
     catalogs: dict[str, list[TargetProduct]] = {}
-    for target_key, xlsx_path in selected:
+    for target_key, xlsx_paths in selected:
         if target_key not in app_config.excel_targets:
             continue
         target_cfg = app_config.excel_targets[target_key]
-        try:
-            catalogs[target_key] = load_target_catalog_from_excel(xlsx_path, target_cfg)
-        except FileNotFoundError as error:
-            logger.warning(
-                "excel target catalog missing",
-                extra={"target": target_key, "path": str(xlsx_path)},
-            )
-            logger.debug("excel target load failure: %s", error)
-            catalogs[target_key] = []
+        merged: list[TargetProduct] = []
+        for xlsx_path in xlsx_paths:
+            try:
+                parsed = load_target_catalog_from_excel(
+                    xlsx_path, target_cfg, source_file=xlsx_path.name
+                )
+            except FileNotFoundError as error:
+                logger.warning(
+                    "excel target catalog missing",
+                    extra={"target": target_key, "path": str(xlsx_path)},
+                )
+                logger.debug("excel target load failure: %s", error)
+                continue
+            merged.extend(parsed)
+        catalogs[target_key] = merged
     return catalogs
 
 
@@ -104,7 +123,8 @@ def run_excel_target_match_only(
     Returns counters ``{"processed": N, "matched": M, "flagged": F}`` for the
     target. Each row mirrors the Tawreed match-only summary shape so the
     downstream tools (``render_fresh_run_analysis``, ``Run DB``) work without
-    changes.
+    changes. When the catalog was built from several files the
+    ``source_file`` column records which file the matched row came from.
     """
     matched = flagged = 0
     items_list = list(items)
@@ -118,6 +138,7 @@ def run_excel_target_match_only(
                 [
                     "target_kind",
                     "target_key",
+                    "source_file",
                     "item_code",
                     "item_name",
                     "matched_name",
@@ -137,6 +158,7 @@ def run_excel_target_match_only(
                         [
                             "excel-target",
                             target_key,
+                            "",
                             item.code,
                             item.name,
                             "",
@@ -155,6 +177,7 @@ def run_excel_target_match_only(
                         [
                             "excel-target",
                             target_key,
+                            "",
                             item.code,
                             item.name,
                             "",
@@ -167,10 +190,12 @@ def run_excel_target_match_only(
                     )
                     flagged += 1
                     continue
+                source_file = str(best.data.get("excelTargetSourceFile", ""))
                 writer.writerow(
                     [
                         "excel-target",
                         target_key,
+                        source_file,
                         item.code,
                         item.name,
                         str(best.data.get("productNameEn", "")),
@@ -182,7 +207,6 @@ def run_excel_target_match_only(
                     ]
                 )
                 matched += 1
-        # Mirror the summary at the requested path so the operator can find it.
         try:
             summary_path.parent.mkdir(parents=True, exist_ok=True)
             target_summary.replace(summary_path)
@@ -200,7 +224,7 @@ def run_excel_target_match_only(
 
 def run_excel_target_match_only_multi(
     app_config: AppConfig,
-    selected: list[tuple[str, Path]],
+    selected: list[tuple[str, list[Path]]],
     catalogs: dict[str, list[TargetProduct]],
     items: Iterable[Item],
     summary_path: Path,
@@ -208,7 +232,7 @@ def run_excel_target_match_only_multi(
     """Run match-only across every Excel target, returning per-target totals."""
     items_list = list(items)
     totals: dict[str, dict[str, int]] = {}
-    for target_key, _xlsx_path in selected:
+    for target_key, _xlsx_paths in selected:
         catalog = catalogs.get(target_key, [])
         totals[target_key] = run_excel_target_match_only(
             app_config,

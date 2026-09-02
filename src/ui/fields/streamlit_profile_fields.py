@@ -185,44 +185,56 @@ def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:
     excel_options = available_excel_target_options()
     st.markdown("##### 📊 Excel target source")
     st.caption(
-        "Pick where each selected Excel target catalog comes from. "
-        "Upload file persists the bytes under "
+        "Pick one or more existing files under data/input/excel target/ or "
+        "upload a fresh catalog. Upload file persists the bytes under "
         "`artifacts/uploaded-excel-targets/<key>.xlsx`."
     )
     for target_key in excel_target_keys:
         st.markdown(f"**{target_key}**")
         mode = st.radio(
             "Source",
-            ["Configured", "Existing file", "Upload file"],
+            ["Existing file", "Upload file"],
             key=f"excel_target_source_{target_key}",
             horizontal=True,
             label_visibility="collapsed",
             help=(
-                "Configured = the catalog that ships with config.yaml. "
-                "Existing file = another .xlsx under data/input/excel target/. "
+                "Existing file = pick one or more .xlsx files under "
+                "data/input/excel target/. "
                 "Upload file = drag-and-drop a fresh catalog."
             ),
         )
-        path = ""
+        paths: list[str] = []
         upload = None
         if mode == "Existing file":
             if excel_options:
-                path = str(
-                    st.selectbox(
-                        "Catalog path",
-                        excel_options,
-                        key=f"excel_target_path_{target_key}",
-                        label_visibility="collapsed",
-                    )
+                select_all_key = f"excel_target_select_all_{target_key}"
+                select_all = st.checkbox(
+                    "Select all",
+                    value=False,
+                    key=select_all_key,
+                    help="Tick to include every .xlsx in data/input/excel target/.",
                 )
+                default_selection: list[str] = list(excel_options) if select_all else []
+                selection_key = f"excel_target_path_{target_key}"
+                chosen = st.multiselect(
+                    "Catalog files",
+                    excel_options,
+                    default=default_selection,
+                    key=selection_key,
+                    label_visibility="collapsed",
+                    help="Pick one or more catalogs. Tick 'Select all' to include every .xlsx.",
+                )
+                paths = [str(p) for p in chosen]
             else:
-                path = str(
-                    st.text_input(
-                        "Catalog path",
-                        key=f"excel_target_path_text_{target_key}",
-                        label_visibility="collapsed",
+                paths = [
+                    str(
+                        st.text_input(
+                            "Catalog path",
+                            key=f"excel_target_path_text_{target_key}",
+                            label_visibility="collapsed",
+                        )
                     )
-                )
+                ]
         elif mode == "Upload file":
             upload = st.file_uploader(
                 f"Upload catalog for {target_key}",
@@ -231,7 +243,7 @@ def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:
                 help="Drag-and-drop or browse to upload this Excel target catalog.",
             )
         st.divider()
-        uploads[target_key] = {"mode": mode, "path": path, "upload": upload}
+        uploads[target_key] = {"mode": mode, "paths": paths, "upload": upload}
     return uploads
 
 

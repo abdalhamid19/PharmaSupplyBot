@@ -21,7 +21,7 @@ from src.core.utils.excel import Item
 
 
 DATA_ROOT = Path("data/input/excel target")
-ALNASR_PATH = DATA_ROOT / "alnasr.xlsx"
+ALNASR_PATH = Path(__file__).resolve().parent / "fixtures" / "alnasr.xlsx"
 
 
 def _build_catalog() -> list[TargetProduct]:
@@ -72,6 +72,18 @@ class TestExcelTargetLoader(TestCase):
         self.assertEqual(candidate["discountPercent"], 2.0)
         self.assertEqual(candidate["salePrice"], 55.0)
         self.assertTrue(candidate["excelTarget"])
+
+    def test_target_product_records_source_file(self) -> None:
+        product = TargetProduct(
+            code="ABC",
+            name="DECLOPHEN GEL",
+            price=55.0,
+            discount_percent=2.0,
+            source_file="warehouse_1.xlsx",
+        )
+        self.assertEqual(product.source_file, "warehouse_1.xlsx")
+        candidate = product.to_candidate_dict()
+        self.assertEqual(candidate["excelTargetSourceFile"], "warehouse_1.xlsx")
 
 
 class TestExcelTargetMatching(TestCase):

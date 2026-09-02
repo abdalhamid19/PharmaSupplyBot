@@ -17,7 +17,7 @@ from src.core.config.config import load_config
 from src.core.utils.excel import Item
 
 
-ALNASR_PATH = Path("data/input/excel target/alnasr.xlsx")
+ALNASR_PATH = Path(__file__).parent / "fixtures" / "alnasr.xlsx"
 TEST_FIXTURE = Path(__file__).parent / "fixtures" / "excel_target_with_target.yaml"
 TEST_EXCEL = Path("data/input/order_items/test_new_feature.xlsx")
 
@@ -56,13 +56,13 @@ excel_targets:
         args = argparse.Namespace(
             excel_target="alnasr",
             all_excel_targets=False,
-            excel_target_path=None,
+            excel_target_path=[f"alnasr={ALNASR_PATH}"],
         )
         selected = selected_excel_target_configs(self.app_config, args)
         self.assertEqual(len(selected), 1)
-        target_key, xlsx_path = selected[0]
+        target_key, xlsx_paths = selected[0]
         self.assertEqual(target_key, "alnasr")
-        self.assertEqual(xlsx_path, ALNASR_PATH)
+        self.assertEqual(xlsx_paths, [ALNASR_PATH])
 
     def test_selected_excel_target_configs_all(self) -> None:
         args = argparse.Namespace(
@@ -86,7 +86,7 @@ excel_targets:
         args = argparse.Namespace(
             excel_target="alnasr",
             all_excel_targets=False,
-            excel_target_path=None,
+            excel_target_path=[f"alnasr={ALNASR_PATH}"],
         )
         selected = selected_excel_target_configs(self.app_config, args)
         catalogs = load_target_catalogs(selected, self.app_config)
@@ -97,7 +97,7 @@ excel_targets:
         args = argparse.Namespace(
             excel_target="alnasr",
             all_excel_targets=False,
-            excel_target_path="alnasr=data/input/excel target/missing.xlsx",
+            excel_target_path=["alnasr=data/input/excel target/missing.xlsx"],
         )
         selected = selected_excel_target_configs(self.app_config, args)
         catalogs = load_target_catalogs(selected, self.app_config)
@@ -107,7 +107,7 @@ excel_targets:
         args = argparse.Namespace(
             excel_target="alnasr",
             all_excel_targets=False,
-            excel_target_path=None,
+            excel_target_path=[f"alnasr={ALNASR_PATH}"],
         )
         selected = selected_excel_target_configs(self.app_config, args)
         catalogs = load_target_catalogs(selected, self.app_config)
@@ -135,6 +135,51 @@ excel_targets:
             for row in rows:
                 self.assertEqual(row["target_kind"], "excel-target")
                 self.assertEqual(row["target_key"], "alnasr")
+                self.assertEqual(row["source_file"], "alnasr.xlsx")
+
+    def test_multi_path_merges_catalogs_with_source_file(self) -> None:
+        """When the same key is fed several files, the CSV records which file
+        produced each row."""
+        import shutil
+
+        alt_path = ALNASR_PATH.parent / "alnasr_alt.xlsx"
+        try:
+            shutil.copyfile(ALNASR_PATH, alt_path)
+            args = argparse.Namespace(
+                excel_target="alnasr",
+                all_excel_targets=False,
+                excel_target_path=[
+                    f"alnasr={ALNASR_PATH}",
+                    f"alnasr={alt_path}",
+                ],
+            )
+            selected = selected_excel_target_configs(self.app_config, args)
+            self.assertEqual(len(selected), 1)
+            target_key, paths = selected[0]
+            self.assertEqual(target_key, "alnasr")
+            self.assertEqual(len(paths), 2)
+            catalogs = load_target_catalogs(selected, self.app_config)
+            self.assertEqual(len(catalogs["alnasr"]), 44)
+            with tempfile.TemporaryDirectory() as temp_dir:
+                summary_path = Path(temp_dir) / "summary.csv"
+                items = [Item(code="75865", name="DECLOPHEN GEL30GM.", qty=1)]
+                run_excel_target_match_only(
+                    self.app_config,
+                    "alnasr",
+                    items,
+                    catalogs["alnasr"],
+                    summary_path=summary_path,
+                )
+                with summary_path.open(newline="", encoding="utf-8") as fh:
+                    rows = list(csv.DictReader(fh))
+            source_files = {row["source_file"] for row in rows if row["source_file"]}
+            self.assertTrue(
+                source_files.issubset({"alnasr.xlsx", "alnasr_alt.xlsx"}),
+                f"unexpected source_file values: {source_files}",
+            )
+        finally:
+            if alt_path.exists():
+                alt_path.unlink()
 
 
 if __name__ == "__main__":

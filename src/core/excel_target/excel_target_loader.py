@@ -33,6 +33,7 @@ class TargetProduct:
     name: str
     price: float
     discount_percent: float
+    source_file: str = ""
     raw: dict[str, Any] = field(default_factory=dict)
 
     def to_candidate_dict(self) -> dict[str, Any]:
@@ -53,6 +54,7 @@ class TargetProduct:
             "salePrice": float(self.price or 0.0),
             "storeProductId": self.code or f"row:{abs(hash(self.name))}",
             "excelTarget": True,
+            "excelTargetSourceFile": self.source_file,
             "excelTargetRaw": dict(self.raw),
         }
 
@@ -68,7 +70,9 @@ def _normalize_header(value: object) -> str:
 
 
 def load_target_catalog_from_excel(
-    path: Path, config: ExcelTargetConfig
+    path: Path,
+    config: ExcelTargetConfig,
+    source_file: str = "",
 ) -> list[TargetProduct]:
     """Load the Excel target catalog from ``path`` using ``config``.
 
@@ -77,6 +81,12 @@ def load_target_catalog_from_excel(
     ``price_col`` / ``discount_col`` headers. When the configured
     ``header_row`` is set explicitly it takes precedence and is trusted
     as-is.
+
+    ``source_file`` is an optional label (typically ``Path(path).name``)
+    that is recorded on every parsed :class:`TargetProduct` so the
+    downstream CSV can preserve provenance when one target key is fed
+    by several files (e.g. the operator picked multiple Existing files
+    in the GUI).
     """
     path = Path(path)
     if not path.exists():
@@ -91,7 +101,7 @@ def load_target_catalog_from_excel(
         for row in sheet.iter_rows(
             min_row=header_index + 2, values_only=True
         ):
-            product = _row_to_product(row, column_indices, config)
+            product = _row_to_product(row, column_indices, config, source_file)
             if product is not None:
                 products.append(product)
         return products
@@ -175,6 +185,7 @@ def _row_to_product(
     row: tuple,
     indices: dict[str, int],
     config: ExcelTargetConfig,
+    source_file: str = "",
 ) -> TargetProduct | None:
     """Convert one Excel row tuple into a TargetProduct."""
     name_cell = row[indices["name"]] if "name" in indices else None
@@ -205,6 +216,7 @@ def _row_to_product(
         name=name,
         price=price,
         discount_percent=discount,
+        source_file=source_file,
         raw=raw,
     )
 

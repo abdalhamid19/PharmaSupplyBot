@@ -1,0 +1,30 @@
+feat(ui+cli): generic Excel target keys + multi-file selection per key
+
+The previous commit hard-coded the example key "alnasr" with a
+display_name. The user is the pharmacy; the Excel catalog is a drug
+warehouse they source from, and any name in display_name would be
+misleading. To give the user full control over the keys and to make
+the UI even more flexible, this commit:
+
+* Removes the alnasr example from config.example.yaml, README.md, and
+  state/config.yaml — those files now document the schema with a
+  <your_key> placeholder and ship with zero configured targets.
+* Drops the "Configured" mode from the Excel target source radio. The
+  operator now picks between "Existing file" and "Upload file" only.
+  Picking the configured catalog is the natural no-op when neither
+  mode is used, so the mode was redundant UI.
+* Replaces the single-file selectbox in "Existing file" mode with a
+  multiselect plus a "Select all" toggle. The operator can include
+  several .xlsx files for the same target key in one run.
+* Persists the source filename on every TargetProduct so the summary
+  CSV records which file produced each row (new source_file column).
+* --excel-target-path now accepts the same key multiple times:
+    --excel-target-path k=file1.xlsx --excel-target-path k=file2.xlsx
+  Selected files are merged into one in-memory catalog for that key.
+* Moves the example alnasr.xlsx catalog out of data/input/ into the
+  test fixtures (tests/core/excel_target/fixtures, tests/cli/commands/
+  fixtures). data/input/ is now reserved for the operator's real data.
+
+UI label cleanup also: Excel target checkbox is "Excel target (<key>)"
+with no display_name interpolation; the source panel header is just the
+key.

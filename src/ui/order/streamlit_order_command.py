@@ -81,18 +81,21 @@ def _order_target_args(form_values: dict[str, object]) -> list[str]:
 def _excel_target_path_overrides(
     form_values: dict[str, object], excel_target_keys: list[str]
 ) -> list[str]:
-    """Emit ``--excel-target-path key=value`` for each non-default upload."""
+    """Emit ``--excel-target-path key=value`` for every selected file.
+
+    Each Excel target can resolve to multiple files: the operator may pick
+    several Existing files via the multiselect, or upload a fresh catalog.
+    Every file becomes its own ``--excel-target-path`` flag so the CLI
+    loads them all into a single in-memory catalog tagged with
+    ``source_file``.
+    """
     uploads = form_values.get("excel_target_uploads") or {}
     if not isinstance(uploads, dict) or not uploads:
         return []
     overrides: list[tuple[str, str]] = []
     for target_key in excel_target_keys:
         entry = uploads.get(target_key) or {}
-        mode = str(entry.get("mode") or "Configured")
-        if mode == "Configured":
-            continue
-        path = _resolve_excel_target_upload_path(target_key, entry)
-        if path:
+        for path in _resolve_excel_target_upload_paths(target_key, entry):
             overrides.append((target_key, str(path)))
     if not overrides:
         return []
@@ -102,23 +105,32 @@ def _excel_target_path_overrides(
     return args
 
 
-def _resolve_excel_target_upload_path(
+def _resolve_excel_target_upload_paths(
     target_key: str, entry: dict[str, object]
-) -> str | None:
-    """Return the on-disk catalog path for one Excel target upload entry."""
-    mode = str(entry.get("mode") or "Configured")
+) -> list[str]:
+    """Return the on-disk catalog paths for one Excel target upload entry.
+
+    Both ``Existing file`` and ``Upload file`` can resolve to several files
+    (a multiselect, or a multi-file upload widget in the future). Empty
+    results are filtered out.
+    """
+    mode = str(entry.get("mode") or "")
     if mode == "Existing file":
-        path = str(entry.get("path") or "").strip()
-        return path or None
+        raw_paths = entry.get("paths")
+        if raw_paths is None:
+            legacy = str(entry.get("path") or "").strip()
+            return [legacy] if legacy else []
+        if not isinstance(raw_paths, (list, tuple)):
+            return []
+        return [str(p).strip() for p in raw_paths if str(p or "").strip()]
     if mode == "Upload file":
         from ..streamlit_uploads import uploaded_excel_target_path
 
         upload = entry.get("upload")
         if upload is None:
-            return None
-        persisted = uploaded_excel_target_path(target_key, upload)
-        return str(persisted)
-    return None
+            return []
+        return [str(uploaded_excel_target_path(target_key, upload))]
+    return []
 
 
 def _legacy_target_args(form_values: dict[str, object]) -> list[str]:

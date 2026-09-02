@@ -32,7 +32,6 @@ CONFIG = AppConfig(
             name_col="صنف",
             price_col="سعر",
             discount_col="الخصم",
-            display_name="صيدلية النصر",
             sheet="",
             header_row=0,
             enabled=True,
