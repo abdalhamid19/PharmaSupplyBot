@@ -49,13 +49,29 @@ def render_run_items_table(items: list[dict[str, Any]], *, caption: str = "items
 
 
 def render_item_stores_expander(items: list[dict[str, Any]], run_key: str) -> None:
-    """Render one expander per item revealing its offering-store snapshot."""
-    with_rows = [item for item in items if item["stores_offering"]]
-    if not with_rows:
+    """Render one expander per unique item revealing its offering-store snapshot.
+
+    ``items`` carries one row per ``(item_key, source_kind, source_label)``
+    so a Tawreed + Excel target shared run produces duplicate ``item_key``
+    entries. The expander dedupes by ``item_key`` and shows the combined
+    snapshot from ``run_item_stores`` (which already aggregates both
+    sources) underneath.
+    """
+    seen: set[str] = set()
+    unique_items: list[dict[str, Any]] = []
+    for item in items:
+        key = item.get("item_key")
+        if not key or key in seen:
+            continue
+        if not item.get("stores_offering"):
+            continue
+        seen.add(key)
+        unique_items.append(item)
+    if not unique_items:
         st.info("No offering-store snapshots stored for this run.")
         return
     st.markdown("**Offering stores per item**")
-    for item in with_rows:
+    for item in unique_items:
         label = (
             f"{item['item_name'] or item['item_code']} — "
             f"{item['stores_offering']} store(s)"
