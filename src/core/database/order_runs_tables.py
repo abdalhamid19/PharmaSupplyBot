@@ -79,6 +79,8 @@ create table if not exists run_items (
     manual_review_required  INTEGER not null default 0,
     manual_review_category  TEXT not null default '',
     matched_query           TEXT not null default '',
+    matched_name_ar         TEXT not null default '',
+    matched_name_en         TEXT not null default '',
     deterministic_score     REAL,
     winner_store_product_id TEXT,
     winner_store_key        TEXT,

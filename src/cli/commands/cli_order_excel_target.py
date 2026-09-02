@@ -408,6 +408,10 @@ def _build_db_persister(run_key: str | None, target_key: str):
             "elapsed_seconds": 0.0,
             "match_elapsed_seconds": 0.0,
             "matched_name": matched_name,
+            "matched_name_ar": matched_name,
+            "matched_name_en": matched_name,
+            "matched_product_name_ar": matched_name,
+            "matched_product_name_en": matched_name,
             "matched_price": matched_price,
             "matched_discount": matched_discount,
         }

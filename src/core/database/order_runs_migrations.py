@@ -123,8 +123,36 @@ def _migrate_v2_to_v3(conn) -> None:
     conn.execute("drop table run_items_v2")
 
 
+def _migrate_v3_to_v4(conn) -> None:
+    """Add ``matched_name_ar`` and ``matched_name_en`` to ``run_items``.
+
+    These columns surface the matched product's name (Arabic + English)
+    in the Run Results tab so pharmacists can verify what was actually
+    matched without opening the offering-store expander. v3 rows simply
+    get empty strings; new runs fill the columns at write time.
+    """
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "select name from sqlite_master where type='table'"
+        ).fetchall()
+    }
+    if "run_items" not in tables:
+        return
+    columns = {row[1] for row in conn.execute("pragma table_info(run_items)").fetchall()}
+    if "matched_name_ar" in columns and "matched_name_en" in columns:
+        return
+    conn.execute(
+        "alter table run_items add column matched_name_ar TEXT not null default ''"
+    )
+    conn.execute(
+        "alter table run_items add column matched_name_en TEXT not null default ''"
+    )
+
+
 MIGRATIONS: dict[int, MigrationFn] = {
     3: _migrate_v2_to_v3,
+    4: _migrate_v3_to_v4,
 }
 
 

@@ -24,6 +24,7 @@ select ri.item_key, i.item_code, i.item_name, ri.requested_qty,
        ri.ordered_qty, ri.status, ri.reason, ri.matched,
        ri.manual_review_required, ri.stores_offering,
        ri.winner_store_key, ri.elapsed_seconds,
+       ri.matched_name_ar, ri.matched_name_en,
        ri.source_kind, ri.source_label
 from run_items ri
 join items i on i.item_key = ri.item_key
@@ -74,6 +75,7 @@ QUERY_COLUMNS = {
         "ordered_qty", "status", "reason", "matched",
         "manual_review_required", "stores_offering",
         "winner_store_key", "elapsed_seconds",
+        "matched_name_ar", "matched_name_en",
         "source_kind", "source_label",
     ],
     "stores": [

@@ -127,6 +127,24 @@ class RunItemRowTests(unittest.TestCase):
         """Phase 2 has no store snapshot yet, so the winner store may be unknown."""
         self.assertIsNone(run_item_row("r", self._summary())["winner_store_key"])
 
+    def test_matched_names_default_to_empty(self) -> None:
+        """Legacy CSVs without matched-name columns still load with empty strings."""
+        row = run_item_row("r", self._summary())
+        self.assertEqual(row["matched_name_ar"], "")
+        self.assertEqual(row["matched_name_en"], "")
+
+    def test_matched_names_are_propagated(self) -> None:
+        """The matched product's Arabic + English name is forwarded to run_items."""
+        row = run_item_row(
+            "r",
+            self._summary(
+                matched_product_name_ar="كال ماج 30 اقراص",
+                matched_product_name_en="CAL MAG 30 TABS",
+            ),
+        )
+        self.assertEqual(row["matched_name_ar"], "كال ماج 30 اقراص")
+        self.assertEqual(row["matched_name_en"], "CAL MAG 30 TABS")
+
 
 class ItemDimensionRowTests(unittest.TestCase):
     """The items dimension keeps the first display values it ever sees."""

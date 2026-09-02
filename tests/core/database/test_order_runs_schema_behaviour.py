@@ -144,7 +144,7 @@ class OrderRunsSchemaBehaviourTests(unittest.TestCase):
         self.assertEqual(tuple(int(value) for value in rows[0]), (2, 1))
 
     def test_bootstrap_recreates_stale_views_from_older_schema(self) -> None:
-        """A v1 database must get the v3 view definition on first open."""
+        """A v1 database must get the v4 view definition on first open."""
         with TemporaryDirectory() as temp:
             path = Path(temp) / "order_runs.db"
             store = OrderRunsStore(path)
@@ -168,7 +168,7 @@ class OrderRunsSchemaBehaviourTests(unittest.TestCase):
             version = reopened.schema_version()
             reopened.db.close()
         self.assertIn("added_to_cart", columns)
-        self.assertEqual(version, 3)
+        self.assertEqual(version, 4)
 
     def test_best_discount_view_uses_precomputed_rank(self) -> None:
         """rank_by_discount avoids a window function in every query."""

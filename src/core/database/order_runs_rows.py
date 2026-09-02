@@ -94,6 +94,8 @@ def _match_outcome_fields(
         "manual_review_required": as_flag(summary.get("manual_review_required")),
         "manual_review_category": as_text(summary.get("manual_review_category")),
         "matched_query": as_text(summary.get("matched_query")),
+        "matched_name_ar": as_text(summary.get("matched_product_name_ar")),
+        "matched_name_en": as_text(summary.get("matched_product_name_en")),
         "deterministic_score": as_optional_float(summary.get("deterministic_score")),
         "winner_store_product_id": as_optional_text(winner_id),
         "tie_break_reason": as_text(summary.get("tie_break_reason")),
