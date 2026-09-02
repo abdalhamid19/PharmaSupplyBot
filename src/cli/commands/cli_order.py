@@ -81,7 +81,26 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
 
     apply_order_overrides(app_config, args)
 
+    profiles = app_config.profiles_to_run(
+        profile=args.profile, all_profiles=args.all_profiles
+    )
+    if not profiles:
+        profiles = []
+
+    # Pre-allocate a single run id when an excel-target flow will run
+    # alongside the Tawreed profiles so both sources land under the same
+    # ``runs`` row. Without this, excel-target writes to its own auto-
+    # generated run_key and never appears in the Tawreed run's
+    # ``run_items`` / ``run_item_stores`` tables.
+    shared_run_id: str | None = None
     selected_targets = selected_excel_target_configs(app_config, args)
+    if selected_targets and profiles:
+        from src.core.artifact_run import unique_run_id
+
+        first_profile_key = profiles[0][0]
+        shared_run_id = unique_run_id("order", first_profile_key)
+        _open_shared_run_record(app_config, first_profile_key, shared_run_id, args)
+
     target_catalogs = (
         load_target_catalogs(selected_targets, app_config) if selected_targets else {}
     )
@@ -96,19 +115,19 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
             if current_artifact_run()
             else Path("artifacts") / "excel_target_summary.csv"
         )
+        excel_run_key = (
+            f"{profiles[0][0]}/{shared_run_id}" if shared_run_id and profiles else None
+        )
         excel_target_totals = run_excel_target_match_only_multi(
             app_config,
             selected_targets,
             target_catalogs,
             target_items,
             summary_path,
+            run_key=excel_run_key,
         )
     else:
         excel_target_totals = None
-
-    profiles = app_config.profiles_to_run(
-        profile=args.profile, all_profiles=args.all_profiles
-    )
 
     timer = CommandTimer()
     run_directories: list[Path] = []
@@ -116,7 +135,7 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     with timer:
         from src.core.artifact_run import current_artifact_run
 
-        execute_profiles(app_config, profiles, args)
+        execute_profiles(app_config, profiles, args, run_id=shared_run_id)
 
         # Snapshot: pull active run (if still set) + fall back to the
         # most recent run directory per profile from disk.
@@ -163,6 +182,29 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         quiet=is_quiet(args),
     )
     return 0
+
+
+def _open_shared_run_record(
+    app_config: AppConfig,
+    profile_key: str,
+    run_id: str,
+    args: argparse.Namespace,
+) -> None:
+    """Pre-open the ``runs`` row that excel-target and Tawreed will share.
+
+    The row is upserted, so the Tawreed ``open_order_run_record`` call that
+    runs later will simply refresh the same row with the live mode/exec
+    metadata. Without this pre-open, the excel-target flow would either
+    write under its own auto-generated run_key (separate row in the DB)
+    or fail the ``run_items`` foreign key when no run_key is supplied.
+    """
+    from .cli_order_run_record import order_run_options
+    from src.core.ordering.order_run_persistence import open_run_record
+
+    database = getattr(app_config, "database", None)
+    options = database.persistence_options() if database else {}
+    run_options = order_run_options(app_config, args, str(Path("artifacts") / "order" / profile_key / run_id))
+    open_run_record(profile_key, run_id, run_options, options)
 
 
 def _load_target_items(
@@ -247,17 +289,23 @@ def execute_profiles(
     app_config: AppConfig,
     profiles: list[tuple[str, ProfileConfig]],
     args: argparse.Namespace,
+    run_id: str | None = None,
 ) -> None:
-    """Run the selected profiles either sequentially or in parallel."""
+    """Run the selected profiles either sequentially or in parallel.
+
+    ``run_id`` is threaded down to :func:`run_single_profile` so a
+    pre-allocated artifact run id (computed by the caller to share the
+    run with the excel-target flow) is used for every profile.
+    """
     from .cli_order_execution import run_single_profile
 
     max_workers = resolve_max_workers(app_config, args, len(profiles))
     if max_workers <= 1:
         for profile_key, profile in profiles:
-            run_single_profile(app_config, profile_key, profile, args)
+            run_single_profile(app_config, profile_key, profile, args, run_id=run_id)
         return
 
-    run_parallel_profiles(app_config, profiles, args, max_workers)
+    run_parallel_profiles(app_config, profiles, args, max_workers, run_id=run_id)
 
 
 def run_parallel_profiles(
@@ -265,6 +313,7 @@ def run_parallel_profiles(
     profiles: list[tuple[str, ProfileConfig]],
     args: argparse.Namespace,
     max_workers: int,
+    run_id: str | None = None,
 ) -> None:
     """Submit profile-level order runs to the configured thread pool."""
     from .cli_order_execution import run_single_profile
@@ -275,7 +324,7 @@ def run_parallel_profiles(
     )
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
-            executor.submit(run_single_profile, app_config, pk, p, args)
+            executor.submit(run_single_profile, app_config, pk, p, args, run_id=run_id)
             for pk, p in profiles
         ]
         concurrent.futures.wait(futures)

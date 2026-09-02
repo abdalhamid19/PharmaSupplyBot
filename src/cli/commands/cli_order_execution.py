@@ -31,12 +31,19 @@ def run_single_profile(
     profile_key: str,
     profile,
     args,
+    run_id: str | None = None,
 ) -> None:
-    """Prepare and run a single profile order flow."""
+    """Prepare and run a single profile order flow.
+
+    ``run_id`` is the pre-allocated artifact run id; when supplied, the
+    same run_key is reused by any excel-target flow that ran before the
+    Tawreed profile, so the per-item offering-store expander can show
+    both sources side by side.
+    """
     from src.core.artifact_run import artifact_run
     from .cli_order_run_record import finish_order_run_record, open_order_run_record
 
-    with artifact_run("order", profile_key) as run:
+    with artifact_run("order", profile_key, run_id=run_id) as run:
         logger.info("artifact run started", extra={"profile": profile_key, "directory": str(run.directory)})
         run_key = open_order_run_record(app_config, profile_key, args, run)
         try:
