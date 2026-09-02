@@ -517,6 +517,57 @@ class ExcelTargetManagerWidgetTests(unittest.TestCase):
             "alnasr",
         )
 
+    def test_edit_button_is_visible_for_every_target(self) -> None:
+        """An ✏ Edit button must be rendered next to every Excel target."""
+        from unittest.mock import patch
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        with patch(
+            "src.ui.fields.streamlit_excel_target_manager_widgets.user_added_targets",
+            return_value=["alnasr"],
+        ):
+            at.run()
+        edit_buttons = [
+            b for b in at.main.button if b.key and "excel_target_edit_alnasr" in b.key
+        ]
+        self.assertEqual(
+            len(edit_buttons), 1, f"expected one edit button, got {[b.key for b in edit_buttons]}"
+        )
+
+    def test_edit_button_sets_pending_flag(self) -> None:
+        """Pressing ✏ Edit sets the edit_pending flag the dialog body uses."""
+        from unittest.mock import patch
+        from streamlit.testing.v1 import AppTest
+
+        at = AppTest.from_file(str(self.FIXTURE), default_timeout=30)
+        with patch(
+            "src.ui.fields.streamlit_excel_target_manager_widgets.user_added_targets",
+            return_value=["alnasr"],
+        ):
+            at.run()
+
+        edit = next(
+            (
+                b
+                for b in at.main.button
+                if b.key and "excel_target_edit_alnasr" in b.key
+            ),
+            None,
+        )
+        self.assertIsNotNone(edit, "edit button must exist for alnasr")
+        edit.click()
+        at.run()
+        self.assertIn(
+            "excel_target_edit_pending",
+            at.session_state,
+            "edit_pending flag must be set after ✏ click",
+        )
+        self.assertEqual(
+            at.session_state["excel_target_edit_pending"],
+            "alnasr",
+        )
+
     def test_excel_source_upload_renders_file_uploader_reactively(self) -> None:
         """Toggling the order Excel source to Upload file must show the uploader."""
         from streamlit.testing.v1 import AppTest

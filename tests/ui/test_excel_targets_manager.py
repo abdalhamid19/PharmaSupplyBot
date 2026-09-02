@@ -13,7 +13,9 @@ from src.ui.excel_targets_manager import (
     USER_ADDED_KEY,
     _normalise_name,
     add_excel_target,
+    excel_target_settings,
     remove_excel_target,
+    update_excel_target,
     user_added_targets,
 )
 
@@ -203,6 +205,82 @@ class RemoveDialogDispatchTests(unittest.TestCase):
             self.assertTrue(real_remove(config, "my_warehouse"))
             self.assertEqual(user_added_targets(config), [])
             self.assertNotIn("my_warehouse:", config.read_text(encoding="utf-8"))
+
+
+class UpdateExcelTargetTests(unittest.TestCase):
+    """The Edit dialog calls update_excel_target to rewrite settings in place."""
+
+    def test_updates_column_names_and_display_name(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "config.yaml"
+            upload = _make_upload("vendor.xlsx", b"x")
+            with patch(
+                "src.ui.excel_targets_manager.ARTIFACTS_DIR",
+                Path(temp_dir) / "artifacts",
+            ):
+                add_excel_target(
+                    config_path=config,
+                    display_name="my_warehouse",
+                    uploaded_file=upload,
+                )
+                self.assertTrue(
+                    update_excel_target(
+                        config,
+                        "my_warehouse",
+                        display_name="My Warehouse",
+                        name_col="الصنف",
+                        price_col="سعر ج",
+                        discount_col="نقدي",
+                        code_col="كود",
+                        sheet="الجزيرة",
+                        header_row=0,
+                        enabled=True,
+                    )
+                )
+            settings = excel_target_settings(config, "my_warehouse")
+            self.assertEqual(settings["display_name"], "My Warehouse")
+            self.assertEqual(settings["name_col"], "الصنف")
+            self.assertEqual(settings["price_col"], "سعر ج")
+            self.assertEqual(settings["discount_col"], "نقدي")
+            self.assertEqual(settings["code_col"], "كود")
+            self.assertEqual(settings["sheet"], "الجزيرة")
+            self.assertTrue(settings["enabled"])
+            text = config.read_text(encoding="utf-8")
+            self.assertIn("price_col: سعر ج", text)
+            self.assertIn("discount_col: نقدي", text)
+            self.assertIn("sheet: الجزيرة", text)
+
+    def test_update_returns_false_for_unknown_key(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "config.yaml"
+            config.write_text(
+                "excel_targets:\n  hardcoded: {}\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(update_excel_target(config, "missing_key", price_col="x"))
+
+    def test_update_can_disable_target(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "config.yaml"
+            upload = _make_upload("vendor.xlsx", b"x")
+            with patch(
+                "src.ui.excel_targets_manager.ARTIFACTS_DIR",
+                Path(temp_dir) / "artifacts",
+            ):
+                add_excel_target(
+                    config_path=config,
+                    display_name="my_warehouse",
+                    uploaded_file=upload,
+                )
+                update_excel_target(config, "my_warehouse", enabled=False)
+            settings = excel_target_settings(config, "my_warehouse")
+            self.assertFalse(settings["enabled"])
+
+    def test_settings_returns_empty_for_unknown_key(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "config.yaml"
+            config.write_text("excel_targets: {}\n", encoding="utf-8")
+            self.assertEqual(excel_target_settings(config, "ghost"), {})
 
 
 if __name__ == "__main__":

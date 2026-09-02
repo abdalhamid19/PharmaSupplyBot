@@ -169,12 +169,92 @@ def remove_excel_target(config_path: Path, target_key: str) -> bool:
     return True
 
 
+# Fields the operator can edit from the GUI. ``display_name`` is the only
+# field without a 1:1 mapping in the YAML — it is mirrored as
+# ``excel_targets.<key>.display_name`` (and falls back to the key when
+# empty). All other entries are the raw YAML field names.
+EDITABLE_FIELDS = (
+    "display_name",
+    "name_col",
+    "price_col",
+    "discount_col",
+    "code_col",
+    "sheet",
+    "header_row",
+    "enabled",
+)
+
+
+def excel_target_settings(config_path: Path, target_key: str) -> dict[str, Any]:
+    """Return the current ``excel_targets.<key>`` entry, or an empty dict.
+
+    The dict is always safe to read; callers can pass defaults from
+    :data:`EDITABLE_FIELDS` for any missing key.
+    """
+    raw = _read_yaml(config_path)
+    excel_targets = dict(raw.get("excel_targets") or {})
+    entry = excel_targets.get(target_key) or {}
+    if not isinstance(entry, dict):
+        return {}
+    return dict(entry)
+
+
+def update_excel_target(
+    config_path: Path,
+    target_key: str,
+    *,
+    display_name: str = "",
+    name_col: str = "",
+    price_col: str = "",
+    discount_col: str = "",
+    code_col: str = "",
+    sheet: str = "",
+    header_row: int = 0,
+    enabled: bool = True,
+) -> bool:
+    """Update one Excel target's settings in place.
+
+    Only the fields the GUI exposes (see :data:`EDITABLE_FIELDS`) are
+    touched; the catalog file is left untouched. Returns ``True`` when
+    the target existed and was rewritten. Non-user-added targets (e.g.
+    hard-coded warehouses in ``state/config.yaml``) are also editable —
+    editing a hard-coded entry is a legitimate operation since the
+    operator owns the config file.
+    """
+    raw = _read_yaml(config_path)
+    excel_targets = dict(raw.get("excel_targets") or {})
+    if target_key not in excel_targets:
+        return False
+    entry = dict(excel_targets[target_key] or {})
+    if display_name:
+        entry["display_name"] = str(display_name)
+    else:
+        entry.pop("display_name", None)
+    if name_col:
+        entry["name_col"] = str(name_col)
+    if price_col:
+        entry["price_col"] = str(price_col)
+    if discount_col:
+        entry["discount_col"] = str(discount_col)
+    entry["code_col"] = str(code_col)
+    entry["sheet"] = str(sheet)
+    entry["header_row"] = int(header_row)
+    entry["enabled"] = bool(enabled)
+    excel_targets[target_key] = entry
+    raw["excel_targets"] = excel_targets
+    _write_yaml(config_path, raw)
+    return True
+
+
 __all__ = [
     "ExcelTargetAddResult",
     "DEFAULT_TARGET_NAME",
     "USER_ADDED_KEY",
+    "EDITABLE_FIELDS",
     "user_added_targets",
     "add_excel_target",
     "remove_excel_target",
+    "excel_target_settings",
+    "update_excel_target",
     "_normalise_name",
 ]

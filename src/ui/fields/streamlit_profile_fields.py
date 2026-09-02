@@ -30,6 +30,7 @@ from src.core.config.config_models import AppConfig
 from ..streamlit_uploads import available_excel_target_options
 from .streamlit_excel_target_manager_widgets import (
     maybe_open_add_dialog,
+    maybe_open_edit_dialog,
     maybe_open_remove_dialog,
     render_add_excel_target_button,
 )
@@ -187,7 +188,7 @@ def _render_target_checkboxes(
     if excel_target_keys:
         st.caption("📊 Excel target catalog")
         for key in excel_target_keys:
-            checkbox_col, action_col = st.columns([0.78, 0.22])
+            checkbox_col, action_col = st.columns([0.66, 0.34])
             with checkbox_col:
                 if st.checkbox(
                     f"📊 Excel target ({key})",
@@ -200,6 +201,20 @@ def _render_target_checkboxes(
                 ):
                     selected_pairs.append(("excel-target", key))
             with action_col:
+                edit_btn_col, remove_btn_col = st.columns(2)
+
+                def _enter_edit(target_key: str = key) -> None:
+                    st.session_state["excel_target_edit_pending"] = target_key
+
+                edit_btn_col.button(
+                    "✏ Edit",
+                    key=f"excel_target_edit_{key}",
+                    help=(
+                        f"Edit column names, sheet, header row, or display "
+                        f"name for `{key}`."
+                    ),
+                    on_click=_enter_edit,
+                )
                 if key in user_added:
 
                     def _enter_remove_confirm(
@@ -207,7 +222,7 @@ def _render_target_checkboxes(
                     ) -> None:
                         st.session_state["excel_target_remove_pending"] = target_key
 
-                    st.button(
+                    remove_btn_col.button(
                         "🗑 Remove",
                         key=f"excel_target_remove_{key}",
                         help=(
@@ -218,10 +233,13 @@ def _render_target_checkboxes(
                     )
     if st.session_state.pop("excel_target_removed_toast", None):
         st.success("Excel target removed.")
+    if st.session_state.pop("excel_target_edited_toast", None):
+        st.success("Excel target settings updated.")
     if config_path is not None:
         render_add_excel_target_button(config_path)
         maybe_open_add_dialog(config_path)
         maybe_open_remove_dialog(config_path)
+        maybe_open_edit_dialog(config_path)
     if not selected_pairs:
         st.warning("Tick at least one target above to enable the Run Order button.")
     st.session_state["excel_target_selected_targets"] = tuple(
