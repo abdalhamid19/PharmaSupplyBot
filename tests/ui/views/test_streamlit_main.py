@@ -37,7 +37,7 @@ class StreamlitMainTests(unittest.TestCase):
         )
         prevented_tab.assert_called_once_with()
         remove_cart_tab.assert_called_once_with(app_config, "wardany", "config.yaml")
-        run_db_tab.assert_called_once_with()
+        run_db_tab.assert_called_once_with(app_config)
 
 
 if __name__ == "__main__":

@@ -96,7 +96,7 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
     with remove_cart_tab:
         render_remove_cart_tab(app_config, default_profile, config_path)
     with run_db_tab:
-        render_run_db_tab()
+        render_run_db_tab(app_config)
     with manual_review_tab:
         render_manual_review_tab(app_config)
 
