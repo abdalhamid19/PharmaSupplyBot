@@ -138,6 +138,16 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
 
         execute_profiles(app_config, profiles, args, run_id=shared_run_id)
 
+        # Cross-source winner reconciliation: when the Tawreed profile
+        # and one or more Excel targets share a run_key, every flow
+        # wrote its own ``is_winner=1`` row. Now we keep only the
+        # cheapest purchase price as the unique winner so the Run
+        # Results tab shows a single ✅ per item across sources.
+        if shared_run_id and profiles:
+            _reconcile_cross_source_winners(
+                app_config, profiles[0][0], shared_run_id
+            )
+
         # Snapshot: pull active run (if still set) + fall back to the
         # most recent run directory per profile from disk.
         active = current_artifact_run()
@@ -183,6 +193,70 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
         quiet=is_quiet(args),
     )
     return 0
+
+
+def _reconcile_cross_source_winners(
+    app_config: AppConfig, profile_key: str, run_id: str
+) -> None:
+    """Keep the cheapest offering store as the unique winner per item.
+
+    The Tawreed and excel-target flows each write their own winner
+    flag on the rows they produce. When both flows land under the
+    same ``run_key`` an item can end up with two ``is_winner=1`` rows
+    (one per source). This pass resets every ``is_winner`` to 0 and
+    then flips the single cheapest row back to 1, so the Run Results
+    tab shows exactly one ✅ per item regardless of source.
+
+    Items with no rows at all, or rows with a NULL ``purchase_price``,
+    fall back to the highest ``discount_percent`` so a 100% discount
+    catalog row still wins over an empty Tawreed snapshot.
+    """
+    import sqlite3
+
+    from src.core.database.order_runs_paths import default_order_runs_db
+    from src.core.database.order_runs_store import OrderRunsStore
+
+    database = getattr(app_config, "database", None)
+    options = database.persistence_options() if database else {}
+    db_path = options.get("path") or default_order_runs_db()
+    run_key = f"{profile_key}/{run_id}"
+    try:
+        # Touch the store so any pending migration runs.
+        OrderRunsStore(db_path)
+        conn = sqlite3.connect(str(db_path))
+        try:
+            conn.execute(
+                "update run_item_stores set is_winner = 0 where run_key = ?",
+                (run_key,),
+            )
+            conn.execute(
+                """
+                update run_item_stores
+                   set is_winner = 1
+                 where run_key = ?
+                   and rowid in (
+                     select rowid from run_item_stores ris
+                      where ris.run_key = ?
+                        and ris.item_key = run_item_stores.item_key
+                      order by
+                        case when ris.purchase_price is null
+                             then 1 else 0 end asc,
+                        ris.purchase_price asc,
+                        ris.discount_percent desc
+                      limit 1
+                   )
+                """,
+                (run_key, run_key),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        logger.debug(
+            "cross-source winner reconciliation failed",
+            extra={"run_key": run_key},
+            exc_info=True,
+        )
 
 
 def _open_shared_run_record(
