@@ -210,6 +210,12 @@ def _reconcile_cross_source_winners(
     Items with no rows at all, or rows with a NULL ``purchase_price``,
     fall back to the highest ``discount_percent`` so a 100% discount
     catalog row still wins over an empty Tawreed snapshot.
+
+    The same pass also rewrites ``run_items.winner_store_key`` and
+    ``run_items.winner_store_product_id`` for the row whose
+    ``source_kind`` / ``source_label`` match the winning store. That
+    keeps the items-table summary consistent with the unique ✅
+    shown in the per-item expander.
     """
     import sqlite3
 
@@ -225,29 +231,71 @@ def _reconcile_cross_source_winners(
         OrderRunsStore(db_path)
         conn = sqlite3.connect(str(db_path))
         try:
+            winners = conn.execute(
+                """
+                select ris.item_key, ris.source, ris.store_key,
+                       ris.store_product_id, ris.purchase_price,
+                       ris.discount_percent
+                  from run_item_stores ris
+                 where ris.run_key = ?
+                """,
+                (run_key,),
+            ).fetchall()
+            by_item: dict[str, dict] = {}
+            for item_key, source, store_key, store_pid, price, discount in winners:
+                candidate = {
+                    "source": source,
+                    "store_key": store_key,
+                    "store_product_id": store_pid,
+                    "purchase_price": price,
+                    "discount_percent": discount,
+                }
+                current = by_item.get(item_key)
+                if current is None or _cheaper(candidate, current):
+                    by_item[item_key] = candidate
+
             conn.execute(
                 "update run_item_stores set is_winner = 0 where run_key = ?",
                 (run_key,),
             )
-            conn.execute(
-                """
-                update run_item_stores
-                   set is_winner = 1
-                 where run_key = ?
-                   and rowid in (
-                     select rowid from run_item_stores ris
-                      where ris.run_key = ?
-                        and ris.item_key = run_item_stores.item_key
-                      order by
-                        case when ris.purchase_price is null
-                             then 1 else 0 end asc,
-                        ris.purchase_price asc,
-                        ris.discount_percent desc
-                      limit 1
-                   )
-                """,
-                (run_key, run_key),
-            )
+            for item_key, winner in by_item.items():
+                conn.execute(
+                    """
+                    update run_item_stores
+                       set is_winner = 1
+                     where run_key = ?
+                       and item_key = ?
+                       and source = ?
+                       and store_product_id = ?
+                    """,
+                    (
+                        run_key,
+                        item_key,
+                        winner["source"],
+                        winner["store_product_id"],
+                    ),
+                )
+                if winner["source"] == "excel_target":
+                    source_kind = "excel-target"
+                else:
+                    source_kind = "tawreed"
+                conn.execute(
+                    """
+                    update run_items
+                       set winner_store_key = ?,
+                           winner_store_product_id = ?
+                     where run_key = ?
+                       and item_key = ?
+                       and source_kind = ?
+                    """,
+                    (
+                        winner["store_key"],
+                        winner["store_product_id"],
+                        run_key,
+                        item_key,
+                        source_kind,
+                    ),
+                )
             conn.commit()
         finally:
             conn.close()
@@ -257,6 +305,30 @@ def _reconcile_cross_source_winners(
             extra={"run_key": run_key},
             exc_info=True,
         )
+
+
+def _cheaper(candidate: dict, current: dict) -> bool:
+    """Return whether ``candidate`` should beat ``current`` for the winner spot.
+
+    Cheapest non-null ``purchase_price`` wins; ties broken by the
+    higher ``discount_percent``. A candidate with a NULL price is
+    only preferred when the current winner also has a NULL price.
+    """
+    cand_price = candidate.get("purchase_price")
+    curr_price = current.get("purchase_price")
+    if cand_price is None and curr_price is not None:
+        return False
+    if cand_price is not None and curr_price is None:
+        return True
+    if cand_price is None and curr_price is None:
+        return (candidate.get("discount_percent") or 0) > (
+            current.get("discount_percent") or 0
+        )
+    if cand_price != curr_price:
+        return cand_price < curr_price
+    return (candidate.get("discount_percent") or 0) > (
+        current.get("discount_percent") or 0
+    )
 
 
 def _open_shared_run_record(
