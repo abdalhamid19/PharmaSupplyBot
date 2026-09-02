@@ -64,6 +64,14 @@ def render_item_stores_expander(items: list[dict[str, Any]], run_key: str) -> No
             _render_store_table(run_key, item["item_key"])
 
 
+STORE_SOURCE_LABELS = {
+    "store_details": "👤 Tawreed",
+    "search": "👤 Tawreed",
+    "excel_target": "📊 Excel target",
+    "excel-target": "📊 Excel target",
+}
+
+
 def _render_store_table(run_key: str, item_key: str) -> None:
     """Fetch and render one item's store rows, winner first."""
     stores = fetch_item_stores(run_key, item_key)
@@ -72,6 +80,10 @@ def _render_store_table(run_key: str, item_key: str) -> None:
         return
     frame = pd.DataFrame(stores)
     frame["is_winner"] = frame["is_winner"].map(_check_mark)
+    if "source" in frame.columns:
+        frame["source"] = frame["source"].map(
+            lambda value: STORE_SOURCE_LABELS.get(value, value) if value else "—"
+        )
     st.dataframe(frame, use_container_width=True, hide_index=True)
 
 
