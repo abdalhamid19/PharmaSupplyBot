@@ -28,13 +28,17 @@ class NormaliseNameTests(unittest.TestCase):
     def test_ascii_letters_lowercase(self) -> None:
         self.assertEqual(_normalise_name("My Warehouse"), "my_warehouse")
 
-    def test_arabic_input_falls_back_to_target_hash(self) -> None:
-        # Arabic letters have no NFKD decomposition, so we get a stable
-        # hash-based slug. The test only asserts the prefix.
-        result = _normalise_name("المخازن الادويه المباشرة")
-        self.assertTrue(
-            result.startswith("target_"),
-            f"expected target_ prefix, got {result!r}",
+    def test_arabic_input_keeps_original_name(self) -> None:
+        """Arabic names keep their original Unicode so the key is readable."""
+        self.assertEqual(
+            _normalise_name("المخازن الادويه المباشرة"),
+            "المخازن الادويه المباشرة",
+        )
+
+    def test_mixed_arabic_and_ascii_uses_ascii_slug(self) -> None:
+        self.assertEqual(
+            _normalise_name("My المخزن 2024"),
+            "my_2024",
         )
 
     def test_strips_punctuation(self) -> None:
@@ -89,7 +93,7 @@ class AddExcelTargetTests(unittest.TestCase):
             self.assertIn("my_warehouse:", text)
             self.assertIn("name_col: صنف", text)
 
-    def test_arabic_name_uses_default_slug(self) -> None:
+    def test_arabic_name_keeps_original_as_key(self) -> None:
         with TemporaryDirectory() as temp_dir:
             config = Path(temp_dir) / "config.yaml"
             upload = _make_upload("vendor.xlsx", b"x")
@@ -102,10 +106,7 @@ class AddExcelTargetTests(unittest.TestCase):
                     display_name=DEFAULT_TARGET_NAME,
                     uploaded_file=upload,
                 )
-            self.assertTrue(
-                result.target_key.startswith("target_"),
-                f"expected target_ prefix, got {result.target_key!r}",
-            )
+            self.assertEqual(result.target_key, DEFAULT_TARGET_NAME)
 
     def test_duplicate_key_appends_index(self) -> None:
         with TemporaryDirectory() as temp_dir:

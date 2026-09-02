@@ -39,18 +39,22 @@ class ExcelTargetAddResult:
 
 
 def _normalise_name(name: str) -> str:
-    """Return a YAML-safe and filename-safe slug for one target name.
+    """Return a stable, key-safe identifier for one target name.
 
-    The slug is composed of ASCII letters/digits joined by single
-    underscores. Arabic letters have no NFKD decomposition, so a name
-    like ``المخازن الادويه المباشرة`` ends up as empty after the
-    ASCII filter — in that case we fall back to a short hash of the
-    original so two distinct Arabic names do not collide.
+    ASCII names become lowercased words joined by underscores
+    (``My Warehouse`` → ``my_warehouse``). Names with no ASCII
+    letters (e.g. ``المخازن الادويه المباشرة``) keep the original
+    Unicode — both YAML and modern filesystems accept it, and the
+    key stays human-readable. A name of only whitespace falls back
+    to ``target_NNNNNN`` so we still emit something valid.
     """
     cleaned = re.sub(r"[^A-Za-z0-9]+", "_", unicodedata.normalize("NFKD", name))
     cleaned = cleaned.strip("_").lower()
     if cleaned:
         return cleaned
+    stripped = name.strip()
+    if stripped:
+        return stripped
     digest = abs(hash(name)) % (10**6)
     return f"target_{digest:06d}"
 
