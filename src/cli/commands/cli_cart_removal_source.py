@@ -9,6 +9,7 @@ from src.core.manual_review.manual_review_removal import (
     cart_items_from_manual_review_csv,
     cart_items_from_saved_not_matching,
 )
+from src.core.errors import ValidationError
 
 
 def cart_removal_items(args: argparse.Namespace, excel_loader) -> list:
@@ -20,5 +21,8 @@ def cart_removal_items(args: argparse.Namespace, excel_loader) -> list:
         return cart_items_from_manual_review_csv(Path(manual_review))
     excel = getattr(args, "excel", None)
     if not excel:
-        raise SystemExit("Provide --excel or --from-manual-review.")
+        raise ValidationError(
+            "Provide --excel or --from-manual-review.",
+            hint="Re-run the command with one of these flags.",
+        )
     return list(excel_loader(Path(excel)))

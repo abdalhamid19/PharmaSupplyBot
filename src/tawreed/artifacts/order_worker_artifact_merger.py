@@ -1,6 +1,9 @@
 """Merge order worker AI trace, summary, and manual-review artifacts."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 from pathlib import Path
 
@@ -50,4 +53,5 @@ def _remove_worker_text(paths: list[Path]) -> None:
         try:
             path.unlink()
         except Exception:
+            logger.debug("artifacts._remove_worker_text: cleanup failed (non-fatal)")
             pass

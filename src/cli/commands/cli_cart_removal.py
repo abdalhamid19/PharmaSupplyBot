@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import argparse
+import logging
 import multiprocessing
 from pathlib import Path
 from typing import Any
@@ -12,20 +13,56 @@ from src.core.utils.chunking import split_into_chunks
 from src.tawreed.artifacts.order_result_merger import merge_worker_summaries
 from src.tawreed.tawreed import TawreedBot
 from src.tawreed.auth.tawreed_session import SessionInvalidError
-from ..cli_shared import build_bot, invalid_session_exit, require_state_file
+from ..cli_shared import (
+    CommandTimer,
+    build_bot,
+    format_duration,
+    is_quiet,
+    print_command_summary,
+    raise_invalid_session,
+    require_state_file,
+)
 from .cli_cart_removal_source import cart_removal_items
 from .item_worker import build_cart_payloads, report_worker_results, resolve_item_workers
+from ..registry import register
+
+logger = logging.getLogger(__name__)
 
 
+@register("remove-cart")
 def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     """Remove requested items from Tawreed carts for the selected profiles."""
-    profiles = app_config.profiles_to_run(
-        profile=args.profile, all_profiles=args.all_profiles
+    timer = CommandTimer()
+    items_total = 0
+    with timer:
+        profiles = app_config.profiles_to_run(
+            profile=args.profile, all_profiles=args.all_profiles
+        )
+        for profile_key, profile in profiles:
+            with artifact_run("remove-cart", profile_key) as run:
+                logger.info(
+                    "artifact run started",
+                    extra={"profile": profile_key, "directory": str(run.directory)},
+                )
+                _run_remove_cart_profile(app_config, profile_key, profile, args)
+                # Capture the count AFTER the run so the summary reflects what
+                # was actually attempted. cart_removal_items() may normalize
+                # duplicates or drop empty rows.
+                try:
+                    items_total += len(cart_removal_items(args, load_cart_removal_items))
+                except Exception:  # noqa: BLE001 - logged; summary keeps running for other profiles
+                    logger.exception("cli.remove-cart: cart_removal_items failed for profile")
+
+    print_command_summary(
+        "remove-cart",
+        {
+            "profiles": [p for p, _ in profiles],
+            "items": items_total,
+            "duration": format_duration(timer.seconds),
+        },
+        success=True,
+        quiet=is_quiet(args),
     )
-    for profile_key, profile in profiles:
-        with artifact_run("remove-cart", profile_key) as run:
-            print(f"[{profile_key}] Artifact run: {run.directory}")
-            _run_remove_cart_profile(app_config, profile_key, profile, args)
     return 0
 
 
@@ -66,7 +103,7 @@ def _run_profile_cart_removal(
     try:
         bot.remove_cart_items(items)
     except SessionInvalidError as error:
-        raise invalid_session_exit(base_url, profile_key, error) from error
+        raise_invalid_session(profile_key, error)
 
 
 def _run_parallel_cart_removal(
@@ -93,7 +130,10 @@ def _run_parallel_cart_removal(
 def _execute_cart_workers(profile_key, chunks, payloads):
     """Execute cart removal workers in parallel."""
     from .item_worker import run_cart_removal_chunk
-    print(f"[{profile_key}] Launching {len(chunks)} parallel cart-removal workers...")
+    logger.info(
+        "launching parallel workers",
+        extra={"profile": profile_key, "workers": len(chunks)},
+    )
     ctx = multiprocessing.get_context("spawn")
     with ctx.Pool(processes=len(chunks)) as pool:
         return pool.map(run_cart_removal_chunk, payloads)

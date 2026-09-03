@@ -1,6 +1,9 @@
 """Products-page search and add-to-cart flow for Tawreed ordering."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 import re
 import time
@@ -104,6 +107,7 @@ def search_visible_products_table(bot, page: Page, query: str) -> list[dict[str,
             payload = resp.value.json()
             return list(payload.get("data", []) or [])
         except Exception:
+            logger.debug("products.search_visible_products_table: search failed (non-fatal)")
             return dom_search_results(page, query)
 
 
@@ -152,6 +156,7 @@ def _open_add_to_cart_for_match(
             close_visible_dialogs(page)
     _click_cart(bot, row, item, match)
     bot.last_ordered_total_qty = fill_add_to_cart_dialog(bot, page, item.qty)
+    _record_single_store_selection(bot, match.data, bot.last_ordered_total_qty)
 
 
 def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
@@ -219,14 +224,19 @@ def _next_store_choice(bot, page, store_rows, used_ids, sels):
 
 def open_stores_dialog(bot, page: Page, row) -> list[dict[str, Any]]:
     """Open the stores dialog for a product and return store candidates."""
+    from ..store.tawreed_store_snapshot import SOURCE_STORE_DETAILS, record_store_rows
+
     with page.expect_response(
         re.compile(f".*{STORE_DETAILS_ENDPOINT}.*"), timeout=2000
     ) as resp:
         stores_button(row).click()
         try:
-            return stores_from_payload(resp.value.json())
+            stores = stores_from_payload(resp.value.json())
         except Exception:
+            logger.debug("products.open_stores_dialog: open failed (non-fatal)")
             return []
+        record_store_rows(bot, stores, SOURCE_STORE_DETAILS)
+        return stores
 
 
 def _is_dom_store(match: SearchMatch) -> bool:
@@ -241,6 +251,7 @@ def _cart_enabled(row) -> bool:
     try:
         return cart_button(row).is_enabled()
     except Exception:
+        logger.debug("products._cart_enabled: check failed (non-fatal)")
         return False
 
 
@@ -254,12 +265,40 @@ def _click_cart(bot, row, item, match):
             )
     
     record_single_store(bot, match.data)
+    _record_search_row_as_store(bot, match.data)
     wait_for_row_to_settle(row)
     cart_button(row).click()
 
 
+def _record_search_row_as_store(bot, candidate: dict[str, Any]) -> None:
+    """Record a single-store product from its search row.
+
+    Products with ``productsCount == 0`` never open the stores dialog, so this
+    is the only chance to capture their one offering store.
+    """
+    from ..store.tawreed_store_snapshot import SOURCE_SEARCH_ROW, record_store_rows
+
+    record_store_rows(bot, [candidate], SOURCE_SEARCH_ROW)
+
+
+def _record_single_store_selection(
+    bot, candidate: dict[str, Any], ordered_qty: int
+) -> None:
+    """Record the one offering store as the selection for a single-store product.
+
+    This path never opens the stores dialog, so ``_record_stores`` never runs and
+    ``winner_store_key`` would stay unset even though a quantity was ordered.
+    """
+    from ..store.tawreed_store_snapshot import record_store_selections
+
+    record_store_selections(bot, [(candidate, int(ordered_qty or 0))])
+
+
 def _record_stores(bot, sels):
+    from ..store.tawreed_store_snapshot import record_store_selections
+
     record_selected_stores(bot, sels)
+    record_store_selections(bot, sels)
 
 
 # ============================================================================
@@ -313,6 +352,8 @@ __all__ = [
     "add_item_from_store_dialogs",
     "open_stores_dialog",
     "_click_cart",
+    "_record_search_row_as_store",
+    "_record_single_store_selection",
     "_record_stores",
     # Search
     "search_visible_products_table",

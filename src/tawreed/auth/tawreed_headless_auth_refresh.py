@@ -1,6 +1,7 @@
 """Headless Tawreed login refresh for expired saved sessions."""
 
 from __future__ import annotations
+import logging
 import os
 from pathlib import Path
 from ..tawreed_constants import PRODUCTS_PAGE_ROUTE
@@ -10,6 +11,9 @@ from .tawreed_session import (
     print_auth_instructions, print_login_detection_result, promote_session_state,
     save_session_state, validate_saved_session, wait_for_login_detection, wait_for_network_idle
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def run_headless_auth_refresh(
@@ -42,8 +46,10 @@ def _run_auth_refresh_session(
             temp_state_path, base_url, wait_seconds
         )
         promote_session_state(temp_state_path, state_path)
-        msg = f"[{profile_key}] Auto-refreshed Tawreed session state: {state_path}"
-        print(msg)
+        logger.info(
+            "auto-refreshed Tawreed session state",
+            extra={"profile": profile_key, "state_path": str(state_path)},
+        )
     except Exception:
         discard_session_state(temp_state_path)
         raise

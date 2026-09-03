@@ -18,7 +18,7 @@ HEADERS = [
     "item_code", "item_name", "item_qty", "status", "reason", "matched_query",
     "deterministic_score", "matched", "deterministic_match_found",
     "manual_review_blocked_match", "matched_product_name_en",
-    "matched_product_name_ar", "ai_status", "manual_review_required",
+    "matched_product_name_ar", "manual_review_required",
     "manual_review_category",
 ]
 
@@ -39,15 +39,14 @@ class QualityMetricsTests(unittest.TestCase):
     def test_auto_match_rate_computation(self) -> None:
         rows = [
             {"status": "matched", "matched": "True", "manual_review_required": "False",
-             "deterministic_match_found": "True", "ai_status": "ai_verified"},
+             "deterministic_match_found": "True"},
             {"status": "matched", "matched": "True", "manual_review_required": "False",
-             "deterministic_match_found": "True", "ai_status": "ai_verified"},
+             "deterministic_match_found": "True"},
             {"status": "no-results", "matched": "False", "manual_review_required": "True",
-             "deterministic_match_found": "False", "ai_status": "ai_rejected",
+             "deterministic_match_found": "False",
              "manual_review_category": "no_results"},
             {"status": "manual-review-required", "matched": "False",
              "manual_review_required": "True", "deterministic_match_found": "True",
-             "ai_status": "ai_low_confidence",
              "manual_review_category": "low_confidence"},
         ]
         with TemporaryDirectory() as temporary:
@@ -60,22 +59,19 @@ class QualityMetricsTests(unittest.TestCase):
         self.assertEqual(metrics.manual_review_required, 2)
         self.assertEqual(metrics.manual_review_rate, 50.0)
         self.assertEqual(metrics.no_results, 1)
-        self.assertEqual(metrics.ai_verified, 2)
-        self.assertEqual(metrics.ai_rejected, 1)
-        self.assertEqual(metrics.ai_low_confidence, 1)
         self.assertEqual(metrics.deterministic_matched, 3)
 
     def test_category_counts_populated(self) -> None:
         rows = [
             {"status": "manual-review-required", "matched": "False",
              "manual_review_required": "True", "deterministic_match_found": "False",
-             "ai_status": "ai_rejected", "manual_review_category": "brand_mismatch"},
+             "manual_review_category": "brand_mismatch"},
             {"status": "manual-review-required", "matched": "False",
              "manual_review_required": "True", "deterministic_match_found": "False",
-             "ai_status": "ai_rejected", "manual_review_category": "brand_mismatch"},
+             "manual_review_category": "brand_mismatch"},
             {"status": "manual-review-required", "matched": "False",
              "manual_review_required": "True", "deterministic_match_found": "False",
-             "ai_status": "ai_low_confidence", "manual_review_category": "low_confidence"},
+             "manual_review_category": "low_confidence"},
         ]
         with TemporaryDirectory() as temporary:
             csv_path = _write_summary_csv(Path(temporary), rows)
@@ -87,7 +83,7 @@ class QualityMetricsTests(unittest.TestCase):
     def test_compute_from_directory(self) -> None:
         rows = [
             {"status": "matched", "matched": "True", "manual_review_required": "False",
-             "deterministic_match_found": "True", "ai_status": "ai_verified"},
+             "deterministic_match_found": "True"},
         ]
         with TemporaryDirectory() as temporary:
             _write_summary_csv(Path(temporary), rows)
@@ -99,9 +95,9 @@ class QualityMetricsTests(unittest.TestCase):
     def test_save_quality_report_writes_file(self) -> None:
         rows = [
             {"status": "matched", "matched": "True", "manual_review_required": "False",
-             "deterministic_match_found": "True", "ai_status": "ai_verified"},
+             "deterministic_match_found": "True"},
             {"status": "no-results", "matched": "False", "manual_review_required": "True",
-             "deterministic_match_found": "False", "ai_status": "ai_rejected",
+             "deterministic_match_found": "False",
              "manual_review_category": "no_results"},
         ]
         with TemporaryDirectory() as temporary:

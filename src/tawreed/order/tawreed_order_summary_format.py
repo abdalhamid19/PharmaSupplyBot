@@ -16,11 +16,8 @@ def _final_trace_row(row: dict[str, object]) -> dict[str, object]:
         "phase": "item_final",
         "item_code": row["item_code"],
         "item_name": row["item_name"],
-        "ai_status": row["ai_status"],
         "result": row["status"],
-        "confidence": row["ai_confidence"],
-        "model_used": row["ai_model"],
-        "provider_used": row["ai_provider"],
+        "deterministic_score": row.get("deterministic_score", ""),
         "reason": row["reason"],
         "manual_review_required": row["manual_review_required"],
         "manual_review_category": row.get("manual_review_category", ""),
@@ -46,9 +43,9 @@ def _append_final_trace_row(
 ) -> None:
     """Append the final trace row to CSV and TXT artifacts."""
     final_row = _final_trace_row(row)
-    append_csv_artifact(profile_key, "order_ai_trace", [final_row], label_suffix)
+    append_csv_artifact(profile_key, "order_matching_trace", [final_row], label_suffix)
     append_text_artifact(
-        profile_key, "order_ai_trace", text_block("item_final", final_row), label_suffix
+        profile_key, "order_matching_trace", text_block("item_final", final_row), label_suffix
     )
 
 

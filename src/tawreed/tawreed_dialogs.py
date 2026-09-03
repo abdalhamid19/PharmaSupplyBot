@@ -1,6 +1,9 @@
 """PrimeNG dialog and overlay interaction helpers for Tawreed."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
@@ -29,8 +32,8 @@ def close_visible_dialogs(page: Page) -> None:
             page.keyboard.press("Escape")
             dialog.wait_for(state="hidden", timeout=800)  # Reduced from 1500
     except Exception:
-        pass
-    close_visible_overlay_panels(page)
+        logger.debug("tawreed.close_visible_dialogs: close failed (non-fatal)")
+        close_visible_overlay_panels(page)
 
 def close_visible_overlay_panels(page: Page) -> None:
     """Dismiss PrimeNG overlay panels that are not represented by dialog masks."""
@@ -45,8 +48,8 @@ def close_visible_overlay_panels(page: Page) -> None:
             _click_safe_page_area(page)
             _wait_for_overlay_panels_to_clear(page, timeout_ms=400)  # Reduced from 700
     except Exception:
+        logger.debug("tawreed.close_visible_overlay_panels: close failed (non-fatal)")
         pass
-
 def visible_overlay_diagnostics(page: Page) -> str:
     """Return compact diagnostics for visible dialogs and overlay panels."""
     lines: list[str] = []
@@ -59,8 +62,8 @@ def _wait_for_overlay_panels_to_clear(page: Page, timeout_ms: int) -> None:
     try:
         page.locator(OVERLAY_PANEL_SELECTOR).first.wait_for(state="hidden", timeout=timeout_ms)
     except Exception:
+        logger.debug("tawreed._wait_for_overlay_panels_to_clear: wait failed (non-fatal)")
         pass
-
 def _click_safe_page_area(page: Page) -> None:
     """Click outside overlays without depending on page-specific layout."""
     with suppress(Exception):
@@ -74,6 +77,7 @@ def _append_visible_count(lines: list[str], label: str, selector: str, page: Pag
     try:
         count = page.locator(selector).count()
     except Exception as error:
+        logger.debug("tawreed._append_visible_count: count append failed (non-fatal)")
         lines.append(f"{label}=unavailable ({type(error).__name__}: {error})")
         return
     lines.append(f"{label}={count}")

@@ -1,9 +1,13 @@
 """Store and warehouse selection helpers for Tawreed ordering flows."""
 
 from __future__ import annotations
+import logging
 
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
 
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
 
@@ -43,6 +47,7 @@ def warehouse_row_quantity(row, available_quantity_selector: str) -> int:
     try:
         return int(float(text.replace(",", "")))
     except Exception:
+        logger.debug("tawreed_strategy.warehouse_row_quantity: row quantity parse failed")
         return 0
 
 
@@ -110,6 +115,7 @@ def _store_discount_value(store: dict[str, Any]) -> float:
         try:
             number = float(value)
         except Exception:
+            logger.debug("tawreed_strategy._store_discount_value: discount parse failed")
             continue
         return number * 100 if 0 < number < 1 else number
     return -1.0

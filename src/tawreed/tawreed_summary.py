@@ -4,7 +4,6 @@ import time
 
 from src.core.matching.candidate_identity import candidate_has_store_product_id
 from src.core.matching_types import CandidateMatchDiagnostic
-from src.core.ordering.order_blocked_candidate import missing_store_product_id_outcome
 from src.core.utils.excel import Item
 from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
 from .matching.tawreed_match_logs import OrderResultSummary
@@ -149,10 +148,6 @@ class SummaryStatus:
 
     def unmatched_decision_status(self) -> str:
         """Return a more precise status for a rejected but recognized candidate."""
-        if missing_store_product_id_outcome(self.bot.last_order_ai_outcome):
-            return "matched-but-unavailable"
-        if getattr(self.bot.last_order_ai_outcome, "manual_review", False):
-            return "manual-review-required"
         decision = self.bot.last_match_decision
         if not decision or decision.best_match:
             return ""
@@ -214,11 +209,6 @@ def _artifact_details(label: str, error: Exception, **extra: object) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _console_safe(text: str) -> str:
-    """Return text that can be printed on cp1252 Windows consoles without crashing."""
-    return text.encode("cp1252", errors="replace").decode("cp1252")
-
-
 __all__ = [
     # Builder
     "SummaryBuilder",
@@ -230,5 +220,4 @@ __all__ = [
     "_item_error_label",
     "_item_error_details",
     "_artifact_details",
-    "_console_safe",
-]
+]  # noqa: F405

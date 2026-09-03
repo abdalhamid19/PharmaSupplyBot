@@ -1,6 +1,7 @@
 """Item-level worker subprocess and pool utilities."""
 
 from __future__ import annotations
+import logging
 
 from contextlib import nullcontext
 from pathlib import Path
@@ -10,7 +11,9 @@ from src.core.artifact_run import artifact_run, current_artifact_run
 from src.core.config.config import load_config
 from src.core.utils.excel import Item
 from src.tawreed.auth.tawreed_session import SessionInvalidError
-from ..cli_shared import build_bot, invalid_session_exit
+from ..cli_shared import build_bot, raise_invalid_session
+
+logger = logging.getLogger(__name__)
 
 
 def execute_order_worker(bot, items, profile_key: str) -> dict[str, Any]:
@@ -21,6 +24,7 @@ def execute_order_worker(bot, items, profile_key: str) -> dict[str, Any]:
     except SessionInvalidError as err:
         return _worker_error_result("session_invalid", profile_key, err)
     except Exception as err:
+        logger.exception("item_worker.execute_order_worker: profile=%s", profile_key)
         return _worker_error_result("error", profile_key, err)
 
 
@@ -32,6 +36,7 @@ def execute_cart_removal_worker(bot, items, profile_key: str) -> dict[str, Any]:
     except SessionInvalidError as err:
         return _worker_error_result("session_invalid", profile_key, err)
     except Exception as err:
+        logger.exception("item_worker.execute_cart_removal_worker: profile=%s", profile_key)
         return _worker_error_result("error", profile_key, err)
 
 
@@ -108,9 +113,9 @@ def report_worker_results(
         status = result.get("status")
         if status == "session_invalid":
             error = SessionInvalidError(str(result.get("error", "")))
-            raise invalid_session_exit(base_url, profile_key, error) from None
+            raise_invalid_session(profile_key, error)
         if status == "error":
-            print(f"[{profile_key}] Worker error: {result.get('error', '')}")
+            logger.warning("worker error", extra={"profile": profile_key, "error": result.get("error", "")})
 
 
 def run_order_chunk(payload: dict[str, Any]) -> dict[str, Any]:
@@ -164,7 +169,6 @@ def _build_bot_options(options: dict[str, Any], worker_id: int) -> dict[str, Any
         "fast_search": options.get("fast_search", False),
         "summary_label_suffix": f"worker_{worker_id}",
         "match_only": options.get("match_only", False),
-        "order_ai_settings": options.get("order_ai_settings"),
         "execution_mode": options.get("execution_mode", "auto"),
         "matching_risk_policy": options.get("matching_risk_policy", "safe"),
         "flagged_match_action": options.get("flagged_match_action", "manual-review-only"),

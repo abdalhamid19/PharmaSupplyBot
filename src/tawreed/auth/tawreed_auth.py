@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from playwright.sync_api import Page
@@ -32,6 +35,7 @@ def access_token_from_state(state_path: Path) -> str:
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except Exception:
+        logger.debug("tawreed_auth.access_token_from_state: unparseable state file %s", state_path)
         return ""
     for origin in state.get("origins", []):
         token = _access_token_from_origin(origin)
@@ -86,6 +90,7 @@ def _jwt_payload(token: str) -> dict:
         payload_bytes = base64.urlsafe_b64decode(payload_encoded)
         payload = json.loads(payload_bytes)
     except Exception:
+        logger.debug("tawreed_auth._jwt_payload: unparseable JWT payload")
         return {}
     return payload if isinstance(payload, dict) else {}
 

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from base64 import b64decode
 from binascii import Error as BinasciiError
 from pathlib import Path
 
 import streamlit as st
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_STATE_DIR = Path("state_defaults")
@@ -56,7 +59,8 @@ def streamlit_secret_value(key: str) -> object | None:
     """Return one Streamlit secret value when available."""
     try:
         return st.secrets.get(key)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - st.secrets may raise if secrets.toml is absent
+        logger.debug("streamlit_default_state.streamlit_secret_value: no secret for %s", key)
         return None
 
 

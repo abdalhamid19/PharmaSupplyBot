@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from src.core.config.config_models import AppConfig, ProfileConfig
 from src.core.matching_types import MatchDecision
-from src.core.ordering.order_ai_matching import OrderAiDecisionService, OrderAiSettings
 from src.core.utils.excel import Item
 from .selectors import _selectors
 from .auth.tawreed_auth import TawreedAuthFlow
@@ -14,12 +14,10 @@ from .cart.tawreed_cart_flow import TawreedCartFlow
 from .order.tawreed_order_flow import TawreedOrderFlow, _SkipItem, _NoResultsItem
 
 
-def _console_safe(text: str) -> str:
-    """Return text that can be printed on cp1252 Windows consoles without crashing."""
-    return text.encode("cp1252", errors="replace").decode("cp1252")
+__all__ = ["TawreedBotCore"]
 
 
-__all__ = ["TawreedBotCore", "_console_safe"]
+logger = logging.getLogger(__name__)
 
 
 class TawreedBotCore:
@@ -36,7 +34,6 @@ class TawreedBotCore:
         fast_search: bool = False,
         summary_label_suffix: str | None = None,
         match_only: bool = False,
-        order_ai_settings: OrderAiSettings | None = None,
         execution_mode: str = "browser",
         matching_risk_policy: str = "safe",
         flagged_match_action: str = "manual-review-only",
@@ -58,13 +55,11 @@ class TawreedBotCore:
         self.fast_search = fast_search
         self.summary_label_suffix = summary_label_suffix
         self.match_only = match_only
-        self.order_ai_settings = order_ai_settings or OrderAiSettings()
         self.execution_mode = execution_mode
         self.matching_risk_policy = matching_risk_policy
         self.flagged_match_action = flagged_match_action
         self.auth_lock = auth_lock
         self.worker_id = worker_id
-        self.order_ai_service = self._build_order_ai_service()
         self.selectors = _selectors(config)
         self.skip_item_exception = _SkipItem
         self.no_results_exception = _NoResultsItem
@@ -77,6 +72,8 @@ class TawreedBotCore:
 
     def _reset_last_item_state(self) -> None:
         """Reset internal state tracking for the next item to be processed."""
+        from .store.tawreed_store_snapshot import clear_store_snapshot
+
         pending_timings = getattr(self, "_pending_item_timings", {})
         self.last_match_decision: MatchDecision | None = None
         self.last_match_elapsed_seconds = 0.0
@@ -84,16 +81,12 @@ class TawreedBotCore:
         self.last_selected_discount_percent = ""
         self.last_selected_store_name = ""
         self.last_ordered_total_qty = 0
-        self.last_order_ai_outcome = None
         self.last_item_timings: dict[str, float] = dict(pending_timings)
         self._pending_item_timings = {}
-
-    def _build_order_ai_service(self):
-        """Return the optional live-order AI decision service."""
-        if not self.order_ai_settings.enabled:
-            return None
-        return OrderAiDecisionService(self.order_ai_settings)
+        # Offering-store rows are per-item; leaking them into the next item
+        # would silently attribute the wrong warehouses to it.
+        clear_store_snapshot(self)
 
     def log(self, message: str) -> None:
-        """Print a profile-scoped diagnostic message."""
-        print(_console_safe(f"[{self.profile_key}] {message}"))
+        """Record a profile-scoped diagnostic message via the unified logger."""
+        logger.info(message, extra={"profile": self.profile_key})

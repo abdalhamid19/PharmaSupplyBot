@@ -75,6 +75,7 @@ def first_profile_key(app_config) -> str | None:
 
 
 from .manual_review.streamlit_manual_review_page import render_manual_review_tab
+from .views.run_db import render_run_db_tab
 
 def render_main_tabs(app_config, default_profile: str | None, config_path) -> None:
     """Render the main Streamlit tabs."""
@@ -83,7 +84,8 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
     )
     (
         overview_tab, auth_tab, order_tab, matching_tab,
-        prevented_items_tab, remove_cart_tab, results_tab, manual_review_tab
+        prevented_items_tab, remove_cart_tab, results_tab, run_db_tab,
+        manual_review_tab
     ) = tabs
     with overview_tab:
         render_overview(app_config, config_path)
@@ -99,6 +101,8 @@ def render_main_tabs(app_config, default_profile: str | None, config_path) -> No
         render_remove_cart_tab(app_config, default_profile, config_path)
     with results_tab:
         render_results_tab(default_profile)
+    with run_db_tab:
+        render_run_db_tab()
     with manual_review_tab:
         render_manual_review_tab(app_config)
 
@@ -107,5 +111,6 @@ def _main_tab_labels() -> list[str]:
     """Return Streamlit main tab labels."""
     return [
         "Overview", "Auth", "Order", "Product Matching",
-        "Prevented items", "Remove cart items", "Results", "Manual Review"
+        "Prevented items", "Remove cart items", "Results", "Run DB",
+        "Manual Review"
     ]

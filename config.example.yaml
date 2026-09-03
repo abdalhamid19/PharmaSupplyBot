@@ -99,9 +99,33 @@ matching:
 runtime:
   headless: true
   slow_mo_ms: 0
-  timeout_ms: 15000
+  # Default timeout for element waits (ms). Page navigations use their own
+  # higher floor (see NAVIGATION_TIMEOUT_FLOOR_MS in tawreed_session.py),
+  # because cold TCP/TLS handshakes to Tawreed can exceed 20 s.
+  # مهلة انتظار العناصر؛ تحميل الصفحات له حد أدنى أعلى لأن أول اتصال قد يتجاوز 20 ثانية
+  timeout_ms: 45000
   submit_order: false
   # Item-level parallel workers per profile. 1 = sequential (default).
   # Each extra worker spawns its own Chromium process (~150MB RAM each).
   # Keep at or below 4 to avoid triggering Tawreed concurrent-session limits.
   item_workers: 1
+
+# Local SQLite persistence for order-run analytics.
+# قاعدة بيانات محلية لتحليل نتائج الطلبات عبر الزمن
+database:
+  # Write each order run (and its items) to state/order_runs.db so prices,
+  # discounts, and availability can be compared across runs. Every write is
+  # failure-isolated: a database error is logged and the run continues, and
+  # the CSV artifacts under artifacts/ remain the complete source of record.
+  order_runs_enabled: true
+
+  # Database file path. Empty = state/order_runs.db (also settable via the
+  # ORDER_RUNS_DB_PATH environment variable). Kept separate from
+  # state/manual_review_decisions.db, which holds human decisions that cannot
+  # be regenerated and therefore needs stricter durability settings.
+  order_runs_path: ""
+
+  # Store every scored candidate, including rejected ones. Useful for auditing
+  # why a match failed, but roughly triples database growth — the equivalent
+  # CSV (match_only_summary) is ~10x the size of order_item_summary.
+  store_candidates: false

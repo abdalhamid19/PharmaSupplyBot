@@ -33,13 +33,6 @@ def product_matching_form(app_config, default_profile: str | None) -> tuple[bool
         )
         limit = st.number_input("Item limit", min_value=0, max_value=100000, value=50)
         trace = st.checkbox("Trace", value=True)
-        no_ai = st.checkbox("No AI", value=True)
-        provider = st.selectbox(
-            "AI provider", ["", "rotation", "groq", "opencode", "openrouter"]
-        )
-        model = st.text_input("AI model", value="")
-        review_model = st.text_input("Review model", value="")
-        concurrency = st.number_input("AI concurrency", min_value=1, max_value=20, value=5)
         submitted = st.form_submit_button("Run Product Matching")
     return bool(submitted), {
         "excel_path": excel_path,
@@ -47,11 +40,6 @@ def product_matching_form(app_config, default_profile: str | None) -> tuple[bool
         "profile_key": profile,
         "limit": int(limit),
         "trace": bool(trace),
-        "no_ai": bool(no_ai),
-        "provider": str(provider),
-        "model": str(model),
-        "review_model": str(review_model),
-        "concurrency": int(concurrency),
     }
 
 
@@ -82,23 +70,10 @@ def product_matching_command(
         str(output_path),
         "--limit",
         str(values["limit"]),
-        "--concurrency",
-        str(values["concurrency"]),
     ]
     if values["trace"]:
         command.append("--trace")
-    if values["no_ai"]:
-        command.append("--no-ai")
-    command.extend(_optional_arg("--provider", values["provider"]))
-    command.extend(_optional_arg("--model", values["model"]))
-    command.extend(_optional_arg("--review-model", values["review_model"]))
     return command
-
-
-def _optional_arg(name: str, value: object) -> list[str]:
-    """Return optional CLI argument if value is non-empty."""
-    text = str(value or "").strip()
-    return [name, text] if text else []
 
 
 # ============================================================================

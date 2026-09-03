@@ -1,6 +1,9 @@
 """Item processing logic for Tawreed order flow."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 from typing import TYPE_CHECKING
 
@@ -75,6 +78,7 @@ class OrderItemProcessor:
             page.locator(self.bot.selectors.item_first_result).first.wait_for(timeout=5000)
             page.locator(self.bot.selectors.item_first_result).first.click()
         except Exception:
+            logger.debug("order.pick_configured_search_result: pick failed (non-fatal)")
             search.press("Enter")
 
     def fill_configured_quantity(self, page: Page, quantity: int) -> None:
@@ -119,6 +123,7 @@ class OrderItemProcessor:
         try:
             page.locator(self.bot.selectors.item_search_input).first.wait_for(timeout=1000)
         except Exception:
+            logger.debug("order.wait_for_legacy_add_completion: wait failed (non-fatal)")
             pass
 
     def wait_for_warehouse_selection(self, page: Page) -> None:
@@ -128,6 +133,7 @@ class OrderItemProcessor:
                 state="hidden", timeout=1000
             )
         except Exception:
+            logger.debug("order.wait_for_warehouse_selection: wait failed (non-fatal)")
             pass
 
     def order_surface_selector(self) -> str:
@@ -142,11 +148,13 @@ class OrderItemProcessor:
             page.locator(self.bot.selectors.item_search_input).first.wait_for(timeout=1500)
             return True
         except Exception:
+            logger.debug("order.order_surface_ready: check failed (non-fatal)")
             return False
 
     def prepare_order_page(self, page: Page) -> None:
         """Open the site and navigate to the ordering surface for item processing."""
-        page.goto(self.bot._products_page_url(), wait_until="domcontentloaded")
+        from ..auth.tawreed_session import resilient_goto
+        resilient_goto(page, self.bot._products_page_url(), self.bot.config.runtime.timeout_ms)
         maybe_switch_pharmacy(page, self.bot.profile.pharmacy_switch or {})
         if self.order_surface_ready(page):
             return

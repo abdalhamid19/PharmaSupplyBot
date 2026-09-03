@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
+from typing import Any
 
 from .tawreed_api_contract_base import DEFAULT_CONTRACT_PATH
+
+
+logger = logging.getLogger(__name__)
 
 
 def begin_api_contract_capture(page) -> list[dict[str, Any]]:
@@ -41,6 +46,7 @@ def _request_body(request) -> dict[str, Any]:
         body = request.post_data_json
         return body() if callable(body) else body
     except Exception:
+        logger.debug("api._request_body: bad JSON (non-fatal)")
         return {}
 
 
@@ -75,6 +81,7 @@ def _capture_request_details(request, captured):
     try:
         post_data = request.post_data_json
     except Exception:
+        logger.debug("api._capture_request_details: capture failed (non-fatal)")
         post_data = None
     
     captured.append({
@@ -104,9 +111,12 @@ def save_captured_requests(
 
 
 def _print_capture_summary(count, output_file):
-    """Print capture summary."""
-    print(f"[API Discovery] Captured {count} requests")
-    print(f"[API Discovery] Saved to: {output_file}")
+    """Log the capture summary at INFO level."""
+    logger.info("API discovery captured requests", extra={"count": count})
+    logger.info(
+        "API discovery saved capture",
+        extra={"output_file": str(output_file)},
+    )
 
 
 def analyze_add_to_cart_payload(captured_file: Path) -> dict[str, Any]:

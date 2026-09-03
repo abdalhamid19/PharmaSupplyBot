@@ -27,11 +27,6 @@ class RunQualityMetrics:
     no_results: int = 0
     matched_but_unavailable: int = 0
     not_orderable: int = 0
-    ai_verified: int = 0
-    ai_searched: int = 0
-    ai_reviewed: int = 0
-    ai_rejected: int = 0
-    ai_low_confidence: int = 0
     deterministic_matched: int = 0
     category_counts: dict[str, int] = field(default_factory=dict)
     status_counts: dict[str, int] = field(default_factory=dict)
@@ -61,7 +56,6 @@ class RunQualityMetrics:
         """Return a human-readable quality report string."""
         lines = ["=" * 60, "ORDER MATCHING QUALITY REPORT", "=" * 60, ""]
         lines.extend(self._format_summary_section())
-        lines.extend(self._format_ai_section())
         lines.extend(self._format_status_section())
         lines.extend(self._format_category_section())
         lines.append("=" * 60)
@@ -77,19 +71,6 @@ class RunQualityMetrics:
             f"No results:                 {self.no_results} ({self.no_results_rate}%)",
             f"Matched but unavailable:    {self.matched_but_unavailable}",
             f"Not orderable:              {self.not_orderable}",
-            "",
-        ]
-
-    def _format_ai_section(self):
-        """Format AI decision breakdown section."""
-        return [
-            "--- AI Decision Breakdown ---",
-            f"Deterministic matched:      {self.deterministic_matched}",
-            f"AI verified:                {self.ai_verified}",
-            f"AI search accepted:         {self.ai_searched}",
-            f"AI reviewed:                {self.ai_reviewed}",
-            f"AI rejected:                {self.ai_rejected}",
-            f"AI low confidence:          {self.ai_low_confidence}",
             "",
         ]
 

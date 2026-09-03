@@ -1,17 +1,155 @@
 {
   "version": 1,
   "skills": {
+    "Pytest Testing": {
+      "source": "pluginagentmarketplace/custom-plugin-python",
+      "sourceType": "github",
+      "skillPath": "skills/pytest-testing/SKILL.md",
+      "computedHash": "4866a177efbeae4ebca8104a3f7870bd21ab8f729f872b54e3ae7a58aa317bdc"
+    },
+    "addressing-pr-review-comments": {
+      "source": "streamlit/streamlit",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/addressing-pr-review-comments/SKILL.md",
+      "computedHash": "11d322e0a6e73ee46b9d2a03ac1dd00e9a4b0c9e9275db961379bfaccaed139b"
+    },
+    "agent-browser": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "skillPath": "skills/agent-browser/SKILL.md",
+      "computedHash": "a674b7d81066e3cc471a7512ddb4ae724418cbfefa75cbb050b0dc430e4d57a0"
+    },
+    "ai": {
+      "source": "vercel-labs/ai-python",
+      "sourceType": "github",
+      "skillPath": "skills/ai/SKILL.md",
+      "computedHash": "6a34cbfe65cde487e2e991dbad820488deb674ac1649eeebaa21674657515854"
+    },
+    "cra-to-next-migration": {
+      "source": "vercel-labs/migration-skills",
+      "sourceType": "github",
+      "skillPath": "cra-to-next-migration/SKILL.md",
+      "computedHash": "2c6d0f84ec8ddaeec2648e8d174fd254b1b470e68f05bab512b5fb2eed2da13e"
+    },
+    "d3k": {
+      "source": "vercel-labs/dev3000",
+      "sourceType": "github",
+      "skillPath": "skills/d3k/SKILL.md",
+      "computedHash": "6462ff3b28aaec3ba02f8419e4a6faace3ccb69165bf0da8f55a7da93393e2d3"
+    },
+    "debugging-streamlit": {
+      "source": "streamlit/streamlit",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/debugging-streamlit/SKILL.md",
+      "computedHash": "0dc44e0fbc557ea8eba6a81a498102c0979734d4309f4e4e225a58ae9c5641c0"
+    },
+    "developing-with-streamlit": {
+      "source": "streamlit/agent-skills",
+      "sourceType": "github",
+      "skillPath": "developing-with-streamlit/SKILL.md",
+      "computedHash": "128c0acf5db60266b0fb0440c4064fccb7adba0a90d07259b4adddf0e4f39c78"
+    },
+    "executing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/executing-plans/SKILL.md",
+      "computedHash": "78a07800ee99a5861ae10be59d79fad085fdca10444e8aaeb2691597e357cff8"
+    },
+    "finalizing-pr": {
+      "source": "streamlit/streamlit",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/finalizing-pr/SKILL.md",
+      "computedHash": "de9ab2fed885d41e085eead69fdc5a2bd0457f879de8f9159d81a3130740b8b9"
+    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",
       "skillPath": "skills/find-skills/SKILL.md",
-      "computedHash": "781bd6d3f9b19f8c9af6b53d8d0e4876d0183841b565db34ca7092ffa412d111"
+      "computedHash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf"
+    },
+    "fixing-streamlit-ci": {
+      "source": "streamlit/streamlit",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/fixing-streamlit-ci/SKILL.md",
+      "computedHash": "4fc239a28846ae85f4d744a1279eeff4a884e9443ff73cd5243077b6e0a3772f"
+    },
+    "implementing-feature": {
+      "source": "streamlit/streamlit",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/implementing-feature/SKILL.md",
+      "computedHash": "f8dbaa199616c3c535765e609196932eeafe89b7a3939621d4d4367498ab9415"
+    },
+    "next-cache-components-optimizer": {
+      "source": "vercel-labs/next.js",
+      "sourceType": "github",
+      "skillPath": "skills/next-cache-components-optimizer/SKILL.md",
+      "computedHash": "a45e680bcb933982e8d71e3b3f45b500ab1edc1aa94b1fbd95d8601776e19bed"
+    },
+    "playwright": {
+      "source": "oakoss/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/playwright/SKILL.md",
+      "computedHash": "179b5f5fbdac8388b6992baa8211fa50b87d02f207175e3ff7c1869999867423"
+    },
+    "portless": {
+      "source": "vercel-labs/portless",
+      "sourceType": "github",
+      "skillPath": "skills/portless/SKILL.md",
+      "computedHash": "6cf90b3cfe12f98878065f2feab6a2b040e2ef07c0f7a120814f44861034f9d5"
     },
     "skill-creator": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "skillPath": "skills/skill-creator/SKILL.md",
       "computedHash": "7e3c9cd74e9e2b4828527a857170e86310f2dab5ea8030a9043df2c7e6c88857"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "a2750dfbaed1690da73b120254892c4f926b4576cb82eb16fc877783941fe39b"
+    },
+    "tdd": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "c1ed8cd854c64d4d226097255d3fa662dae4a758a1462fadd63cc10e413d88d7"
+    },
+    "template-skill": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "template/SKILL.md",
+      "computedHash": "daf176f2cd0030d321982d3e813fd1a794a0b4744c5a92d2931a37001bb40fb9"
+    },
+    "typer": {
+      "source": "fastapi/typer",
+      "sourceType": "github",
+      "skillPath": "typer/.agents/skills/typer/SKILL.md",
+      "computedHash": "985e1078fae0bbb4acf314c34862229c84a52bfff8f761c95495ca66db3bf251"
+    },
+    "understanding-streamlit-architecture": {
+      "source": "streamlit/streamlit",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/understanding-streamlit-architecture/SKILL.md",
+      "computedHash": "391e7d469018035b49de284a112eb6facc1d0115ebd078238bab7c1fe64ced07"
+    },
+    "webapp-testing": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "computedHash": "3f14af7f5690695209c22fbf8c8d133769a86d64892602c09bb13f135e14e857"
+    },
+    "writing-plans": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/writing-plans/SKILL.md",
+      "computedHash": "27c75044e444a4fc68798c3f799dc23eaff3a6bfabff32e6ad75bb20f881c094"
+    },
+    "xlsx": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "skillPath": "cli-tool/components/skills/document-processing/xlsx/SKILL.md",
+      "computedHash": "3f00b01ef71a41442310e04d22d6827aa3d020e043ffd8c99f640a7593d69844"
     }
   }
 }

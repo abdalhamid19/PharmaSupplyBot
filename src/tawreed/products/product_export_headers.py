@@ -1,6 +1,7 @@
 """Tawreed product export header capture helpers."""
 
 from __future__ import annotations
+import logging
 
 import json
 from typing import TYPE_CHECKING, Any
@@ -15,6 +16,9 @@ from .tawreed_product_search import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def capture_product_search_headers(page: Page) -> dict[str, str]:
     """Return reusable Tawreed product-search headers from a browser request."""
     try:
@@ -22,6 +26,8 @@ def capture_product_search_headers(page: Page) -> dict[str, str]:
             _submit_blank_search(page)
         return _reusable_headers(response.value.request.headers)
     except Exception:
+        logger.debug("products.capture_product_search_headers: no headers captured")
+        logger.debug("products.export_headers: empty header capture")
         return {}
 
 
@@ -60,6 +66,7 @@ def _request_body(request: Any) -> dict[str, Any]:
     try:
         body = request.post_data_json
     except Exception:
+        logger.debug("products._request_body: bad post_data JSON")
         body = json.loads(request.post_data or "{}")
     if isinstance(body, dict):
         return body

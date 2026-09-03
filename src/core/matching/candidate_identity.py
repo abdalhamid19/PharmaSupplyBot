@@ -1,4 +1,4 @@
-"""Candidate identity helpers shared by matching, AI, and artifacts."""
+"""Candidate identity helpers shared by matching and artifacts."""
 
 from __future__ import annotations
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -9,6 +10,9 @@ if TYPE_CHECKING:
     from playwright.sync_api import Page
 
 from ..tawreed_login_detection import login_detected
+
+
+logger = logging.getLogger(__name__)
 
 
 def _initial_wait_state(wait_seconds: int) -> dict[str, int]:
@@ -95,8 +99,12 @@ def save_session_state(context, state_path: Path, is_intermediate: bool) -> None
     try:
         context.storage_state(path=str(state_path))
         if is_intermediate:
-            print(f"Saved intermediate session state: {state_path}")
+            logger.debug(
+                "saved intermediate session state",
+                extra={"state_path": str(state_path)},
+            )
     except Exception:
+        logger.debug("tawreed_session_state.save_session_state: best-effort state save failed")
         pass
 
 
@@ -111,7 +119,7 @@ def discard_session_state(state_path: Path) -> None:
     try:
         state_path.unlink(missing_ok=True)
     except Exception:
-        pass
+        logger.debug("tawreed_session_state.discard_session_state: best-effort discard failed")
 
 
 __all__ = [

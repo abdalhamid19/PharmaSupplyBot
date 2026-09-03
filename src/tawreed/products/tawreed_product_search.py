@@ -1,6 +1,9 @@
 """DOM-backed Tawreed product table search helpers."""
 
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
+
 
 import re
 import time
@@ -71,6 +74,7 @@ def _submit_product_search_with_api(page: Page, query: str) -> list[dict[str, An
             _submit_product_search(page, query)
         return _api_candidates(resp.value.json())
     except Exception:
+        logger.debug("products._submit_product_search_with_api: API submit failed (non-fatal)")
         return None
 
 def _search_response_pattern():
@@ -143,5 +147,6 @@ def _ready_product_rows(page: Page):
     try:
         rows.first.wait_for(timeout=1500)
     except Exception:
+        logger.debug("products._ready_product_rows: ready check failed (non-fatal)")
         return None
     return rows if rows.count() > 0 else None

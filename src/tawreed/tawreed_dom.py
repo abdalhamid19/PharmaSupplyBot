@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 from .tawreed_constants import MAX_DOM_SEARCH_ROWS
 from .tawreed_ui import is_no_results_row, visible_product_rows
+
+logger = logging.getLogger(__name__)
 
 _NUMERIC_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?")
 _OCR_ZERO_RE = re.compile(r"(?<=\d)[Oo](?=\b|[^A-Za-z0-9])")
@@ -66,6 +69,7 @@ def _badge_int(row, selector: str) -> int:
         text = _inner_text(row.locator(selector).first, FAST_OPTIONAL_TEXT_TIMEOUT_MS)
         return int(float(text.strip()))
     except Exception:
+        logger.debug("tawreed._badge_int: parse failed (non-fatal)")
         return 0
 
 
@@ -95,6 +99,7 @@ def _inner_text(locator, timeout_ms: int) -> str:
     try:
         return str(locator.inner_text(timeout=timeout_ms))
     except Exception:
+        logger.debug("tawreed._inner_text: extract failed (non-fatal)")
         return ""
 
 
@@ -111,6 +116,7 @@ def _row_unavailable_message(row) -> str:
     try:
         return _inner_text(row.locator("div[style*='color: red']").first, 300).strip()
     except Exception:
+        logger.debug("tawreed._row_unavailable_message: extract failed (non-fatal)")
         return ""
 
 
@@ -155,6 +161,7 @@ def _row_name_lines(row) -> list[str]:
         text = _inner_text(div, FAST_OPTIONAL_TEXT_TIMEOUT_MS).strip()
         return [line.strip() for line in text.splitlines() if line.strip()]
     except Exception:
+        logger.debug("tawreed._row_name_lines: extract failed (non-fatal)")
         return []
 
 

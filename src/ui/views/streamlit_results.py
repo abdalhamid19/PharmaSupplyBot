@@ -8,7 +8,6 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from ...core.ordering.order_ai_artifacts import summarize_order_ai_rows
 from ..streamlit_shared import (
     ARTIFACTS_DIR,
     load_csv_rows,
@@ -95,16 +94,7 @@ def render_run_table(run_dir: Path, title: str, pattern: str) -> None:
     rows = load_csv_rows(paths[0])
     if rows:
         st.subheader(title)
-        if title == "Order AI Trace":
-            render_order_ai_trace_summary(rows)
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-
-
-def render_order_ai_trace_summary(rows: list[dict[str, str]]) -> None:
-    """Render compact AI/API trace grouping before the full table."""
-    summary = summarize_order_ai_rows(rows)
-    if summary:
-        st.dataframe(pd.DataFrame(summary), use_container_width=True, hide_index=True)
 
 
 def render_recent_run_files(run_dir: Path) -> None:
@@ -164,7 +154,7 @@ def render_run_dir_results(command: str, profile_key: str, run_dir: Path) -> Non
     if summary_rows:
         render_timing_metrics(summary_rows)
         st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
-    render_run_table(run_dir, "Order AI Trace", "order_ai_trace_*.csv")
+    render_run_table(run_dir, "Order Matching Trace", "order_matching_trace_*.csv")
     render_recent_run_files(run_dir)
 
 
@@ -277,7 +267,6 @@ __all__ = [
     "render_profile_summaries",
     "render_fresh_run_analysis",
     "render_run_table",
-    "render_order_ai_trace_summary",
     "render_recent_run_files",
     "render_recent_artifact_files",
 ]

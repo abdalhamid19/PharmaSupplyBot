@@ -119,7 +119,6 @@ def _handle_api_no_match(
         _raise_non_orderable_exception(bot, item, results)
 
     decision = _api_match_decision(bot, item, results, review_decision)
-    decision = bot.resolve_order_ai_decision(item, decision)
     write_match_log(bot, item, decision)
     if decision.best_match:
         return _accepted_api_match(bot, item, decision, require_available)
