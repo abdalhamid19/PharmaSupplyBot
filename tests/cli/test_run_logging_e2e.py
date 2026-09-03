@@ -1,8 +1,7 @@
 """End-to-end tests for the unified logging integration.
 
 These tests invoke ``run.py`` as a subprocess for every public command
-(``auth``, ``order``, ``match-products``, ``remove-cart``,
-``export-products``) and verify:
+(``auth``, ``order``, ``remove-cart``, ``export-products``) and verify:
 
 * The right exit code is returned.
 * ``logs/app.log`` is created and contains records.
@@ -96,7 +95,6 @@ def config_file(tmp_path: Path) -> Path:
         # Each command's --help must succeed with exit 0.
         (["auth", "--help"], 0),
         (["order", "--help"], 0),
-        (["match-products", "--help"], 0),
         (["remove-cart", "--help"], 0),
         (["export-products", "--help"], 0),
         # auth with an unknown profile must fail with ValidationError
@@ -106,7 +104,6 @@ def config_file(tmp_path: Path) -> Path:
     ids=[
         "auth-help",
         "order-help",
-        "match-products-help",
         "remove-cart-help",
         "export-products-help",
         "auth-bad-profile",

@@ -1,7 +1,7 @@
 """Typer + Rich CLI application for PharmaSupplyBot.
 
-Five subcommands (registered incrementally in Tasks 6-10):
-``auth``, ``order``, ``remove-cart``, ``export-products``, ``match-products``.
+Four subcommands (registered incrementally in Tasks 6-10):
+``auth``, ``order``, ``remove-cart``, ``export-products``.
 
 Each subcommand is a thin adapter that:
 
@@ -246,35 +246,6 @@ def export_products_cmd(
 ) -> None:
     """Export all Tawreed store products to CSV, XLSX, and TXT."""
     raise typer.Exit(_run_registered(ctx, "export-products"))
-
-
-@app.command("match-products")
-def match_products_cmd(
-    ctx: Context,
-    config: str = typer.Option(
-        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
-    ),
-    profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
-    all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
-    preset: str | None = typer.Option(None, "--preset", help="User-config preset name."),
-    excel: str = typer.Option(..., "--excel", "-x", help="Inventory Excel/CSV file."),
-    tawreed_csv: str | None = typer.Option(
-        None, "--tawreed-csv", help="Tawreed products CSV path."
-    ),
-    output: str | None = typer.Option(None, "--output", help="Output CSV path."),
-    limit: int | None = typer.Option(None, "--limit", "-n", help="Limit items."),
-    start: int | None = typer.Option(None, "--start", help="Start item index."),
-    end: int | None = typer.Option(None, "--end", help="End item index."),
-    resume: bool = typer.Option(False, "--resume", help="Resume from saved state."),
-    trace: bool = typer.Option(False, "--trace", help="Trace mode."),
-    threshold: int = typer.Option(80, "--threshold", help="Score threshold."),
-    format: str | None = typer.Option(
-        None, "--format",
-        help="Output format: human (default, TTY-only), json, or plain.",
-    ),
-) -> None:
-    """Match an inventory Excel/CSV file against exported Tawreed products."""
-    raise typer.Exit(_run_registered(ctx, "match-products"))
 
 
 @app.command("remove-cart")

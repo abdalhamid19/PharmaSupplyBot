@@ -10,8 +10,20 @@ Such handlers silently hide failures from the operator.
 
 | Metric | Count |
 |--------|------:|
-| Swallowed `except Exception` handlers in `src/` | 0 |
+| Swallowed `except Exception` handlers in `src/` | 1 |
 | Files in allowlist (intentional) | 5 |
+
+## Per-file breakdown
+
+| File | Count |
+|------|------:|
+| `src\core\database\order_runs_read.py` | 1 |
+
+## All occurrences
+
+| File:Line | Function | Snippet |
+|-----------|----------|---------|
+| `src\core\database\order_runs_read.py:98` | `database_is_ready` | `except Exception:` |
 
 ## Allowlist
 

@@ -13,8 +13,6 @@ TARGETS = [
     *sorted((ROOT / "src").rglob("*.py")),
 ]
 EXCEPTED_FILE_LENGTHS = {
-    "src/core/drug_matching/indexer.py",
-    "src/core/drug_matching/normalizer.py",
     "src/core/matching_rules.py",
     "src/core/product_matching.py",
     "src/tawreed/tawreed.py",
@@ -27,7 +25,6 @@ EXCEPTED_FILE_LENGTHS = {
     "src/cli/cli_order.py",
     "src/cli/cli_parser.py",
     "src/cli/item_worker.py",
-    "src/cli/cli_match_products.py",
     "src/ui/streamlit_order.py",
     "src/ui/streamlit_remove_cart.py",
     "src/ui/streamlit_results.py",

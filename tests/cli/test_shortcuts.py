@@ -50,14 +50,6 @@ def test_remove_cart_accepts_x_shortcut_for_excel() -> None:
     assert captured["cmd"] == "remove-cart"
 
 
-def test_match_products_accepts_x_shortcut_for_excel() -> None:
-    captured: dict = {"excel": None, "cmd": None}
-    result = _invoke(["match-products", "-x", "data/m.xlsx"], captured)
-    assert result.exit_code == 0
-    assert captured["excel"] == "data/m.xlsx"
-    assert captured["cmd"] == "match-products"
-
-
 def test_export_products_does_not_accept_x_shortcut() -> None:
     """``-x`` is not part of the export-products surface; long forms are."""
     runner = CliRunner()
@@ -86,16 +78,6 @@ def test_export_products_accepts_n_shortcut_for_limit() -> None:
     assert result.exit_code == 0
     assert captured["limit"] == 10
     assert captured["cmd"] == "export-products"
-
-
-def test_match_products_accepts_n_shortcut_for_limit() -> None:
-    captured: dict = {"limit": None, "cmd": None}
-    result = _invoke(
-        ["match-products", "--excel", "data.xlsx", "-n", "3"],
-        captured,
-    )
-    assert result.exit_code == 0
-    assert captured["limit"] == 3
 
 
 # ─────────────────────────── -p / --profile ────────────────────────────

@@ -58,10 +58,10 @@ def pytest_raises(exc_type, match=None):
 
 
 def test_real_cli_commands_are_registered() -> None:
-    """The five production subcommands must be present in the registry."""
+    """The four production subcommands must be present in the registry."""
     # Import the module so the @register decorators fire
     from src.cli import cli_commands  # noqa: F401
 
-    expected = {"auth", "order", "remove-cart", "export-products", "match-products"}
+    expected = {"auth", "order", "remove-cart", "export-products"}
     missing = expected - set(COMMANDS)
     assert not missing, f"missing commands in registry: {missing}"

@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from difflib import SequenceMatcher
 
-from src.core.drug_matching.normalization.normalizer_manufacturer_extraction import (
+from src.core.normalization.normalizer_manufacturer_extraction import (
     KNOWN_MANUFACTURERS,
 )
 from src.core.matching.product_matching_helpers import normalize_text
