@@ -285,18 +285,21 @@ def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:
         if mode == "Existing file":
             if excel_options:
                 select_all_key = f"excel_target_select_all_{target_key}"
+                selection_key = f"excel_target_path_{target_key}"
+                previous_select_all = st.session_state.get(select_all_key, False)
                 select_all = st.checkbox(
                     "Select all",
                     value=False,
                     key=select_all_key,
                     help="Tick to include every .xlsx in data/input/excel target/.",
                 )
-                default_selection: list[str] = list(excel_options) if select_all else []
-                selection_key = f"excel_target_path_{target_key}"
+                if select_all and not previous_select_all:
+                    st.session_state[selection_key] = list(excel_options)
+                elif not select_all and previous_select_all:
+                    st.session_state[selection_key] = []
                 chosen = st.multiselect(
                     "Catalog files",
                     excel_options,
-                    default=default_selection,
                     key=selection_key,
                     label_visibility="collapsed",
                     help="Pick one or more catalogs. Tick 'Select all' to include every .xlsx.",
