@@ -297,14 +297,21 @@ def render_excel_target_sources(app_config) -> dict[str, dict[str, object]]:
                     st.session_state[selection_key] = list(excel_options)
                 elif not select_all and previous_select_all:
                     st.session_state[selection_key] = []
-                chosen = st.multiselect(
-                    "Catalog files",
-                    excel_options,
-                    key=selection_key,
-                    label_visibility="collapsed",
-                    help="Pick one or more catalogs. Tick 'Select all' to include every .xlsx.",
-                )
-                paths = [str(p) for p in chosen]
+                if select_all:
+                    st.caption(
+                        f"All {len(excel_options)} catalog file(s) selected. "
+                        "Untick to pick a subset."
+                    )
+                    paths = [str(p) for p in excel_options]
+                else:
+                    chosen = st.multiselect(
+                        "Catalog files",
+                        excel_options,
+                        key=selection_key,
+                        label_visibility="collapsed",
+                        help="Pick one or more catalogs. Tick 'Select all' to include every .xlsx.",
+                    )
+                    paths = [str(p) for p in chosen]
             else:
                 paths = [
                     str(
