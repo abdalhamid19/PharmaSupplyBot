@@ -15,7 +15,7 @@ class TawreedResolveTests(unittest.TestCase):
     """Tawreed rows preserve the two distinct prices and only those."""
 
     def test_both_prices_preserved_with_net(self) -> None:
-        """Net equals purchase after discount."""
+        """Net equals purchase: the Tawreed purchase is already discounted."""
         store = {
             "retailPrice": 147.0,
             "salePrice": 116.13,
@@ -25,7 +25,8 @@ class TawreedResolveTests(unittest.TestCase):
         self.assertAlmostEqual(resolved.public_price or 0, 147.0)
         self.assertAlmostEqual(resolved.purchase_price or 0, 116.13)
         self.assertAlmostEqual(resolved.discount_percent, 21.0)
-        self.assertAlmostEqual(resolved.net_price or 0, 91.74, places=2)
+        # Net equals purchase — never apply the discount a second time.
+        self.assertAlmostEqual(resolved.net_price or 0, 116.13)
         self.assertEqual(resolved.price_provenance, "tawreed_both")
 
     def test_only_public_keeps_purchase_null(self) -> None:
@@ -59,13 +60,17 @@ class ExcelResolveTests(unittest.TestCase):
     """Excel rows carry a single price; the rule depends on ``priceMeaning``."""
 
     def test_public_with_discount_derives_purchase(self) -> None:
-        """Default: column "سعر" is retail, purchase is derived."""
+        """Default: column "سعر" is retail, purchase is derived.
+
+        Net equals the derived purchase — applying the discount a second
+        time would double-count it.
+        """
         store = {"price": 200.0, "discountPercent": 10.0}
         resolved = resolve_store_prices(store, source_kind="excel_target")
         self.assertAlmostEqual(resolved.public_price or 0, 200.0)
         self.assertAlmostEqual(resolved.purchase_price or 0, 180.0)
         self.assertAlmostEqual(resolved.discount_percent, 10.0)
-        self.assertAlmostEqual(resolved.net_price or 0, 162.0)
+        self.assertAlmostEqual(resolved.net_price or 0, 180.0)
         self.assertEqual(
             resolved.price_provenance, "excel_public_implies_purchase"
         )

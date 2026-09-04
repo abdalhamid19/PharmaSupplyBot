@@ -76,12 +76,29 @@ def _read_discount(store: dict[str, Any]) -> float:
     return discount_percent_value(store)
 
 
-def _net_price(purchase: float | None, public: float | None, discount: float) -> float | None:
-    """Return ``purchase × (1 − discount)`` when possible, else fall back to public."""
-    rate = max(0.0, 1.0 - discount / 100.0)
+def _net_price(
+    purchase: float | None,
+    public: float | None,
+    discount: float,
+    provenance: PriceProvenance = "unknown",
+) -> float | None:
+    """Return the price the pharmacy effectively pays.
+
+    Two cases:
+    - Tawreed (or any row with both prices set independently): the API
+      already returns the discounted purchase price, so ``net`` equals
+      ``purchase``.
+    - Excel target with a single column (``excel_public_implies_purchase``
+      or ``excel_purchase_implies_public``): the column already encodes
+      the public price, and the resolver derives purchase from it. The
+      net therefore equals ``purchase`` too — applying the discount
+      again would double-count it.
+    - When only ``public`` is known: ``net = public × (1 − discount)``.
+    """
     if purchase is not None:
-        return round(purchase * rate, 2)
+        return round(purchase, 2)
     if public is not None:
+        rate = max(0.0, 1.0 - discount / 100.0)
         return round(public * rate, 2)
     return None
 
@@ -173,7 +190,7 @@ def resolve_store_prices(
                 purchase_price = None
                 provenance = "unknown"
 
-    net = _net_price(purchase_price, public_price, discount)
+    net = _net_price(purchase_price, public_price, discount, provenance)
 
     return ResolvedPrices(
         public_price=public_price,
