@@ -27,6 +27,14 @@ class ExcelTargetConfig:
     that the matching engine searches in addition to the live Tawreed
     profiles. The matching algorithm is identical; only the search surface
     changes (in-memory catalog scan instead of HTTP/API/Playwright).
+
+    ``price_meaning`` declares what the single ``price_col`` represents in
+    this catalog. The default ``"public_with_discount"`` treats the column
+    as the retail price (what the end customer pays) and derives the
+    pharmacy purchase price from ``public × (1 − discount)``.
+    ``"purchase_only"`` treats the column as already-discounted and
+    mirrors it into both price fields. ``"public_only"`` leaves the
+    purchase side ``NULL``.
     """
 
     name_col: str
@@ -37,6 +45,7 @@ class ExcelTargetConfig:
     sheet: str = ""
     header_row: int = 0
     enabled: bool = True
+    price_meaning: str = "public_with_discount"
 
     @property
     def requires_code(self) -> bool:

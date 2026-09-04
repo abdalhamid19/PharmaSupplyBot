@@ -70,8 +70,22 @@ class TestExcelTargetLoader(TestCase):
         self.assertEqual(candidate["productNameEn"], "DECLOPHEN GEL")
         self.assertEqual(candidate["availableQuantity"], 1)
         self.assertEqual(candidate["discountPercent"], 2.0)
-        self.assertEqual(candidate["salePrice"], 55.0)
+        self.assertEqual(candidate["price"], 55.0)
         self.assertTrue(candidate["excelTarget"])
+        self.assertEqual(candidate["priceMeaning"], "public_with_discount")
+
+    def test_target_product_purchase_only_uses_saleprice_key(self) -> None:
+        """Purchase-only catalog exposes ``salePrice`` so the matcher reads it."""
+        product = TargetProduct(
+            code="ABC",
+            name="DECLOPHEN GEL",
+            price=55.0,
+            discount_percent=0.0,
+            price_meaning="purchase_only",
+        )
+        candidate = product.to_candidate_dict()
+        self.assertEqual(candidate["salePrice"], 55.0)
+        self.assertNotIn("price", candidate)
 
     def test_target_product_records_source_file(self) -> None:
         product = TargetProduct(

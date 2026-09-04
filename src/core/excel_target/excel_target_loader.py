@@ -35,6 +35,9 @@ class TargetProduct:
     discount_percent: float
     source_file: str = ""
     raw: dict[str, Any] = field(default_factory=dict)
+    price_meaning: str = "public_with_discount"
+    public_price: float | None = None
+    purchase_price: float | None = None
 
     def to_candidate_dict(self) -> dict[str, Any]:
         """Return the candidate dict shape consumed by the core matcher.
@@ -43,20 +46,35 @@ class TargetProduct:
         ``availableQuantity``, ``discountPercent`` and ``salePrice`` from
         each candidate. We populate those keys so the same scoring engine
         works on Excel catalog rows without modification.
+
+        The candidate also carries ``priceMeaning`` and (when the catalog
+        declares them) explicit ``publicPrice`` / ``salePrice`` columns so
+        the pricing resolver knows whether to derive or trust each side.
         """
-        return {
+        candidate: dict[str, Any] = {
             "productNameEn": self.name,
             "productNameEnFallback": self.name,
             "productName": self.name,
             "availableQuantity": 1,
             "productsCount": 1,
             "discountPercent": float(self.discount_percent or 0.0),
-            "salePrice": float(self.price or 0.0),
             "storeProductId": self.code or f"row:{abs(hash(self.name))}",
             "excelTarget": True,
             "excelTargetSourceFile": self.source_file,
             "excelTargetRaw": dict(self.raw),
+            "priceMeaning": self.price_meaning,
         }
+        if self.price_meaning == "purchase_only":
+            candidate["salePrice"] = float(self.price or 0.0)
+        else:
+            candidate["price"] = float(self.price or 0.0)
+        if self.public_price is not None:
+            candidate["publicPrice"] = float(self.public_price)
+            candidate["public_price_col_value"] = float(self.public_price)
+        if self.purchase_price is not None:
+            candidate["salePrice"] = float(self.purchase_price)
+            candidate["purchase_price_col_value"] = float(self.purchase_price)
+        return candidate
 
 
 _HEADER_NORMALIZE_RE = re.compile(r"\s+")
@@ -218,6 +236,7 @@ def _row_to_product(
         discount_percent=discount,
         source_file=source_file,
         raw=raw,
+        price_meaning=getattr(config, "price_meaning", "public_with_discount"),
     )
 
 

@@ -54,6 +54,11 @@ warehouse_strategy:
   mode: "first_available"
   # Set to 0 to allow any discount, or e.g. 12 to require stores with >= 12% discount.
   min_discount_percent: 0
+  # When true, the cross-source reconciliation ranks stores by the
+  # purchase price after discount (``public × (1 − discount)``) instead
+  # of the raw ``purchase_price``. Default false so existing runs stay
+  # reproducible; flip on with the CLI flag ``--sort-by-net``.
+  sort_by_net: false
   
   # Preferred warehouses (highest to lowest priority)
   # When discounts are equal (within 0.3%), prefer these warehouses in order

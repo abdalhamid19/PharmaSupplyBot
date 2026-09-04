@@ -51,6 +51,9 @@ def build_excel_targets(
 def build_excel_target(raw_values: Any) -> ExcelTargetConfig:
     """Build one Excel target config from its raw YAML dictionary."""
     values = dict(raw_values or {})
+    price_meaning = str(values.get("price_meaning", "public_with_discount"))
+    if price_meaning not in {"public_with_discount", "purchase_only", "public_only"}:
+        price_meaning = "public_with_discount"
     return ExcelTargetConfig(
         name_col=str(values.get("name_col", DEFAULT_TARGET_NAME_COLUMN)),
         price_col=str(values.get("price_col", DEFAULT_TARGET_PRICE_COLUMN)),
@@ -60,6 +63,7 @@ def build_excel_target(raw_values: Any) -> ExcelTargetConfig:
         sheet=str(values.get("sheet", "")),
         header_row=int(values.get("header_row", 0)),
         enabled=_as_bool(values.get("enabled"), True),
+        price_meaning=price_meaning,
     )
 
 

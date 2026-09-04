@@ -2,13 +2,27 @@
 
 Reuses the Tawreed pricing helpers the ordering strategy already relies on, so
 a stored discount always equals the discount the strategy compared against.
+
+The actual rule for turning a candidate dict into public/purchase prices lives
+in :mod:`src.core.pricing.store_price_resolution`; this module keeps the legacy
+flat-field API (``store_price_fields``) as a thin shim so existing call-sites
+keep working.
 """
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Any, Iterable, Literal
 
 from ..matching.candidate_identity import candidate_store_product_id
+from ..pricing import (
+    DEFAULT_EXCEL_PRICE_MEANING,
+    PROVENANCE_LABELS,
+    PriceProvenance,
+    ResolvedPrices,
+    SourceKind,
+    resolve_store_prices,
+    resolved_to_store_price_fields,
+)
 from .order_runs_values import as_int, as_optional_float
 
 SYNTHETIC_ID_PREFIX = "dom-row-"
@@ -16,20 +30,36 @@ PUBLIC_PRICE_KEYS = ("retailPrice", "publicPrice", "price", "sellingPrice")
 PURCHASE_PRICE_KEYS = ("salePrice", "salesPrice")
 
 
-def store_price_fields(store: dict[str, Any]) -> dict[str, Any]:
+def store_price_fields(
+    store: dict[str, Any],
+    *,
+    source_kind: SourceKind = "tawreed",
+    excel_price_meaning: Literal[
+        "public_with_discount", "purchase_only", "public_only"
+    ] = DEFAULT_EXCEL_PRICE_MEANING,
+) -> dict[str, Any]:
     """Return the price, discount, and currency fields for one store row.
 
     ``public_price`` is the retail price and ``purchase_price`` is what the
     pharmacy actually pays. The CSV artifacts name these two the other way
     round (``winner_sale_price`` holds the retail price); the database uses the
     accurate names on purpose.
+
+    For ``excel_target`` rows whose single price column means
+    ``public_with_discount`` (the default), ``purchase_price`` is derived
+    from ``public_price`` and ``discount_percent`` so every snapshot row
+    carries both columns.
     """
-    return {
-        "public_price": _first_price(store, PUBLIC_PRICE_KEYS),
-        "purchase_price": _first_price(store, PURCHASE_PRICE_KEYS),
-        "discount_percent": discount_percent_value(store),
-        "currency": str(store.get("currency") or "").strip(),
-    }
+    resolved = resolve_store_prices(
+        store,
+        source_kind=source_kind,
+        excel_price_meaning=excel_price_meaning,
+    )
+    fields = resolved_to_store_price_fields(resolved)
+    fields["currency"] = str(store.get("currency") or "").strip()
+    fields["price_provenance"] = resolved.price_provenance
+    fields["net_price"] = resolved.net_price
+    return fields
 
 
 def discount_percent_value(store: dict[str, Any]) -> float:
@@ -77,8 +107,14 @@ __all__ = [
     "SYNTHETIC_ID_PREFIX",
     "PUBLIC_PRICE_KEYS",
     "PURCHASE_PRICE_KEYS",
+    "PriceProvenance",
+    "PROVENANCE_LABELS",
+    "ResolvedPrices",
+    "SourceKind",
+    "DEFAULT_EXCEL_PRICE_MEANING",
     "store_price_fields",
     "discount_percent_value",
     "ordered_quantity_by_product",
     "is_synthetic_product_id",
+    "resolve_store_prices",
 ]

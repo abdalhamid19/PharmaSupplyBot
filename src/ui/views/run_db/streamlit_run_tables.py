@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from ....core.database.order_runs_read import fetch_item_stores
+from ....core.pricing import PROVENANCE_LABELS
 
 STATUS_LABELS = {
     "added-to-cart": "🛒 added",
@@ -74,6 +75,7 @@ def render_item_stores_expander(items: list[dict[str, Any]], run_key: str) -> No
         st.info("No offering-store snapshots stored for this run.")
         return
     st.markdown("**Offering stores per item**")
+    _render_pricing_help_banner(run_key)
     for item in unique_items:
         snapshot_rows = fetch_item_stores(run_key, item["item_key"])
         store_count = len(snapshot_rows) if snapshot_rows else 0
@@ -97,6 +99,45 @@ STORE_SOURCE_LABELS = {
     "excel-target": "📊 Excel target",
 }
 
+EXCEL_PROVENANCE_PREFIX = "excel_"
+
+PRICING_HELP_TEXT = (
+    "💡 **Public** = price the warehouse charges end customers. "
+    "**Purchase** = price the pharmacy actually pays. "
+    "**Net** = purchase after the discount. "
+    "For Excel targets the file lists only the public price; "
+    "the purchase price is derived as `public × (1 − discount%)`."
+)
+
+EXCEL_RUN_CAPTION = (
+    "📊 This run includes Excel-target stores. Their public and purchase "
+    "prices are identical by definition — only the net price (after "
+    "discount) and the discount % vary."
+)
+
+
+def _render_pricing_help_banner(run_key: str) -> None:
+    """Show the pricing help text and the Excel-specific caption when relevant."""
+    st.caption(PRICING_HELP_TEXT)
+    try:
+        any_excel = _run_has_excel_rows(run_key)
+    except Exception:
+        any_excel = False
+    if any_excel:
+        st.caption(EXCEL_RUN_CAPTION)
+
+
+def _run_has_excel_rows(run_key: str) -> bool:
+    """Return whether any ``run_item_stores`` row for the run is from Excel."""
+    from ....core.database.order_runs_read import order_runs_connection
+
+    sql = (
+        "select 1 from run_item_stores where run_key = ? and source = "
+        "'excel_target' limit 1"
+    )
+    rows = order_runs_connection(None).execute_query(sql, (run_key,))
+    return bool(rows)
+
 
 def _render_store_table(run_key: str, item_key: str) -> None:
     """Fetch and render one item's store rows, winner first."""
@@ -110,7 +151,28 @@ def _render_store_table(run_key: str, item_key: str) -> None:
         frame["source"] = frame["source"].map(
             lambda value: STORE_SOURCE_LABELS.get(value, value) if value else "—"
         )
+    frame = _enrich_pricing_columns(frame)
     st.dataframe(frame, use_container_width=True, hide_index=True)
+
+
+def _enrich_pricing_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    """Add ``Net price``, ``Margin %`` and ``Provenance`` columns when useful."""
+    if frame.empty:
+        return frame
+    if {"public_price", "purchase_price"}.issubset(frame.columns):
+        public = pd.to_numeric(frame["public_price"], errors="coerce")
+        purchase = pd.to_numeric(frame["purchase_price"], errors="coerce")
+        discount = pd.to_numeric(frame.get("discount_percent"), errors="coerce")
+        rate = (1.0 - discount.fillna(0.0) / 100.0).clip(lower=0.0)
+        net = purchase.where(purchase.notna(), public).mul(rate)
+        frame["net_price"] = net.round(2)
+        margin = (public - purchase) / public.replace({0: pd.NA})
+        frame["margin_percent"] = margin.mul(100).round(2)
+    if "price_provenance" in frame.columns:
+        frame["provenance"] = frame["price_provenance"].map(
+            lambda v: PROVENANCE_LABELS.get(v, v or "—")
+        )
+    return frame
 
 
 def _check_mark(value: Any) -> str:

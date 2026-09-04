@@ -36,6 +36,9 @@ def apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> No
         app_config.warehouse_strategy["min_discount_percent"] = float(
             min_discount_percent
         )
+    sort_by_net = getattr(args, "sort_by_net", None)
+    if sort_by_net is not None:
+        app_config.warehouse_strategy["sort_by_net"] = bool(sort_by_net)
 
 
 def resolve_max_workers(
@@ -226,6 +229,9 @@ def _reconcile_cross_source_winners(
     options = database.persistence_options() if database else {}
     db_path = options.get("path") or default_order_runs_db()
     run_key = f"{profile_key}/{run_id}"
+    sort_by_net = bool(
+        (getattr(app_config, "warehouse_strategy", {}) or {}).get("sort_by_net")
+    )
     try:
         # Touch the store so any pending migration runs.
         OrderRunsStore(db_path)
@@ -235,23 +241,27 @@ def _reconcile_cross_source_winners(
                 """
                 select ris.item_key, ris.source, ris.store_key,
                        ris.store_product_id, ris.purchase_price,
-                       ris.discount_percent
+                       ris.public_price, ris.discount_percent
                   from run_item_stores ris
                  where ris.run_key = ?
                 """,
                 (run_key,),
             ).fetchall()
             by_item: dict[str, dict] = {}
-            for item_key, source, store_key, store_pid, price, discount in winners:
+            for (
+                item_key, source, store_key, store_pid,
+                purchase_price, public_price, discount,
+            ) in winners:
                 candidate = {
                     "source": source,
                     "store_key": store_key,
                     "store_product_id": store_pid,
-                    "purchase_price": price,
+                    "purchase_price": purchase_price,
+                    "public_price": public_price,
                     "discount_percent": discount,
                 }
                 current = by_item.get(item_key)
-                if current is None or _cheaper(candidate, current):
+                if current is None or _cheaper(candidate, current, sort_by_net):
                     by_item[item_key] = candidate
 
             conn.execute(
@@ -307,13 +317,39 @@ def _reconcile_cross_source_winners(
         )
 
 
-def _cheaper(candidate: dict, current: dict) -> bool:
+def _net_for(row: dict) -> float | None:
+    """Return the purchase-after-discount value when both inputs are present."""
+    purchase = row.get("purchase_price")
+    if purchase is None:
+        purchase = row.get("public_price")
+    if purchase is None:
+        return None
+    discount = row.get("discount_percent") or 0.0
+    rate = max(0.0, 1.0 - float(discount) / 100.0)
+    return round(float(purchase) * rate, 2)
+
+
+def _cheaper(candidate: dict, current: dict, sort_by_net: bool = False) -> bool:
     """Return whether ``candidate`` should beat ``current`` for the winner spot.
 
     Cheapest non-null ``purchase_price`` wins; ties broken by the
     higher ``discount_percent``. A candidate with a NULL price is
     only preferred when the current winner also has a NULL price.
+
+    When ``sort_by_net`` is true, the comparator ranks by
+    ``purchase × (1 − discount)`` first and falls back to the same
+    tie-break so existing runs stay reproducible when the flag is
+    off.
     """
+    if sort_by_net:
+        cand_net = _net_for(candidate)
+        curr_net = _net_for(current)
+        if cand_net is None and curr_net is not None:
+            return False
+        if cand_net is not None and curr_net is None:
+            return True
+        if cand_net is not None and curr_net is not None and cand_net != curr_net:
+            return cand_net < curr_net
     cand_price = candidate.get("purchase_price")
     curr_price = current.get("purchase_price")
     if cand_price is None and curr_price is not None:

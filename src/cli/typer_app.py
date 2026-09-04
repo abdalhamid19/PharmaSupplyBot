@@ -373,6 +373,10 @@ def order_cmd(
         None, "--min-discount-percent",
         help="Only stores with discount ≥ this percent.",
     ),
+    sort_by_net: bool = typer.Option(
+        False, "--sort-by-net",
+        help="Rank offering stores by net (purchase after discount) instead of purchase price.",
+    ),
     prevented_items_excel: str = typer.Option(
         "data/input/prevented_items/drugprevented.xlsx",
         "--prevented-items-excel",
