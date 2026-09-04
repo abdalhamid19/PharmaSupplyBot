@@ -362,13 +362,23 @@ def _load_target_items(
     Excel-target runs reuse the existing shortage Excel format (code/name/qty).
     When ``--excel`` is missing and no manual-review-corrections path is set,
     the Excel-target flow is skipped (the Tawreed profiles will still run).
+
+    The Tawreed flow applies both ``slice_items`` (start/end) and
+    ``limited_order_items`` (the legacy ``--limit``). For the cross-source
+    view to stay in sync — the same item limit, the same set of items —
+    we apply the same two filters here, otherwise the Excel-target flow
+    can search a much larger sheet than the Tawreed profile processed.
     """
     if not getattr(args, "excel", None):
         return None
-    from .cli_order_items import load_regular_order_items
+    from .cli_order_items import (
+        limited_order_items,
+        load_regular_order_items,
+    )
 
     try:
         items = list(load_regular_order_items(app_config, args))
+        items = list(limited_order_items(items, args))
     except Exception as exc:
         logger.warning("excel target item load failed: %s", exc)
         return None
