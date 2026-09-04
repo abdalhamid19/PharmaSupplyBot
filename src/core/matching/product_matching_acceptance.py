@@ -75,8 +75,12 @@ def _candidate_component_rejection(query: str, candidate: dict[str, Any]) -> str
 
 def _candidate_variant_rejection(query: str, candidate: dict[str, Any]) -> str:
     query_tokens = set(_normalized_tokens(query))
-    reasons = _synthetic_name_rejection_reasons(query_tokens, candidate)
-    reasons.extend(_missing_english_identity_reasons(query_tokens, candidate))
+    is_excel_target = bool(candidate.get("excelTarget"))
+    if is_excel_target:
+        reasons: list[str] = []
+    else:
+        reasons = _synthetic_name_rejection_reasons(query_tokens, candidate)
+        reasons.extend(_missing_english_identity_reasons(query_tokens, candidate))
     arabic_name = _normalized_arabic_name(candidate)
     if arabic_name:
         reasons.extend(_missing_arabic_token_reasons(query_tokens, arabic_name, candidate))
