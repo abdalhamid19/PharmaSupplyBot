@@ -313,24 +313,7 @@ def _cheaper(candidate: dict, current: dict) -> bool:
     Cheapest non-null ``purchase_price`` wins; ties broken by the
     higher ``discount_percent``. A candidate with a NULL price is
     only preferred when the current winner also has a NULL price.
-
-    The Excel target catalog carries the pharmacy's **retail price**
-    (price the pharmacy charges end customers), not its wholesale
-    purchase cost. Comparing it apples-to-apples with a Tawreed
-    purchase row would mislead the operator, so Excel target rows
-    can never displace a Tawreed row. The source-based short-circuit
-    keeps that contract explicit even if a future writer accidentally
-    populates ``purchase_price`` on an Excel target row.
     """
-    cand_source = candidate.get("source")
-    curr_source = current.get("source")
-    cand_is_excel = _is_excel_target_source(cand_source)
-    curr_is_excel = _is_excel_target_source(curr_source)
-    if cand_is_excel and not curr_is_excel:
-        return False
-    if not cand_is_excel and curr_is_excel:
-        return True
-
     cand_price = candidate.get("purchase_price")
     curr_price = current.get("purchase_price")
     if cand_price is None and curr_price is not None:
@@ -346,18 +329,6 @@ def _cheaper(candidate: dict, current: dict) -> bool:
     return (candidate.get("discount_percent") or 0) > (
         current.get("discount_percent") or 0
     )
-
-
-def _is_excel_target_source(source: object) -> bool:
-    """Return True when ``source`` identifies an Excel-target row.
-
-    The reconciler accepts both ``excel_target`` (preferred) and the
-    legacy ``excel-target`` form so older runs whose rows were written
-    before the underscore normalisation still compare correctly.
-    """
-    if not isinstance(source, str):
-        return False
-    return source.strip().lower().replace("-", "_") == "excel_target"
 
 
 def _open_shared_run_record(

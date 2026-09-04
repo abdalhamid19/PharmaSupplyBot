@@ -60,8 +60,6 @@ def build_excel_target(raw_values: Any) -> ExcelTargetConfig:
         sheet=str(values.get("sheet", "")),
         header_row=int(values.get("header_row", 0)),
         enabled=_as_bool(values.get("enabled"), True),
-        store_id=str(values.get("store_id", "")),
-        store_name=str(values.get("store_name", "")),
     )
 
 

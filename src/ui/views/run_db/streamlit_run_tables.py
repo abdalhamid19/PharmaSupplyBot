@@ -110,32 +110,7 @@ def _render_store_table(run_key: str, item_key: str) -> None:
         frame["source"] = frame["source"].map(
             lambda value: STORE_SOURCE_LABELS.get(value, value) if value else "—"
         )
-    _annotate_price_columns(frame)
     st.dataframe(frame, use_container_width=True, hide_index=True)
-
-
-def _annotate_price_columns(frame: pd.DataFrame) -> None:
-    """Append a ``price_note`` column so users never confuse retail vs purchase.
-
-    Tawreed rows expose both ``purchase_price`` (what the pharmacy pays)
-    and ``public_price`` (what the pharmacy charges end customers).
-    Excel target rows only have ``public_price`` because the catalog
-    carries retail prices — the missing ``purchase_price`` is therefore
-    expected, not a data error.
-
-    The note column makes that semantic explicit so the operator can
-    tell the two sources apart at a glance without reading the schema.
-    """
-    if "source" not in frame.columns:
-        return
-    is_excel = (
-        frame["source"].astype(str).str.contains("excel", case=False, na=False)
-    )
-    notes = ["💵 purchase price" for _ in range(len(frame))]
-    for idx, excel_row in enumerate(is_excel):
-        if excel_row:
-            notes[idx] = "💰 retail (reference)"
-    frame["price_note"] = notes
 
 
 def _check_mark(value: Any) -> str:
