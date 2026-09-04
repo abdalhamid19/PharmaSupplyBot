@@ -454,11 +454,22 @@ def _excel_target_store_dict(
 
     The shape matches what the Tawreed store-snapshot writer consumes
     (:func:`usable_store_rows`, :func:`store_price_fields`,
-    :func:`candidate_store_product_id`, :func:`store_identity_key`). Excel
-    catalogs only carry the pharmacy's purchase price + discount + name, so
-    the public/retail price is left empty and the warehouse identity is
-    derived from the target key + source file so the row groups under one
-    entry per catalog.
+    :func:`candidate_store_product_id`, :func:`store_identity_key`).
+
+    Excel catalogs declare their price column under ``priceMeaning``:
+
+    - ``public_with_discount`` (default): the column carries the
+      retail price. We forward it as ``price`` (which
+      :data:`PUBLIC_PRICE_KEYS` reads) and let the resolver derive
+      ``purchase_price = public × (1 − discount)``.
+    - ``purchase_only``: the column carries the pharmacy's purchase
+      price. We forward it as ``salePrice`` (which
+      :data:`PURCHASE_PRICE_KEYS` reads).
+    - ``public_only``: the column carries the retail price only; the
+      purchase side stays ``NULL``.
+
+    The warehouse identity is derived from the target key + source file
+    so the row groups under one entry per catalog.
     """
     name = (
         best.get("productNameEn")
@@ -468,20 +479,28 @@ def _excel_target_store_dict(
     )
     discount = best.get("discountPercent", best.get("discount", 0)) or 0
     price = best.get("salePrice", best.get("price", 0)) or 0
+    price_meaning = best.get("priceMeaning") or "public_with_discount"
     label = f"excel-target:{target_key}"
     if source_file:
         label = f"{label}@{source_file}"
-    return {
+    row: dict = {
         "storeProductId": str(best.get("storeProductId") or best.get("id") or name),
         "storeName": label,
         "storeNameEn": label,
         "companyName": label,
         "productNameEn": str(name),
         "productName": str(name),
-        "salePrice": float(price),
-        "sellingPrice": float(price),
         "discountPercent": float(discount),
         "availableQuantity": 1,
         "productsCount": 1,
         "currency": "",
+        "priceMeaning": price_meaning,
+        "excelTarget": True,
     }
+    if price_meaning == "purchase_only":
+        row["salePrice"] = float(price)
+    elif price_meaning == "public_only":
+        row["price"] = float(price)
+    else:
+        row["price"] = float(price)
+    return row
