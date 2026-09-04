@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterable
 
 from src.core.artifact_run import artifact_run
-from src.core.config.config_models import AppConfig
+from src.core.config.config_models import AppConfig, ExcelTargetConfig
 from src.core.excel_target import (
     TargetProduct,
     find_best_match_in_target,
@@ -21,6 +21,33 @@ from src.tawreed.matching.tawreed_match_only import MATCH_ONLY_SUMMARY_LABEL
 
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_excel_target_store_identity(
+    target_key: str,
+    source_file: str,
+    config: ExcelTargetConfig,
+) -> tuple[str, str]:
+    """Return ``(store_key, store_name)`` for an Excel target catalog row.
+
+    The Excel target represents an offline pharmacy / wholesale
+    catalog. When the operator configured ``store_id`` and
+    ``store_name`` in ``excel_targets.<key>`` we surface them verbatim
+    so each catalog row in ``run_item_stores`` is identifiable in the
+    UI and in the reconciler's ``WHERE`` clause.
+
+    When the operator did not configure those keys we fall back to a
+    derived identity (``excel-target:<key>[@<source_file>]``) so the
+    schema still receives a non-empty ``store_key`` — the reconciler's
+    unique UPDATE breaks on an empty ``store_key``.
+    """
+    if config.store_id:
+        return config.store_id, config.store_name or f"Excel target ({target_key})"
+    label = f"excel-target:{target_key}"
+    if source_file:
+        label = f"{label}@{source_file}"
+    display = config.store_name or label
+    return label, display
 
 
 def selected_excel_target_configs(
@@ -139,7 +166,8 @@ def run_excel_target_match_only(
     """
     matched = flagged = 0
     items_list = list(items)
-    db_persist = _build_db_persister(run_key, target_key)
+    target_cfg = app_config.excel_targets.get(target_key)
+    db_persist = _build_db_persister(run_key, target_key, target_cfg)
     provided_run_id = run_id or (
         _extract_run_id(run_key) if run_key else None
     )
@@ -378,7 +406,11 @@ def _finish_run_record(app_config: AppConfig, run_key: str | None) -> None:
     finish_run_record(run_key, options)
 
 
-def _build_db_persister(run_key: str | None, target_key: str):
+def _build_db_persister(
+    run_key: str | None,
+    target_key: str,
+    target_cfg: ExcelTargetConfig | None = None,
+):
     """Return a callback that mirrors one match result into order_runs.db.
 
     When ``run_key`` is None the callback is a no-op so the legacy callers
@@ -432,6 +464,9 @@ def _build_db_persister(run_key: str | None, target_key: str):
             label = f"{label}@{source_file}"
         snapshot_kwargs: dict = {"source_kind": "excel-target", "source_label": label}
         if best is not None:
+            if target_cfg is not None and not best.get("_excel_target_config"):
+                best = dict(best)
+                best["_excel_target_config"] = target_cfg
             store_dict = _excel_target_store_dict(
                 target_key, source_file, best
             )
@@ -454,12 +489,23 @@ def _excel_target_store_dict(
 
     The shape matches what the Tawreed store-snapshot writer consumes
     (:func:`usable_store_rows`, :func:`store_price_fields`,
-    :func:`candidate_store_product_id`, :func:`store_identity_key`). Excel
-    catalogs only carry the pharmacy's purchase price + discount + name, so
-    the public/retail price is left empty and the warehouse identity is
-    derived from the target key + source file so the row groups under one
-    entry per catalog.
+    :func:`candidate_store_product_id`, :func:`store_identity_key`).
+
+    The Excel catalog carries the pharmacy's **retail price** (the
+    price it sells to end customers), so the row has a populated
+    ``public_price`` / ``salePrice`` and a NULL ``purchase_price``.
+    Because retail vs wholesale are different semantic classes the row
+    never wins the ``is_winner`` spot — the cross-source reconciler in
+    :func:`src.cli.commands.cli_order._reconcile_cross_source_winners`
+    keeps the cheapest Tawreed row as the unique winner per item.
+
+    The store identity is resolved by
+    :func:`resolve_excel_target_store_identity` so an operator that
+    configured ``store_id`` / ``store_name`` sees a meaningful label
+    instead of an anonymous ``excel-target:<key>`` string.
     """
+    from src.core.config.config_models import ExcelTargetConfig as _ExcelTargetConfig
+
     name = (
         best.get("productNameEn")
         or best.get("productName")
@@ -468,14 +514,20 @@ def _excel_target_store_dict(
     )
     discount = best.get("discountPercent", best.get("discount", 0)) or 0
     price = best.get("salePrice", best.get("price", 0)) or 0
-    label = f"excel-target:{target_key}"
-    if source_file:
-        label = f"{label}@{source_file}"
+    cfg = best.get("_excel_target_config")
+    if isinstance(cfg, _ExcelTargetConfig):
+        _store_key, store_name = resolve_excel_target_store_identity(
+            target_key, source_file, cfg
+        )
+    else:
+        store_name = f"excel-target:{target_key}"
+        if source_file:
+            store_name = f"{store_name}@{source_file}"
     return {
         "storeProductId": str(best.get("storeProductId") or best.get("id") or name),
-        "storeName": label,
-        "storeNameEn": label,
-        "companyName": label,
+        "storeName": store_name,
+        "storeNameEn": store_name,
+        "companyName": store_name,
         "productNameEn": str(name),
         "productName": str(name),
         "salePrice": float(price),

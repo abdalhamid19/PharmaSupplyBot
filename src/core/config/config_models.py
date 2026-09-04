@@ -27,6 +27,12 @@ class ExcelTargetConfig:
     that the matching engine searches in addition to the live Tawreed
     profiles. The matching algorithm is identical; only the search surface
     changes (in-memory catalog scan instead of HTTP/API/Playwright).
+
+    The Excel catalog carries the pharmacy's **retail price** (the price
+    the pharmacy sells to end customers), not its wholesale purchase
+    cost. As a result the matching rows never carry a ``purchase_price``;
+    they are surfaced in the UI as a reference list and never compete
+    for the ``is_winner`` spot against a real Tawreed purchase row.
     """
 
     name_col: str
@@ -37,6 +43,8 @@ class ExcelTargetConfig:
     sheet: str = ""
     header_row: int = 0
     enabled: bool = True
+    store_id: str = ""
+    store_name: str = ""
 
     @property
     def requires_code(self) -> bool:

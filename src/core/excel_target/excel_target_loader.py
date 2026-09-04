@@ -7,6 +7,13 @@ The Excel target is a pharmacy/vendor pricelist in the shape::
 (or with an optional leading code column). Each row becomes one
 :class:`TargetProduct` so the matching engine can treat the catalog the
 same way it treats a Tawreed search response.
+
+The ``سعر`` column carries the pharmacy's **retail price** (the price
+the pharmacy charges end customers). The catalog never carries the
+pharmacy's wholesale purchase cost; the cross-source reconciler in
+``src/cli/commands/cli_order.py`` treats Excel target rows as
+reference-only and never lets them win against a Tawreed
+``purchase_price`` row.
 """
 
 from __future__ import annotations
@@ -27,7 +34,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class TargetProduct:
-    """One row of an Excel target catalog, normalised for matching."""
+    """One row of an Excel target catalog, normalised for matching.
+
+    The ``price`` field carries the pharmacy's **retail price**
+    (the price the pharmacy sells to end customers) — not the
+    pharmacy's wholesale purchase cost. The cross-source reconciler
+    treats Excel target rows as reference-only and never lets them
+    displace a Tawreed ``purchase_price`` row from the winner spot
+    because the two numbers live in different semantic classes.
+    """
 
     code: str
     name: str
@@ -42,7 +57,11 @@ class TargetProduct:
         The matcher reads ``productNameEn``, ``productName``,
         ``availableQuantity``, ``discountPercent`` and ``salePrice`` from
         each candidate. We populate those keys so the same scoring engine
-        works on Excel catalog rows without modification.
+        works on Excel catalog rows without modification. The retail
+        ``price`` is written to ``salePrice`` because the matcher uses
+        that key for the catalog-price slot; ``purchase_price`` is
+        intentionally left unset so the cross-source reconciler
+        recognises the row as retail-only.
         """
         return {
             "productNameEn": self.name,
