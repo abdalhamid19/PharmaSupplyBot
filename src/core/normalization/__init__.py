@@ -1,12 +1,13 @@
-"""Drug name normalization and parsing module.
+"""Public API for the drug-name normalization utilities."""
+from .bilingual_brand_matcher import BrandMatch, match_brand
+from .drug_dictionary import load_dictionary, lookup_ar, lookup_en
+from .translation import ar_to_en
 
-This module contains all normalization-related functionality split into
-submodules for better organization:
-- normalizer_constants: Constants for drug name normalization
-- normalizer_parsing: Drug name parsing and component extraction
-- normalizer_matching: Drug component matching and compatibility
-"""
-
-from .normalizer import *  # noqa: F401, F403
-
-__all__ = []
+__all__ = [
+    "BrandMatch",
+    "ar_to_en",
+    "load_dictionary",
+    "lookup_ar",
+    "lookup_en",
+    "match_brand",
+]

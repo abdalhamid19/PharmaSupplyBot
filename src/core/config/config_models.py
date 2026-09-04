@@ -98,6 +98,8 @@ class MatchingConfig:
     enable_manufacturer_check: bool = False
     manufacturer_match_threshold: float = 0.85
     reject_extra_brand_token: bool = False
+    enable_bilingual_secondary_match: bool = False
+    bilingual_min_score: float = 0.7
 
 @dataclass(frozen=True)
 class DatabaseConfig:
