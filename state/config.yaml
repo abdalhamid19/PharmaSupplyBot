@@ -1,0 +1,100 @@
+site:
+  base_url: https://seller.tawreed.io/#/login
+excel:
+  code_col: كود
+  name_col: إسم الصنف
+  qty_col: كمية النقص
+  min_qty: 1
+  max_qty: 999999
+profiles:
+  wardany:
+    display_name: صيدلية الورداني
+    pharmacy_switch:
+      enabled: false
+      pharmacy_name: ''
+selectors:
+  login:
+    email_input: input[type='email'], input[name='email']
+    password_input: input[type='password'], input[name='password']
+    submit_button: button[type='submit']
+  nav:
+    logged_in_marker: text=الرئيسية, text=Home, [data-testid='home']
+  order_flow:
+    go_to_orders: text=الطلبيات, text=Orders
+    new_order: text=طلبية جديدة, text=New Order, button:has-text('New')
+    item_search_input: input[placeholder*='بحث'], input[placeholder*='Search']
+    item_first_result: .results >> :nth-match(*, 1)
+    qty_input: input[type='number']
+    add_item_button: text=إضافة, text=Add
+    confirm_order_button: text=تأكيد, text=Confirm
+  cart_flow:
+    route: '#/purchase/carts/'
+    rows: tbody.p-datatable-tbody > tr
+    delete_button: button:has(.pi-trash), button:has(.pi-times), button:has-text('حذف'), button:has-text('Delete')
+    confirm_delete_button: button:has-text('تأكيد'), button:has-text('حذف'), button:has-text('Delete'), button:has-text('Yes'), button:has-text('OK')
+warehouse_strategy:
+  mode: first_available
+  min_discount_percent: 0
+  preferred_warehouses:
+  - شركه البركه (الجيزه)
+  - شركه الماسه (مالك سابقا ) (الجيزه)
+  - شركه الشفاء ميدكو - الريحان سابقا (الجيزه)
+  - شركه الفا فارما (الجيزه)
+  - شركه مصر مديكال (الجيزه)
+  - شركه نيو سيدرا (القليوبيه)
+  - شركه الريان (القاهره)
+  selectors:
+    warehouse_rows: .warehouse-row, [data-testid='warehouse-row']
+    available_qty: .available, [data-testid='available']
+    pick_button: text=اختيار, text=Select
+matching:
+  exact_match_accept: true
+  high_overlap_threshold: 0.85
+  medium_score_threshold: 12.0
+  medium_overlap_threshold: 0.6
+  numeric_score_threshold: 20.0
+  numeric_overlap_threshold: 0.45
+  numeric_score_weight: 4.0
+  critical_token_penalty: 2.0
+  distinguishing_token_penalty: 3.0
+  semantic_mismatch_penalty: 10.0
+  manual_review_save_candidate_limit: 30
+  manual_review_display_candidate_limit: 5
+  enable_auto_match_re_review_on_fail: false
+  enable_auto_save_verified_match: true
+  enable_approved_match_re_review_on_fail: false
+  enable_manufacturer_check: false
+  manufacturer_match_threshold: 0.85
+  reject_extra_brand_token: false
+runtime:
+  headless: true
+  slow_mo_ms: 0
+  timeout_ms: 45000
+  submit_order: false
+  item_workers: 1
+database:
+  order_runs_enabled: true
+  order_runs_path: ''
+  store_candidates: false
+excel_targets:
+  الجزيره:
+    name_col: الصنف
+    price_col: سعر ج
+    discount_col: 'نقدي '
+    code_col: ''
+    sheet: ''
+    header_row: 0
+    enabled: true
+    display_name: الجزيره
+  البركة شركات:
+    name_col: الصنف
+    price_col: سعر ج
+    discount_col: 'شركات '
+    code_col: الكود
+    sheet: ''
+    header_row: 0
+    enabled: true
+    display_name: البركة شركات
+user_added_targets:
+- الجزيره
+- البركة شركات
