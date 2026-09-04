@@ -168,7 +168,7 @@ class OrderRunsSchemaBehaviourTests(unittest.TestCase):
             version = reopened.schema_version()
             reopened.db.close()
         self.assertIn("added_to_cart", columns)
-        self.assertEqual(version, 4)
+        self.assertEqual(version, 5)
 
     def test_best_discount_view_uses_precomputed_rank(self) -> None:
         """rank_by_discount avoids a window function in every query."""

@@ -150,9 +150,21 @@ def _migrate_v3_to_v4(conn) -> None:
     )
 
 
+def _migrate_v4_to_v5(conn) -> None:
+    """Recreate ``v_run_summary`` to include ``not_orderable`` and ``no_results``.
+
+    The v3/v4 view counted only ``items``, ``matched``, ``flagged`` and
+    ``added_to_cart``. The Run Results KPI bar exposes a "Not-orderable"
+    toggle, but without these columns the bar always read zero. Drop the
+    stale view so :data:`ALL_DDL` recreates it with the new shape.
+    """
+    conn.execute("drop view if exists v_run_summary")
+
+
 MIGRATIONS: dict[int, MigrationFn] = {
     3: _migrate_v2_to_v3,
     4: _migrate_v3_to_v4,
+    5: _migrate_v4_to_v5,
 }
 
 

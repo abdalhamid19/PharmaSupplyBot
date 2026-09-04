@@ -9,7 +9,7 @@ otherwise prevent bootstrap from completing.
 
 from __future__ import annotations
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 SCHEMA_VERSION_KEY = "schema_version"
 
 __all__ = ["SCHEMA_VERSION", "SCHEMA_VERSION_KEY"]

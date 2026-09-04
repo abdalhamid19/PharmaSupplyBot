@@ -12,6 +12,8 @@ select r.run_key, r.run_id, r.profile_key, r.command, r.mode,
        coalesce(v.items, 0)    as items,
        coalesce(v.matched, 0)  as matched,
        coalesce(v.flagged, 0)  as flagged,
+       coalesce(v.no_results, 0)    as no_results,
+       coalesce(v.not_orderable, 0) as not_orderable,
        coalesce(v.added_to_cart, 0) as added_to_cart,
        coalesce(v.total_ordered, 0) as total_ordered
 from runs r
@@ -68,7 +70,7 @@ QUERY_COLUMNS = {
     "runs": [
         "run_key", "run_id", "profile_key", "command", "mode",
         "started_at", "finished_at", "total_items", "items", "matched",
-        "flagged", "added_to_cart", "total_ordered",
+        "flagged", "no_results", "not_orderable", "added_to_cart", "total_ordered",
     ],
     "items": [
         "item_key", "item_code", "item_name", "requested_qty",
