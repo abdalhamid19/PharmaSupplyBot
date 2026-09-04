@@ -84,6 +84,9 @@ def slice_items(items: Iterable[Item], args) -> Iterable[Item]:
     start_item = max(1, getattr(args, "start_item", 1))
     end_item = getattr(args, "end_item", 0)
 
+    if end_item > 0 and end_item < start_item:
+        return iter([])
+
     if start_item > 1:
         items = itertools.islice(items, start_item - 1, None)
 
