@@ -17,12 +17,22 @@ same product as an English order row:
 
 The output is a float in ``[0.0, 1.0]`` plus a short reason string for
 logging.
+
+When ``MATCH_ARTIFACT_PATH`` is set in the environment, every
+``match_brand`` call also writes a one-line JSON record with the
+per-tier traces (which tier fired, what score, what reason). This is
+useful for postmortem analysis on a real run.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
+import threading
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 
 from rapidfuzz import fuzz, process
 
@@ -30,6 +40,46 @@ from .drug_dictionary import lookup_ar, lookup_en
 from .translation import ar_to_en
 
 logger = logging.getLogger(__name__)
+
+
+_artifact_lock = threading.Lock()
+_artifact_path: Path | None = None
+
+
+def set_artifact_path(path: Path | str | None) -> None:
+    """Set the destination for per-call JSONL trace records.
+
+    Pass ``None`` to disable. The path is opened lazily on first
+    write so callers can configure this at any point before
+    ``match_brand`` is invoked.
+    """
+    global _artifact_path
+    with _artifact_lock:
+        if path is None:
+            _artifact_path = None
+            return
+        _artifact_path = Path(path)
+        _artifact_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _artifact_path_lazy() -> Path | None:
+    if _artifact_path is not None:
+        return _artifact_path
+    env = os.environ.get("MATCH_ARTIFACT_PATH")
+    if not env:
+        return None
+    p = Path(env)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _write_trace(record: dict) -> None:
+    path = _artifact_path_lazy()
+    if path is None:
+        return
+    with _artifact_lock:
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 _FORM_EN_TO_AR = {
@@ -216,28 +266,67 @@ def match_brand(en_query: str, ar_row: str) -> BrandMatch:
     2. **karem505 community dictionary** — direct EN↔AR + fuzzy.
     3. **Cohere translation cache** — pre-translated via the batch CLI.
     4. **Cohere live translation** — last-resort LLM call.
+
+    When ``MATCH_ARTIFACT_PATH`` is set, every call also writes a
+    one-line JSON record with the per-tier scores + winning reason.
     """
-    tawreed_score, tawreed_reason, en_brand, manufacturer = _tawreed_score(en_query, ar_row)
-    if tawreed_score > 0.0:
-        score = tawreed_score
-        reason = tawreed_reason
+    tier1_score, tier1_reason, en_brand, manufacturer = _tawreed_score(en_query, ar_row)
+    tier2_score = 0.0
+    tier2_reason = ""
+    tier3_score = 0.0
+    tier3_reason = ""
+    tier3_translation: str | None = None
+
+    if tier1_score > 0.0:
+        score = tier1_score
+        reason = tier1_reason
     else:
-        dict_score, dict_reason, dict_en_brand, dict_manufacturer = _dict_score(en_query, ar_row)
+        tier2_score, tier2_reason, dict_en_brand, dict_manufacturer = _dict_score(
+            en_query, ar_row
+        )
         en_brand = dict_en_brand or en_brand
-        if dict_score > 0.0:
-            score = dict_score
-            reason = dict_reason
+        if tier2_score > 0.0:
+            score = tier2_score
+            reason = tier2_reason
             manufacturer = dict_manufacturer
         else:
-            translated = _translation_score(en_query, ar_row, en_brand)
-            if translated >= 0.6:
-                score = translated
-                reason = f"translation similarity ({score:.2f})"
+            translated = ar_to_en(ar_row)
+            if translated and translated != ar_row:
+                tier3_translation = translated
+                tier3_score = _translation_score(en_query, translated, en_brand)
+                tier3_reason = f"translation similarity ({tier3_score:.2f})"
+                if tier3_score >= 0.6:
+                    score = tier3_score
+                    reason = tier3_reason
+                else:
+                    score = 0.0
+                    reason = "no brand match"
             else:
                 score = 0.0
                 reason = "no brand match"
 
-    score *= _compatibility_factor(en_query, ar_row)
+    compat = _compatibility_factor(en_query, ar_row)
+    score *= compat
+
+    _write_trace({
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "en_query": en_query,
+        "ar_row": ar_row,
+        "tier1_tawreed": {"score": round(tier1_score, 3), "reason": tier1_reason},
+        "tier2_karem505": {"score": round(tier2_score, 3), "reason": tier2_reason},
+        "tier3_cache": {
+            "score": round(tier3_score, 3),
+            "reason": tier3_reason,
+            "translation": tier3_translation,
+        },
+        "compatibility_factor": round(compat, 3),
+        "final_score": round(score, 3),
+        "winning_reason": reason or "no brand match",
+        "en_brand": en_brand,
+        "ar_brand": _brand_only(ar_row),
+        "manufacturer": manufacturer,
+    })
+
     return BrandMatch(
         score=round(score, 3),
         reason=reason or "no brand match",

@@ -23,7 +23,7 @@ DEFAULT_TARGET_DISCOUNT_COLUMN = "الخصم"
 MATCHING_BOOL_KEYS = {"exact_match_accept", "require_identity_token_for_flag",
     "enable_auto_save_verified_match", "enable_auto_match_re_review_on_fail",
     "enable_approved_match_re_review_on_fail", "enable_manufacturer_check",
-    "reject_extra_brand_token"}
+    "reject_extra_brand_token", "enable_bilingual_secondary_match"}
 MATCHING_INT_KEYS = {"candidate_top_k", "fuzzy_prefix_len", "query_cache_size",
     "manual_review_save_candidate_limit", "manual_review_display_candidate_limit"}
 

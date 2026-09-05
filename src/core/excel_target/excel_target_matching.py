@@ -98,6 +98,7 @@ def _bilingual_secondary_match(
     from rapidfuzz import fuzz
     from src.core.normalization.bilingual_brand_matcher import (
         _dict_score, _compatibility_factor, _brand_only, _translation_score,
+        match_brand,
     )
 
     item_name = item.name
@@ -139,8 +140,17 @@ def _bilingual_secondary_match(
         if quick < 0.3:
             continue
         candidates.append((quick, product, manufacturer))
+        # Emit a per-tier trace for every catalog row that passed the
+        # pre-filter so postmortem analysis can see which tier fired
+        # (or rejected) for each candidate. This is the cheapest way
+        # to audit the bilingual secondary match at scale.
+        match_brand(item_name, product.name)
 
     if not candidates or best is not None and best[0] >= min_score:
+        # Emit a per-tier trace for the winning row so postmortem
+        # analysis can see why a candidate won or was rejected.
+        if best is not None:
+            match_brand(item_name, best[1].name)
         return _finalize_fallback(best, item_name, min_score)
 
     candidates.sort(key=lambda x: x[0], reverse=True)
@@ -159,6 +169,10 @@ def _bilingual_secondary_match(
         score *= _compatibility_factor(item_name, product.name)
         if score >= min_score and (best is None or score > best[0]):
             best = (score, product, f"translation similarity ({score:.2f})", manufacturer)
+        # Always emit a per-tier trace for the candidate that was
+        # tested via the translation path so postmortem analysis can
+        # see which tier rejected it (if any).
+        match_brand(item_name, product.name)
 
     return _finalize_fallback(best, item_name, min_score)
 
