@@ -145,6 +145,33 @@ class TranslationCache:
                 )
         return result
 
+    def get_many_by_raw(self, raw_arabic_texts: Iterable[str]) -> dict[str, str]:
+        """Like :meth:`get_many` but matches against ``raw_ar`` (the original
+        text as written, before any normalization) and returns the
+        ``raw_ar → en_text`` mapping.
+
+        Use this when the caller has the exact string the Excel cell
+        contained (including double-spaces) and the lookup key is the
+        raw cell content rather than the normalized form.
+        """
+        raws = [str(t) for t in raw_arabic_texts if t]
+        if not raws:
+            return {}
+        with self._connect() as conn:
+            placeholders = ",".join("?" for _ in raws)
+            rows = conn.execute(
+                f"select raw_ar, en_text from translation_cache where raw_ar in ({placeholders})",
+                raws,
+            ).fetchall()
+        result = {row["raw_ar"]: row["en_text"] for row in rows}
+        if result:
+            with self._connect() as conn:
+                conn.executemany(
+                    "update translation_cache set hits = hits + 1 where raw_ar = ?",
+                    [(k,) for k in result],
+                )
+        return result
+
     def put_many(
         self,
         entries: dict[str, str],

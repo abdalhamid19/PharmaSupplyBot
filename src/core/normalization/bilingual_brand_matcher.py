@@ -24,7 +24,7 @@ import logging
 import re
 from dataclasses import dataclass
 
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
 
 from .drug_dictionary import lookup_ar, lookup_en
 from .translation import ar_to_en
@@ -113,6 +113,50 @@ def _brand_only(text: str) -> str:
     return s
 
 
+def _tawreed_score(en_query: str, ar_row: str) -> tuple[float, str, str, str]:
+    """Tier 1: check the verified Tawreed product catalog.
+
+    The Tawreed catalog carries both Arabic and English trade names
+    for every registered product, so a hit is a high-confidence match
+    without any translation. We try the direct Arabic lookup first
+    (cheap), then a fuzzy fallback.
+
+    Returns ``(score, reason, en_brand, manufacturer)``. When no hit
+    is found, returns ``(0.0, "", en_brand, "")``.
+    """
+    from .tawreed_catalog import lookup_by_arabic, collapse_ws, load_tawreed_catalog
+    en_brand = _brand_only(en_query)
+    ar_brand = _brand_only(ar_row)
+
+    rows = lookup_by_arabic(ar_row)
+    if rows:
+        for row in rows:
+            hit_en_brand = _brand_only(row.get("en", ""))
+            if hit_en_brand and fuzz.token_set_ratio(hit_en_brand, en_brand.upper()) >= 70:
+                return 0.98, "tawreed direct hit (AR)", en_brand, ""
+
+    catalog = load_tawreed_catalog()
+    tawreed_collapsed = list(catalog["by_ar"].keys())
+    if not tawreed_collapsed or not ar_brand:
+        return 0.0, "", en_brand, ""
+    best = process.extractOne(
+        collapse_ws(ar_row),
+        tawreed_collapsed,
+        scorer=fuzz.token_set_ratio,
+        score_cutoff=80,
+    )
+    if best is None:
+        return 0.0, "", en_brand, ""
+    hit_key = best[0]
+    rows = catalog["by_ar"][hit_key]
+    if not rows:
+        return 0.0, "", en_brand, ""
+    hit_en_brand = _brand_only(rows[0].get("en", ""))
+    if hit_en_brand and fuzz.token_set_ratio(hit_en_brand, en_brand.upper()) >= 70:
+        return 0.92, "tawreed fuzzy hit (AR)", en_brand, ""
+    return 0.0, "", en_brand, ""
+
+
 def _dict_score(en_query: str, ar_row: str) -> tuple[float, str, str, str]:
     """Try the brand dictionary first. Returns (score, reason, en_brand, manufacturer)."""
     en_brand = _brand_only(en_query)
@@ -165,18 +209,33 @@ def match_brand(en_query: str, ar_row: str) -> BrandMatch:
     """Score how likely an Arabic catalog row matches the English query.
 
     Returns a :class:`BrandMatch` with ``score`` in ``[0.0, 1.0]``.
+
+    The lookup runs four tiers in order of trust + speed:
+
+    1. **Tawreed catalog** (verified) — direct Arabic lookup + fuzzy.
+    2. **karem505 community dictionary** — direct EN↔AR + fuzzy.
+    3. **Cohere translation cache** — pre-translated via the batch CLI.
+    4. **Cohere live translation** — last-resort LLM call.
     """
-    dict_score, reason, en_brand, manufacturer = _dict_score(en_query, ar_row)
-    if dict_score == 0.0:
-        translated = _translation_score(en_query, ar_row, en_brand)
-        if translated >= 0.6:
-            score = translated
-            reason = f"translation similarity ({score:.2f})"
-        else:
-            score = 0.0
-            reason = "no brand match"
+    tawreed_score, tawreed_reason, en_brand, manufacturer = _tawreed_score(en_query, ar_row)
+    if tawreed_score > 0.0:
+        score = tawreed_score
+        reason = tawreed_reason
     else:
-        score = dict_score
+        dict_score, dict_reason, dict_en_brand, dict_manufacturer = _dict_score(en_query, ar_row)
+        en_brand = dict_en_brand or en_brand
+        if dict_score > 0.0:
+            score = dict_score
+            reason = dict_reason
+            manufacturer = dict_manufacturer
+        else:
+            translated = _translation_score(en_query, ar_row, en_brand)
+            if translated >= 0.6:
+                score = translated
+                reason = f"translation similarity ({score:.2f})"
+            else:
+                score = 0.0
+                reason = "no brand match"
 
     score *= _compatibility_factor(en_query, ar_row)
     return BrandMatch(
