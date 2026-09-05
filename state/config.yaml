@@ -66,6 +66,8 @@ matching:
   enable_manufacturer_check: false
   manufacturer_match_threshold: 0.85
   reject_extra_brand_token: false
+  enable_bilingual_secondary_match: true
+  bilingual_min_score: 0.7
 runtime:
   headless: true
   slow_mo_ms: 0
