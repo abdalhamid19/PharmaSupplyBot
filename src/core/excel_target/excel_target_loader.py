@@ -63,6 +63,8 @@ class TargetProduct:
             "excelTargetSourceFile": self.source_file,
             "excelTargetRaw": dict(self.raw),
             "priceMeaning": self.price_meaning,
+            "verified_brand_identity": False,
+            "identity_evidence": "",
         }
         if self.price_meaning == "purchase_only":
             candidate["salePrice"] = float(self.price or 0.0)

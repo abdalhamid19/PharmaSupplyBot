@@ -81,6 +81,13 @@ def _candidate_variant_rejection(query: str, candidate: dict[str, Any]) -> str:
     is_excel_target = bool(candidate.get("excelTarget"))
     if is_excel_target:
         reasons: list[str] = []
+        is_verified = bool(candidate.get("verified_brand_identity"))
+        en_name = str(candidate.get("productNameEn") or "").strip()
+        has_latin_alpha = any(c.isascii() and c.isalpha() for c in en_name)
+        if not is_verified and not has_latin_alpha:
+            reasons.append("Arabic-only candidate lacks verified brand identity")
+        else:
+            reasons.extend(_missing_english_identity_reasons(query_tokens, candidate))
     else:
         reasons = _synthetic_name_rejection_reasons(query_tokens, candidate)
         reasons.extend(_missing_english_identity_reasons(query_tokens, candidate))
@@ -424,6 +431,10 @@ def _diagnostic_acceptance(
     )
     if is_rejected:
         return False, "", rejection_reason
+
+    pre_rejection = _candidate_variant_rejection(score_query, candidate)
+    if pre_rejection:
+        return False, "", pre_rejection
 
     helpers = (
         _normalize_text,
