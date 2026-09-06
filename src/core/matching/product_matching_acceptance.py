@@ -29,8 +29,11 @@ from ..identity.manufacturer_identity import (
     extract_manufacturer_from_name,
     manufacturer_conflict,
 )
+from .matching_rules import acceptance_details
 from .product_matching_scoring import (
+    _best_candidate_overlap,
     _candidate_english_name,
+    _numeric_match_count,
 )
 
 
@@ -422,8 +425,28 @@ def _diagnostic_acceptance(
     if is_rejected:
         return False, "", rejection_reason
 
+    helpers = (
+        _normalize_text,
+        _candidate_english_name,
+        _best_candidate_overlap,
+        _numeric_match_count,
+    )
+    score = float(getattr(breakdown, "total_score", 0.0) or 0.0)
+    acc_ok, acc_reason, acc_rejection = acceptance_details(
+        score_query,
+        candidate,
+        score,
+        matching_config,
+        helpers,
+    )
+    if not acc_ok:
+        acceptance = (False, "", acc_rejection)
+    else:
+        acceptance = _numeric_acceptance(score_query, candidate, breakdown, matching_config)
+        if acceptance[0]:
+            acceptance = (True, f"{acc_reason}; {acceptance[1]}", "")
+
     pre_rejection = _candidate_variant_rejection(score_query, candidate)
-    acceptance = _numeric_acceptance(score_query, candidate, breakdown, matching_config)
     if not candidate_has_store_product_id(candidate) and not pre_rejection:
         return _unorderable_acceptance(candidate, acceptance, breakdown)
     return _orderable_acceptance(candidate, acceptance)
