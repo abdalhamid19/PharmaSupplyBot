@@ -94,6 +94,9 @@ def _manual_review_id_match(
     for query, candidates in results:
         for index, candidate in enumerate(candidates):
             if candidate_store_product_id(candidate) == target_id:
+                if candidate.get("excelTarget"):
+                    candidate["verified_brand_identity"] = True
+                    candidate["identity_evidence"] = "saved manual review"
                 # Skip validation for ID match to preserve backward compatibility
                 # التخطي من التحقق لمطابقة المعرف للحفاظ على التوافق مع الإصدارات السابقة
                 match = SearchMatch(query, index, 999.0, candidate)
@@ -142,6 +145,9 @@ def _find_name_match_in_candidates(
         c_ar = candidate_ar(candidate).lower()
         if not ((target_en and c_en == target_en) or (target_ar and c_ar == target_ar)):
             continue
+        if candidate.get("excelTarget"):
+            candidate["verified_brand_identity"] = True
+            candidate["identity_evidence"] = "saved manual review"
         # Orderable rows force an immediate accepted match. Non-orderable rows
         # (empty storeProductId) still count as a recognized approved product so
         # downstream status can become not-orderable instead of no-results.

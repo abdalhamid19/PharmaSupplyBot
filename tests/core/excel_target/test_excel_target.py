@@ -215,3 +215,79 @@ class TestConfigExcelTargets(TestCase):
             excel_target=None, all_excel_targets=True
         )
         self.assertEqual([key for key, _ in all_selected], ["alnasr"])
+
+
+class TestBilingualOfflineEvidence(TestCase):
+    """Bilingual offline evidence verifies Arabic catalog rows safely."""
+
+    def test_cached_bilingual_evidence_qualifies_arabic_candidate(self) -> None:
+        """Inodep in Arabic matches when offline translation cache confirms INODEP."""
+        from unittest.mock import patch
+        item = Item(code="90951", name="INODEP CAPSULES 30", qty=1)
+        catalog = [
+            TargetProduct(
+                code="inodp-ar",
+                name="اينوديب 30 كبسول",
+                price=50.0,
+                discount_percent=5.0,
+            ),
+            TargetProduct(
+                code="unrelated-30",
+                name="سالبوفنت 30 قرص",
+                price=20.0,
+                discount_percent=0.0,
+            ),
+        ]
+        cfg = MatchingConfig(
+            enable_bilingual_secondary_match=True,
+            bilingual_min_score=0.75,
+        )
+        # Mock cached translations: INODEP row is translated; SALBOVENT is translated to Salbovent
+        def fake_cached(ar_name: str) -> str:
+            if "اينوديب" in ar_name:
+                return "INODEP 30 CAPSULES"
+            if "سالبوفنت" in ar_name:
+                return "SALBOVENT 30 TABLETS"
+            return ""
+
+        with patch(
+            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+            return_value=None,
+        ), patch(
+            "src.core.normalization.translation.ar_to_en_cached_only",
+            side_effect=fake_cached,
+        ):
+            match = find_best_match_in_target(item, "test", catalog, cfg)
+            self.assertIsNotNone(match)
+            self.assertIsNotNone(match.decision.best_match)
+            self.assertEqual(match.decision.best_match.data["storeProductId"], "inodp-ar")
+            self.assertTrue(match.decision.best_match.data.get("verified_brand_identity"))
+
+    def test_unrelated_arabic_row_remains_unmatched_even_with_shared_numbers(self) -> None:
+        """Salbovent 30 tablets never matches INODEP 30 even with bilingual match enabled."""
+        from unittest.mock import patch
+        item = Item(code="90951", name="INODEP CAPSULES 30", qty=1)
+        catalog = [
+            TargetProduct(
+                code="unrelated-30",
+                name="سالبوفنت 30 قرص",
+                price=20.0,
+                discount_percent=0.0,
+            )
+        ]
+        cfg = MatchingConfig(
+            enable_bilingual_secondary_match=True,
+            bilingual_min_score=0.75,
+        )
+        def fake_cached(ar_name: str) -> str:
+            if "سالبوفنت" in ar_name:
+                return "SALBOVENT 30 TABLETS"
+            return ""
+
+        with patch(
+            "src.core.normalization.translation.ar_to_en_cached_only",
+            side_effect=fake_cached,
+        ):
+            match = find_best_match_in_target(item, "test", catalog, cfg)
+            self.assertIsNotNone(match)
+            self.assertIsNone(match.decision.best_match)

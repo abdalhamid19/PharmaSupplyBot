@@ -31,7 +31,7 @@ from src.core.manual_review.manual_review_runtime import (
     saved_manual_review_decision,
 )
 from src.core.matching_types import MatchDecision, SearchMatch
-from src.core.normalization.bilingual_brand_matcher import match_brand
+from src.core.normalization.bilingual_brand_matcher import match_brand_readonly
 from src.core.utils.excel import Item
 
 from .excel_target_loader import (
@@ -98,7 +98,6 @@ def _bilingual_secondary_match(
     from rapidfuzz import fuzz
     from src.core.normalization.bilingual_brand_matcher import (
         _dict_score, _compatibility_factor, _brand_only, _translation_score,
-        match_brand,
     )
 
     item_name = item.name
@@ -142,37 +141,51 @@ def _bilingual_secondary_match(
         candidates.append((quick, product, manufacturer))
         # Emit a per-tier trace for every catalog row that passed the
         # pre-filter so postmortem analysis can see which tier fired
-        # (or rejected) for each candidate. This is the cheapest way
-        # to audit the bilingual secondary match at scale.
-        match_brand(item_name, product.name)
+        # (or rejected) for each candidate. Read-only on purpose: the
+        # live ``match_brand`` used to fire Cohere calls per candidate
+        # and burned the trial quota mid-run (see docs/postmortem/01
+        # §R2a).
+        match_brand_readonly(item_name, product.name)
 
     if not candidates or best is not None and best[0] >= min_score:
         # Emit a per-tier trace for the winning row so postmortem
         # analysis can see why a candidate won or was rejected.
         if best is not None:
-            match_brand(item_name, best[1].name)
+            match_brand_readonly(item_name, best[1].name)
         return _finalize_fallback(best, item_name, min_score)
 
     candidates.sort(key=lambda x: x[0], reverse=True)
     candidates = candidates[:30]
 
-    from src.core.normalization.translation import ar_to_en
+    from src.core.normalization.translation import ar_to_en_cached_only
     for _, product, manufacturer in candidates:
         if product.name in seen_translations:
             translated = seen_translations[product.name]
         else:
-            translated = ar_to_en(product.name)
+            translated = ar_to_en_cached_only(product.name)
             seen_translations[product.name] = translated
         if not translated or translated == product.name:
             continue
         score = _translation_score(item_name, translated, en_brand)
+        # Brand gate: form/strength/pack compatibility may only boost a
+        # candidate, never qualify it. Without this gate a pure pack
+        # match ("30قرص") could clear min_score with an unrelated brand
+        # (the سالبوفنت × 3 pathology — docs/postmortem/01 §R6).
+        translated_brand = _brand_only(translated).upper()
+        brand_score = (
+            fuzz.token_set_ratio(en_brand.upper(), translated_brand) / 100.0
+            if translated_brand
+            else 0.0
+        )
+        if brand_score < 0.75:
+            continue
         score *= _compatibility_factor(item_name, product.name)
         if score >= min_score and (best is None or score > best[0]):
             best = (score, product, f"translation similarity ({score:.2f})", manufacturer)
         # Always emit a per-tier trace for the candidate that was
         # tested via the translation path so postmortem analysis can
         # see which tier rejected it (if any).
-        match_brand(item_name, product.name)
+        match_brand_readonly(item_name, product.name)
 
     return _finalize_fallback(best, item_name, min_score)
 
@@ -188,7 +201,13 @@ def _finalize_fallback(
     best_match = SearchMatch(
         query=item_name,
         row_index=0,
-        score=score * 100,
+        # The bilingual path scores in 0..1 (bilingual_min_score gate);
+        # the canonical SearchMatch.scale everywhere else in this
+        # codebase is the Tawreed 0..20 weighted-sum (thresholds
+        # medium=12, numeric=20, match_confidence divides by 20). The
+        # previous ×100 produced 90.00-style outliers that maxed out
+        # match_confidence's first factor and poisoned the CSV column.
+        score=score * 20,
         data={
             "productNameEn": product.name,
             "productNameEnFallback": product.name,
@@ -207,6 +226,8 @@ def _finalize_fallback(
             },
             "priceMeaning": product.price_meaning or "public_with_discount",
             "price": product.price,
+            "verified_brand_identity": True,
+            "identity_evidence": f"bilingual fallback: {reason}",
         },
     )
     logger.info(
@@ -265,7 +286,7 @@ def find_best_match_in_target(
     ) and getattr(matching_config, "enable_bilingual_secondary_match", False)
     if needs_fallback:
         fallback = _bilingual_secondary_match(
-            item, catalog, min_score=getattr(matching_config, "bilingual_min_score", 0.7)
+            item, catalog, min_score=getattr(matching_config, "bilingual_min_score", 0.75)
         )
         if fallback is not None:
             decision = fallback
