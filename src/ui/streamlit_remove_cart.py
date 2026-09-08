@@ -333,7 +333,7 @@ def render_remove_cart_summary() -> None:
     summary_path = ARTIFACTS_DIR / "wardany" / "cart_removal_summary.csv"
     rows = load_csv_rows(summary_path)
     if rows:
-        st.dataframe(rows[-20:], use_container_width=True, hide_index=True)
+        st.dataframe(rows[-20:], width="stretch", hide_index=True)
 
 
 __all__ = [

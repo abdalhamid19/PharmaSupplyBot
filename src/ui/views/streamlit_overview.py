@@ -96,7 +96,7 @@ def render_profile_table(profiles) -> None:
         }
         for k, p in profiles.items()
     ]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 def render_input_files_table(input_files, prevented_files, remove_files) -> None:
@@ -104,19 +104,19 @@ def render_input_files_table(input_files, prevented_files, remove_files) -> None
     st.subheader("Available Order Excel Files")
     rows = file_table_rows(input_files, "order_items")
     if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
     else:
         st.info("No order Excel files found under `data/input/order_items/`.")
     st.subheader("Available Prevented Excel Files")
     prevented_rows = file_table_rows(prevented_files, "prevented_items")
     if prevented_rows:
-        st.dataframe(pd.DataFrame(prevented_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(prevented_rows), width="stretch", hide_index=True)
     else:
         st.info("No prevented-items Excel files found under `data/input/prevented_items/`.")
     st.subheader("Available Remove-Cart Excel Files")
     remove_rows = file_table_rows(remove_files, "remove_items")
     if remove_rows:
-        st.dataframe(pd.DataFrame(remove_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(remove_rows), width="stretch", hide_index=True)
     else:
         st.info("No remove-cart Excel files found under `data/input/remove_items/`.")
 
@@ -137,4 +137,4 @@ def render_latest_summary_rows(summary_rows) -> None:
     """Render the latest summary rows block when data exists."""
     if summary_rows:
         st.subheader("Latest Order Summary Rows")
-        st.dataframe(pd.DataFrame(summary_rows[-10:]), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(summary_rows[-10:]), width="stretch", hide_index=True)

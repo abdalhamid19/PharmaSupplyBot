@@ -105,7 +105,7 @@ def render_prevented_items_editor(
                     for item in prevented_items
                 ]
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
     else:

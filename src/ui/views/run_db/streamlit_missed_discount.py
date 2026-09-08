@@ -25,7 +25,7 @@ def render_missed_discount_panel(run_key: str | None) -> None:
         return
     frame = pd.DataFrame(rows)
     frame = frame.drop(columns=["run_key", "item_key"], errors="ignore")
-    st.dataframe(frame, use_container_width=True, hide_index=True)
+    st.dataframe(frame, width="stretch", hide_index=True)
     _render_missed_summary(rows)
 
 

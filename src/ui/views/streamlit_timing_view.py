@@ -23,10 +23,10 @@ def render_timing_metrics(rows: list[dict[str, str]]) -> None:
     left, right = st.columns(2)
     with left:
         st.markdown("**Timing summary**")
-        st.dataframe(timing_breakdown(rows), use_container_width=True, hide_index=True)
+        st.dataframe(timing_breakdown(rows), width="stretch", hide_index=True)
     with right:
         st.markdown("**Top slowest items**")
-        st.dataframe(top_slowest_rows(rows), use_container_width=True, hide_index=True)
+        st.dataframe(top_slowest_rows(rows), width="stretch", hide_index=True)
 
 
 def render_timing_header_metrics(rows: list[dict[str, str]], elapsed_values: list[float]) -> None:

@@ -76,14 +76,14 @@ def _add_excel_target_dialog(config_path: Path) -> None:
     st.write(f"Key that will be added: `{preview_key}`")
 
     cancel, add = st.columns(2)
-    if cancel.button("Cancel", use_container_width=True):
+    if cancel.button("Cancel", width="stretch"):
         st.session_state[ADD_DIALOG_KEY] = False
         st.rerun()
     add_disabled = uploaded is None
     if add.button(
         "Add Excel target",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         disabled=add_disabled,
     ):
         result = add_excel_target(
@@ -179,13 +179,13 @@ def _edit_excel_target_dialog(config_path: Path, target_key: str) -> None:
     )
 
     cancel, save = st.columns(2)
-    if cancel.button("Cancel", use_container_width=True, key=f"excel_target_edit_cancel_{target_key}"):
+    if cancel.button("Cancel", width="stretch", key=f"excel_target_edit_cancel_{target_key}"):
         st.session_state["excel_target_edit_pending"] = None
         st.rerun()
     if save.button(
         "Save changes",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         key=f"excel_target_edit_save_{target_key}",
     ):
         if update_excel_target(

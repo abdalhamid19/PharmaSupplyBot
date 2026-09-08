@@ -169,7 +169,7 @@ def _show_saved_instructions():
 def _render_saved_editor(display_df):
     """Render the data editor for saved decisions."""
     return st.data_editor(
-        display_df, use_container_width=True, hide_index=True,
+        display_df, width="stretch", hide_index=True,
         num_rows="dynamic", key="saved_decisions_editor"
     )
 

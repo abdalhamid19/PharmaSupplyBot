@@ -46,7 +46,7 @@ def render_run_items_table(items: list[dict[str, Any]], *, caption: str = "items
         frame["source_label"] = frame["source_label"].map(
             lambda label: label if label else "—"
         )
-    st.dataframe(frame, use_container_width=True, hide_index=True)
+    st.dataframe(frame, width="stretch", hide_index=True)
 
 
 def render_item_stores_expander(items: list[dict[str, Any]], run_key: str) -> None:
@@ -114,7 +114,7 @@ def _render_store_table(run_key: str, item_key: str) -> None:
             lambda value: STORE_SOURCE_LABELS.get(value, value) if value else "—"
         )
     frame = _enrich_pricing_columns(frame)
-    st.dataframe(frame, use_container_width=True, hide_index=True)
+    st.dataframe(frame, width="stretch", hide_index=True)
 
 
 def _enrich_pricing_columns(frame: pd.DataFrame) -> pd.DataFrame:

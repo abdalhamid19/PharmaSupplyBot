@@ -9,6 +9,7 @@ from src.ui.streamlit_shared import (
     DEFAULT_CONFIG_PATH,
     FALLBACK_CONFIG_PATH,
     load_csv_rows,
+    load_new_summary_rows,
     load_xlsx_rows,
     resolved_streamlit_config_path,
 )
@@ -113,6 +114,29 @@ class StreamlitSharedTests(unittest.TestCase):
             self.assertEqual(first_rows, [{"name": "alpha"}])
             self.assertEqual(second_rows, first_rows)
             self.assertEqual(reader.call_count, 1)
+
+    def test_load_new_summary_rows_returns_only_appended_records(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            csv_path = Path(temporary_directory) / "summary.csv"
+            csv_path.write_text(
+                "name,quantity\nalpha,1\nbeta,2\n", encoding="utf-8"
+            )
+
+            appended_rows = load_new_summary_rows(csv_path, previous_row_count=1)
+
+        self.assertEqual(appended_rows, [{"name": "beta", "quantity": 2}])
+
+    def test_load_new_summary_rows_handles_multiline_csv_fields(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            csv_path = Path(temporary_directory) / "summary.csv"
+            csv_path.write_text(
+                'name,reason\n"alpha\npack",first\n"beta\npack",second\n',
+                encoding="utf-8",
+            )
+
+            appended_rows = load_new_summary_rows(csv_path, previous_row_count=1)
+
+        self.assertEqual(appended_rows, [{"name": "beta\npack", "reason": "second"}])
 
 
 if __name__ == "__main__":

@@ -54,4 +54,4 @@ def render_summary_table(rows: list[dict[str, str]], empty_message: str) -> None
     if not rows:
         st.info(empty_message)
         return
-    st.dataframe(pd.DataFrame(rows[-100:]), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows[-100:]), width="stretch", hide_index=True)

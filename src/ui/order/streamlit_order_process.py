@@ -194,7 +194,7 @@ def render_fresh_run_analysis(rows: list[dict[str, str]]) -> None:
         return
     from ..views.streamlit_timing_view import render_timing_metrics
     render_timing_metrics(rows)
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 __all__ = [

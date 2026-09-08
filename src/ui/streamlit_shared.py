@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from pathlib import Path
 
 import pandas as pd
@@ -88,7 +90,44 @@ def csv_row_count(path: Path) -> int:
 
 def load_new_summary_rows(path: Path, previous_row_count: int) -> list[dict[str, str]]:
     """Return only the summary rows appended after the recorded starting count."""
-    return load_csv_rows(path)[previous_row_count:]
+    if previous_row_count == 0:
+        return load_csv_rows(path)
+    try:
+        file_statistics = path.stat()
+    except FileNotFoundError:
+        return []
+    return _read_new_csv_rows_cached(
+        str(path.resolve()),
+        file_statistics.st_mtime_ns,
+        file_statistics.st_size,
+        previous_row_count,
+    )
+
+
+@st.cache_data(max_entries=128, show_spinner=False)
+def _read_new_csv_rows_cached(
+    path_string: str,
+    modified_time_ns: int,
+    file_size: int,
+    previous_row_count: int,
+) -> list[dict[str, str]]:
+    """Parse only the appended CSV records while preserving pandas typing."""
+    del modified_time_ns, file_size
+    with Path(path_string).open("r", encoding="utf-8") as csv_file:
+        records = (record for record in csv.reader(csv_file) if record)
+        header = next(records, None)
+        if header is None:
+            return []
+        for _ in range(previous_row_count):
+            if next(records, None) is None:
+                return []
+        appended_records = list(records)
+    if not appended_records:
+        return []
+    csv_text = io.StringIO()
+    csv.writer(csv_text, lineterminator="\n").writerows([header, *appended_records])
+    dataframe = pd.read_csv(io.StringIO(csv_text.getvalue())).fillna("")
+    return dataframe.to_dict(orient="records")
 
 
 def profile_selector_options() -> list[str]:

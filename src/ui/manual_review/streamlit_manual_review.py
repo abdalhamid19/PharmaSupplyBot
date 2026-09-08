@@ -68,7 +68,7 @@ def _render_editor_ui(editable_rows: list[dict]) -> list[dict]:
     selected_columns = _select_columns(visible_rows)
     edited = st.data_editor(
         pd.DataFrame(visible_rows),
-        use_container_width=True,
+        width="stretch",
         column_order=selected_columns if selected_columns else None
     )
     return edited.to_dict("records")
