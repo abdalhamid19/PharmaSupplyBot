@@ -7,7 +7,8 @@ offline identity evidence and strict variant compatibility have both passed.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Sequence
 
@@ -17,15 +18,24 @@ from src.core.matching.product_matching_queries import search_queries_for_item
 from src.core.matching_types import MatchDecision, SearchMatch
 from src.core.matching.candidate_identity import candidate_store_product_id
 from src.core.manual_review.manual_review_runtime import saved_manual_review_decision
+from src.core.manual_review.manual_review_store import ManualReviewStore
 from src.core.utils.excel import Item
 
-from .excel_target_identity import ExcelTargetBilingualIndex, IdentifiedTarget, IdentityEvidence
+from .excel_target_identity import (
+    ExcelTargetBilingualIndex,
+    IdentifiedTarget,
+    IdentityEvidence,
+    normalize_arabic_brand,
+    normalize_english_brand,
+)
 from .excel_target_loader import TargetProduct, load_target_catalog_from_excel
 from .product_attributes import CompatibilityResult, validate_product_compatibility
 from .excel_target_review_candidates import (
     ExcelTargetReviewCandidate,
     build_review_candidates,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -139,23 +149,97 @@ def _scoped_manual_review(
         excel_target_key=target_key,
         include_legacy=False,
     )
-    if not decision or not decision.approved or decision.excel_target_key != target_key:
+    if not decision or decision.excel_target_key != target_key:
         return None
+    if decision.manual_decision in {"needs_correction", "not_matching"}:
+        return MatchDecision(None, [], f"Saved {decision.manual_decision} requires manual review")
+    if not decision.approved:
+        return MatchDecision(None, [], "Saved decision is not approved")
+
+    compatible: list[TargetProduct] = []
+    rejected: list[str] = []
+    saved_en = normalize_english_brand(decision.correct_product_name)
+    saved_ar = normalize_arabic_brand(decision.correct_product_name_ar)
     for product in catalog:
-        product_id = candidate_store_product_id(product.to_candidate_dict())
-        if product.code != decision.correct_store_product_id and product_id != decision.correct_store_product_id:
-            continue
-        if (
-            decision.excel_target_source_file
-            and product.source_file != decision.excel_target_source_file
-        ):
-            continue
-        identified = IdentifiedTarget(
-            product,
-            IdentityEvidence("manual_review", "", "scoped saved manual review", 1.0),
+        current_id = candidate_store_product_id(product.to_candidate_dict())
+        same_identity = bool(
+            (decision.correct_store_product_id and current_id == decision.correct_store_product_id)
+            or (saved_en and normalize_english_brand(product.trusted_name_en) == saved_en)
+            or (saved_ar and normalize_arabic_brand(product.name_ar) == saved_ar)
         )
-        return _identity_decision(item, identified, time.perf_counter())
-    return None
+        if not same_identity:
+            continue
+        compatibility = validate_product_compatibility(item.name, product.name_ar)
+        if compatibility.accepted:
+            compatible.append(product)
+        else:
+            rejected.append(compatibility.rejection_reason)
+    if len(compatible) != 1:
+        reason = (
+            "Saved product is ambiguous in current Excel file"
+            if len(compatible) > 1
+            else (rejected[0] if rejected else "Saved product is absent from current Excel file")
+        )
+        _record_manual_rebind_failure(decision, target_key, catalog, reason)
+        return MatchDecision(None, [], reason)
+
+    product = compatible[0]
+    identified = IdentifiedTarget(
+        product,
+        IdentityEvidence(
+            "manual_review_rebound",
+            saved_en or saved_ar,
+            "saved approval rebound to current Excel catalog",
+            1.0,
+        ),
+    )
+    _record_manual_rebind(decision, target_key, product)
+    return _identity_decision(item, identified, time.perf_counter())
+
+
+def _record_manual_rebind(decision, target_key: str, product: TargetProduct) -> None:
+    """Update current catalog metadata while retaining the logical approval."""
+    try:
+        ManualReviewStore().upsert(
+            replace(
+                decision,
+                correct_store_product_id=candidate_store_product_id(product.to_candidate_dict()),
+                correct_product_name=product.trusted_name_en or decision.correct_product_name,
+                correct_product_name_ar=product.name_ar,
+                excel_target_key=target_key,
+                excel_target_source_file=product.source_file,
+                matching_source="excel-target",
+                matching_source_label=(
+                    f"{target_key}@{product.source_file}" if product.source_file else target_key
+                ),
+                last_rebind_status="compatible_rebound",
+            )
+        )
+    except Exception:
+        logger.warning("could not persist Excel-target manual-review rebound", exc_info=True)
+
+
+def _record_manual_rebind_failure(
+    decision, target_key: str, catalog: Sequence[TargetProduct], reason: str
+) -> None:
+    """Record why a saved approval could not bind to the current catalog."""
+    try:
+        source_files = sorted({product.source_file for product in catalog if product.source_file})
+        source_file = source_files[0] if len(source_files) == 1 else ";".join(source_files)
+        ManualReviewStore().upsert(
+            replace(
+                decision,
+                excel_target_key=target_key,
+                excel_target_source_file=source_file,
+                matching_source="excel-target",
+                matching_source_label=(
+                    f"{target_key}@{source_file}" if source_file else target_key
+                ),
+                last_rebind_status=f"manual_review_required: {reason}",
+            )
+        )
+    except Exception:
+        logger.warning("could not persist Excel-target rebind failure", exc_info=True)
 
 
 def _identity_decision(item: Item, identified: IdentifiedTarget, started: float) -> MatchDecision:

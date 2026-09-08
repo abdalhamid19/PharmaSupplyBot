@@ -143,7 +143,7 @@ class TestBarakaSafeMatching(TestCase):
         ):
             self.assertIsNone(matcher.match(ITEM, MatchingConfig()).decision.best_match)
 
-    def test_scoped_manual_review_can_select_only_its_target_row(self) -> None:
+    def test_scoped_manual_review_cannot_override_variant_safety(self) -> None:
         matcher = self._matcher("اينوديب شراب 100 مل")
         scoped = ManualReviewDecision(
             ITEM.code, ITEM.name, True, "1", excel_target_key="baraka"
@@ -151,16 +151,70 @@ class TestBarakaSafeMatching(TestCase):
         with patch(
             "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
             return_value=scoped,
-        ) as saved_lookup:
+        ) as saved_lookup, patch(
+            "src.core.excel_target.excel_target_matching._record_manual_rebind_failure"
+        ):
             best = matcher.match(ITEM, MatchingConfig()).decision.best_match
-        self.assertIsNotNone(best)
-        self.assertEqual(best.data["identity_evidence_kind"], "manual_review")
+        self.assertIsNone(best)
         saved_lookup.assert_called_once_with(
             ITEM,
             matching_source="excel-target",
             excel_target_key="baraka",
             include_legacy=False,
         )
+
+    def test_approved_match_rebinds_to_current_file_code_for_same_target(self) -> None:
+        matcher = ExcelTargetMatcher(
+            "baraka",
+            [TargetProduct("new-code", "INODEP CAPSULES 30", 10, 0, "new.xlsx")],
+        )
+        scoped = ManualReviewDecision(
+            ITEM.code,
+            ITEM.name,
+            True,
+            "old-code",
+            correct_product_name="INODEP CAPSULES 30",
+            manual_decision="approved_match",
+            excel_target_key="baraka",
+            excel_target_source_file="old.xlsx",
+            matching_source="excel-target",
+            matching_source_label="baraka@old.xlsx",
+        )
+        with patch(
+            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+            return_value=scoped,
+        ), patch(
+            "src.core.excel_target.excel_target_matching._record_manual_rebind"
+        ) as record:
+            best = matcher.match(ITEM, MatchingConfig()).decision.best_match
+
+        self.assertIsNotNone(best)
+        self.assertEqual(best.data["storeProductId"], "new-code")
+        self.assertEqual(best.data["identity_evidence_kind"], "manual_review_rebound")
+        record.assert_called_once()
+
+    def test_non_approved_target_decisions_remain_manual_across_excel_files(self) -> None:
+        matcher = ExcelTargetMatcher(
+            "baraka",
+            [TargetProduct("new-code", "INODEP CAPSULES 30", 10, 0, "new.xlsx")],
+        )
+        for status in ("not_matching", "needs_correction"):
+            scoped = ManualReviewDecision(
+                ITEM.code,
+                ITEM.name,
+                False,
+                manual_decision=status,
+                excel_target_key="baraka",
+                excel_target_source_file="old.xlsx",
+                matching_source="excel-target",
+            )
+            with self.subTest(status=status), patch(
+                "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+                return_value=scoped,
+            ):
+                decision = matcher.match(ITEM, MatchingConfig()).decision
+                self.assertIsNone(decision.best_match)
+                self.assertIn(status, decision.final_reason)
 
     def test_pantogar_packaging_suffix_does_not_hide_verified_brand(self) -> None:
         matcher = self._matcher("بانتوجار 6شريط 60 كبسولة س ج")

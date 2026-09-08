@@ -23,6 +23,7 @@ def render_saved_decisions() -> None:
     display_df = _prepare_saved_decisions_display(decisions, store)
     if display_df is None:
         return
+    _render_source_history(store)
     _render_saved_actions(display_df, decisions)
 
 
@@ -45,6 +46,7 @@ def _select_saved_columns(df):
     default_columns = [
         "item_code", "item_name", "run_date", "decision", "manual_decision",
         "matching_source", "matching_source_label",
+        "supplier_scope_key", "last_rebind_status",
         "correct_product_name", "correct_product_name_ar"
     ]
     default_columns = [col for col in default_columns if col in all_columns]
@@ -122,6 +124,8 @@ def _decision_row(d) -> dict:
         "run_id": d.run_id,
         "excel_target_key": target_key,
         "excel_target_source_file": getattr(d, "excel_target_source_file", "") or "",
+        "supplier_scope_key": getattr(d, "supplier_scope_key", "") or "",
+        "last_rebind_status": getattr(d, "last_rebind_status", "") or "",
         "approved": d.approved,
     }
 
@@ -134,6 +138,19 @@ def _render_saved_actions(display_df, decisions):
     edited_df = _render_saved_editor(display_df)
     _handle_saved_modifications(display_df, edited_df)
     _render_download_and_search(display_df, decisions)
+
+
+def _render_source_history(store) -> None:
+    """Show catalog files previously observed for logical supplier decisions."""
+    history = store.list_all_source_history()
+    if not history:
+        return
+    with st.expander("Supplier catalog history", expanded=False):
+        st.dataframe(
+            pd.DataFrame([dataclasses.asdict(row) for row in history]),
+            hide_index=True,
+            width="stretch",
+        )
 
 
 def _show_saved_instructions():
@@ -195,22 +212,24 @@ def _handle_deletion(display_df, edited_df, store):
     deleted_pairs = deleted_identity_pairs(display_df, edited_df)
     if deleted_pairs:
         if st.button("🗑️ Confirm Deletion of Selected Items"):
-            for code, name, source, source_label in deleted_pairs:
-                store.delete(
-                    code, name,
-                    matching_source=source,
-                    matching_source_label=source_label,
-                )
+            for code, name, source, source_label, target_key in deleted_pairs:
+                kwargs = {"matching_source": source}
+                if source.replace("_", "-") == "excel-target" and target_key:
+                    kwargs["excel_target_key"] = target_key
+                else:
+                    kwargs["matching_source_label"] = source_label
+                store.delete(code, name, **kwargs)
             st.success(
                 f"Successfully deleted {len(deleted_pairs)} items from saved corrections!"
             )
             st.rerun()
 
 
-def deleted_identity_pairs(original_df, edited_df) -> list[tuple[str, str, str, str]]:
+def deleted_identity_pairs(original_df, edited_df) -> list[tuple[str, str, str, str, str]]:
     """Return exact item-and-supplier identities removed from the table."""
     columns = [
         "item_code", "item_name", "matching_source", "matching_source_label",
+        "excel_target_key",
     ]
     original = set(original_df.reindex(columns=columns, fill_value="").itertuples(index=False, name=None))
     edited = set(edited_df.reindex(columns=columns, fill_value="").itertuples(index=False, name=None))
@@ -243,12 +262,17 @@ def _render_conversion_button(selected_auto_matched, store):
 def _convert_to_approved(selected_auto_matched, store):
     """Convert selected auto_matched items to approved_match."""
     for _, row in selected_auto_matched.iterrows():
+        source = str(row.get("matching_source", "") or "")
+        target_key = str(row.get("excel_target_key", "") or "")
+        lookup_kwargs = {"matching_source": source}
+        if source.replace("_", "-") == "excel-target" and target_key:
+            lookup_kwargs["excel_target_key"] = target_key
+        else:
+            lookup_kwargs["matching_source_label"] = str(
+                row.get("matching_source_label", "") or ""
+            )
         decision_obj = store.lookup(
-            str(row["item_code"]),
-            str(row["item_name"]),
-            matching_source=str(row.get("matching_source", "") or ""),
-            matching_source_label=str(row.get("matching_source_label", "") or ""),
-            excel_target_key=str(row.get("excel_target_key", "") or ""),
+            str(row["item_code"]), str(row["item_name"]), **lookup_kwargs
         )
         if decision_obj and decision_obj.manual_decision == "auto_matched":
             new_decision = dataclasses.replace(

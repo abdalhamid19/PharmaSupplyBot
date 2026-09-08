@@ -94,6 +94,40 @@ def test_same_item_keeps_independent_rows_per_matching_supplier(tmp_path: Path) 
     assert remaining[0].matching_source == "excel-target"
 
 
+def test_excel_files_with_same_target_share_one_current_decision_and_keep_history(
+    tmp_path: Path,
+) -> None:
+    store = ManualReviewStore(tmp_path / "manual.sqlite3")
+    for filename, product_id, run_id in (
+        ("البركة.xlsx", "old-code", "run-1"),
+        ("البركة خمسة.xlsx", "new-code", "run-2"),
+    ):
+        store.upsert(
+            ManualReviewDecision(
+                item_code="1",
+                item_name="INODEP CAPSULES 30",
+                approved=True,
+                correct_store_product_id=product_id,
+                correct_product_name="INODEP CAPSULES 30",
+                run_id=run_id,
+                manual_decision="approved_match",
+                excel_target_key="البركة شركات",
+                excel_target_source_file=filename,
+                matching_source="excel-target",
+                matching_source_label=f"البركة شركات@{filename}",
+            )
+        )
+
+    decisions = store.list_decisions()
+    assert len(decisions) == 1
+    assert decisions[0].correct_store_product_id == "new-code"
+    assert decisions[0].supplier_scope_key == "البركة شركات"
+    assert {row.source_file for row in store.list_source_history("1", "INODEP CAPSULES 30")} == {
+        "البركة.xlsx",
+        "البركة خمسة.xlsx",
+    }
+
+
 def test_legacy_database_is_migrated_without_losing_decision(tmp_path: Path) -> None:
     db_path = tmp_path / "legacy.sqlite3"
     con = sqlite3.connect(db_path)
@@ -154,6 +188,50 @@ def test_legacy_database_is_migrated_without_losing_decision(tmp_path: Path) -> 
         )
     )
     assert len(store.list_decisions()) == 2
+
+
+def test_source_label_schema_merges_same_target_and_preserves_both_files(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "source-label.sqlite3"
+    con = sqlite3.connect(db_path)
+    con.executescript(
+        """
+        create table manual_review_decisions (
+            item_code_key text not null,item_name_key text not null,
+            item_code text not null,item_name text not null,approved integer not null,
+            manual_decision text not null default '',correct_store_product_id text not null default '',
+            correct_product_name text not null default '',correct_product_name_ar text not null default '',
+            correct_query text not null default '',run_id text not null default '',
+            excel_target_key text not null default '',excel_target_source_file text not null default '',
+            matching_source text not null default '',matching_source_label text not null default '',
+            identity_evidence_kind text not null default '',identity_evidence text not null default '',
+            supplier_scope_key text not null default '',last_rebind_status text not null default '',
+            created_at text not null,updated_at text not null,
+            primary key(item_code_key,item_name_key,matching_source,matching_source_label)
+        );
+        insert into manual_review_decisions values
+        ('1','INODEP','1','INODEP',1,'auto_matched','old','INODEP','','','r1',
+         'baraka','old.xlsx','excel-target','baraka@old.xlsx','','','baraka','',
+         '2026-01-02','2026-01-02'),
+        ('1','INODEP','1','INODEP',1,'approved_match','approved','INODEP','','','r2',
+         'baraka','approved.xlsx','excel-target','baraka@approved.xlsx','','','baraka','',
+         '2026-01-01','2026-01-01');
+        """
+    )
+    con.commit()
+    con.close()
+
+    store = ManualReviewStore(db_path)
+
+    decisions = store.list_decisions()
+    assert len(decisions) == 1
+    assert decisions[0].manual_decision == "approved_match"
+    assert {row.source_file for row in store.list_source_history("1", "INODEP")} == {
+        "old.xlsx",
+        "approved.xlsx",
+    }
+    assert db_path.with_suffix(".sqlite3.supplier-scope-v2.bak").exists()
 
 
 def test_manual_selection_carries_candidate_provenance() -> None:

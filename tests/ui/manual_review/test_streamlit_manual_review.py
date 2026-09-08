@@ -376,7 +376,7 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         self.assertEqual(
             deleted_identity_pairs(original, edited),
-            [("47853", "ZOCOZET 10/10", "tawreed", "wardany")],
+            [("47853", "ZOCOZET 10/10", "tawreed", "wardany", "")],
         )
 
     def test_convert_to_approved_looks_up_exact_supplier_row(self) -> None:
@@ -400,7 +400,7 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         store.lookup.assert_called_once_with(
             "47853", "ZOCOZET 10/10", matching_source="excel-target",
-            matching_source_label="baraka", excel_target_key="baraka",
+            excel_target_key="baraka",
         )
         self.assertEqual(store.upsert.call_args.args[0].manual_decision, "approved_match")
 

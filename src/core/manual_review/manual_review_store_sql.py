@@ -4,7 +4,8 @@ SELECT_DECISIONS = (
     "select item_code,item_name,approved,correct_store_product_id,manual_decision,"
     "correct_product_name,correct_product_name_ar,correct_query,run_id,excel_target_key,"
     "excel_target_source_file,matching_source,matching_source_label,"
-    "identity_evidence_kind,identity_evidence from manual_review_decisions"
+    "identity_evidence_kind,identity_evidence,supplier_scope_key,"
+    "last_rebind_status from manual_review_decisions"
 )
 
 UPSERT_DECISION = """
@@ -12,9 +13,9 @@ insert into manual_review_decisions
 (item_code_key,item_name_key,item_code,item_name,approved,manual_decision,
  correct_store_product_id,correct_product_name,correct_product_name_ar,correct_query,run_id,
  excel_target_key,excel_target_source_file,matching_source,matching_source_label,
- identity_evidence_kind,identity_evidence)
-values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-on conflict(item_code_key,item_name_key,matching_source,matching_source_label) do update set
+ identity_evidence_kind,identity_evidence,supplier_scope_key,last_rebind_status)
+values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+on conflict(item_code_key,item_name_key,matching_source,supplier_scope_key) do update set
 approved=excluded.approved,
 manual_decision=excluded.manual_decision,
 correct_store_product_id=excluded.correct_store_product_id,
@@ -28,6 +29,8 @@ matching_source=excluded.matching_source,
 matching_source_label=excluded.matching_source_label,
 identity_evidence_kind=excluded.identity_evidence_kind,
 identity_evidence=excluded.identity_evidence,
+supplier_scope_key=excluded.supplier_scope_key,
+last_rebind_status=excluded.last_rebind_status,
 updated_at=CURRENT_TIMESTAMP
 """
 
@@ -50,10 +53,12 @@ create table if not exists manual_review_decisions (
     matching_source_label TEXT not null default '',
     identity_evidence_kind TEXT not null default '',
     identity_evidence TEXT not null default '',
+    supplier_scope_key TEXT not null default '',
+    last_rebind_status TEXT not null default '',
     created_at TEXT not null default CURRENT_TIMESTAMP,
     updated_at TEXT not null default CURRENT_TIMESTAMP,
     primary key (
-        item_code_key, item_name_key, matching_source, matching_source_label
+        item_code_key, item_name_key, matching_source, supplier_scope_key
     )
 )
 """
@@ -97,3 +102,47 @@ ALTER_DECISIONS_TABLE_EVIDENCE = (
     "alter table manual_review_decisions "
     "add column identity_evidence TEXT not null default ''"
 )
+
+ALTER_DECISIONS_TABLE_SCOPE = (
+    "alter table manual_review_decisions "
+    "add column supplier_scope_key TEXT not null default ''"
+)
+
+ALTER_DECISIONS_TABLE_REBIND = (
+    "alter table manual_review_decisions "
+    "add column last_rebind_status TEXT not null default ''"
+)
+
+CREATE_SOURCE_HISTORY_TABLE = """
+create table if not exists manual_review_source_history (
+    item_code_key TEXT not null,
+    item_name_key TEXT not null,
+    matching_source TEXT not null,
+    supplier_scope_key TEXT not null,
+    source_file TEXT not null default '',
+    source_label TEXT not null default '',
+    run_id TEXT not null default '',
+    store_product_id TEXT not null default '',
+    product_name TEXT not null default '',
+    manual_decision TEXT not null default '',
+    rebind_status TEXT not null default '',
+    first_seen_at TEXT not null default CURRENT_TIMESTAMP,
+    last_seen_at TEXT not null default CURRENT_TIMESTAMP,
+    primary key (
+        item_code_key,item_name_key,matching_source,supplier_scope_key,
+        source_file,store_product_id
+    )
+)
+"""
+
+UPSERT_SOURCE_HISTORY = """
+insert into manual_review_source_history
+(item_code_key,item_name_key,matching_source,supplier_scope_key,source_file,
+ source_label,run_id,store_product_id,product_name,manual_decision,rebind_status)
+values (?,?,?,?,?,?,?,?,?,?,?)
+on conflict(item_code_key,item_name_key,matching_source,supplier_scope_key,
+ source_file,store_product_id) do update set
+source_label=excluded.source_label,run_id=excluded.run_id,
+product_name=excluded.product_name,manual_decision=excluded.manual_decision,
+rebind_status=excluded.rebind_status,last_seen_at=CURRENT_TIMESTAMP
+"""

@@ -19,6 +19,7 @@ IdentityKind = Literal[
     "cached_translation",
     "tawreed_catalog",
     "manual_review",
+    "manual_review_rebound",
 ]
 _ARABIC_DECORATION_RE = re.compile(
     r"\d+(?:\.\d+)?\s*(?:\u0645\u062c\u0645|\u0645\u0644\u062c\u0645|\u0645\u064a\u0643\u0631\u0648\u062c\u0631\u0627\u0645|\u062c\u0631\u0627\u0645|\u062c\u0645|\u0645\u0644|\u0648\u062d\u062f\u0629|%|"

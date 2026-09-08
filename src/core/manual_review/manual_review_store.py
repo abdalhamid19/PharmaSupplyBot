@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Any
+import sqlite3
 
 from ..database import get_db_manager
 from ..database.database_credentials import _DEFAULT_DB_PATH
@@ -21,12 +22,17 @@ from .manual_review_store_sql import (
     ALTER_DECISIONS_TABLE_SOURCE_LABEL,
     ALTER_DECISIONS_TABLE_EVIDENCE_KIND,
     ALTER_DECISIONS_TABLE_EVIDENCE,
+    ALTER_DECISIONS_TABLE_SCOPE,
+    ALTER_DECISIONS_TABLE_REBIND,
+    CREATE_SOURCE_HISTORY_TABLE,
+    UPSERT_SOURCE_HISTORY,
 )
 from .manual_review_store_helpers import (
     _decision_values,
     _decision_from_row,
     _ensure_column,
     _default_decision,
+    _history_values,
 )
 from .manual_review_store_query import (
     _unique_item_keys,
@@ -57,11 +63,28 @@ class ManualReviewDecision:
     matching_source_label: str = ""
     identity_evidence_kind: str = ""
     identity_evidence: str = ""
+    supplier_scope_key: str = ""
+    last_rebind_status: str = ""
 
     def __post_init__(self) -> None:
         """Backfill the explicit decision for old approved-only call sites."""
         if not self.manual_decision:
             object.__setattr__(self, "manual_decision", _default_decision(self.approved))
+
+
+@dataclass(frozen=True)
+class ManualReviewSourceHistory:
+    matching_source: str
+    supplier_scope_key: str
+    source_file: str
+    source_label: str
+    run_id: str
+    store_product_id: str
+    product_name: str
+    manual_decision: str
+    rebind_status: str
+    first_seen_at: str
+    last_seen_at: str
 
 
 class ManualReviewStore:
@@ -81,10 +104,13 @@ class ManualReviewStore:
         self._init_schema_once()
 
     def upsert(self, decision: ManualReviewDecision) -> None:
-        """Insert or replace one manual-review decision by normalized item key."""
+        """Insert/update one logical supplier decision and record its file history."""
         code_key, name_key = hint_key(decision.item_code, decision.item_name)
         self.db.execute_update(
             UPSERT_DECISION, _decision_values(code_key, name_key, decision)
+        )
+        self.db.execute_update(
+            UPSERT_SOURCE_HISTORY, _history_values(code_key, name_key, decision)
         )
 
     def upsert_batch(self, decisions: list[ManualReviewDecision]) -> None:
@@ -100,6 +126,13 @@ class ManualReviewStore:
         with self.db.get_connection() as conn:
             cur = conn.cursor()
             cur.executemany(UPSERT_DECISION, values)
+            cur.executemany(
+                UPSERT_SOURCE_HISTORY,
+                [
+                    _history_values(*hint_key(d.item_code, d.item_name), d)
+                    for d in decisions
+                ],
+            )
             conn.commit()
             cur.close()
 
@@ -194,6 +227,7 @@ class ManualReviewStore:
         *,
         matching_source: str | None = None,
         matching_source_label: str | None = None,
+        excel_target_key: str | None = None,
     ) -> None:
         """Remove one source-scoped decision, or every source when omitted."""
         code_key, name_key = hint_key(item_code, item_name)
@@ -205,6 +239,9 @@ class ManualReviewStore:
         if matching_source_label is not None:
             clauses.append("matching_source_label=?")
             params.append(str(matching_source_label))
+        if excel_target_key is not None:
+            clauses.append("excel_target_key=?")
+            params.append(str(excel_target_key))
         self.db.execute_update(
             "delete from manual_review_decisions where " + " and ".join(clauses),
             tuple(params),
@@ -214,6 +251,30 @@ class ManualReviewStore:
         """Return all saved manual-review decisions in newest-updated order."""
         rows = self.db.execute_query(SELECT_DECISIONS + " order by updated_at desc")
         return [_decision_from_row(row) for row in rows]
+
+    def list_source_history(
+        self, item_code: str, item_name: str
+    ) -> list["ManualReviewSourceHistory"]:
+        """Return immutable catalog-file observations for one order item."""
+        code_key, name_key = hint_key(item_code, item_name)
+        rows = self.db.execute_query(
+            "select matching_source,supplier_scope_key,source_file,source_label,"
+            "run_id,store_product_id,product_name,manual_decision,rebind_status,"
+            "first_seen_at,last_seen_at from manual_review_source_history "
+            "where item_code_key=? and item_name_key=? order by last_seen_at desc",
+            (code_key, name_key),
+        )
+        return [ManualReviewSourceHistory(*map(lambda value: str(value or ""), row)) for row in rows]
+
+    def list_all_source_history(self) -> list["ManualReviewSourceHistory"]:
+        """Return all catalog observations for the Saved Corrections audit view."""
+        rows = self.db.execute_query(
+            "select matching_source,supplier_scope_key,source_file,source_label,"
+            "run_id,store_product_id,product_name,manual_decision,rebind_status,"
+            "first_seen_at,last_seen_at from manual_review_source_history "
+            "order by last_seen_at desc"
+        )
+        return [ManualReviewSourceHistory(*map(lambda value: str(value or ""), row)) for row in rows]
 
     def _init_schema(self) -> None:
         self.db.execute_update(CREATE_DECISIONS_TABLE)
@@ -239,6 +300,9 @@ class ManualReviewStore:
             "identity_evidence",
             ALTER_DECISIONS_TABLE_EVIDENCE,
         )
+        _ensure_column(self.db, "supplier_scope_key", ALTER_DECISIONS_TABLE_SCOPE)
+        _ensure_column(self.db, "last_rebind_status", ALTER_DECISIONS_TABLE_REBIND)
+        self.db.execute_update(CREATE_SOURCE_HISTORY_TABLE)
         # Make provenance explicit for rows written before the source fields
         # existed.  We can prove an Excel target from its scoped key; all
         # other historical rows remain deliberately unknown rather than
@@ -254,6 +318,15 @@ class ManualReviewStore:
             "set matching_source='legacy-unknown' "
             "where coalesce(matching_source,'')='' "
             "and coalesce(excel_target_key,'')=''"
+        )
+        self.db.execute_update(
+            "update manual_review_decisions set supplier_scope_key=case "
+            "when replace(lower(matching_source),'_','-')='excel-target' "
+            "then lower(trim(excel_target_key)) "
+            "when replace(lower(matching_source),'_','-')='tawreed' "
+            "then lower(trim(matching_source_label)) "
+            "else replace(lower(matching_source),'_','-') end "
+            "where coalesce(supplier_scope_key,'')=''"
         )
         self._migrate_to_source_scoped_primary_key()
 
@@ -276,7 +349,7 @@ class ManualReviewStore:
             "item_code_key",
             "item_name_key",
             "matching_source",
-            "matching_source_label",
+            "supplier_scope_key",
         ]
         if primary_key == expected:
             return
@@ -290,16 +363,41 @@ class ManualReviewStore:
             "manual_decision,correct_store_product_id,correct_product_name,"
             "correct_product_name_ar,correct_query,run_id,excel_target_key,"
             "excel_target_source_file,matching_source,matching_source_label,"
-            "identity_evidence_kind,identity_evidence,created_at,updated_at"
+            "identity_evidence_kind,identity_evidence,supplier_scope_key,"
+            "last_rebind_status,created_at,updated_at"
         )
         with self.db.get_connection() as conn:
+            self._backup_before_scope_migration(conn)
             conn.execute("begin immediate")
             try:
+                conn.execute(
+                    "insert or replace into manual_review_source_history "
+                    "(item_code_key,item_name_key,matching_source,supplier_scope_key,"
+                    "source_file,source_label,run_id,store_product_id,product_name,"
+                    "manual_decision,rebind_status,first_seen_at,last_seen_at) "
+                    "select item_code_key,item_name_key,matching_source,supplier_scope_key,"
+                    "excel_target_source_file,matching_source_label,run_id,"
+                    "correct_store_product_id,case when correct_product_name<>'' "
+                    "then correct_product_name else correct_product_name_ar end,"
+                    "manual_decision,last_rebind_status,created_at,updated_at "
+                    "from manual_review_decisions"
+                )
                 conn.execute(f"drop table if exists {scoped_table}")
                 conn.execute(create_scoped)
                 conn.execute(
                     f"insert into {scoped_table} ({columns}) "
-                    f"select {columns} from manual_review_decisions"
+                    f"select {columns} from manual_review_decisions d where not exists ("
+                    "select 1 from manual_review_decisions newer where "
+                    "newer.item_code_key=d.item_code_key and "
+                    "newer.item_name_key=d.item_name_key and "
+                    "newer.matching_source=d.matching_source and "
+                    "newer.supplier_scope_key=d.supplier_scope_key and ("
+                    "(case when newer.manual_decision='auto_matched' then 0 else 1 end) > "
+                    " (case when d.manual_decision='auto_matched' then 0 else 1 end) or ("
+                    "(case when newer.manual_decision='auto_matched' then 0 else 1 end) = "
+                    " (case when d.manual_decision='auto_matched' then 0 else 1 end) and ("
+                    "newer.updated_at>d.updated_at or "
+                    "(newer.updated_at=d.updated_at and newer.rowid>d.rowid)))))"
                 )
                 conn.execute("drop table manual_review_decisions")
                 conn.execute(
@@ -309,6 +407,19 @@ class ManualReviewStore:
             except Exception:
                 conn.rollback()
                 raise
+
+    def _backup_before_scope_migration(self, source_conn) -> None:
+        """Create one consistent SQLite backup before changing the primary key."""
+        if not self.path:
+            return
+        path = Path(self.path)
+        if not path.exists():
+            return
+        backup_path = path.with_suffix(path.suffix + ".supplier-scope-v2.bak")
+        if backup_path.exists():
+            return
+        with sqlite3.connect(backup_path) as destination:
+            source_conn.backup(destination)
 
     def _init_schema_once(self) -> None:
         db_id = id(self.db)
@@ -326,5 +437,6 @@ def _normalize_source(value: object) -> str:
 __all__ = [
     "DEFAULT_MANUAL_REVIEW_DB",
     "ManualReviewDecision",
+    "ManualReviewSourceHistory",
     "ManualReviewStore",
 ]

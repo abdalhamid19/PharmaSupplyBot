@@ -641,7 +641,6 @@ def _auto_save_excel_target_match(
             item.code,
             item.name,
             matching_source="excel-target",
-            matching_source_label=source_label,
             excel_target_key=target_key,
         )
         if existing is None:
