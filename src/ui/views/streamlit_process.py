@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import traceback
+from typing import Literal, TextIO, TypedDict
 
 import streamlit as st
 
@@ -13,7 +14,38 @@ from ..streamlit_shared import RUNNER_PATH
 from ..streamlit_subprocess_env import merged_env
 
 
-def run_cli_subprocess(arguments: list[str], env_overrides: dict[str, str] | None = None) -> dict[str, object]:
+ProcessStatus = Literal["running", "completed", "failed"]
+
+
+class ProcessState(TypedDict, total=False):
+    """Runtime state shared by Streamlit background-process controls."""
+
+    process: subprocess.Popen[str]
+    output_file: TextIO
+    output_path: Path
+    command: list[str]
+    stop_flag_path: str
+    summary_path: str
+    previous_row_count: int
+    profile_key: str
+    match_only: bool
+
+
+class ProcessResult(TypedDict, total=False):
+    """Normalized result shape used by completed Streamlit commands."""
+
+    ok: bool
+    exit_code: int
+    command: str
+    output: str
+    error_type: str
+    error_message: str
+    traceback: str
+
+
+def run_cli_subprocess(
+    arguments: list[str], env_overrides: dict[str, str] | None = None
+) -> ProcessResult:
     """Run the project CLI in a subprocess so Playwright is isolated from Streamlit."""
     command = cli_command(arguments)
     try:
@@ -27,7 +59,7 @@ def start_cli_subprocess(
     arguments: list[str],
     output_path: Path,
     env_overrides: dict[str, str] | None = None,
-) -> dict[str, object]:
+) -> ProcessState:
     """Start the project CLI in the background and stream output to a file."""
     command = cli_command(arguments)
     output_file = output_stream(output_path)
@@ -80,7 +112,7 @@ def _process_result(
     returncode: int,
     stdout: str,
     stderr: str,
-) -> dict[str, object]:
+) -> ProcessResult:
     """Return the normalized result structure for one completed subprocess."""
     return {
         "ok": returncode == 0,
@@ -92,7 +124,7 @@ def _process_result(
     }
 
 
-def _failed_process_result(command: list[str], error: BaseException) -> dict[str, object]:
+def _failed_process_result(command: list[str], error: BaseException) -> ProcessResult:
     """Return the normalized result structure for one subprocess-start failure."""
     return {
         "ok": False,
@@ -104,7 +136,7 @@ def _failed_process_result(command: list[str], error: BaseException) -> dict[str
     }
 
 
-def render_command_result(result: dict[str, object]) -> None:
+def render_command_result(result: ProcessResult) -> None:
     """Render one captured command result block."""
     if bool(result["ok"]):
         st.success(f"Command completed. Exit code: {result.get('exit_code', 0)}")
