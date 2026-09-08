@@ -33,6 +33,7 @@ from .manual_review_store_helpers import (
     _ensure_column,
     _default_decision,
     _history_values,
+    _history_values_from_decision_values,
 )
 from .manual_review_store_query import (
     _unique_item_keys,
@@ -118,21 +119,27 @@ class ManualReviewStore:
         if not decisions:
             return
 
-        values = [
-            _decision_values(*hint_key(d.item_code, d.item_name), d)
-            for d in decisions
+        keyed_decisions = [
+            (hint_key(decision.item_code, decision.item_name), decision)
+            for decision in decisions
+        ]
+        decision_rows = [
+            _decision_values(*decision_key, decision)
+            for decision_key, decision in keyed_decisions
+        ]
+        history_rows = [
+            _history_values_from_decision_values(
+                decision_key[0], decision_key[1], decision, decision_row
+            )
+            for (decision_key, decision), decision_row in zip(
+                keyed_decisions, decision_rows
+            )
         ]
 
         with self.db.get_connection() as conn:
             cur = conn.cursor()
-            cur.executemany(UPSERT_DECISION, values)
-            cur.executemany(
-                UPSERT_SOURCE_HISTORY,
-                [
-                    _history_values(*hint_key(d.item_code, d.item_name), d)
-                    for d in decisions
-                ],
-            )
+            cur.executemany(UPSERT_DECISION, decision_rows)
+            cur.executemany(UPSERT_SOURCE_HISTORY, history_rows)
             conn.commit()
             cur.close()
 

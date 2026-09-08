@@ -94,6 +94,35 @@ def test_same_item_keeps_independent_rows_per_matching_supplier(tmp_path: Path) 
     assert remaining[0].matching_source == "excel-target"
 
 
+def test_batch_upsert_preserves_current_decisions_and_history(
+    tmp_path: Path,
+) -> None:
+    store = ManualReviewStore(tmp_path / "manual.sqlite3")
+    decisions = [
+        ManualReviewDecision(
+            item_code=str(index),
+            item_name=f"PRODUCT {index}",
+            approved=True,
+            correct_store_product_id=f"store-{index}",
+            correct_product_name=f"PRODUCT {index}",
+            run_id=f"run-{index}",
+            matching_source="tawreed",
+            matching_source_label="wardany",
+        )
+        for index in range(2)
+    ]
+
+    store.upsert_batch(decisions)
+
+    assert {decision.item_code for decision in store.list_decisions()} == {"0", "1"}
+    assert {
+        row.store_product_id for row in store.list_source_history("0", "PRODUCT 0")
+    } == {"store-0"}
+    assert {
+        row.store_product_id for row in store.list_source_history("1", "PRODUCT 1")
+    } == {"store-1"}
+
+
 def test_excel_files_with_same_target_share_one_current_decision_and_keep_history(
     tmp_path: Path,
 ) -> None:

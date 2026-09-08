@@ -72,19 +72,32 @@ def _decision_from_row(row):
 
 
 def _history_values(code_key: str, name_key: str, decision):
-    values = _decision_values(code_key, name_key, decision)
+    return _history_values_from_decision_values(
+        code_key,
+        name_key,
+        decision,
+        _decision_values(code_key, name_key, decision),
+    )
+
+
+def _history_values_from_decision_values(
+    code_key: str,
+    name_key: str,
+    decision,
+    decision_values: tuple[object, ...],
+):
     return (
         code_key,
         name_key,
-        values[13],
-        values[17],
+        decision_values[13],
+        decision_values[17],
         _clean(decision.excel_target_source_file),
         _clean(decision.matching_source_label),
         _clean(decision.run_id),
         _clean(decision.correct_store_product_id),
         _clean(decision.correct_product_name or decision.correct_product_name_ar),
         _clean(decision.manual_decision),
-        values[18],
+        decision_values[18],
     )
 
 
@@ -108,4 +121,5 @@ __all__ = [
     "_ensure_column",
     "_default_decision",
     "_history_values",
+    "_history_values_from_decision_values",
 ]
