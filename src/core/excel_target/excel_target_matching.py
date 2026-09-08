@@ -15,7 +15,7 @@ from typing import Any, Sequence
 from src.core.config.config_models import AppConfig, ExcelTargetConfig, MatchingConfig
 from src.core.matching.product_matching import explain_best_product_match
 from src.core.matching.product_matching_queries import search_queries_for_item
-from src.core.matching_types import MatchDecision, SearchMatch
+from src.core.matching_types import DecisionSource, MatchDecision, SearchMatch
 from src.core.matching.candidate_identity import candidate_store_product_id
 from src.core.manual_review.manual_review_runtime import saved_manual_review_decision
 from src.core.manual_review.manual_review_store import ManualReviewStore
@@ -205,7 +205,8 @@ def _scoped_manual_review(
         ),
     )
     _record_manual_rebind(decision, target_key, product)
-    return _identity_decision(item, identified, time.perf_counter())
+    rebound = _identity_decision(item, identified, time.perf_counter())
+    return replace(rebound, source=DecisionSource.MANUAL_REVIEW_SAVED)
 
 
 def _record_manual_rebind(decision, target_key: str, product: TargetProduct) -> None:

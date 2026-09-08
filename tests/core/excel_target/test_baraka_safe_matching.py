@@ -9,6 +9,7 @@ from src.core.config.config_models import MatchingConfig
 from src.core.excel_target.excel_target_loader import TargetProduct
 from src.core.excel_target.excel_target_matching import ExcelTargetMatcher
 from src.core.manual_review.manual_review_store import ManualReviewDecision
+from src.core.matching_types import DecisionSource
 from src.core.utils.excel import Item
 
 
@@ -186,11 +187,13 @@ class TestBarakaSafeMatching(TestCase):
         ), patch(
             "src.core.excel_target.excel_target_matching._record_manual_rebind"
         ) as record:
-            best = matcher.match(ITEM, MatchingConfig()).decision.best_match
+            decision = matcher.match(ITEM, MatchingConfig()).decision
 
+        best = decision.best_match
         self.assertIsNotNone(best)
         self.assertEqual(best.data["storeProductId"], "new-code")
         self.assertEqual(best.data["identity_evidence_kind"], "manual_review_rebound")
+        self.assertEqual(decision.source, DecisionSource.MANUAL_REVIEW_SAVED)
         record.assert_called_once()
 
     def test_non_approved_target_decisions_remain_manual_across_excel_files(self) -> None:
