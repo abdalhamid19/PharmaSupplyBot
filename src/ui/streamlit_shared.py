@@ -44,18 +44,39 @@ def resolved_streamlit_config_path(config_path: Path) -> Path:
 
 def load_csv_rows(path: Path) -> list[dict[str, str]]:
     """Return CSV rows from disk, or an empty list when the file is absent."""
-    return _load_table_rows(path, pd.read_csv)
+    return _load_table_rows(path, "csv")
 
 
 def load_xlsx_rows(path: Path) -> list[dict[str, str]]:
     """Return XLSX rows from disk, or an empty list when the file is absent."""
-    return _load_table_rows(path, pd.read_excel)
+    return _load_table_rows(path, "xlsx")
 
 
-def _load_table_rows(path: Path, reader) -> list[dict[str, str]]:
-    """Return table rows from one artifact path using the provided pandas reader."""
-    if not path.exists():
+def _load_table_rows(path: Path, table_format: str) -> list[dict[str, str]]:
+    """Return table rows while invalidating cached data when the file changes."""
+    try:
+        file_statistics = path.stat()
+    except FileNotFoundError:
         return []
+
+    return _read_table_rows_cached(
+        str(path.resolve()),
+        file_statistics.st_mtime_ns,
+        file_statistics.st_size,
+        table_format,
+    )
+
+
+@st.cache_data(max_entries=128, show_spinner=False)
+def _read_table_rows_cached(
+    path_string: str,
+    modified_time_ns: int,
+    file_size: int,
+    table_format: str,
+) -> list[dict[str, str]]:
+    """Read a table once for one file fingerprint and return ordered rows."""
+    path = Path(path_string)
+    reader = pd.read_csv if table_format == "csv" else pd.read_excel
     dataframe = reader(path).fillna("")
     return dataframe.to_dict(orient="records")
 
