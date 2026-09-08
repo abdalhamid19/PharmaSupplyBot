@@ -1,0 +1,21 @@
+feat(ui): upload Excel target catalogs from Run Order page
+
+Operators can now choose the source of every selected Excel target from
+the Run Order page:
+
+  * Configured    — the default ``data/input/excel target/<key>.xlsx``
+    that ships with config.yaml.
+  * Existing file — another ``.xlsx`` already on disk under
+    ``data/input/excel target/``.
+  * Upload file   — drag-and-drop a brand-new catalog; the bytes are
+    written to ``artifacts/uploaded-excel-targets/<key>.xlsx`` so the
+    subprocess can read them.
+
+Each non-Configured selection emits a ``--excel-target-path key=path``
+flag, which the existing CLI already understands. No new flags were
+introduced — the GUI now drives the same override mechanism operators
+can already use from the terminal.
+
+Tests: 631 tests, 0 regressions (4 pre-existing unrelated failures).
+New tests cover Configured / Existing file / Upload file command emission
+end-to-end and the persistence path for uploaded catalogs.

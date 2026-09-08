@@ -1,0 +1,17 @@
+fix(ui): keep the operator's name as the target key (no hash fallback)
+
+When the catalog name has no ASCII letters, e.g. the default
+"المخازن الادويه المباشرة", the previous implementation returned
+"target_<hash>" so the operator saw a meaningless identifier in the
+dialog preview and in the new checkbox label.
+
+Keep the original Unicode name as the key in that case. Both YAML
+and modern filesystems (including Windows NTFS) accept non-ASCII
+filenames, and the key remains human-readable. A name of only
+whitespace still falls back to the hash-based slug so the add
+button never produces an empty key.
+
+Tests cover the new behaviour:
+* test_arabic_input_keeps_original_name
+* test_mixed_arabic_and_ascii_uses_ascii_slug
+* test_arabic_name_keeps_original_as_key

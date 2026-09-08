@@ -1,0 +1,31 @@
+feat(order): add Excel target source beside Tawreed profiles
+
+Operators can now match the order Excel against any combination of
+Tawreed profiles and in-memory Excel catalogs configured under
+``excel_targets`` in config.yaml. The Excel target runs through the
+same pure-Python matching engine (``explain_best_product_match``) so
+score thresholds, manual-review rules and persistence stay identical
+between sources. Artifacts are written to
+``artifacts/excel_target_summary_<key>.csv`` and per-target run
+directories under ``artifacts/excel-target/<key>/<run_id>/``.
+
+GUI changes:
+  - ``Run target`` is now a multi-select that combines Tawreed
+    profiles (👤 Tawreed profile — Display (key)) and Excel targets
+    (📊 Excel target — key) in one widget.
+  - Validation requires at least one selection and accepts runs that
+    target Excel catalogs only (no Tawreed profile session needed).
+
+CLI changes:
+  - ``--excel-target <key>`` runs one configured catalog.
+  - ``--all-excel-targets`` runs every enabled catalog (multi-key form
+    repeats ``--excel-target`` and adds ``--all-excel-targets``).
+  - ``--excel-target-path key=path`` overrides the catalog path used
+    for one key (repeatable via comma separator).
+
+Tests: 627 tests, 0 regressions (4 pre-existing unrelated failures).
+
+Verified end-to-end against ``data/input/order_items/test_new_feature.xlsx``
+and ``data/input/excel target/alnasr.xlsx`` with ``--match-only``:
+5 processed, 4 matched, 1 flagged (CALAMINE-GO LOTION — Arabic identity
+marker mismatch surfaces exactly like Tawreed matches).

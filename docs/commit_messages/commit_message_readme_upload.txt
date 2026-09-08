@@ -1,0 +1,1 @@
+docs: describe Excel target upload modes in README

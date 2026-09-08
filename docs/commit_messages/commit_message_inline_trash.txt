@@ -1,0 +1,16 @@
+fix(ui): inline the trash button next to each user-added Excel target
+
+The trash button used to live in its own "Targets you added" panel
+below the checkbox group, so the operator had to scroll past the
+"Excel target source" controls to find the trash icon. With no
+visual link between a checkbox row and the matching trash button,
+the operator thought the catalog was stuck.
+
+Render one row per Excel target: [checkbox, 🗑] side by side. The
+trash button only appears for keys the operator added from the UI
+(those flagged in state/config.yaml under user_added_targets). Hard
+coded targets stay protected.
+
+The Yes/Cancel confirmation panel is still rendered at the same
+spot (between the checkboxes and the +Add button) so a misclick
+costs one extra step rather than deleting a warehouse.

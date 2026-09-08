@@ -1,0 +1,39 @@
+feat(ui): inline Edit button for Excel target settings
+
+Operators who picked the wrong column names (e.g. "سعر ج" vs
+"سعر", or "نقدي" vs "الخصم") had to delete the catalog and
+re-upload it. Add an inline ✏ Edit button next to the 🗑
+Remove button so the column names, sheet, header row, display
+name, and enabled flag can be rewritten in place.
+
+* excel_targets_manager:
+  - update_excel_target(config_path, key, **fields) rewrites the
+    entry for an existing Excel target. The catalog file is left
+    untouched; only the editable settings are changed. Returns
+    False for an unknown key so callers can show a clean error.
+  - excel_target_settings(config_path, key) returns the current
+    entry as a dict (empty for an unknown key) so the Edit
+    dialog can pre-populate its form fields.
+  - EDITABLE_FIELDS lists every field the GUI exposes.
+
+* streamlit_excel_target_manager_widgets:
+  - new _edit_excel_target_dialog and maybe_open_edit_dialog
+    render a Streamlit dialog with text/number/checkbox fields
+    for every editable setting.
+  - The "Save changes" button calls update_excel_target and
+    sets excel_target_edited_toast on success.
+
+* streamlit_profile_fields._render_target_checkboxes:
+  - the action column now hosts two side-by-side buttons:
+    ✏ Edit (visible for every target) and 🗑 Remove
+    (visible only for user-added targets, unchanged).
+  - maybe_open_edit_dialog is wired into the same dispatch
+    flow as the add/remove dialogs.
+
+* Tests:
+  - UpdateExcelTargetTests covers column-name rewrites,
+    display_name mirror, the unknown-key False return, the
+    disable toggle, and the empty settings for a missing key.
+  - ExcelTargetManagerWidgetTests gains two tests that
+    confirm the ✏ Edit button is rendered and that pressing
+    it sets excel_target_edit_pending in session_state.

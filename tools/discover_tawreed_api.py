@@ -75,7 +75,7 @@ def _json_body(value: str) -> dict[str, Any]:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", default="state/config.yaml")
     parser.add_argument("--profile", default="wardany")
     parser.add_argument("--seconds", type=int, default=60)
     parser.add_argument("--output", default=str(DEFAULT_CONTRACT_PATH))

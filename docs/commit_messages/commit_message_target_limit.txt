@@ -1,0 +1,14 @@
+fix(cli): honor --limit in the Excel target item loader
+
+The Tawreed flow applied two filters: ``slice_items`` (start/end)
+and ``limited_order_items`` (the legacy ``--limit`` field used by
+the Streamlit GUI). The Excel target flow only ran ``slice_items``,
+so when the operator set "Item limit = 50" in the GUI, the Tawreed
+profile searched 50 items while the Excel target flow searched the
+full sheet (often 1000+). The two flows ended up with completely
+different item sets and the "processed" counter on the run
+summary diverged from the Tawreed CSV.
+
+Apply ``limited_order_items`` in ``_load_target_items`` after
+``load_regular_order_items`` so both filters run for the cross-
+source view, matching the Tawreed flow exactly.

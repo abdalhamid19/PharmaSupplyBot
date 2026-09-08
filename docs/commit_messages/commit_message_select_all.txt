@@ -1,0 +1,14 @@
+fix(ui): hide the catalog multiselect when "Select all" is on
+
+Streamlit >=1.36 shows a built-in "All" toggle inside the
+multiselect toolbar. With our own "Select all" checkbox above
+the picker, that toolbar toggle duplicates the control and
+confuses the user (two stacked "Select all" affordances,
+different behaviour for each).
+
+When the user ticks "Select all" we now skip rendering the
+multiselect entirely and replace it with a one-line caption
+naming the count of selected catalogs and pointing the user
+to untick "Select all" to narrow the selection. When
+"Select all" is off the multiselect is shown as before, so
+the two control surfaces can never be on screen together.

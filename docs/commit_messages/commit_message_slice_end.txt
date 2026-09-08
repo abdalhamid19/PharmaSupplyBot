@@ -1,0 +1,15 @@
+fix(cli): return empty slice when --end-item precedes --start-item
+
+``slice_items`` only honoured ``end_item`` when it was greater than
+or equal to ``start_item``. The inverse case — e.g.
+``--start-item 10 --end-item 5`` — silently dropped the end guard
+and kept every item from ``start_item`` to the bottom of the sheet,
+which is almost never what the user wants. The Excel target
+match-only flow inherits the same logic, so the bug also leaked
+into the new cross-source persistence.
+
+Return an empty iterator when ``end_item`` is explicitly set and
+falls below ``start_item`` so the run produces zero items instead
+of an unbounded tail slice. This makes the start/end contract
+symmetric: invalid ranges are now clearly "no work" rather than
+"all remaining work".

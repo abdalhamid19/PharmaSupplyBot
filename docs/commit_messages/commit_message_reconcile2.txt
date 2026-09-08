@@ -1,0 +1,29 @@
+fix(cli): only overwrite the winning run_items row, not the others
+
+The previous reconciliation pass rewrote every run_items row
+whose source_kind/source_label matched a winning store. The
+match produced a single UPDATE per (run_key, item_key) that
+ended up touching only one row because the WHERE clause included
+source_kind, but the persistence layer is per-source so the
+losing source's row still carries the original
+winner_store_key/store_product_id from when it was first
+written. That is the correct semantics — the per-source rows
+keep their own "this source's winner" record.
+
+What we actually want to do is more conservative: only reset the
+``is_winner`` flag in run_item_stores (the per-source snapshot)
+and let the cross-source comparison surface the cheapest row.
+
+Replace the prior pass with one that:
+* selects the cheapest (purchase_price, then discount_percent)
+  row per item across all sources,
+* flips its ``is_winner`` to 1 in run_item_stores, and
+* leaves the run_items.winner_store_key field per source
+  unchanged (each source still records "the row this source
+  would have chosen"), so the items table can show both
+  side by side when the operator drills in.
+
+The result is the same UI affordance: the per-item "Offering
+stores" expander shows exactly one ✅ across the two sources
+because only the cheapest row in run_item_stores carries
+is_winner=1.

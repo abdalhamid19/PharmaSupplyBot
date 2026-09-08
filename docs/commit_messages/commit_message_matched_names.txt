@@ -1,0 +1,36 @@
+feat(db): add matched_name_ar and matched_name_en to run_items (schema v4)
+
+The Run Results (Database) tab showed the requested item name but
+not the name of the product that was actually matched. Pharmacists
+had to open the per-item "Offering stores" expander to read
+``products.name_ar`` / ``name_en`` for the winner, which made it
+hard to scan a 33-item run and confirm the right product was
+matched.
+
+* Schema: bump SCHEMA_VERSION to 4. New migration
+  ``_migrate_v3_to_v4`` adds two ``TEXT NOT NULL DEFAULT ''``
+  columns to ``run_items``:
+  ``matched_name_ar`` and ``matched_name_en``. Existing rows are
+  left empty; new runs fill them at write time. The migration is
+  idempotent: if either column already exists, it is skipped.
+* run_item_row + _match_outcome_fields: read
+  ``summary.get("matched_product_name_ar")`` /
+  ``"matched_product_name_en")`` and forward to the new columns.
+  These keys are already produced by
+  ``candidate_summary_fields`` for every Tawreed match.
+* UPSERT_RUN_ITEM: list the new columns in the INSERT and in the
+  ON CONFLICT update clause so re-imports do not regress them.
+* order_runs_read_sql.RUN_FACTS and the four
+  order_runs_read_filters_sql queries (matched/flagged/
+  not-orderable/ordered) now SELECT the two columns, and
+  QUERY_COLUMNS["items"] exposes them to the UI table.
+* cli_order_excel_target: the db_persister now also writes
+  ``matched_product_name_ar`` and ``matched_product_name_en`` in
+  the summary row so excel-target matches surface the same
+  columns (the Excel target's ``productNameEn`` is used for
+  both).
+* Tests:
+  - test_order_runs_rows gains two tests for the new fields
+    (empty default + propagation from the summary).
+  - test_order_runs_schema_behaviour bumps the expected schema
+    version from 3 to 4 in the stale-view bootstrap test.

@@ -1,0 +1,35 @@
+feat(excel-target): clarify retail vs wholesale and harden winner logic
+
+The Excel target catalog carries the pharmacy's retail price (the
+price the pharmacy charges end customers), not its wholesale purchase
+cost. Comparing the two in the cross-source winner race was misleading
+and the "Offering stores per item" expander surfaced the retail number
+without any semantic distinction. This change makes the contract
+explicit at every layer.
+
+* config: add optional ``store_id`` / ``store_name`` keys under each
+  ``excel_targets.<key>`` so operators can label their offline
+  catalogs. ``resolve_excel_target_store_identity`` falls back to a
+  derived ``excel-target:<key>[@<source_file>]`` label when the keys
+  are absent, preserving the existing snapshot writer behaviour.
+
+* reconcile: ``_cheaper`` now short-circuits on ``source`` so an
+  Excel target row can never displace a Tawreed row from the winner
+  spot, even if a future writer accidentally populates
+  ``purchase_price`` on an Excel row. A new ``_is_excel_target_source``
+  helper accepts both ``excel_target`` and the legacy
+  ``excel-target`` form.
+
+* ui: ``streamlit_run_tables._render_store_table`` appends a
+  ``price_note`` column. Tawreed rows read
+  "💵 purchase price" while Excel target rows read
+  "💰 retail (reference)" so operators can tell the two price
+  classes apart at a glance.
+
+* docs: ``docs/excel_target_pricing/`` documents the diagnosis, the
+  cross-source semantic, and the recommended configuration.
+
+* tests: ``test_cli_order_cheaper`` and
+  ``test_excel_target_store_identity`` lock in the new contracts and
+  the source-based short-circuit. Existing e2e and unit tests pass
+  unchanged.

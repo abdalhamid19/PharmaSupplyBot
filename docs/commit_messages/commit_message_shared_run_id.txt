@@ -1,0 +1,28 @@
+feat(cli): share one run_id between Tawreed and excel-target
+
+When --all-excel-targets is combined with the Tawreed profiles, the
+excel-target flow ran first under its own auto-generated run_key
+(``wardany/<minute>``) and wrote 33 no-results rows to state/order_runs.db
+that never appeared in the Tawreed run the user just launched. The Run
+DB tab then showed the Tawreed rows in the latest run and the
+excel-target rows in a different, hidden, almost-empty run.
+
+Fix: ``run_order_command`` now pre-allocates one ``run_id`` (the
+upcoming minute-stamp) when both flows will run, opens the parent
+``runs`` row up front, and threads the same ``run_id`` down to
+``run_single_profile`` so the Tawreed ``artifact_run`` uses the
+identical timestamp. ``run_excel_target_match_only_multi`` receives
+the shared ``run_key`` (``<profile>/<run_id>``) so every excel-target
+``run_items`` / ``run_item_stores`` row lands under the same run.
+
+* cli_order.py: new ``_open_shared_run_record`` pre-opens the
+  ``runs`` row; ``run_order_command`` computes ``shared_run_id`` from
+  ``unique_run_id`` and passes it to both
+  ``run_excel_target_match_only_multi`` and ``execute_profiles``.
+* cli_order.py: ``execute_profiles`` and ``run_parallel_profiles``
+  accept an optional ``run_id`` and forward it to
+  ``run_single_profile``.
+* cli_order_execution.py: ``run_single_profile`` accepts an
+  optional ``run_id`` and uses it in the ``artifact_run`` context so
+  the artifact directory and the ``runs`` row line up with the
+  excel-target rows.

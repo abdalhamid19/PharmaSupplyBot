@@ -1,0 +1,15 @@
+fix(db): self-heal stale v_run_* views that reference run_items_v2
+
+A previous install left state/order_runs.db at schema v3 with
+v_run_winners and v_run_summary still defined against the legacy
+run_items_v2 staging table. CREATE VIEW IF NOT EXISTS in ALL_DDL was
+a no-op for those already-existing views, so fetch_runs() crashed
+with "no such table: main.run_items_v2" on every Streamlit launch.
+
+* order_runs_schema: register v_run_winners + v_run_summary in
+  STALE_VIEWS_BY_VERSION[2] so the v2->v3 migration drops them
+  before ALL_DDL recreates them with current SQL.
+* order_runs_store: _drop_stale_views also scans sqlite_master for
+  any view whose SQL still mentions run_items_v2 or run_items_v3
+  and drops it, so a half-applied migration from any future attempt
+  is self-healing on the next read.

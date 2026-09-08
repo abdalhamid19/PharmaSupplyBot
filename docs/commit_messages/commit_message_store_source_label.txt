@@ -1,0 +1,23 @@
+feat(ui): translate run_item_stores source codes to friendly labels
+
+The per-item offering-store snapshot table in the Run Results tab
+used to show the raw Tawreed-internal source code in the ``source``
+column: every Tawreed-sourced row was tagged ``store_details`` or
+``search`` (whichever API endpoint returned the row). Pharmacists
+asked what those meant and could not tell at a glance whether a
+row came from Tawreed or from an Excel target catalog.
+
+The internal values stay as-is (they are referenced from multiple
+call sites in the Tawreed snapshot flow), but the UI now translates
+them in ``_render_store_table``:
+
+* ``store_details`` and ``search`` -> ``👤 Tawreed``
+* ``excel_target`` and ``excel-target`` -> ``📊 Excel target``
+* empty / unknown -> ``—``
+
+Note: only the Tawreed flow currently writes to ``run_item_stores``;
+the excel-target flow records facts in ``run_items`` but not store
+snapshots, so the per-item expander is Tawreed-only today. Future
+work: write a ``run_item_stores`` row per matched Excel target
+candidate so the per-item expander surfaces both sources side by
+side.

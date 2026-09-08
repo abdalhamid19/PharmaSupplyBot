@@ -1,0 +1,59 @@
+fix(ui): render every input outside st.form so widgets react immediately
+
+What changed:
+
+* Every input widget (Excel source radio + uploader, Run target
+  checkboxes, Excel target source panel, advanced options) now lives
+  outside ``st.form``. ``st.form`` only wraps the "Run Order" submit
+  button so the operator's click starts the subprocess.
+
+Why:
+
+* ``st.file_uploader`` declared inside ``st.form`` is deferred until the
+  form is submitted. The operator had to click "Run Order" once for
+  the file uploader to even appear, then click it again with a real
+  file attached — which made the run feel like it required two clicks
+  to "discover" the upload widget.
+* The same delay made the Excel target checkboxes feel inert: ticking
+  the box did not reveal the source panel until the form rerendered,
+  and the panel sometimes only appeared after the operator pressed
+  the submit button (which produced an error like
+  "Pick at least one Run target" because the form had reset state).
+
+The new layout:
+
+* ``render_excel_source_fields`` (replaces ``excel_source_fields``)
+  renders ``st.radio`` + ``st.selectbox``/``st.file_uploader`` straight
+  to the page. Mode + path/upload are mirrored to
+  ``st.session_state``.
+* ``profile_run_fields_with_workers`` renders the checkbox group +
+  advanced options outside the form and snapshots the result into
+  ``st.session_state["excel_target_selected_targets"]``,
+  ``st.session_state["order_form_advanced"]``, and
+  ``st.session_state["order_form_item_workers"]``.
+* ``render_excel_target_sources`` reads the selected-targets list from
+  session state and renders the per-target radio + uploader
+  immediately for any selected target.
+* ``order_form_values`` becomes a thin wrapper that renders the input
+  widgets, collects the snapshot, then opens a small ``st.form`` only
+  to host the "Run Order" submit button.
+
+Tests: 638 tests pass when each module is run in isolation. Two
+``RunDbTabSmokeTests`` failures show up only when the test runner
+walks ``tests/ui/`` in alphabetical order; they are caused by
+``AppTest.exception`` pollution from a sibling test in
+``test_streamlit_run_drilldown`` and pre-exist this commit. The new
+behavior itself is fully covered by ``ExcelTargetCheckboxWidgetTests``
+(22 cases), all green.
+
+Verified end-to-end via Streamlit's ``AppTest``:
+
+* Initial render shows the checkbox group (``What to run against?``)
+  with the Tawreed profile ticked and the Excel target unticked.
+* Ticking the alnasr checkbox reveals the ``Source`` radio
+  (Configured / Existing file / Upload file) on the **same rerun**
+  — no submit click required.
+* Selecting ``Upload file`` in the per-target radio reveals the
+  ``Upload catalog for alnasr`` file uploader immediately.
+* Toggling the order ``Excel source`` radio to ``Upload file``
+  reveals the ``Upload Excel`` file uploader immediately.

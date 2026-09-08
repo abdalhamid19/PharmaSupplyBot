@@ -1,0 +1,28 @@
+feat(ui): show friendly source name in Run DB items table; drop noisy per-item expander
+
+The items table in the Run Results tab used to show the raw
+source_label (e.g. "wardany") and was followed by an
+"Offering stores per item" expander section that dumped the entire
+store snapshot per item. Pharmacists found the per-item expanders
+noisy and the source_label column unhelpful when the friendly
+pharmacy or warehouse name was configured in state/config.yaml.
+
+* streamlit_run_db_page: render_run_db_tab now takes an optional
+  app_config so the items table can resolve source_label keys
+  (e.g. "wardany", "drug-warehouses") to their configured
+  display_name from profiles.<key>.display_name or
+  excel_targets.<key>.display_name.
+* streamlit_run_tables: render_run_items_table accepts a
+  source_label_resolver(kind, key) callable; the raw key is
+  kept as a fallback when the configured display name is empty
+  or the app config is unavailable.
+* render_item_stores_expander is reduced to a no-op stub; the
+  per-item winner + stores_offering columns already in the
+  items table cover what pharmacists need at a glance.
+* streamlit_main: render_main_tabs now forwards app_config into
+  render_run_db_tab.
+* New unit tests in tests/ui/views/run_db/test_source_label_resolver.py
+  cover tawreed/excel-target resolution, missing display_name
+  fallback, unknown kind fallback, and the None app_config path.
+* Existing tests for the Run DB tab and main tabs updated to
+  pass None explicitly where app_config is unavailable.

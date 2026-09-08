@@ -1,0 +1,29 @@
+fix(ui): add display_name to ExcelTargetConfig so upload widgets render
+
+When the operator selected an Excel target in the Run target
+multiselect, the Streamlit rerun crashed with::
+
+    AttributeError: 'ExcelTargetConfig' object has no attribute 'display_name'
+
+in ``_render_excel_target_upload_widgets`` (streamlit_profile_fields.py:145).
+The whole upload widget block (Source radio + Upload catalog file
+uploader) silently failed to render, making it look like the feature
+was missing.
+
+Root cause: ``ExcelTargetConfig`` only had ``name_col`` / ``price_col``
+/ ``discount_col`` columns — no human-readable label. The UI was
+reaching for ``target_cfg.display_name`` which never existed.
+
+Fix:
+  * Add ``display_name`` to ``ExcelTargetConfig`` (default ``""``).
+  * Read it in ``build_excel_target`` so YAML ``excel_targets.<key>.display_name``
+    populates it.
+  * Guard the UI label with ``getattr(..., "display_name", "")`` so the
+    upload block keeps rendering even when a future config omits the field.
+
+Tests: 633 tests, 0 regressions (4 pre-existing unrelated failures).
+New tests guard the schema and the loader.
+
+The full Run Order flow is now exercised by AppTest in
+``tools/debug/verify_gui_upload_apptest.py`` — selecting an Excel target
+in the multiselect renders the source radio + file uploader as designed.

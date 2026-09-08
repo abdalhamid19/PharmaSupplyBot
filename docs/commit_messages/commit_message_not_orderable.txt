@@ -1,0 +1,18 @@
+fix(db): expose not_orderable in the Run Results KPI bar
+
+``streamlit_run_drilldown._kpi_specs`` reads ``run["not_orderable"]``
+to render the "Not-orderable" toggle on the Run Results page, but the
+``v_run_summary`` view never selected the column. The SQL builder
+in ``LIST_RUNS`` therefore never bound the alias, and the KPI
+always read 0 — hiding every item that finished a Tawreed match
+without a usable storeProductId.
+
+Add ``no_results`` and ``not_orderable`` to ``v_run_summary``,
+expose them in ``LIST_RUNS`` + ``QUERY_COLUMNS["runs"]``, and add
+a forward ``_migrate_v4_to_v5`` migration (idempotent
+``drop view if exists``) so any existing v4 database self-heals
+on the next read. Bump ``SCHEMA_VERSION`` to 5 and record the
+view in ``STALE_VIEWS_BY_VERSION[3]`` so the bootstrap
+recreate step picks up the new shape.
+
+Update the schema-behaviour test to expect version 5.

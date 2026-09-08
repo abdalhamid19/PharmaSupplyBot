@@ -1,0 +1,54 @@
+fix(matching): accept Excel-target candidates without Arabic name
+
+Excel target catalogs only carry one product-name column, not a
+dedicated Arabic one, so the Arabic-required-token check
+("Arabic name missing marker for ML/VAG/APPLE/...") was rejecting
+every Excel candidate that did not have a separate Arabic name.
+That made ``B-FRESH MOUTHWASH MINT 250MLاخضر`` (a real match for
+``B FRESH MOUTHWASH MINT 250MLاخضر``) come back as ``no-results``
+because the check looked for ``مل/مللي/ميللي`` in the candidate's
+Arabic name and found nothing.
+
+* product_matching_helpers: new ``_ARABIC_KEEP_RE`` regex that
+  strips every non-Arabic character, used by the internal
+  ``_normalized_arabic_name`` helper so an embedded marker like
+  ``مل`` survives inside a mixed-script product name.
+* product_matching_acceptance._missing_arabic_token_reasons now
+  accepts the candidate dict and skips the entire Arabic check
+  when ``candidate.get("excelTarget")`` is truthy. Tawreed
+  candidates still go through the full Arabic-required-token
+  validation.
+* product_matching_acceptance._candidate_variant_rejection passes
+  the candidate through to the new skip path.
+
+Also fixes a long-standing race between the Tawreed and
+excel-target flows that share a run_key. Tawreed's
+``_write_store_snapshot`` deleted every ``run_item_stores`` row
+for ``(run_key, item_key)`` before upserting its own, so the
+excel-target rows that ran first were wiped when Tawreed finished.
+
+* order_runs_store_sql.DELETE_RUN_ITEM_STORES now matches on
+  ``(run_key, item_key, source)``.
+* order_runs_snapshot_writer._write_store_snapshot passes
+  ``plan.source`` so the delete only touches the source being
+  rewritten.
+
+The excel-target CLI now also accepts a pre-allocated ``run_id``
+so the run_key it produces matches the one the Tawreed CLI
+allocated for the shared run. Previously ``unique_run_id`` was
+called twice (once with ``("order", profile)`` and once with
+``("excel-target", target_key)``) and could return different
+timestamps when the two calls happened a tick apart.
+
+* cli_order_excel_target.run_excel_target_match_only and the
+  ``_multi`` wrapper now accept an optional ``run_id`` and use
+  it for the artifact_run context.
+* cli_order forwards ``shared_run_id`` to the multi call.
+
+Verified with a fresh ``py run.py order --all-excel-targets
+--match-only --excel .../SMALL_TEST.xlsx`` on state/config.yaml's
+``الجزيره`` Excel target (sheet "الجزيرة", price column "سعر ج",
+discount column "نقدي "): 33/33 items matched, 33 excel-target
+``run_item_stores`` rows alongside the Tawreed rows in the same
+run_key, no regressions in the unittest suite (7 fail + 5 error
+matches the prior baseline).

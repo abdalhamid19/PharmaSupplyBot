@@ -1,0 +1,38 @@
+fix(ui): replace multiselect with visible checkbox group for Run target
+
+The Run target picker used to be a single ``st.multiselect`` whose
+dropdown had to be opened before any Excel target option became
+visible. The operator reported the upload widget as missing even when
+``state/config.yaml`` clearly had an Excel target configured; the
+multiselect container only showed the default ``wardany`` profile and
+the Excel target option sat inside the closed dropdown.
+
+This commit replaces the multiselect with a checkbox group rendered
+under a visible ``##### What to run against?`` header. Each configured
+Tawreed profile and Excel target is rendered as its own ``st.checkbox``
+so the operator can see every available target immediately. The
+existing Excel target source panel (Configured / Existing file /
+Upload file radio + file uploader) continues to render below the
+form, gated by the checkbox state via ``st.session_state``.
+
+Why outside the form:
+
+* The radio + file uploader must keep state across reruns triggered by
+  changes inside the form, so they live outside ``st.form`` (matches
+  the previous design but now driven by the visible checkboxes).
+* The checkbox group mirrors its selection into
+  ``st.session_state["excel_target_selected_targets"]`` so
+  ``render_excel_target_sources`` reads a single source of truth
+  without re-evaluating the multiselect.
+
+Tests: 637 tests, 0 regressions (4 pre-existing unrelated failures).
+New ``ExcelTargetCheckboxWidgetTests`` cover all three visibility
+states via Streamlit's ``AppTest``:
+
+  * alnasr checkbox is rendered even when unticked
+  * ticking alnasr reveals the ``Source`` radio (3 modes)
+  * selecting ``Upload file`` reveals the ``Upload catalog`` uploader
+
+A standalone ``order_tab_fixture.py`` lives next to the tests so the
+test runner can drive the Order tab widgets without spinning up the
+full Streamlit app.

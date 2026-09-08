@@ -15,7 +15,7 @@ from playwright.sync_api import sync_playwright
 import json
 
 profile = "wardany"
-app_config = load_config(Path("config.yaml"))
+app_config = load_config(Path("state/config.yaml"))
 state_path = Path("state") / f"{profile}.json"
 
 print("🔍 Starting API capture...")

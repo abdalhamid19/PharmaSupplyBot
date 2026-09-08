@@ -1,0 +1,18 @@
+fix(ui): dedupe offering-stores expander by item_key
+
+The "Offering stores per item" expander iterated over every
+``run_items`` row whose ``stores_offering`` was non-zero. In a
+shared Tawreed + Excel target run each item produces two
+``run_items`` rows (one per source), so the expander rendered the
+same item twice with the same stores underneath.
+
+Dedupe by ``item_key`` before opening the expanders so each item
+shows up exactly once, and the per-item expander still pulls the
+combined snapshot from ``run_item_stores`` (which already
+aggregates both sources, with the unique ``is_winner=1`` row
+from the cross-source reconciliation surfacing the cheapest
+offering store).
+
+Verified with the latest ``wardany/20260902_1808`` shared run:
+33 unique items, all with exactly one expander instead of the
+previous 59 (33 Tawreed + 26 Excel target duplicates).

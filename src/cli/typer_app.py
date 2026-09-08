@@ -159,7 +159,7 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
     # 4. Load config + dispatch (full wrap so PharmaSupplyError always logs).
     fmt = FormatFlags.resolve(explicit="json" if obj.get("json_logs") else None)
     try:
-        config_path = Path(getattr(ns, "config", "config.yaml"))
+        config_path = Path(getattr(ns, "config", "state/config.yaml"))
         app_config = load_config(config_path)
         logger.debug(
             "dispatching command",

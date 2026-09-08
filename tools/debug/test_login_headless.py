@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Quick test of login with corrected selectors - saves result to file."""
 
-from playwright.sync_api import sync_playwright
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
 
 load_dotenv()
 
@@ -13,6 +15,8 @@ password = os.getenv("TAWREED_PASSWORD", "").strip()
 result = []
 result.append(f"Email: {email}")
 result.append(f"Password: {'*' * len(password)}\n")
+artifact_directory = Path("artifacts") / "debug"
+artifact_directory.mkdir(parents=True, exist_ok=True)
 
 try:
     with sync_playwright() as p:
@@ -45,7 +49,7 @@ try:
             result.append("✅ SUCCESS - Login worked! Not on login page anymore.")
         else:
             result.append("❌ FAILED - Still on login page.")
-            page.screenshot(path="login_failed.png")
+            page.screenshot(path=str(artifact_directory / "login_failed.png"))
         
         browser.close()
         
@@ -53,7 +57,7 @@ except Exception as e:
     result.append(f"\n❌ ERROR: {str(e)}")
 
 # Save result
-with open("login_test_result.txt", "w", encoding="utf-8") as f:
-    f.write("\n".join(result))
+result_path = artifact_directory / "login_test_result.txt"
+result_path.write_text("\n".join(result), encoding="utf-8")
 
 print("\n".join(result))

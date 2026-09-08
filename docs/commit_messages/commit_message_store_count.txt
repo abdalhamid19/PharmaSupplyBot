@@ -1,0 +1,15 @@
+fix(ui): show actual run_item_stores count in the per-item label
+
+The "Offering stores per item" expander was reading
+``item['stores_offering']`` from the first ``run_items`` row in
+the deduped list. That field is per-source, so for a Tawreed +
+Excel target shared run it was almost always 1 (the Excel
+target row carries a single offering store) while the actual
+``run_item_stores`` snapshot underneath had 10-25 rows for the
+same item.
+
+Compute the count from the snapshot rows themselves so the
+number next to the item name matches the table inside the
+expander. Fall back to the per-source counter when the snapshot
+was pruned (older runs) so the label is never 0 when the user
+can see real rows.

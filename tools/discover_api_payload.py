@@ -33,7 +33,9 @@ def main():
         description="Discover correct API payload structure by capturing browser requests"
     )
     parser.add_argument("--profile", required=True, help="Profile name (e.g., wardany)")
-    parser.add_argument("--config", default="config.yaml", help="Config file path")
+    parser.add_argument(
+        "--config", default="state/config.yaml", help="Config file path"
+    )
     
     args = parser.parse_args()
     

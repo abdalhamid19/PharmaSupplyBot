@@ -1,0 +1,16 @@
+fix(ui): drop display_name from Excel target checkbox label
+
+The user is the pharmacy; the Excel catalog is a drug warehouse they
+purchase from to find the best price to resell. Naming the checkbox
+"pharmacy" is wrong on both ends, so the label is now a fixed
+"Excel target" string plus the catalog key (e.g. "alnasr") for
+disambiguation in the run-target list.
+
+* streamlit_profile_fields.py: checkbox label is "Excel target (<key>)",
+  no display_name interpolation; source panel header is just the key.
+* verify_gui_live.py: select the checkbox by its new label.
+* tools/debug/inspect_gui_upload.py: removed (debug-only, still used the
+  old multiselect flow).
+* test_run_target_excel_target.py: ExcelTargetConfigDisplayNameTests now
+  asserts the field is round-tripped through YAML as data, not as a
+  GUI label.

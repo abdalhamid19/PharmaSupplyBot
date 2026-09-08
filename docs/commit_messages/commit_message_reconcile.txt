@@ -1,0 +1,30 @@
+feat(cli): reconcile cross-source winners to a single cheapest row
+
+When --all-excel-targets runs alongside the Tawreed profile, both
+flows write their own ``is_winner=1`` row to ``run_item_stores`` for
+every matched item. The Run Results tab then showed two ``✅``
+rows per item, one per source, which made it hard to scan and
+compare offers at a glance.
+
+After all flows finish, ``_reconcile_cross_source_winners`` runs
+once for the shared run_key:
+
+1. Reset every ``is_winner`` flag to 0 for the run.
+2. For each ``item_key``, flip the single cheapest offering store
+   back to ``is_winner=1``. The ordering is:
+   - non-null ``purchase_price`` first
+   - then ascending ``purchase_price`` (so the lowest unit cost wins)
+   - then descending ``discount_percent`` as a tie-breaker for
+     rows with no purchase price recorded (e.g. some Tawreed
+     snapshots with NULL salePrice).
+
+The reconciliation is best-effort: if the database is missing or
+the SQL raises, the function logs at DEBUG and returns; the
+``is_winner`` flags stay as written by the individual flows so a
+single run never loses data because of a reconciliation bug.
+
+Verified with ``py run.py order --all-excel-targets --match-only
+--excel .../SMALL_TEST.xlsx`` on state/config.yaml's ``الجزيره``
+Excel target: 33 items, all with exactly one ✅ across sources
+(mix of Excel target and Tawreed winners depending on which had
+the cheaper purchase price).

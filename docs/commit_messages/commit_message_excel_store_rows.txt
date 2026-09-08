@@ -1,0 +1,29 @@
+feat(db): persist Excel-target store rows in run_item_stores
+
+The Excel-target flow was writing to run_items (fact) but not to
+run_item_stores (offering-store snapshot). That left the per-item
+"Offering stores per item" expander in the Run Results tab
+empty for excel-target runs, so pharmacists could not see the
+Excel candidate alongside the Tawreed rows.
+
+* cli_order_excel_target: the db_persister built by
+  _build_db_persister now accepts the matched product dict and
+  passes it through record_run_item as a store snapshot with
+  source='excel_target'. _excel_target_store_dict maps the
+  Excel catalog row into the same store-dict shape the Tawreed
+  store-snapshot writer consumes (storeProductId, storeName,
+  salePrice, discountPercent, etc.).
+* The persister now opens the parent runs row via open_run_record
+  before persisting items and closes it via finish_run_record,
+  because run_items has a foreign key on runs(run_key). When the
+  caller already supplied a run_key, the artifact_run is started
+  with the same run_id so the opened run_key matches the caller.
+* _ensure_run_record is a no-op when the run row already exists,
+  so a re-run with the same run_key will not create a duplicate.
+* New unit test
+  test_run_excel_target_match_only_persists_run_item_stores
+  drives the function with a real catalog fixture and asserts
+  that one row appears in run_items (source_kind=excel-target)
+  and at least one row appears in run_item_stores
+  (source=excel_target). The test cleans up its run_key after
+  the assertion so the live state/order_runs.db stays clean.
