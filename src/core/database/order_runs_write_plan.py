@@ -7,6 +7,7 @@ writer mixin keeps only transaction handling and both halves stay small.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any
 
 from .order_runs_keys import item_dimension_row, order_run_item_key
@@ -52,11 +53,27 @@ def item_write_plan(
 
 def _snapshot_parts(snapshot: dict[str, Any]) -> tuple[tuple, tuple, str]:
     """Return the store rows, selections, and source from a snapshot payload."""
+    source = str(snapshot.get("store_source") or "")
+    stores = tuple(snapshot.get("stores") or ())
+    selections = tuple(snapshot.get("store_selections") or ())
+    if source in {"excel_target", "excel-target"}:
+        stores = tuple(_excel_snapshot_identity(row) for row in stores)
+        selections = tuple((_excel_snapshot_identity(row), qty) for row, qty in selections)
     return (
-        tuple(snapshot.get("stores") or ()),
-        tuple(snapshot.get("store_selections") or ()),
-        str(snapshot.get("store_source") or ""),
+        stores, selections, source,
     )
+
+
+def _excel_snapshot_identity(row: dict[str, Any]) -> dict[str, Any]:
+    """Excel item codes are only unique within a catalog, not across suppliers."""
+    from ..matching.candidate_identity import candidate_store_product_id
+    from ..ordering.store_identity import store_identity_key
+
+    product_id = candidate_store_product_id(row)
+    if not product_id:
+        return row
+    identity = repr((store_identity_key(row), product_id)).encode("utf-8")
+    return {**row, "storeProductId": "excel-snapshot:" + sha256(identity).hexdigest()}
 
 
 def _fact_row(

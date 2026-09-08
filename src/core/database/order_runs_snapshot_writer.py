@@ -49,6 +49,7 @@ class OrderRunsSnapshotMixin:
                 "run_key": plan.run_key,
                 "item_key": plan.item_key,
                 "source": plan.source,
+                "source_label": plan.fact_row["source_label"],
             },
         )
         if usable:
@@ -63,12 +64,12 @@ def _insert_snapshot(conn, plan, usable: list[dict[str, Any]]) -> None:
     conn.executemany(
         UPSERT_PRODUCT, [product_dimension_row(store, plan.now) for store in usable]
     )
-    conn.executemany(
-        UPSERT_RUN_ITEM_STORE,
-        store_snapshot_rows(
-            plan.run_key, plan.item_key, usable, plan.selections, plan.now, plan.source
-        ),
+    rows = store_snapshot_rows(
+        plan.run_key, plan.item_key, usable, plan.selections, plan.now, plan.source
     )
+    for row in rows:
+        row["source_label"] = plan.fact_row["source_label"]
+    conn.executemany(UPSERT_RUN_ITEM_STORE, rows)
 
 
 def snapshot_fact_fields(stores: Any, selections: Any) -> dict[str, Any]:

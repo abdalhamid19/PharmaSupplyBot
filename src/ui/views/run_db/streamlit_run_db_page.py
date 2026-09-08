@@ -10,6 +10,7 @@ from ....core.database.order_runs_read import (
     fetch_runs,
 )
 from .streamlit_missed_discount import render_missed_discount_panel
+from .streamlit_warehouse_winners import render_warehouse_winners
 from .streamlit_run_drilldown import (
     get_active_filter,
     render_kpi_filter_bar,
@@ -57,6 +58,8 @@ def _render_run_selector(runs: list[dict]) -> int:
 def _render_selected_run(run: dict) -> None:
     """Render KPIs, item facts, store snapshots, and missed discounts."""
     render_run_header(run)
+    render_warehouse_winners(run["run_key"])
+    st.divider()
     items = fetch_run_items(run["run_key"])
     render_kpi_filter_bar(run, items)
     active = get_active_filter(run["run_key"])

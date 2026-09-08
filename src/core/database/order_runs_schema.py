@@ -23,6 +23,7 @@ from .order_runs_tables import (
 )
 from .order_runs_version import SCHEMA_VERSION, SCHEMA_VERSION_KEY
 from .order_runs_views import ALL_VIEWS
+from .order_runs_warehouse_winners import CREATE_WAREHOUSE_WINNERS
 
 # Views referenced by name in ALL_DDL use ``if not exists`` so concurrent
 # workers stay safe, but a stored view keeps its original definition forever.
@@ -45,6 +46,7 @@ CREATE_TABLES = (
     CREATE_RUN_ITEMS,
     CREATE_RUN_ITEM_STORES,
     CREATE_RUN_CANDIDATES,
+    CREATE_WAREHOUSE_WINNERS,
 )
 
 ALL_DDL = (*CREATE_TABLES, *CREATE_INDEXES, *ALL_VIEWS)

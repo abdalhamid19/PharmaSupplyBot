@@ -23,6 +23,7 @@ create table if not exists run_item_stores (
     ordered_qty      INTEGER not null default 0,
     rank_by_discount INTEGER,
     source           TEXT not null default '',
+    source_label     TEXT not null default '',
     captured_at      TEXT not null,
     primary key (run_key, item_key, store_product_id)
 )

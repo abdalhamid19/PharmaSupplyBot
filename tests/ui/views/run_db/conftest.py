@@ -77,6 +77,8 @@ ORDERED = {ordered}
 with patch('src.ui.views.run_db.streamlit_run_db_page.fetch_runs', return_value=[RUN]), \\
      patch('src.ui.views.run_db.streamlit_run_db_page.fetch_run_items', return_value=ITEMS), \\
      patch('src.ui.views.run_db.streamlit_run_db_page.database_is_ready', return_value=True), \\
+     patch('src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_winners', return_value=[]), \\
+     patch('src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_exclusions', return_value=[]), \\
      patch('src.core.database.order_runs_read.run_store_row_count', return_value=STORE_ROW_COUNT), \\
      patch('src.ui.views.run_db.streamlit_run_tables.fetch_item_stores', return_value=ITEM_STORES), \\
      patch('src.ui.views.run_db.streamlit_missed_discount.fetch_missed_discounts', return_value=MISSED_DISCOUNTS), \\
@@ -130,6 +132,10 @@ def build_app_test(
               return_value=items),
         patch("src.ui.views.run_db.streamlit_run_db_page.database_is_ready",
               return_value=True),
+        patch("src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_winners",
+              return_value=[]),
+        patch("src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_exclusions",
+              return_value=[]),
         patch("src.core.database.order_runs_read.run_store_row_count",
               return_value=store_row_count),
         patch("src.ui.views.run_db.streamlit_run_tables.fetch_item_stores",

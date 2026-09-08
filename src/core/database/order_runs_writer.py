@@ -65,6 +65,9 @@ class OrderRunsWriterMixin:
         conn.execute(UPSERT_ITEM, plan.item_row)
         conn.execute(UPSERT_RUN_ITEM, plan.fact_row)
         self._write_store_snapshot(conn, plan)
+        from .order_runs_warehouse_winners import refresh_warehouse_winner
+
+        refresh_warehouse_winner(conn, plan.run_key, plan.item_key)
 
     def _write(self, operation) -> None:
         """Run one write inside a short immediate transaction."""

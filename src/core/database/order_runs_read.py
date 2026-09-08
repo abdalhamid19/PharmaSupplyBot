@@ -102,6 +102,8 @@ def run_store_row_count(run_key: str, db=None) -> int:
 
 def database_is_ready(db=None) -> bool:
     """Return whether the order-runs database exists and is readable."""
+    if not Path(db if db is not None else default_order_runs_db()).is_file():
+        return False
     try:
         rows = order_runs_connection(db).execute_query(
             "select 1 from schema_meta limit 1", ()
@@ -110,3 +112,25 @@ def database_is_ready(db=None) -> bool:
     except Exception as exc:
         logger.debug("database_is_ready: %s", exc)
         return False
+
+
+def fetch_run_warehouse_winners(run_key: str, db=None) -> list[dict[str, Any]]:
+    """Read persisted cheapest offers; exclusions remain available separately."""
+    return _warehouse_comparisons(run_key, db, winners=True)
+
+
+def fetch_run_warehouse_exclusions(run_key: str, db=None) -> list[dict[str, Any]]:
+    """Return items without a comparable available offer and their reasons."""
+    return _warehouse_comparisons(run_key, db, winners=False)
+
+
+def _warehouse_comparisons(run_key: str, db, *, winners: bool) -> list[dict[str, Any]]:
+    from .order_runs_warehouse_winners import WINNER_COLUMNS
+
+    condition = "is not null" if winners else "is null"
+    rows = order_runs_connection(db).execute_query(
+        f"select {', '.join(WINNER_COLUMNS)} from run_warehouse_winners "
+        f"where run_key = ? and store_key {condition} "
+        "order by source_kind, store_name, store_key, item_name, item_key", (run_key,),
+    )
+    return _rows_as_dicts(rows, list(WINNER_COLUMNS))

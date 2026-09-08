@@ -75,6 +75,15 @@ class RunDbTabSmokeTests(unittest.TestCase):
             any("order-runs database" in text for text in warnings)
         )
 
+    def test_warehouse_table_precedes_existing_items(self) -> None:
+        self._app_test.run()
+        self.assertEqual(self._app_test.exception, [])
+        frames = self._app_test.dataframe
+        self.assertEqual(frames[0].value.iloc[0]["سعر الشراء"], 8)
+        self.assertIn("status", frames[1].value.columns)
+        labels = [element.label for element in self._app_test.get("download_button")]
+        self.assertIn("تحميل جميع المخازن", labels)
+
 
 def _project_root() -> str:
     """Return the repository root the tests run against."""

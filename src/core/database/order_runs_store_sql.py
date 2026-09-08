@@ -38,11 +38,11 @@ UPSERT_RUN_ITEM_STORE = """
 insert into run_item_stores
  (run_key, item_key, store_product_id, store_key, available_qty, public_price,
   purchase_price, discount_percent, currency, priority, is_winner, ordered_qty,
-  rank_by_discount, source, captured_at)
+  rank_by_discount, source, source_label, captured_at)
 values
  (:run_key, :item_key, :store_product_id, :store_key, :available_qty,
   :public_price, :purchase_price, :discount_percent, :currency, :priority,
-  :is_winner, :ordered_qty, :rank_by_discount, :source, :captured_at)
+  :is_winner, :ordered_qty, :rank_by_discount, :source, :source_label, :captured_at)
 on conflict(run_key, item_key, store_product_id) do update set
  store_key        = excluded.store_key,
  available_qty    = excluded.available_qty,
@@ -55,12 +55,14 @@ on conflict(run_key, item_key, store_product_id) do update set
  ordered_qty      = excluded.ordered_qty,
  rank_by_discount = excluded.rank_by_discount,
  source           = excluded.source,
+ source_label     = excluded.source_label,
  captured_at      = excluded.captured_at
 """
 
 DELETE_RUN_ITEM_STORES = (
     "delete from run_item_stores"
     " where run_key = :run_key and item_key = :item_key and source = :source"
+    " and (:source not in ('excel_target', 'excel-target') or source_label = :source_label)"
 )
 
 SELECT_RUN_ITEM_STORE_COUNT = (

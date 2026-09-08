@@ -161,10 +161,24 @@ def _migrate_v4_to_v5(conn) -> None:
     conn.execute("drop view if exists v_run_summary")
 
 
+def _migrate_v5_to_v6(conn) -> None:
+    """Keep separate Excel snapshot owners when replacing a source's offers."""
+    columns = {row[1] for row in conn.execute("pragma table_info(run_item_stores)")}
+    if columns and "source_label" not in columns:
+        conn.execute("alter table run_item_stores add column source_label TEXT not null default ''")
+        conn.execute(
+            "update run_item_stores set source_label = coalesce("
+            "(select replace(s.store_name, 'excel-target:', '') from stores s "
+            "where s.store_key = run_item_stores.store_key), '') "
+            "where source in ('excel_target', 'excel-target')"
+        )
+
+
 MIGRATIONS: dict[int, MigrationFn] = {
     3: _migrate_v2_to_v3,
     4: _migrate_v3_to_v4,
     5: _migrate_v4_to_v5,
+    6: _migrate_v5_to_v6,
 }
 
 

@@ -64,11 +64,16 @@ class OrderRunsStore(
         from .order_runs_migrations import apply_migrations
 
         with self.db.get_connection() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             current = self._read_schema_version(conn)
             self._drop_stale_views(conn, current)
             apply_migrations(conn, current)
             for statement in ALL_DDL:
                 conn.execute(statement)
+            if current < 6:
+                from .order_runs_warehouse_winners import backfill_warehouse_winners
+
+                backfill_warehouse_winners(conn)
             conn.execute(
                 UPSERT_SCHEMA_VERSION, (SCHEMA_VERSION_KEY, str(SCHEMA_VERSION))
             )

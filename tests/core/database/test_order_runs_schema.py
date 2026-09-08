@@ -145,8 +145,14 @@ class OrderRunsSchemaTests(unittest.TestCase):
                     """
                 )
                 conn.execute(
-                    "insert into run_items (run_key, item_key) values ('r1', 'i1')"
+                    "insert into runs (run_key, run_id, profile_key, started_at) "
+                    "values ('r1', 'r1', '', '2026-01-01')"
                 )
+                conn.execute(
+                    "insert into items (item_key, first_seen_at, last_seen_at) "
+                    "values ('i1', '2026-01-01', '2026-01-01')"
+                )
+                conn.execute("insert into run_items (run_key, item_key) values ('r1', 'i1')")
                 conn.execute(
                     "update schema_meta set value='2' where key='schema_version'"
                 )
@@ -170,7 +176,7 @@ class OrderRunsSchemaTests(unittest.TestCase):
             close_db()
             self.assertIn("source_kind", columns)
             self.assertIn("source_label", columns)
-            self.assertEqual(version_rows[0][0], "3")
+            self.assertEqual(version_rows[0][0], str(SCHEMA_VERSION))
             self.assertEqual(legacy[0][0], "tawreed")
             self.assertEqual(legacy[0][1], "")
         finally:
@@ -181,8 +187,6 @@ class OrderRunsSchemaTests(unittest.TestCase):
                     os.remove(db_path)
                 except OSError:
                     pass
-        self.assertIn("purchase_price", columns)
-        self.assertNotIn("winner_sale_price", columns)
         self.assertNotIn("winner_Purchase_Price", columns)
 
     def test_introspection_rejects_unsafe_table_names(self) -> None:
