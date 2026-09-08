@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 
@@ -46,6 +47,14 @@ class CandidateMatchDiagnostic:
     candidate: dict[str, Any]
 
 
+class DecisionSource(str, Enum):
+    """Source that produced a match decision."""
+
+    SCORING = "scoring"
+    MANUAL_REVIEW_SAVED = "manual_review_saved"
+    MANUAL_REVIEW_FORCED = "manual_review_forced"
+
+
 @dataclass(frozen=True)
 class MatchDecision:
     """Final match decision plus diagnostics for every candidate inspected."""
@@ -53,6 +62,7 @@ class MatchDecision:
     best_match: SearchMatch | None
     diagnostics: list[CandidateMatchDiagnostic]
     final_reason: str
+    source: DecisionSource = DecisionSource.SCORING
 
 
 # Token tables used by Tawreed product-matching lexical penalties
