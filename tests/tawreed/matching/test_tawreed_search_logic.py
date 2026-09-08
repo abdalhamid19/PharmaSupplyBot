@@ -59,6 +59,7 @@ class TawreedSearchLogicTests(unittest.TestCase):
         self.assertEqual(match_decision.best_match.score, 999.0)
         self.assertEqual(match_decision.best_match.data["storeProductId"], "s123")
         self.assertEqual(match_decision.final_reason, "Approved by saved manual review (ID match).")
+        self.assertEqual(match_decision.source.value, "manual_review_forced")
 
 
 if __name__ == "__main__":

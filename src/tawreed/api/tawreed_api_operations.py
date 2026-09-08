@@ -2,76 +2,18 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
-from src.core.matching.candidate_identity import candidate_store_product_id
 from .tawreed_api_contract import product_search_body, product_search_url, TawreedApiUnavailable
-from ..products.tawreed_product_search import _api_candidates
 from .tawreed_api_http import _is_trusted_add_to_cart_url, _ensure_cart_item_added, _post_json
+from .tawreed_api_payloads import (
+    body_with_item,
+    body_with_match,
+    body_with_query,
+    stores_from_payload,
+)
+from ..products.tawreed_product_payloads import product_candidates_from_payload
 
-
-# ============================================================================
-# Request Payload Helpers
-# ============================================================================
-
-def body_with_query(body: dict[str, Any], query: str) -> dict[str, Any]:
-    """Return a search body with common query fields populated."""
-    payload = _copy_body(body)
-    data = payload.setdefault("data", {})
-    if isinstance(data, dict):
-        data["productName"] = query
-        data.setdefault("globalSearch", query)
-        data.setdefault("search", query)
-    return payload
-
-
-def body_with_match(body: dict[str, Any], match: Any, quantity: int) -> dict[str, Any]:
-    """Return an add-to-cart body with product identity and quantity populated."""
-    payload = _copy_body(body)
-    candidate = match if isinstance(match, dict) else (getattr(match, "data", {}) or {})
-    store_product_id = candidate_store_product_id(candidate)
-    if not store_product_id:
-        raise ValueError(
-            "Cannot add to cart without orderable storeProductId on the match."
-        )
-    try:
-        store_product_id_int = int(float(str(store_product_id).strip()))
-    except (TypeError, ValueError) as error:
-        raise ValueError(
-            f"Invalid storeProductId for add-to-cart: {store_product_id!r}"
-        ) from error
-
-    # The discovered add-to-cart request always uses mode "all" with this data
-    # shape; customerId is injected by TawreedApiClient from the JWT token.
-    payload["mode"] = "all"
-    payload.setdefault("langCode", "ar")
-    payload["data"] = {
-        "customerId": None,
-        "storeProductId": store_product_id_int,
-        "quantity": int(quantity),
-        "typeId": 1,
-    }
-    return payload
-
-
-def body_with_item(body: dict[str, Any], item: Any) -> dict[str, Any]:
-    """Return a cart-removal body with the requested item identity populated."""
-    payload = _copy_body(body)
-    data = payload.setdefault("data", {})
-    if isinstance(data, dict):
-        data["itemCode"] = getattr(item, "code", "")
-        data["itemName"] = getattr(item, "name", "")
-    return payload
-
-
-def _copy_body(body: dict[str, Any]) -> dict[str, Any]:
-    return json.loads(json.dumps(body))
-
-
-# ============================================================================
-# API Operations
-# ============================================================================
 
 def search_products(client, query: str) -> list[dict[str, Any]]:
     """Return product candidates from a discovered API search endpoint."""
@@ -80,7 +22,7 @@ def search_products(client, query: str) -> list[dict[str, Any]]:
         product_search_url(client.contract),
         body_with_query(product_search_body(client.contract), query),
     )
-    return _api_candidates(payload)
+    return product_candidates_from_payload(payload)
 
 
 def get_store_details(client, product_id: Any) -> list[dict[str, Any]]:
@@ -91,7 +33,6 @@ def get_store_details(client, product_id: Any) -> list[dict[str, Any]]:
         return []
 
     from ..tawreed_constants import STORE_DETAILS_ENDPOINT
-    from .tawreed_api_payloads import stores_from_payload
     url = f"/rest/v2/{STORE_DETAILS_ENDPOINT}?productId={pid}"
     payload = _post_json(
         client,

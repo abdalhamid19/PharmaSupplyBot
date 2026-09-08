@@ -12,12 +12,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from playwright.sync_api import Page
 
-from ..tawreed_constants import (
-    NESTED_NAME_KEYS,
-    NESTED_STORE_KEYS,
-    PRODUCT_SEARCH_ENDPOINT,
-    STORE_NAME_KEYS,
-)
+from ..tawreed_constants import PRODUCT_SEARCH_ENDPOINT
+from .tawreed_product_payloads import product_candidates_from_payload
 from .tawreed_product_search_select import has_orderable_candidate, select_search_candidates
 from ..matching.tawreed_timing import record_timing
 
@@ -28,9 +24,6 @@ PRODUCT_SEARCH_INPUT_SELECTOR = (
     "input[placeholder*='بحث'], "
     "input[placeholder*='Search']"
 )
-_PRODUCT_LIST_KEYS = ("data", "content", "items", "products", "result", "results", "storeProducts")
-
-
 def search_products(bot, page: Page, query: str) -> list[dict[str, Any]]:
     """Search products and prefer API candidates over DOM fallbacks."""
     bot.log(f"Searching for '{query}'...")
@@ -81,56 +74,8 @@ def _search_response_pattern():
     return re.compile(f".*{PRODUCT_SEARCH_ENDPOINT}.*")
 
 def _api_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    candidates = _product_dicts(payload)
-    return [_enrich_candidate_with_company(c) for c in candidates]
-
-
-def _product_dicts(value: Any) -> list[dict[str, Any]]:
-    if isinstance(value, list):
-        return [item for item in value if _is_product_dict(item)]
-    if not isinstance(value, dict):
-        return []
-    if _is_product_dict(value):
-        return [value]
-    return _first_nested_product_list(value)
-
-
-def _first_nested_product_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    for key in _PRODUCT_LIST_KEYS:
-        candidates = _product_dicts(payload.get(key))
-        if candidates:
-            return candidates
-    return []
-
-
-def _is_product_dict(value: Any) -> bool:
-    return isinstance(value, dict) and bool(value.get("productName") or value.get("productNameEn"))
-
-
-def _enrich_candidate_with_company(candidate: dict[str, Any]) -> dict[str, Any]:
-    """Add companyName field from nested store/supplier objects if missing."""
-    if candidate.get("companyName"):
-        return candidate
-    company = _extract_company_name(candidate)
-    if company:
-        candidate["companyName"] = company
-    return candidate
-
-
-def _extract_company_name(source: dict[str, Any]) -> str:
-    """Extract company name using STORE_NAME_KEYS and nested objects."""
-    for key in STORE_NAME_KEYS:
-        value = str(source.get(key) or "").strip()
-        if value:
-            return value
-    for obj_key in NESTED_STORE_KEYS:
-        nested = source.get(obj_key)
-        if isinstance(nested, dict):
-            for name_key in NESTED_NAME_KEYS:
-                value = str(nested.get(name_key) or "").strip()
-                if value:
-                    return value
-    return ""
+    """Keep the historical browser-search helper name for callers."""
+    return product_candidates_from_payload(payload)
 
 
 def _submit_product_search(page: Page, query: str) -> None:

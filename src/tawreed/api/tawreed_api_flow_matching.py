@@ -93,13 +93,14 @@ def _api_match_decision(bot, item: Item, results, review_decision=None):
     """Return the API match decision and accumulate decision CPU/storage timing."""
     from src.core.manual_review.manual_review_runtime import manual_review_match
     from src.core.matching.product_matching import explain_best_product_match
+    from ..matching.tawreed_search_decision import mark_forced_manual_review
     from ..matching.tawreed_timing import record_timing
     
     started_at = time.perf_counter()
     try:
         manual = manual_review_match(item, results, review_decision)
         if manual:
-            return manual
+            return mark_forced_manual_review(manual)
         return explain_best_product_match(item, results, bot.config.matching)
     finally:
         record_timing(
@@ -194,9 +195,20 @@ def _require_orderable_api_match(bot, item: Item, match):
 
 
 def _is_saved_manual_review_match(decision) -> bool:
+    from src.core.matching_types import DecisionSource
+
     return bool(
         decision.best_match
-        and str(decision.final_reason).startswith("Approved by saved manual review")
+        and (
+            getattr(decision, "source", DecisionSource.SCORING)
+            in {
+                DecisionSource.MANUAL_REVIEW_SAVED,
+                DecisionSource.MANUAL_REVIEW_FORCED,
+            }
+            or str(decision.final_reason).startswith(
+                "Approved by saved manual review"
+            )
+        )
     )
 
 

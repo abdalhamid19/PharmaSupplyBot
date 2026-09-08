@@ -20,7 +20,7 @@ from src.core.utils.excel import Item
 from .tawreed_aggressive_matching import aggressive_review_result, available_quantity
 from .tawreed_match_logs import write_match_log
 from .tawreed_query_cache import cached_query_result, get_bot_query_cache
-from .tawreed_search_decision import decisive_match
+from .tawreed_search_decision import decisive_match, mark_forced_manual_review
 from .tawreed_timing import record_timing
 
 
@@ -95,7 +95,7 @@ def _match_decision(bot, item: Item, results: list[tuple[str, list]], review_dec
     forced_match = manual_review_match(item, results, review_decision)
     try:
         if forced_match:
-            return forced_match
+            return mark_forced_manual_review(forced_match)
         filtered = filter_manual_review_candidates(item, results, review_decision)
         return explain_best_product_match(item, filtered, bot.config.matching)
     finally:
@@ -129,6 +129,7 @@ def manual_review_result(bot, item, started_at, queries, results, review_decisio
     decision = manual_review_match(item, results, review_decision)
     if not decision:
         return None
+    decision = mark_forced_manual_review(decision)
     bot.last_match_decision, bot.last_searched_queries = decision, queries
     bot.last_match_elapsed_seconds = time.perf_counter() - started_at
     write_match_log(bot, item, decision)

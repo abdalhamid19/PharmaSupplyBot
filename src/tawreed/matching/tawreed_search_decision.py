@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 
 from src.core.matching.matching_confidence import match_confidence
-from src.core.matching_types import MatchDecision
+from src.core.matching_types import DecisionSource, MatchDecision
 from src.core.matching.product_matching import is_decisive_product_match
 from src.core.utils.excel import Item
 from .tawreed_match_logs import write_match_log
 from .tawreed_aggressive_matching import available_quantity
 
 MIN_SEARCH_QUERIES_PER_ITEM = 3
+
+
+def mark_forced_manual_review(decision: MatchDecision) -> MatchDecision:
+    """Mark a decision produced by an approved saved manual-review rule."""
+    return replace(decision, source=DecisionSource.MANUAL_REVIEW_FORCED)
 
 
 def decisive_match(
