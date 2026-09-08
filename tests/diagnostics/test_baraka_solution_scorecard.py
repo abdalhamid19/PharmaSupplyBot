@@ -8,7 +8,6 @@ English match, and remain deterministic.
 from __future__ import annotations
 
 from unittest import TestCase
-from unittest.mock import patch
 
 from src.core.config.config_models import MatchingConfig
 from src.core.excel_target.excel_target_loader import TargetProduct
@@ -31,12 +30,6 @@ class TestBarakaSolutionScorecard(TestCase):
 
     def setUp(self) -> None:
         self.config = MatchingConfig(enable_bilingual_secondary_match=False)
-        self.no_saved_review = patch(
-            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
-            return_value=None,
-        )
-        self.no_saved_review.start()
-        self.addCleanup(self.no_saved_review.stop)
 
     def _match(self, catalog: list[TargetProduct]):
         return find_best_match_in_target(ITEM, "baraka-scorecard", catalog, self.config).decision
@@ -57,4 +50,3 @@ class TestBarakaSolutionScorecard(TestCase):
             first.best_match.data["storeProductId"],
             second.best_match.data["storeProductId"],
         )
-

@@ -67,7 +67,19 @@ with patch.object(tbl, 'fetch_item_stores', return_value=fetched):
 
 
 class PricingEnrichmentTests(unittest.TestCase):
-    """The store table gains ``net_price``, ``margin_percent`` and ``provenance``."""
+    """The store table exposes only ``Provenance`` as a derived column.
+
+    ``net_price`` and ``margin_percent`` were removed because they
+    duplicated columns already on the row:
+    * ``net_price`` was always equal to ``purchase_price`` (the resolver
+      already applies the discount to ``purchase``).
+    * ``margin_percent`` was equal to ``discount_percent`` for every
+      Tawreed row (``purchase = public × (1 − discount)``).
+
+    The pricing help caption and the Excel-specific caption were also
+    removed; the ``provenance`` column already conveys the same context
+    in-row, so the captions were redundant.
+    """
 
     def _run(self) -> AppTest:
         app = AppTest.from_string(_DRIVER_SCRIPT, default_timeout=30)
@@ -75,29 +87,30 @@ class PricingEnrichmentTests(unittest.TestCase):
         self.assertEqual(app.exception, [])
         return app
 
-    def test_dataframe_has_derived_columns(self) -> None:
-        """All three derived columns appear in the rendered dataframe."""
+    def test_only_provenance_is_derived(self) -> None:
+        """Only ``provenance`` is added; ``net_price`` and ``margin_percent`` are gone."""
         app = self._run()
         self.assertTrue(app.dataframe)
         frame = app.dataframe[-1].value
-        self.assertIn("net_price", frame.columns)
-        self.assertIn("margin_percent", frame.columns)
         self.assertIn("provenance", frame.columns)
+        self.assertNotIn(
+            "net_price",
+            frame.columns,
+            "net_price was removed because it duplicated purchase_price.",
+        )
+        self.assertNotIn(
+            "margin_percent",
+            frame.columns,
+            "margin_percent was removed because it duplicated discount_percent.",
+        )
 
-    def test_tawreed_row_has_margin_hint(self) -> None:
-        """Tawreed row carries a margin between public and purchase."""
+    def test_tawreed_row_keeps_purchase_and_discount(self) -> None:
+        """Tawreed rows still expose purchase_price and discount_percent."""
         app = self._run()
         frame = app.dataframe[-1].value
         tawreed = frame[frame["source"] == "👤 Tawreed"].iloc[0]
-        self.assertAlmostEqual(tawreed["margin_percent"], 21.0, delta=0.5)
-
-    def test_excel_row_net_equals_public_after_discount(self) -> None:
-        """Excel row net = public × (1 − discount)."""
-        app = self._run()
-        frame = app.dataframe[-1].value
-        excel = frame[frame["source"] == "📊 Excel target"]
-        discounted = excel[excel["discount_percent"] == 5.0].iloc[0]
-        self.assertAlmostEqual(discounted["net_price"], 76.0)
+        self.assertIn("purchase_price", tawreed)
+        self.assertIn("discount_percent", tawreed)
 
     def test_provenance_column_shows_human_label(self) -> None:
         """Provenance text is the friendly label, not the raw enum."""
@@ -107,22 +120,22 @@ class PricingEnrichmentTests(unittest.TestCase):
         self.assertIn("👤 Tawreed", labels)
         self.assertIn("📊 Excel (public → purchase)", labels)
 
-    def test_caption_with_pricing_help_is_rendered(self) -> None:
-        """The pricing help caption appears above the per-item expanders."""
+    def test_pricing_help_caption_is_removed(self) -> None:
+        """The pricing help caption no longer renders above the expanders."""
         app = self._run()
         captions = [c.value for c in app.caption]
-        self.assertTrue(
+        self.assertFalse(
             any("Public" in c and "Purchase" in c for c in captions),
-            f"Expected pricing help caption, got {captions!r}",
+            f"Pricing help caption must be removed, got {captions!r}",
         )
 
-    def test_excel_run_caption_appears_when_excel_rows_exist(self) -> None:
-        """An extra caption explains Excel-target pricing semantics."""
+    def test_excel_run_caption_is_removed(self) -> None:
+        """The Excel-target caption no longer renders above the expanders."""
         app = self._run()
         captions = [c.value for c in app.caption]
-        self.assertTrue(
+        self.assertFalse(
             any("Excel-target stores" in c for c in captions),
-            f"Expected Excel-run caption, got {captions!r}",
+            f"Excel-run caption must be removed, got {captions!r}",
         )
 
 

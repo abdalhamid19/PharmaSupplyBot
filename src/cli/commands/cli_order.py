@@ -87,6 +87,8 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     profiles = app_config.profiles_to_run(
         profile=args.profile, all_profiles=args.all_profiles
     )
+    if getattr(args, "excel_target_only", False):
+        profiles = []
     if not profiles:
         profiles = []
 

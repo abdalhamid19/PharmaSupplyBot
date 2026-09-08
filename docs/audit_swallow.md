@@ -10,20 +10,31 @@ Such handlers silently hide failures from the operator.
 
 | Metric | Count |
 |--------|------:|
-| Swallowed `except Exception` handlers in `src/` | 1 |
+| Swallowed `except Exception` handlers in `src/` | 10 |
 | Files in allowlist (intentional) | 5 |
 
 ## Per-file breakdown
 
 | File | Count |
 |------|------:|
-| `src\core\database\order_runs_read.py` | 1 |
+| `src\core\normalization\translation.py` | 7 |
+| `src\ui\order\streamlit_order_command.py` | 2 |
+| `src\core\database\order_runs_store.py` | 1 |
 
 ## All occurrences
 
 | File:Line | Function | Snippet |
 |-----------|----------|---------|
-| `src\core\database\order_runs_read.py:98` | `database_is_ready` | `except Exception:` |
+| `src\core\database\order_runs_store.py:81` | `_read_schema_version` | `except Exception:` |
+| `src\core\normalization\translation.py:368` | `normalize_key_for_lru` | `except Exception:` |
+| `src\core\normalization\translation.py:404` | `ar_to_en_cached_only` | `except Exception:` |
+| `src\core\normalization\translation.py:418` | `ar_to_en_many_cached_only` | `except Exception:` |
+| `src\core\normalization\translation.py:344` | `_lru_translate` | `except Exception:` |
+| `src\core\normalization\translation.py:354` | `_lru_translate` | `except Exception:` |
+| `src\core\normalization\translation.py:443` | `ar_to_en_many` | `except Exception:` |
+| `src\core\normalization\translation.py:474` | `ar_to_en_many` | `except Exception:` |
+| `src\ui\order\streamlit_order_command.py:157` | `_configured_profiles` | `except Exception:` |
+| `src\ui\order\streamlit_order_command.py:161` | `_configured_profiles` | `except Exception:` |
 
 ## Allowlist
 

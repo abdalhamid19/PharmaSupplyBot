@@ -112,6 +112,51 @@ class ManualReviewCandidatesTests(TestCase):
             self.assertIn(item_one_key, loaded)
             self.assertEqual(loaded[item_one_key][0].store_product_id, "s1")
 
+    def test_loader_merges_target_candidate_files_and_inherits_source_metadata(self) -> None:
+        """One run may contain one JSONL artifact per matching source/target."""
+        option = {
+            "store_product_id": "baraka-1",
+            "name_en": "INODEP 30 CAPS",
+            "name_ar": "اينوديب 30 كبسول",
+            "supplier": "Baraka",
+            "available_quantity": 1,
+            "price": 25.0,
+            "score": 18.0,
+            "rejection_reason": "identity review",
+            "orderable": True,
+        }
+        with TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir) / "20260907_1600"
+            run_dir.mkdir()
+            for filename, source in (
+                ("manual_review_candidates_excel-target_baraka.jsonl", "excel_target"),
+                ("manual_review_candidates_tawreed.jsonl", "tawreed"),
+            ):
+                (run_dir / filename).write_text(
+                    json.dumps(
+                        {
+                            "item_code": "90951",
+                            "item_name": "INODEP CAPSULES 30",
+                            "options": [option],
+                            "source_kind": source,
+                            "source_label": "baraka@baraka.xlsx" if source == "excel_target" else "wardany",
+                            "target_key": "baraka" if source == "excel_target" else "",
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            loaded = load_review_candidates(run_dir)
+
+        values = loaded["90951::INODEP CAPSULES 30"]
+        self.assertEqual(len(values), 2)
+        self.assertEqual({value.matching_source for value in values}, {"excel_target", "tawreed"})
+        baraka = next(value for value in values if value.matching_source == "excel_target")
+        self.assertEqual(baraka.matching_source_label, "baraka@baraka.xlsx")
+        self.assertEqual(baraka.target_key, "baraka")
+
 def _diag(
     english_name: str,
     score: float,

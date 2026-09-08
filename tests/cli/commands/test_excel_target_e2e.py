@@ -7,6 +7,7 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from src.cli.commands.cli_order_excel_target import (
     load_target_catalogs,
@@ -14,6 +15,7 @@ from src.cli.commands.cli_order_excel_target import (
     selected_excel_target_configs,
 )
 from src.core.config.config import load_config
+from src.core.excel_target.excel_target_loader import TargetProduct
 from src.core.utils.excel import Item
 
 
@@ -199,6 +201,30 @@ excel_targets:
                 self.assertEqual(row["target_kind"], "excel-target")
                 self.assertEqual(row["target_key"], "alnasr")
                 self.assertEqual(row["source_file"], "alnasr.xlsx")
+
+    def test_summary_preserves_identity_evidence_for_rejected_variant(self) -> None:
+        catalog = [
+            TargetProduct("inodep-syrup", "اينوديب شراب 100 مل", 10.0, 0.0)
+        ]
+        item = Item(code="90951", name="INODEP CAPSULES 30", qty=1)
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "src.core.excel_target.excel_target_identity.lookup_en",
+            return_value=[{"ar": "اينوديب", "en": "INODEP"}],
+        ):
+            summary_path = Path(temp_dir) / "summary.csv"
+            run_excel_target_match_only(
+                self.app_config,
+                "alnasr",
+                [item],
+                catalog,
+                summary_path=summary_path,
+            )
+            with summary_path.open(newline="", encoding="utf-8") as fh:
+                row = next(csv.DictReader(fh))
+        self.assertEqual(row["status"], "no-results")
+        self.assertEqual(row["identity_evidence_kind"], "dictionary")
+        self.assertEqual(row["compatibility_status"], "rejected")
+        self.assertIn("form", row["compatibility_rejection"])
 
     def test_multi_path_merges_catalogs_with_source_file(self) -> None:
         """When the same key is fed several files, the CSV records which file

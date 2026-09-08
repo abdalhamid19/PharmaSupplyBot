@@ -37,7 +37,7 @@ from pathlib import Path
 from rapidfuzz import fuzz, process
 
 from .drug_dictionary import lookup_ar, lookup_en
-from .translation import ar_to_en
+from .translation import ar_to_en, ar_to_en_cached_only
 
 logger = logging.getLogger(__name__)
 
@@ -229,9 +229,16 @@ def _dict_score(en_query: str, ar_row: str) -> tuple[float, str, str, str]:
     return 0.0, "", en_brand, ""
 
 
-def _translation_score(en_query: str, ar_row: str, en_brand: str) -> float:
-    """Translate the Arabic row to English, then string-similarity."""
-    translated = ar_to_en(ar_row)
+def _translation_score(
+    en_query: str, translated: str, en_brand: str, ar_row: str = ""
+) -> float:
+    """Brand-similarity score of an already-translated row.
+
+    ``translated`` must be the English translation (cache hit or live).
+    When ``ar_row`` is provided it is treated as the fallback signal:
+    passing the raw Arabic row as ``translated`` yields 0.0, matching
+    the historical "no usable translation" behaviour.
+    """
     if not translated or translated == ar_row:
         return 0.0
     translated_brand = _brand_only(translated).upper()
@@ -253,6 +260,81 @@ def _compatibility_factor(en_query: str, ar_row: str) -> float:
     if en_packs and ar_packs and not (en_packs & ar_packs):
         factor *= 0.9
     return factor
+
+
+def match_brand_readonly(en_query: str, ar_row: str) -> BrandMatch:
+    """Score without ever contacting the live translation provider.
+
+    Identical to :func:`match_brand` except tier 3 consults the
+    persistent translation cache directly (cache-only) instead of
+    ``ar_to_en`` (which can fire live Cohere calls). Use this for
+    trace/audit call sites and interactive matching loops; live
+    translation belongs to the batch pre-translate CLI.
+    """
+    tier1_score, tier1_reason, en_brand, manufacturer = _tawreed_score(en_query, ar_row)
+    tier2_score = 0.0
+    tier2_reason = ""
+    tier3_score = 0.0
+    tier3_reason = ""
+    tier3_translation: str | None = None
+
+    if tier1_score > 0.0:
+        score = tier1_score
+        reason = tier1_reason
+    else:
+        tier2_score, tier2_reason, dict_en_brand, dict_manufacturer = _dict_score(
+            en_query, ar_row
+        )
+        en_brand = dict_en_brand or en_brand
+        if tier2_score > 0.0:
+            score = tier2_score
+            reason = tier2_reason
+            manufacturer = dict_manufacturer
+        else:
+            translated = ar_to_en_cached_only(ar_row)
+            if translated and translated != ar_row:
+                tier3_translation = translated
+                tier3_score = _translation_score(en_query, translated, en_brand, ar_row)
+                tier3_reason = f"translation similarity ({tier3_score:.2f})"
+                if tier3_score >= 0.6:
+                    score = tier3_score
+                    reason = tier3_reason
+                else:
+                    score = 0.0
+                    reason = "no brand match"
+            else:
+                score = 0.0
+                reason = "no brand match"
+
+    compat = _compatibility_factor(en_query, ar_row)
+    score *= compat
+
+    _write_trace({
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "en_query": en_query,
+        "ar_row": ar_row,
+        "tier1_tawreed": {"score": round(tier1_score, 3), "reason": tier1_reason},
+        "tier2_karem505": {"score": round(tier2_score, 3), "reason": tier2_reason},
+        "tier3_cache": {
+            "score": round(tier3_score, 3),
+            "reason": tier3_reason,
+            "translation": tier3_translation,
+        },
+        "compatibility_factor": round(compat, 3),
+        "final_score": round(score, 3),
+        "winning_reason": reason or "no brand match",
+        "en_brand": en_brand,
+        "ar_brand": _brand_only(ar_row),
+        "manufacturer": manufacturer,
+    })
+
+    return BrandMatch(
+        score=round(score, 3),
+        reason=reason or "no brand match",
+        en_brand=en_brand,
+        ar_brand=_brand_only(ar_row),
+        manufacturer=manufacturer,
+    )
 
 
 def match_brand(en_query: str, ar_row: str) -> BrandMatch:
@@ -293,7 +375,7 @@ def match_brand(en_query: str, ar_row: str) -> BrandMatch:
             translated = ar_to_en(ar_row)
             if translated and translated != ar_row:
                 tier3_translation = translated
-                tier3_score = _translation_score(en_query, translated, en_brand)
+                tier3_score = _translation_score(en_query, translated, en_brand, ar_row)
                 tier3_reason = f"translation similarity ({tier3_score:.2f})"
                 if tier3_score >= 0.6:
                     score = tier3_score

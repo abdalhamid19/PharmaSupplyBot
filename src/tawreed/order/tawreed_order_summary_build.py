@@ -107,7 +107,21 @@ def _auto_save_verified_match(item: Item, decision, matching_config=None) -> Non
         return
 
     store = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB)
-    if _preserve_existing_decision(store.lookup(item.code, item.name)):
+    source_label = _current_profile_key()
+    existing = store.lookup(
+        item.code,
+        item.name,
+        matching_source="tawreed",
+        matching_source_label=source_label,
+    )
+    if existing is None:
+        # Keep historical, unscoped human decisions authoritative without
+        # allowing a known Excel-target (or another Tawreed profile) to block
+        # this supplier's independent row.
+        existing = store.lookup(
+            item.code, item.name, matching_source="legacy-unknown"
+        )
+    if _preserve_existing_decision(existing):
         return
 
     _create_and_save_decision(item, match, store)
@@ -147,7 +161,11 @@ def _create_and_save_decision(item, match, store) -> None:
         item_code=item.code, item_name=item.name, approved=True,
         correct_store_product_id=store_id, manual_decision="auto_matched",
         correct_query="", run_id=run_id, correct_product_name=name_en,
-        correct_product_name_ar=name_ar
+        correct_product_name_ar=name_ar,
+        matching_source="tawreed",
+        matching_source_label=_current_profile_key(),
+        identity_evidence_kind=str(match.data.get("identity_evidence_kind") or ""),
+        identity_evidence=str(match.data.get("identity_evidence") or ""),
     )
     store.upsert(new_decision)
 

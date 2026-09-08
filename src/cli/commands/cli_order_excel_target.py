@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import csv
+import json
 import logging
+import os
+import shutil
+import time
 from pathlib import Path
 from typing import Iterable
 
@@ -11,11 +15,18 @@ from src.core.artifact_run import artifact_run
 from src.core.config.config_models import AppConfig
 from src.core.excel_target import (
     TargetProduct,
-    find_best_match_in_target,
+    ExcelTargetMatcher,
     load_target_catalog_from_excel,
     match_item_against_all_targets,
     first_accepted_match,
 )
+from src.core.excel_target.product_attributes import validate_product_compatibility
+from src.core.manual_review.manual_review_store import (
+    DEFAULT_MANUAL_REVIEW_DB,
+    ManualReviewDecision,
+    ManualReviewStore,
+)
+from src.core.matching.candidate_identity import candidate_store_product_id
 from src.core.utils.excel import Item
 from src.tawreed.matching.tawreed_match_only import MATCH_ONLY_SUMMARY_LABEL
 
@@ -137,8 +148,11 @@ def run_excel_target_match_only(
     in the Run Results tab shows the Excel candidate alongside any
     Tawreed rows.
     """
-    matched = flagged = 0
+    matched = flagged = manual_review_count = 0
     items_list = list(items)
+    matcher = ExcelTargetMatcher(target_key, catalog)
+    deadline = time.monotonic() + 300
+    timed_out = False
     db_persist = _build_db_persister(run_key, target_key)
     provided_run_id = run_id or (
         _extract_run_id(run_key) if run_key else None
@@ -148,7 +162,23 @@ def run_excel_target_match_only(
         target_summary = (
             run.directory / f"{MATCH_ONLY_SUMMARY_LABEL}_{target_key}.csv"
         )
-        with target_summary.open("w", newline="", encoding="utf-8") as fh:
+        trace_path = run.directory / f"{MATCH_ONLY_SUMMARY_LABEL}_{target_key}.jsonl"
+        review_csv_path = run.directory / f"manual_review_excel-target_{target_key}.csv"
+        review_candidates_path = (
+            run.directory / f"manual_review_candidates_excel-target_{target_key}.jsonl"
+        )
+        # Write to a temp file and atomically replace at the end so a
+        # run killed mid-loop leaves no zero-byte summary artifact.
+        tmp_summary = target_summary.with_suffix(".csv.tmp")
+        stale_tmp = target_summary.with_suffix(".tmp")
+        for leftover in (stale_tmp,):
+            try:
+                leftover.unlink()
+            except OSError:
+                pass
+        with tmp_summary.open("w", newline="", encoding="utf-8") as fh, trace_path.open(
+            "w", encoding="utf-8"
+        ) as trace:
             writer = csv.writer(fh)
             writer.writerow(
                 [
@@ -163,12 +193,26 @@ def run_excel_target_match_only(
                     "status",
                     "score",
                     "final_reason",
+                    "identity_evidence_kind",
+                    "identity_evidence",
+                    "compatibility_status",
+                    "compatibility_rejection",
+                    "match_elapsed_ms",
+                    "candidate_source_file",
+                    "candidate_count",
+                    "manual_review_required",
+                    "manual_review_category",
+                    "matching_source",
+                    "matching_source_label",
                 ]
             )
             for item in items_list:
-                result = find_best_match_in_target(
-                    item, target_key, catalog, app_config.matching
-                )
+                if time.monotonic() > deadline:
+                    timed_out = True
+                    break
+                item_started = time.perf_counter()
+                result = matcher.match(item, app_config.matching)
+                elapsed_ms = round((time.perf_counter() - item_started) * 1000, 2)
                 if result is None:
                     writer.writerow(
                         [
@@ -183,24 +227,97 @@ def run_excel_target_match_only(
                             "no-results",
                             "0",
                             "no catalog",
+                            "", "", "rejected", "no catalog", elapsed_ms, "",
+                            0, False, "", "excel-target", target_key,
                         ]
                     )
+                    trace.write(json.dumps({
+                        "item_code": item.code,
+                        "item_name": item.name,
+                        "status": "no-results",
+                        "reason": "no catalog",
+                        "identity_evidence_kind": "",
+                        "identity_evidence": "",
+                        "compatibility_status": "rejected",
+                        "compatibility_rejection": "no catalog",
+                        "match_elapsed_ms": elapsed_ms,
+                        "catalog_size": 0,
+                        "candidate_count": 0,
+                        "manual_review_required": False,
+                        "matching_source": "excel-target",
+                        "matching_source_label": target_key,
+                    }, ensure_ascii=False) + "\n")
                     db_persist(
                         item,
                         status="no-results",
                         score=0.0,
                         reason="no catalog",
                         source_file="",
+                        candidate_count=0,
+                        manual_review_required=False,
                     )
                     continue
                 decision = result.decision
                 best = decision.best_match
                 if best is None:
+                    identified = matcher.identity_index.identify(item.name)
+                    identity_kinds = ";".join(
+                        dict.fromkeys(candidate.evidence.kind for candidate in identified)
+                    )
+                    identity_details = "; ".join(
+                        dict.fromkeys(candidate.evidence.detail for candidate in identified)
+                    )
+                    compatibility_rejection = decision.final_reason
+                    if identified and not compatibility_rejection:
+                        compatibility_rejection = validate_product_compatibility(
+                            item.name, identified[0].product.name_ar
+                        ).rejection_reason
                     score = (
                         f"{decision.diagnostics[0].score:.2f}"
                         if decision.diagnostics
                         else "0"
                     )
+                    review_limit = _review_candidate_limit(app_config)
+                    review_candidates = tuple(result.review_candidates[:review_limit])
+                    candidate_count = len(review_candidates)
+                    review_required = candidate_count > 0
+                    review_category = (
+                        "excel_target_candidate_available" if review_required
+                        else _excel_target_no_candidate_category(decision.final_reason)
+                    )
+                    candidate_source_file = ";".join(
+                        dict.fromkeys(
+                            candidate.product.source_file
+                            for candidate in review_candidates
+                            if candidate.product.source_file
+                        )
+                    )
+                    candidate_evidence_kinds = ";".join(
+                        dict.fromkeys(
+                            candidate.identity_evidence_kind
+                            for candidate in review_candidates
+                            if candidate.identity_evidence_kind
+                        )
+                    )
+                    candidate_evidence_details = "; ".join(
+                        dict.fromkeys(
+                            candidate.identity_evidence_detail
+                            for candidate in review_candidates
+                            if candidate.identity_evidence_detail
+                        )
+                    )
+                    if review_required:
+                        _append_excel_target_review_artifacts(
+                            review_csv_path,
+                            review_candidates_path,
+                            item,
+                            review_candidates,
+                            reason=decision.final_reason,
+                            identity_evidence_kind=candidate_evidence_kinds or identity_kinds,
+                            identity_evidence=candidate_evidence_details or identity_details,
+                            compatibility_rejection=compatibility_rejection,
+                        )
+                        manual_review_count += 1
                     writer.writerow(
                         [
                             "excel-target",
@@ -214,8 +331,39 @@ def run_excel_target_match_only(
                             "no-results",
                             score,
                             decision.final_reason,
+                            identity_kinds,
+                            identity_details,
+                            "rejected",
+                            compatibility_rejection,
+                            elapsed_ms,
+                            candidate_source_file,
+                            candidate_count,
+                            review_required,
+                            review_category,
+                            "excel-target",
+                            _excel_target_source_label(target_key, candidate_source_file),
                         ]
                     )
+                    trace.write(json.dumps({
+                        "item_code": item.code,
+                        "item_name": item.name,
+                        "status": "no-results",
+                        "reason": decision.final_reason,
+                        "identity_evidence_kind": identity_kinds,
+                        "identity_evidence": identity_details,
+                        "compatibility_status": "rejected",
+                        "compatibility_rejection": compatibility_rejection,
+                        "match_elapsed_ms": elapsed_ms,
+                        "catalog_size": len(catalog),
+                        "candidate_count": candidate_count,
+                        "manual_review_required": review_required,
+                        "manual_review_category": review_category,
+                        "candidate_source_file": candidate_source_file,
+                        "matching_source": "excel-target",
+                        "matching_source_label": _excel_target_source_label(
+                            target_key, candidate_source_file
+                        ),
+                    }, ensure_ascii=False) + "\n")
                     flagged += 1
                     db_persist(
                         item,
@@ -224,6 +372,9 @@ def run_excel_target_match_only(
                         reason=decision.final_reason,
                         source_file="",
                         best=None,
+                        candidate_count=candidate_count,
+                        manual_review_required=review_required,
+                        manual_review_category=review_category,
                     )
                     continue
                 source_file = str(best.data.get("excelTargetSourceFile", ""))
@@ -234,14 +385,42 @@ def run_excel_target_match_only(
                         source_file,
                         item.code,
                         item.name,
-                        str(best.data.get("productNameEn", "")),
+                        str(best.data.get("productName", best.data.get("productNameEn", ""))),
                         str(best.data.get("salePrice", "")),
                         str(best.data.get("discountPercent", "")),
                         "matched-only",
                         f"{best.score:.2f}",
                         decision.final_reason,
+                        str(best.data.get("identity_evidence_kind", "")),
+                        str(best.data.get("identity_evidence", "")),
+                        str(best.data.get("compatibility_status", "")),
+                        str(best.data.get("compatibility_rejection", "")),
+                        str(best.data.get("match_elapsed_ms", "")),
+                        source_file,
+                        0,
+                        False,
+                        "",
+                        "excel-target",
+                        _excel_target_source_label(target_key, source_file),
                     ]
                 )
+                trace.write(json.dumps({
+                    "item_code": item.code,
+                    "item_name": item.name,
+                    "status": "matched-only",
+                    "reason": decision.final_reason,
+                    "identity_evidence_kind": best.data.get("identity_evidence_kind", ""),
+                    "identity_evidence": best.data.get("identity_evidence", ""),
+                    "compatibility_status": best.data.get("compatibility_status", ""),
+                    "match_elapsed_ms": best.data.get("match_elapsed_ms", ""),
+                    "catalog_size": len(catalog),
+                    "candidate_count": 0,
+                    "manual_review_required": False,
+                    "matching_source": "excel-target",
+                    "matching_source_label": _excel_target_source_label(
+                        target_key, source_file
+                    ),
+                }, ensure_ascii=False) + "\n")
                 matched += 1
                 db_persist(
                     item,
@@ -250,23 +429,50 @@ def run_excel_target_match_only(
                     reason=decision.final_reason,
                     source_file=source_file,
                     best=best.data,
-                    matched_name=str(best.data.get("productNameEn", "")),
+                    matched_name=str(best.data.get("productName", best.data.get("productNameEn", ""))),
                     matched_price=str(best.data.get("salePrice", "")),
                     matched_discount=str(best.data.get("discountPercent", "")),
+                    candidate_count=0,
+                    manual_review_required=False,
                 )
+                _auto_save_excel_target_match(
+                    app_config,
+                    item,
+                    best.data,
+                    target_key=target_key,
+                    source_file=source_file,
+                    run_id=run.run_id,
+                )
+        os.replace(tmp_summary, target_summary)
         try:
             summary_path.parent.mkdir(parents=True, exist_ok=True)
-            target_summary.replace(summary_path)
+            shutil.copy2(target_summary, summary_path)
         except OSError:
             logger.debug(
                 "could not mirror excel-target summary", extra={"path": str(summary_path)}
             )
 
+        if timed_out:
+            raise TimeoutError("Excel-target match-only exceeded the 300-second safety limit")
+
     _finish_run_record(app_config, run_key)
+    from src.core.normalization.translation import provider_status
+
+    status = provider_status()
+    if status["quota_dead"]:
+        logger.warning(
+            "live translation was DISABLED during this run (monthly quota exhausted) "
+            "— matches relied on the translation cache only"
+        )
+    elif status["breaker_open"] or status["consecutive_failures"]:
+        logger.warning(
+            "translation provider state at run end: %s", status
+        )
     return {
         "processed": len(items_list),
         "matched": matched,
         "flagged": flagged,
+        "manual_review": manual_review_count,
     }
 
 
@@ -303,6 +509,176 @@ def run_excel_target_match_only_multi(
             run_id=run_id,
         )
     return totals
+
+
+def _review_candidate_limit(app_config: AppConfig) -> int:
+    """Return the configured number of options persisted for human review."""
+    value = getattr(
+        getattr(app_config, "matching", None),
+        "manual_review_save_candidate_limit",
+        5,
+    )
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return 5
+
+
+def _excel_target_source_label(target_key: str, source_file: str = "") -> str:
+    """Build the same source label used by Run DB and Saved Corrections."""
+    return f"{target_key}@{source_file}" if source_file else str(target_key or "")
+
+
+def _excel_target_no_candidate_category(reason: str) -> str:
+    """Classify a blocked target row that has no review candidate."""
+    text = str(reason or "").lower()
+    if "identity" in text or "brand" in text:
+        return "identity_not_proven"
+    if "form" in text or "strength" in text or "pack" in text or "compatib" in text:
+        return "compatibility_conflict"
+    return "no_safe_candidate"
+
+
+def _append_excel_target_review_artifacts(
+    review_csv_path: Path,
+    candidates_path: Path,
+    item: Item,
+    candidates,
+    *,
+    reason: str,
+    identity_evidence_kind: str,
+    identity_evidence: str,
+    compatibility_rejection: str,
+) -> None:
+    """Persist one Baraka review row and its target-only candidates."""
+    if not candidates:
+        return
+    source_files = ";".join(
+        dict.fromkeys(
+            candidate.product.source_file
+            for candidate in candidates
+            if candidate.product.source_file
+        )
+    )
+    source_label = _excel_target_source_label(
+        candidates[0].target_key,
+        source_files,
+    )
+    review_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    needs_header = not review_csv_path.exists() or review_csv_path.stat().st_size == 0
+    with review_csv_path.open("a", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=[
+                "item_code", "item_name", "status", "manual_review_required",
+                "manual_review_category", "candidate_count", "matching_source",
+                "matching_source_label", "target_key", "source_file",
+                "identity_evidence_kind", "identity_evidence",
+                "compatibility_status", "compatibility_rejection", "reason",
+            ],
+        )
+        if needs_header:
+            writer.writeheader()
+        writer.writerow(
+            {
+                "item_code": item.code,
+                "item_name": item.name,
+                "status": "no-results",
+                "manual_review_required": True,
+                "manual_review_category": "excel_target_candidate_available",
+                "candidate_count": len(candidates),
+                "matching_source": "excel-target",
+                "matching_source_label": source_label,
+                "target_key": candidates[0].target_key,
+                "source_file": source_files,
+                "identity_evidence_kind": identity_evidence_kind,
+                "identity_evidence": identity_evidence,
+                "compatibility_status": "rejected",
+                "compatibility_rejection": compatibility_rejection,
+                "reason": reason,
+            }
+        )
+
+    code_key = str(item.code or "").strip().upper()
+    name_key = str(item.name or "").strip().upper()
+    payload = {
+        "item_key": f"{code_key}::{name_key}",
+        "item_code": str(item.code or ""),
+        "item_name": str(item.name or ""),
+        "source_kind": "excel-target",
+        "source_label": source_label,
+        "target_key": candidates[0].target_key,
+        "source_file": source_files,
+        "identity_evidence_kind": identity_evidence_kind,
+        "identity_evidence": identity_evidence,
+        "compatibility_status": "rejected",
+        "compatibility_rejection": compatibility_rejection,
+        "options": [
+            candidate.to_review_candidate_dict() for candidate in candidates
+        ],
+    }
+    with candidates_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def _auto_save_excel_target_match(
+    app_config: AppConfig,
+    item: Item,
+    best: dict,
+    *,
+    target_key: str,
+    source_file: str,
+    run_id: str,
+) -> None:
+    """Save a verified Excel-target match with explicit provenance."""
+    matching = getattr(app_config, "matching", None)
+    if not matching or not getattr(matching, "enable_auto_save_verified_match", False):
+        return
+    try:
+        store = ManualReviewStore(DEFAULT_MANUAL_REVIEW_DB)
+        source_label = _excel_target_source_label(target_key, source_file)
+        existing = store.lookup(
+            item.code,
+            item.name,
+            matching_source="excel-target",
+            matching_source_label=source_label,
+            excel_target_key=target_key,
+        )
+        if existing is None:
+            # Decisions created before source provenance existed remain a
+            # conservative safeguard, but a decision from another known
+            # supplier must never block this Excel target.
+            existing = store.lookup(
+                item.code, item.name, matching_source="legacy-unknown"
+            )
+        if existing and existing.manual_decision in {"approved_match", "not_matching"}:
+            return
+        store_id = candidate_store_product_id(best)
+        decision = ManualReviewDecision(
+            item_code=item.code,
+            item_name=item.name,
+            approved=True,
+            correct_store_product_id=store_id,
+            correct_product_name=str(
+                best.get("productNameEn") or best.get("productNameEnFallback") or ""
+            ),
+            correct_product_name_ar=str(best.get("productName") or ""),
+            run_id=run_id,
+            manual_decision="auto_matched",
+            excel_target_key=target_key,
+            excel_target_source_file=source_file,
+            matching_source="excel-target",
+            matching_source_label=source_label,
+            identity_evidence_kind=str(best.get("identity_evidence_kind") or ""),
+            identity_evidence=str(best.get("identity_evidence") or ""),
+        )
+        store.upsert(decision)
+    except Exception:
+        logger.warning(
+            "could not auto-save Excel-target match",
+            extra={"item_code": str(item.code), "target_key": target_key},
+            exc_info=True,
+        )
 
 
 __all__ = [
@@ -401,6 +777,9 @@ def _build_db_persister(run_key: str | None, target_key: str):
         matched_name: str = "",
         matched_price: str = "",
         matched_discount: str = "",
+        candidate_count: int = 0,
+        manual_review_required: bool = False,
+        manual_review_category: str = "",
     ) -> None:
         summary_row = {
             "item_code": str(item.code or ""),
@@ -408,9 +787,10 @@ def _build_db_persister(run_key: str | None, target_key: str):
             "item_qty": int(getattr(item, "qty", 0) or 0),
             "status": str(status),
             "reason": str(reason or ""),
-            "matched": 1 if status == "matched-only" else 0,
-            "manual_review_required": 0,
-            "manual_review_category": "",
+            "matched": 1 if status == "matched-only" and not manual_review_required else 0,
+            "manual_review_required": bool(manual_review_required),
+            "manual_review_category": str(manual_review_category or ""),
+            "candidate_count": int(candidate_count or 0),
             "matched_query": "",
             "deterministic_score": float(score or 0.0),
             "winner_store_key": "",
@@ -431,6 +811,7 @@ def _build_db_persister(run_key: str | None, target_key: str):
         if source_file:
             label = f"{label}@{source_file}"
         snapshot_kwargs: dict = {"source_kind": "excel-target", "source_label": label}
+        snapshot_kwargs["candidates_considered"] = int(candidate_count or 0)
         if best is not None:
             store_dict = _excel_target_store_dict(
                 target_key, source_file, best

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
+from typing import Iterable
 import streamlit as st
 
 from ...core.manual_review.manual_review_candidate_store import load_review_candidates
@@ -26,49 +28,198 @@ def render_manual_review_tab(app_config=None) -> None:
     st.markdown("Select an artifact run to evaluate matches and correct them.")
     if render_running_remove_cart_controls("manual_review") or render_running_search_controls():
         return
-    runs = _available_runs_with_candidates()
-    if not runs:
+    run_groups = _group_runs_by_id(_available_runs_with_candidates())
+    if not run_groups:
         st.info("No matching runs with manual review candidates found.")
         render_saved_decisions()
         return
-    selected_run = st.selectbox(
-        "Select Run", runs,
-        format_func=lambda r: f"{r.parent.parent.name} / {r.parent.name} / {r.name}"
+    run_ids = [run_id for run_id, _ in run_groups]
+    directories_by_id = dict(run_groups)
+    selected_run_id = st.selectbox(
+        "Select Run", run_ids,
+        index=0,
+        format_func=lambda run_id: _format_run_group(
+            run_id, directories_by_id[run_id]
+        ),
     )
-    if selected_run:
-        _render_selected_run(selected_run, app_config)
+    if selected_run_id:
+        _render_selected_run(directories_by_id[selected_run_id], app_config)
         render_saved_decisions()
 
 
 def _render_selected_run(selected_run, app_config=None):
-    """Render the selected run's manual review."""
-    paths = list(selected_run.glob("manual_review_*.csv"))
+    """Render all source directories belonging to one logical run."""
+    run_dirs = _coerce_run_dirs(selected_run)
+    run_context = _primary_run_dir(run_dirs)
+    paths = sorted(
+        path
+        for run_dir in run_dirs
+        for path in run_dir.glob("manual_review_*.csv")
+    )
     if paths:
-        rows = load_csv_rows(paths[0])
+        rows = []
+        seen_rows = set()
+        for path in paths:
+            for row in load_csv_rows(path):
+                key = (
+                    str(row.get("item_code", "")),
+                    str(row.get("item_name", "")),
+                    str(row.get("matching_source", row.get("source_kind", ""))),
+                    str(row.get("matching_source_label", row.get("source_label", ""))),
+                    str(row.get("target_key", row.get("excel_target_key", ""))),
+                )
+                if key in seen_rows:
+                    continue
+                seen_rows.add(key)
+                rows.append(row)
         if rows:
-            render_manual_review_editor(rows, selected_run)
+            render_manual_review_editor(rows, run_context)
             st.divider()
-    render_run_candidates(selected_run, app_config)
+    render_run_candidates(run_dirs, app_config)
+
+
+def _group_runs_by_id(runs: Iterable[Path]) -> list[tuple[str, tuple[Path, ...]]]:
+    """Collapse source-specific artifact directories into logical runs."""
+    grouped: dict[str, list[Path]] = {}
+    for run_dir in runs:
+        grouped.setdefault(run_dir.name, []).append(run_dir)
+    return [
+        (run_id, tuple(sorted(grouped[run_id], key=str)))
+        for run_id in sorted(grouped, reverse=True)
+    ]
+
+
+def _format_run_group(run_id: str, run_dirs: tuple[Path, ...]) -> str:
+    """Return a concise selectbox label listing every source in the run."""
+    sources = ", ".join(
+        f"{run_dir.parent.parent.name}/{run_dir.parent.name}"
+        for run_dir in run_dirs
+    )
+    return f"{run_id} — {sources}"
+
+
+def _coerce_run_dirs(value) -> tuple[Path, ...]:
+    """Accept the old single-Path API and the new grouped-run API."""
+    if isinstance(value, Path):
+        return (value,)
+    return tuple(value)
+
+
+def _primary_run_dir(run_dirs: tuple[Path, ...]) -> Path:
+    """Choose the Tawreed directory for shared run actions when available."""
+    for run_dir in run_dirs:
+        if run_dir.parent.parent.name == "order":
+            return run_dir
+    return run_dirs[0]
 
 
 def _available_runs_with_candidates() -> list[Path]:
-    runs = []
+    """Return artifact runs that can provide a review or candidate view.
+
+    Generic Tawreed runs use ``order_item_summary`` while Excel-target runs
+    use ``match_only_summary`` and may emit one candidate JSONL per target.
+    Discovery therefore checks all review artifact markers.
+    """
+    runs: set[Path] = set()
     if not ARTIFACTS_DIR.exists():
-        return runs
-    for c_dir in filter(lambda p: p.is_dir(), ARTIFACTS_DIR.iterdir()):
-        for p_dir in filter(lambda p: p.is_dir(), c_dir.iterdir()):
-            for r_dir in filter(lambda p: p.is_dir(), p_dir.iterdir()):
-                if list(r_dir.glob("order_item_summary_*.csv")):
-                    runs.append(r_dir)
-    return sorted(runs, reverse=True)
+        return []
+    for category_dir in _safe_child_directories(ARTIFACTS_DIR):
+        for source_dir in _safe_child_directories(category_dir):
+            for run_dir in _safe_child_directories(source_dir):
+                if _has_review_artifacts(run_dir):
+                    runs.add(run_dir)
+    # The selectbox uses index 0 when the user has not made a choice yet, so
+    # order by the run id first instead of the full path. Sorting by the full
+    # path made the artifact category/source name decide the default and could
+    # surface an older run.
+    return sorted(runs, key=_run_recency_key, reverse=True)
+
+
+def _safe_child_directories(path) -> tuple[Path, ...]:
+    """List readable child directories without breaking the whole UI.
+
+    Test/runtime artifact folders can temporarily be locked by Windows or
+    owned by another process. Such a folder is unrelated to Manual Review and
+    must not prevent accessible order runs from being displayed.
+    """
+    try:
+        children = tuple(path.iterdir())
+    except OSError:
+        return ()
+    readable: list[Path] = []
+    for child in children:
+        try:
+            if child.is_dir():
+                readable.append(child)
+        except OSError:
+            continue
+    return tuple(readable)
+
+
+def _run_recency_key(path: Path) -> tuple[str, int, int, str]:
+    """Return a deterministic newest-first key for an artifact run.
+
+    Normal run directory names are timestamp-like (``YYYYMMDD_HHMM``), making
+    lexical ordering chronological. When one command creates Tawreed and
+    Excel-target directories with the same id, the directory containing more
+    review items wins the default selection. Modification time breaks ties.
+    """
+    run_id = path.name
+    timestamp_key = run_id if _is_timestamp_run_id(run_id) else ""
+    try:
+        modified_ns = path.stat().st_mtime_ns
+    except OSError:
+        modified_ns = 0
+    return timestamp_key, _review_item_count(path), modified_ns, str(path)
+
+
+def _review_item_count(run_dir: Path) -> int:
+    """Count persisted review-item records without parsing candidate payloads."""
+    count = 0
+    for candidate_file in run_dir.glob("manual_review_candidates_*.jsonl"):
+        try:
+            with candidate_file.open("r", encoding="utf-8") as handle:
+                count += sum(1 for line in handle if line.strip())
+        except OSError:
+            continue
+    return count
+
+
+def _is_timestamp_run_id(value: str) -> bool:
+    """Return whether ``value`` starts with the standard run timestamp."""
+    date, separator, time_part = value.partition("_")
+    return bool(
+        separator
+        and len(date) == 8
+        and date.isdigit()
+        and len(time_part) >= 4
+        and time_part[:4].isdigit()
+    )
+
+
+def _has_review_artifacts(run_dir: Path) -> bool:
+    """Return whether a directory contains a review-relevant artifact."""
+    markers = (
+        "order_item_summary_*.csv",
+        "match_only_summary_*.csv",
+        "manual_review_*.csv",
+        "manual_review_candidates_*.jsonl",
+    )
+    try:
+        return any(any(run_dir.glob(pattern)) for pattern in markers)
+    except OSError:
+        return False
 
 
 # ============ Candidate Rendering ============
 
-def render_run_candidates(run_dir: Path, app_config=None) -> None:
-    """Render the evaluation cards for the selected run."""
-    st.subheader(f"Candidates from run: {run_dir.name}")
-    candidates_dict = load_review_candidates(run_dir)
+def render_run_candidates(run_dir: Path | Iterable[Path], app_config=None) -> None:
+    """Render merged evaluation cards for every source in one run."""
+    run_dirs = _coerce_run_dirs(run_dir)
+    run_context = _primary_run_dir(run_dirs)
+    st.subheader(f"Candidates from run: {run_context.name}")
+    st.caption(f"Combined sources: {len(run_dirs)}")
+    candidates_dict = _load_group_candidates(run_dirs)
     if not candidates_dict:
         st.success(
             "🎉 All items in this run were processed automatically! "
@@ -82,7 +233,64 @@ def render_run_candidates(run_dir: Path, app_config=None) -> None:
     page_items = _paginate_candidates(display_items)
     for item_key, options in page_items:
         item = _parse_item_from_key(item_key)
-        _render_item_card(item_key, item, options[:display_limit], run_dir, store)
+        _render_item_card(item_key, item, options[:display_limit], run_context, store)
+
+
+def _load_group_candidates(
+    run_dirs: Iterable[Path],
+) -> dict[str, list[ReviewCandidateOption]]:
+    """Merge source-specific candidate artifacts without losing provenance."""
+    merged: dict[str, list[ReviewCandidateOption]] = {}
+    seen: dict[str, set[tuple[str, ...]]] = {}
+    for run_dir in run_dirs:
+        for item_key, options in load_review_candidates(run_dir).items():
+            bucket = merged.setdefault(item_key, [])
+            bucket_seen = seen.setdefault(item_key, set())
+            for raw_option in options:
+                option = _candidate_with_run_source(raw_option, run_dir)
+                identity = (
+                    option.store_product_id,
+                    option.name_en,
+                    option.name_ar,
+                    option.matching_source,
+                    option.matching_source_label,
+                    option.target_key,
+                    option.source_file,
+                )
+                if identity in bucket_seen:
+                    continue
+                bucket_seen.add(identity)
+                bucket.append(option)
+    return merged
+
+
+def _candidate_with_run_source(
+    option: ReviewCandidateOption, run_dir: Path
+) -> ReviewCandidateOption:
+    """Backfill provenance for legacy candidates from their artifact path."""
+    if option.matching_source:
+        return option
+    category = run_dir.parent.parent.name
+    source_name = run_dir.parent.name
+    if category == "order":
+        return replace(
+            option,
+            matching_source="tawreed",
+            matching_source_label=source_name,
+        )
+    if category == "excel-target":
+        return replace(
+            option,
+            matching_source="excel-target",
+            matching_source_label=source_name,
+            target_key=option.target_key or source_name,
+            excel_target_key=option.excel_target_key or source_name,
+        )
+    return replace(
+        option,
+        matching_source=category or "legacy-unknown",
+        matching_source_label=source_name,
+    )
 
 
 def _candidate_display_limit(app_config=None) -> int:
@@ -108,7 +316,7 @@ def _configured_candidate_limit(app_config=None) -> int:
 
 
 def _filter_and_prepare_items(candidates_dict, store, hide_completed):
-    """Filter and prepare display items based on completion status."""
+    """Filter completed candidate scopes while preserving other sources."""
     all_items = list(candidates_dict.items())
     if not hide_completed:
         return all_items
@@ -117,9 +325,43 @@ def _filter_and_prepare_items(candidates_dict, store, hide_completed):
         parts = item_key.split("::", 1)
         item_code = parts[0].upper()
         item_name = parts[1].upper() if len(parts) > 1 else "Unknown"
-        if not store.lookup(item_code, item_name):
+        saved_decisions = store.lookup_all(item_code, item_name)
+        if not saved_decisions:
             filtered_items.append((item_key, options))
+            continue
+        remaining_options = [
+            option
+            for option in options
+            if not any(
+                _decision_covers_candidate_scope(saved, option)
+                for saved in saved_decisions
+            )
+        ]
+        if remaining_options:
+            filtered_items.append((item_key, remaining_options))
     return filtered_items
+
+
+def _decision_covers_candidate_scope(decision, option: ReviewCandidateOption) -> bool:
+    """Return whether a saved decision belongs to this candidate source scope."""
+    option_source = _normalized_source(option.matching_source)
+    if not option_source:
+        # Legacy candidate artifacts did not record a source and retain their
+        # historical item-level completion behaviour.
+        return True
+    decision_source = _normalized_source(getattr(decision, "matching_source", ""))
+    if decision_source != option_source:
+        return False
+    if option_source != "excel-target":
+        return True
+    option_target = option.excel_target_key or option.target_key
+    decision_target = getattr(decision, "excel_target_key", "")
+    return bool(option_target and decision_target and option_target == decision_target)
+
+
+def _normalized_source(value: object) -> str:
+    """Normalize source aliases used by old and new artifacts."""
+    return str(value or "").strip().lower().replace("_", "-")
 
 
 def _paginate_candidates(display_items):
@@ -152,7 +394,33 @@ def _render_item_card(
 ) -> None:
     with st.expander(f"Review: {item.name} ({item.code})", expanded=True):
         st.markdown(f"**Requested Item:** {item.name}")
+        _render_candidate_provenance(options)
         render_selection_form(item, options, run_dir, store, item_key)
+
+
+def _render_candidate_provenance(options: list[ReviewCandidateOption]) -> None:
+    """Display every distinct source represented in the merged review card."""
+    scopes: dict[tuple[str, ...], ReviewCandidateOption] = {}
+    for option in options:
+        scope = (
+            option.matching_source,
+            option.matching_source_label,
+            option.target_key,
+            option.source_file,
+            option.identity_evidence_kind,
+        )
+        scopes.setdefault(scope, option)
+    for option in scopes.values():
+        details = [f"Matching source: {option.matching_source or 'legacy/unknown'}"]
+        if option.matching_source_label:
+            details.append(f"Source label: {option.matching_source_label}")
+        if option.target_key:
+            details.append(f"Target: {option.target_key}")
+        if option.source_file:
+            details.append(f"File: {option.source_file}")
+        if option.identity_evidence_kind:
+            details.append(f"Identity evidence: {option.identity_evidence_kind}")
+        st.caption(" · ".join(details))
 
 
 # ============ Form Rendering ============
@@ -225,6 +493,9 @@ def _build_radio_opts(options: list[ReviewCandidateOption]) -> list[str]:
             f"[{i+1}] {name} | {opt.supplier} | "
             f"Qty: {opt.available_quantity} | سعر الجمهور: {opt.price} EGP | {avail}"
         )
+        source = getattr(opt, "matching_source", "") or getattr(opt, "source_kind", "")
+        if source:
+            label += f" | Source: {source}"
         radio_opts.append(label)
     return radio_opts
 

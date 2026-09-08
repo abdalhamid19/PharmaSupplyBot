@@ -9,8 +9,11 @@ from unittest.mock import patch
 
 from src.core.manual_review.manual_review_runtime import (
     filter_manual_review_candidates,
+    manual_review_cache_context,
     manual_review_match,
     manual_review_queries,
+    preload_manual_review_decisions,
+    saved_manual_review_decision,
 )
 from src.core.manual_review.manual_review_store import ManualReviewDecision, ManualReviewStore
 from src.core.matching.product_matching import explain_best_product_match
@@ -31,6 +34,75 @@ class ManualReviewRuntimeTests(unittest.TestCase):
         self.assertEqual(len(db.lookup_queries), 1)
         self.assertEqual(decisions[("1", "PANADOL")].correct_store_product_id, "s1")
         self.assertEqual(decisions[("2", "CATAFLAM")].correct_store_product_id, "s2")
+
+    def test_tawreed_runtime_does_not_consume_excel_target_decision(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "manual.sqlite3"
+            store = ManualReviewStore(db_path)
+            item = Item("1", "Panadol", 1)
+            store.upsert(
+                ManualReviewDecision(
+                    item.code,
+                    item.name,
+                    True,
+                    "baraka-id",
+                    matching_source="excel-target",
+                    matching_source_label="baraka",
+                    excel_target_key="baraka",
+                )
+            )
+            store.upsert(
+                ManualReviewDecision(
+                    item.code,
+                    item.name,
+                    True,
+                    "tawreed-id",
+                    matching_source="tawreed",
+                    matching_source_label="wardany",
+                )
+            )
+            with patch(
+                "src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB",
+                db_path,
+            ):
+                cache = preload_manual_review_decisions([item])
+                with manual_review_cache_context(cache):
+                    decision = saved_manual_review_decision(item)
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.correct_store_product_id, "tawreed-id")
+
+    def test_excel_target_lookup_bypasses_tawreed_runtime_cache(self) -> None:
+        item = Item("1", "Panadol", 1)
+        tawreed = ManualReviewDecision("1", "Panadol", True, "tawreed-id")
+        cache = type("Cache", (), {"lookup": lambda self, _: tawreed})()
+        excel = ManualReviewDecision(
+            "1",
+            "Panadol",
+            True,
+            "baraka-id",
+            matching_source="excel-target",
+            excel_target_key="baraka",
+        )
+        with manual_review_cache_context(cache), patch(
+            "src.core.manual_review.manual_review_runtime._lookup_with_retry",
+            return_value=excel,
+        ) as lookup:
+            decision = saved_manual_review_decision(
+                item,
+                matching_source="excel-target",
+                excel_target_key="baraka",
+                include_legacy=False,
+            )
+
+        self.assertEqual(decision.correct_store_product_id, "baraka-id")
+        lookup.assert_called_once_with(
+            item,
+            matching_source="excel-target",
+            matching_source_label=None,
+            excel_target_key="baraka",
+            include_legacy=False,
+        )
 
     def test_manual_review_queries_prepend_saved_correct_query(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -172,8 +244,12 @@ class _FakeManualReviewDb:
         # PRAGMA table_info: cid, name, type, notnull, dflt_value, pk
         if "PRAGMA table_info" in query or "pragma table_info" in query.lower():
             return [
-                (0, "manual_decision", "TEXT", 1, "''", 0),
-                (1, "correct_product_name_ar", "TEXT", 1, "''", 0),
+                (0, "item_code_key", "TEXT", 1, "''", 1),
+                (1, "item_name_key", "TEXT", 1, "''", 2),
+                (2, "matching_source", "TEXT", 1, "''", 3),
+                (3, "matching_source_label", "TEXT", 1, "''", 4),
+                (4, "manual_decision", "TEXT", 1, "''", 0),
+                (5, "correct_product_name_ar", "TEXT", 1, "''", 0),
             ]
         self.lookup_queries.append((query, params))
         return [

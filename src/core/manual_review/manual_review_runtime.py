@@ -39,9 +39,15 @@ class ManualReviewDecisionCache:
 
 
 def preload_manual_review_decisions(items: Iterable[Item]) -> ManualReviewDecisionCache:
-    """Load manual-review decisions for this run in one store call."""
+    """Load Tawreed decisions for this run in one store call.
+
+    Legacy decisions remain a fallback, but Excel-target decisions are never
+    allowed into this cache because its consumers drive Tawreed matching.
+    """
     # Default path is resolved at call time so tests can patch DEFAULT_MANUAL_REVIEW_DB
-    decisions = ManualReviewStore().lookup_many(items)
+    decisions = ManualReviewStore().lookup_many(
+        items, matching_source="tawreed", include_legacy=True
+    )
     return ManualReviewDecisionCache(decisions)
 
 
@@ -60,13 +66,26 @@ def manual_review_cache_context(
         _MANUAL_REVIEW_CACHE.reset(token)
 
 
-def saved_manual_review_decision(item: Item) -> ManualReviewDecision | None:
-    """Return a saved manual-review decision with retry logic."""
+def saved_manual_review_decision(
+    item: Item,
+    *,
+    matching_source: str = "tawreed",
+    matching_source_label: str | None = None,
+    excel_target_key: str | None = None,
+    include_legacy: bool = True,
+) -> ManualReviewDecision | None:
+    """Return a saved decision scoped to the matching supplier/target."""
     cache = _MANUAL_REVIEW_CACHE.get()
-    if cache is not None:
+    if cache is not None and matching_source == "tawreed" and matching_source_label is None:
         return cache.lookup(item)
-    
-    return _lookup_with_retry(item)
+
+    return _lookup_with_retry(
+        item,
+        matching_source=matching_source,
+        matching_source_label=matching_source_label,
+        excel_target_key=excel_target_key,
+        include_legacy=include_legacy,
+    )
 
 
 def manual_review_queries(

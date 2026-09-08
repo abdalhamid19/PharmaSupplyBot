@@ -97,6 +97,25 @@ def test_order_accepts_all_excel_targets_flag() -> None:
     assert getattr(handler_args, "all_excel_targets", None) is True
 
 
+def test_order_accepts_excel_target_only_flag() -> None:
+    runner = CliRunner()
+    captured: dict[str, object] = {}
+
+    def _capture(cfg, args):
+        captured["args"] = args
+        return 0
+
+    with patch("src.cli.typer_app.get_command") as get_cmd, \
+         patch("src.cli.typer_app.load_config") as load_cfg, \
+         patch("src.cli.typer_app.configure_logging"):
+        get_cmd.return_value = _capture
+        load_cfg.return_value = object()
+        result = runner.invoke(app, ["order", "--excel-target-only"])
+
+    assert result.exit_code == 0
+    assert getattr(captured["args"], "excel_target_only", None) is True
+
+
 def test_order_accepts_repeated_excel_target_path_flag() -> None:
     """The ``--excel-target-path`` flag must accept the same key multiple times."""
     runner = CliRunner()
@@ -126,4 +145,4 @@ def test_order_accepts_repeated_excel_target_path_flag() -> None:
     assert result.exit_code == 0
     handler_args = captured["args"]
     overrides = getattr(handler_args, "excel_target_path", None) or []
-    assert overrides == ["alnasr=file1.xlsx", "alnasr=file2.xlsx"]
+    assert list(overrides) == ["alnasr=file1.xlsx", "alnasr=file2.xlsx"]

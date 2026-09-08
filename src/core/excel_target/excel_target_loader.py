@@ -38,6 +38,21 @@ class TargetProduct:
     price_meaning: str = "public_with_discount"
     public_price: float | None = None
     purchase_price: float | None = None
+    name_en: str | None = None
+
+    @property
+    def name_ar(self) -> str:
+        """Return the supplier's raw name; it may be Arabic or English."""
+        return self.name
+
+    @property
+    def trusted_name_en(self) -> str:
+        """Return a native English name only; Arabic/mixed cells are not English evidence."""
+        if self.name_en:
+            return self.name_en
+        has_arabic = any("\u0600" <= char <= "\u06ff" for char in self.name)
+        has_latin = any(char.isascii() and char.isalpha() for char in self.name)
+        return self.name if has_latin and not has_arabic else ""
 
     def to_candidate_dict(self) -> dict[str, Any]:
         """Return the candidate dict shape consumed by the core matcher.
@@ -52,8 +67,8 @@ class TargetProduct:
         the pricing resolver knows whether to derive or trust each side.
         """
         candidate: dict[str, Any] = {
-            "productNameEn": self.name,
-            "productNameEnFallback": self.name,
+            "productNameEn": self.trusted_name_en,
+            "productNameEnFallback": self.trusted_name_en,
             "productName": self.name,
             "availableQuantity": 1,
             "productsCount": 1,
@@ -63,8 +78,9 @@ class TargetProduct:
             "excelTargetSourceFile": self.source_file,
             "excelTargetRaw": dict(self.raw),
             "priceMeaning": self.price_meaning,
-            "verified_brand_identity": False,
-            "identity_evidence": "",
+            "verified_brand_identity": bool(self.trusted_name_en),
+            "identity_evidence": "native English supplier name" if self.trusted_name_en else "",
+            "identity_evidence_kind": "native_english" if self.trusted_name_en else "",
         }
         if self.price_meaning == "purchase_only":
             candidate["salePrice"] = float(self.price or 0.0)

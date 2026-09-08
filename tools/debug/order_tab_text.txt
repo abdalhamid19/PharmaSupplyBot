@@ -1,0 +1,47 @@
+Config path
+
+Loaded config: state\config.yaml
+
+Deploy
+💊
+PharmaSupplyBot
+
+Tawreed authentication, order execution, and result review from one UI.
+
+Overview
+
+Auth
+
+Order
+
+Prevented items
+
+Remove cart items
+
+Run DB
+
+Manual Review
+
+Run Order
+
+Excel source
+
+Existing file
+
+Upload file
+
+Excel file
+
+Run target
+
+👤 Tawreed profile — صيدلية الورداني (wardany)
+
+Primary profile (for resume/preview only)
+
+Item limit
+
+keyboard_arrow_right
+
+⚙️ Advanced Options
+
+Run Order

@@ -43,7 +43,8 @@ def _select_saved_columns(df):
     """Select columns to display."""
     all_columns = list(df.columns)
     default_columns = [
-        "item_code", "item_name", "run_date", "decision",
+        "item_code", "item_name", "run_date", "decision", "manual_decision",
+        "matching_source", "matching_source_label",
         "correct_product_name", "correct_product_name_ar"
     ]
     default_columns = [col for col in default_columns if col in all_columns]
@@ -55,7 +56,13 @@ def _select_saved_columns(df):
 
 def _build_editor_columns(selected_columns):
     """Build editor columns with identity columns first."""
-    identity_columns = ["item_code", "item_name"]
+    # Supplier scope is part of the persistent identity.  Keep it in the
+    # editor even when the user customises the visible business columns so a
+    # deletion or approval can never fall back to item-only behaviour.
+    identity_columns = [
+        "item_code", "item_name", "matching_source", "matching_source_label",
+        "excel_target_key",
+    ]
     return identity_columns + [c for c in selected_columns if c not in identity_columns]
 
 
@@ -91,16 +98,30 @@ def _get_sort_preferences(selected_columns):
 
 
 def _decision_row(d) -> dict:
+    """Return a backward-compatible, provenance-rich display row."""
+    target_key = getattr(d, "excel_target_key", "")
+    source = getattr(d, "matching_source", "") or getattr(d, "source_kind", "")
+    if not source and target_key:
+        # Decisions written before the explicit source migration can still be
+        # identified safely from their target scope.
+        source = "excel_target"
     return {
         "item_code": d.item_code,
         "item_name": d.item_name,
         "run_date": d.run_id,
         "decision": d.manual_decision,
+        "manual_decision": d.manual_decision,
+        "matching_source": source,
+        "matching_source_label": getattr(d, "matching_source_label", "") or "",
+        "identity_evidence_kind": getattr(d, "identity_evidence_kind", "") or "",
+        "identity_evidence": getattr(d, "identity_evidence", "") or "",
         "correct_store_product_id": d.correct_store_product_id,
         "correct_product_name": getattr(d, "correct_product_name", ""),
         "correct_product_name_ar": getattr(d, "correct_product_name_ar", ""),
         "correct_query": d.correct_query,
         "run_id": d.run_id,
+        "excel_target_key": target_key,
+        "excel_target_source_file": getattr(d, "excel_target_source_file", "") or "",
         "approved": d.approved,
     }
 
@@ -174,18 +195,25 @@ def _handle_deletion(display_df, edited_df, store):
     deleted_pairs = deleted_identity_pairs(display_df, edited_df)
     if deleted_pairs:
         if st.button("🗑️ Confirm Deletion of Selected Items"):
-            for code, name in deleted_pairs:
-                store.delete(code, name)
+            for code, name, source, source_label in deleted_pairs:
+                store.delete(
+                    code, name,
+                    matching_source=source,
+                    matching_source_label=source_label,
+                )
             st.success(
                 f"Successfully deleted {len(deleted_pairs)} items from saved corrections!"
             )
             st.rerun()
 
 
-def deleted_identity_pairs(original_df, edited_df) -> list[tuple[str, str]]:
-    """Return (item_code, item_name) pairs removed from the edited table."""
-    original = set(zip(original_df["item_code"], original_df["item_name"]))
-    edited = set(zip(edited_df["item_code"], edited_df["item_name"]))
+def deleted_identity_pairs(original_df, edited_df) -> list[tuple[str, str, str, str]]:
+    """Return exact item-and-supplier identities removed from the table."""
+    columns = [
+        "item_code", "item_name", "matching_source", "matching_source_label",
+    ]
+    original = set(original_df.reindex(columns=columns, fill_value="").itertuples(index=False, name=None))
+    edited = set(edited_df.reindex(columns=columns, fill_value="").itertuples(index=False, name=None))
     return sorted(original - edited)
 
 
@@ -215,7 +243,13 @@ def _render_conversion_button(selected_auto_matched, store):
 def _convert_to_approved(selected_auto_matched, store):
     """Convert selected auto_matched items to approved_match."""
     for _, row in selected_auto_matched.iterrows():
-        decision_obj = store.lookup(str(row["item_code"]), str(row["item_name"]))
+        decision_obj = store.lookup(
+            str(row["item_code"]),
+            str(row["item_name"]),
+            matching_source=str(row.get("matching_source", "") or ""),
+            matching_source_label=str(row.get("matching_source_label", "") or ""),
+            excel_target_key=str(row.get("excel_target_key", "") or ""),
+        )
         if decision_obj and decision_obj.manual_decision == "auto_matched":
             new_decision = dataclasses.replace(
                 decision_obj, manual_decision="approved_match"

@@ -5,8 +5,10 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import Mock, patch
 
 from src.core.manual_review.manual_review_store import ManualReviewDecision, ManualReviewStore
+from src.core.manual_review.manual_review_candidates import ReviewCandidateOption
 from src.ui.manual_review.streamlit_manual_review_input import (
     editable_manual_review_rows,
     manual_review_decisions_from_rows,
@@ -17,10 +19,12 @@ from src.ui.manual_review.streamlit_manual_review_cli import (
     write_not_matching_review_csv,
 )
 from src.ui.manual_review.streamlit_manual_review_page_saved import (
+    _convert_to_approved,
     _decision_row,
     deleted_identity_pairs,
 )
 from src.ui.manual_review.streamlit_manual_review_page import _configured_candidate_limit
+from src.ui.manual_review import streamlit_manual_review_page as manual_review_page
 
 
 class StreamlitManualReviewTests(unittest.TestCase):
@@ -43,6 +47,32 @@ class StreamlitManualReviewTests(unittest.TestCase):
         self.assertTrue(decisions[0].approved)
         self.assertEqual(decisions[0].manual_decision, "approved_match")
         self.assertEqual(decisions[0].correct_store_product_id, "store-1")
+
+    def test_approved_table_row_preserves_matching_provenance(self) -> None:
+        decisions = manual_review_decisions_from_rows(
+            [
+                {
+                    "item_code": "90951",
+                    "item_name": "INODEP CAPSULES 30",
+                    "approved_match": True,
+                    "correct_store_product_id": "baraka-1",
+                    "matching_source": "excel-target",
+                    "matching_source_label": "baraka@baraka.xlsx",
+                    "excel_target_key": "baraka",
+                    "excel_target_source_file": "baraka.xlsx",
+                    "identity_evidence_kind": "dictionary",
+                    "identity_evidence": "INODEP -> اينوديب",
+                }
+            ],
+            "20260907_1752",
+        )
+
+        self.assertEqual(len(decisions), 1)
+        self.assertEqual(decisions[0].manual_decision, "approved_match")
+        self.assertEqual(decisions[0].matching_source, "excel-target")
+        self.assertEqual(decisions[0].matching_source_label, "baraka@baraka.xlsx")
+        self.assertEqual(decisions[0].excel_target_key, "baraka")
+        self.assertEqual(decisions[0].identity_evidence_kind, "dictionary")
 
     def test_builds_not_matching_decision(self) -> None:
         decisions = manual_review_decisions_from_rows(
@@ -150,21 +180,229 @@ class StreamlitManualReviewTests(unittest.TestCase):
         self.assertEqual(row["run_date"], "20260622_1425")
         self.assertEqual(row["run_id"], "20260622_1425")
 
+    def test_saved_decision_row_exposes_matching_source_and_decision(self) -> None:
+        from types import SimpleNamespace
+
+        row = _decision_row(
+            SimpleNamespace(
+                item_code="90951",
+                item_name="INODEP CAPSULES 30",
+                approved=True,
+                manual_decision="auto_matched",
+                correct_store_product_id="baraka-1",
+                correct_product_name="INODEP 30 CAPS",
+                correct_product_name_ar="اينوديب 30 كبسول",
+                correct_query="",
+                run_id="20260907_1600",
+                matching_source="excel_target",
+                matching_source_label="baraka@baraka.xlsx",
+                identity_evidence_kind="dictionary",
+                identity_evidence="INODEP",
+                excel_target_key="baraka",
+                excel_target_source_file="baraka.xlsx",
+            )
+        )
+
+        self.assertEqual(row["matching_source"], "excel_target")
+        self.assertEqual(row["matching_source_label"], "baraka@baraka.xlsx")
+        self.assertEqual(row["manual_decision"], "auto_matched")
+        self.assertEqual(row["excel_target_key"], "baraka")
+        self.assertEqual(row["identity_evidence_kind"], "dictionary")
+
+    def test_run_discovery_includes_excel_target_summary_and_candidate_artifacts(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            artifacts = Path(temp_dir) / "artifacts"
+            run_dir = artifacts / "excel-target" / "baraka" / "20260907_1600"
+            run_dir.mkdir(parents=True)
+            (run_dir / "match_only_summary_baraka.csv").write_text("status\nno-results\n", encoding="utf-8")
+            with patch.object(manual_review_page, "ARTIFACTS_DIR", artifacts):
+                runs = manual_review_page._available_runs_with_candidates()
+
+        self.assertEqual(runs, [run_dir])
+
+    def test_run_discovery_skips_directory_when_windows_denies_listing(self) -> None:
+        class DeniedDirectory:
+            def iterdir(self):
+                raise PermissionError(5, "Access is denied", "artifacts/pytest_runtime")
+
+        self.assertEqual(
+            manual_review_page._safe_child_directories(DeniedDirectory()),
+            (),
+        )
+
+    def test_run_discovery_puts_latest_run_first_for_default_selection(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            artifacts = Path(temp_dir) / "artifacts"
+            older = artifacts / "order" / "wardany" / "20260906_2359"
+            latest = artifacts / "excel-target" / "baraka" / "20260907_0001"
+            for run_dir in (older, latest):
+                run_dir.mkdir(parents=True)
+                (run_dir / "manual_review_candidates_test.jsonl").write_text(
+                    "", encoding="utf-8"
+                )
+            with patch.object(manual_review_page, "ARTIFACTS_DIR", artifacts):
+                runs = manual_review_page._available_runs_with_candidates()
+
+        self.assertEqual(runs, [latest, older])
+
+    def test_same_run_id_prefers_source_with_more_review_items(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            artifacts = Path(temp_dir) / "artifacts"
+            tawreed = artifacts / "order" / "wardany" / "20260907_1839"
+            baraka = artifacts / "excel-target" / "baraka" / "20260907_1839"
+            for run_dir, records in ((tawreed, 1), (baraka, 8)):
+                run_dir.mkdir(parents=True)
+                (run_dir / "manual_review_candidates_test.jsonl").write_text(
+                    "{}\n" * records, encoding="utf-8"
+                )
+            with patch.object(manual_review_page, "ARTIFACTS_DIR", artifacts):
+                runs = manual_review_page._available_runs_with_candidates()
+
+        self.assertEqual(runs[0], baraka)
+
+    def test_run_groups_merge_all_sources_with_the_same_run_id(self) -> None:
+        tawreed = Path("artifacts/order/wardany/20260907_1839")
+        baraka = Path("artifacts/excel-target/baraka/20260907_1839")
+        older = Path("artifacts/order/wardany/20260907_1700")
+
+        groups = manual_review_page._group_runs_by_id([tawreed, older, baraka])
+
+        self.assertEqual([run_id for run_id, _ in groups], ["20260907_1839", "20260907_1700"])
+        self.assertEqual(set(groups[0][1]), {tawreed, baraka})
+
+    def test_group_candidate_loader_combines_tawreed_and_baraka(self) -> None:
+        tawreed_dir = Path("artifacts/order/wardany/20260907_1839")
+        baraka_dir = Path("artifacts/excel-target/baraka/20260907_1839")
+        tawreed_option = ReviewCandidateOption(
+            store_product_id="t-1", name_en="TEST", name_ar="",
+            supplier="wardany", available_quantity=1, price=10.0,
+            score=15.0, rejection_reason="", orderable=True,
+        )
+        baraka_option = ReviewCandidateOption(
+            store_product_id="b-1", name_en="", name_ar="منتج",
+            supplier="excel-target:baraka", available_quantity=1, price=9.0,
+            score=14.0, rejection_reason="strength not proven", orderable=True,
+            matching_source="excel-target", matching_source_label="baraka@baraka.xlsx",
+            target_key="baraka", excel_target_key="baraka",
+        )
+
+        def candidates_for(run_dir):
+            option = tawreed_option if run_dir == tawreed_dir else baraka_option
+            return {"1::TEST": [option]}
+
+        with patch.object(
+            manual_review_page, "load_review_candidates", side_effect=candidates_for
+        ):
+            merged = manual_review_page._load_group_candidates(
+                (tawreed_dir, baraka_dir)
+            )
+
+        self.assertEqual(len(merged["1::TEST"]), 2)
+        self.assertEqual(
+            {option.matching_source for option in merged["1::TEST"]},
+            {"tawreed", "excel-target"},
+        )
+
+    def test_tawreed_saved_decision_does_not_hide_baraka_candidates(self) -> None:
+        option = ReviewCandidateOption(
+            store_product_id="baraka-1",
+            name_en="",
+            name_ar="منتج البركة",
+            supplier="excel-target:baraka",
+            available_quantity=1,
+            price=10.0,
+            score=20.0,
+            rejection_reason="candidate strength is not proven",
+            orderable=True,
+            matching_source="excel-target",
+            target_key="baraka",
+            excel_target_key="baraka",
+        )
+        store = Mock()
+        store.lookup_all.return_value = [
+            ManualReviewDecision(
+                item_code="1",
+                item_name="TEST",
+                approved=True,
+                manual_decision="auto_matched",
+                matching_source="tawreed",
+            )
+        ]
+
+        visible = manual_review_page._filter_and_prepare_items(
+            {"1::TEST": [option]}, store, hide_completed=True
+        )
+
+        self.assertEqual(visible, [("1::TEST", [option])])
+
+    def test_any_saved_supplier_row_hides_only_its_own_candidate_scope(self) -> None:
+        tawreed = ReviewCandidateOption(
+            store_product_id="t-1", name_en="TEST", name_ar="", supplier="wardany",
+            available_quantity=1, price=10.0, score=90.0, matching_source="tawreed",
+            rejection_reason="", orderable=True,
+        )
+        baraka = ReviewCandidateOption(
+            store_product_id="b-1", name_en="", name_ar="منتج", supplier="baraka",
+            available_quantity=1, price=10.0, score=90.0,
+            matching_source="excel-target", target_key="baraka", excel_target_key="baraka",
+            rejection_reason="", orderable=True,
+        )
+        store = Mock()
+        store.lookup_all.return_value = [
+            ManualReviewDecision(
+                item_code="1", item_name="TEST", approved=True,
+                manual_decision="approved_match", matching_source="excel-target",
+                excel_target_key="baraka",
+            )
+        ]
+
+        visible = manual_review_page._filter_and_prepare_items(
+            {"1::TEST": [tawreed, baraka]}, store, hide_completed=True
+        )
+
+        self.assertEqual(visible, [("1::TEST", [tawreed])])
+
     def test_deleted_identity_pairs_targets_exact_row_not_shared_code(self) -> None:
-        """Deletion must remove only the exact (code, name) row, not its twin."""
+        """Deletion must include supplier scope when the same item has two rows."""
         import pandas as pd
 
         original = pd.DataFrame(
             [
-                {"item_code": "47853", "item_name": "ZOCOZET 10/10"},
-                {"item_code": "47853", "item_name": "ZOCOZET 10/20"},
+                {"item_code": "47853", "item_name": "ZOCOZET 10/10", "matching_source": "tawreed", "matching_source_label": "wardany"},
+                {"item_code": "47853", "item_name": "ZOCOZET 10/10", "matching_source": "excel-target", "matching_source_label": "baraka"},
             ]
         )
-        edited = pd.DataFrame([{"item_code": "47853", "item_name": "ZOCOZET 10/20"}])
+        edited = pd.DataFrame([{"item_code": "47853", "item_name": "ZOCOZET 10/10", "matching_source": "excel-target", "matching_source_label": "baraka"}])
 
         self.assertEqual(
-            deleted_identity_pairs(original, edited), [("47853", "ZOCOZET 10/10")]
+            deleted_identity_pairs(original, edited),
+            [("47853", "ZOCOZET 10/10", "tawreed", "wardany")],
         )
+
+    def test_convert_to_approved_looks_up_exact_supplier_row(self) -> None:
+        import pandas as pd
+
+        selected = pd.DataFrame([{
+            "item_code": "47853", "item_name": "ZOCOZET 10/10",
+            "matching_source": "excel-target", "matching_source_label": "baraka",
+            "excel_target_key": "baraka",
+        }])
+        decision = ManualReviewDecision(
+            item_code="47853", item_name="ZOCOZET 10/10", approved=True,
+            manual_decision="auto_matched", matching_source="excel-target",
+            matching_source_label="baraka", excel_target_key="baraka",
+        )
+        store = Mock()
+        store.lookup.return_value = decision
+
+        with patch("src.ui.manual_review.streamlit_manual_review_page_saved.st"):
+            _convert_to_approved(selected, store)
+
+        store.lookup.assert_called_once_with(
+            "47853", "ZOCOZET 10/10", matching_source="excel-target",
+            matching_source_label="baraka", excel_target_key="baraka",
+        )
+        self.assertEqual(store.upsert.call_args.args[0].manual_decision, "approved_match")
 
     def test_configured_candidate_limit_defaults_to_five(self) -> None:
         self.assertEqual(_configured_candidate_limit(None), 5)

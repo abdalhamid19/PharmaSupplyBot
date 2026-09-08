@@ -84,11 +84,10 @@ class TestBarakaMatchingHypotheses(TestCase):
         )
 
     def test_h3_catalog_schema_is_single_name_and_not_an_english_identity_source(self) -> None:
-        """Confirmed data-shape fact, not a failure: both name fields are Arabic."""
-        self.assertEqual(
-            self.candidate["productNameEn"], self.candidate["productName"]
-        )
-        self.assertFalse(any(char.isascii() and char.isalpha() for char in self.candidate["productNameEn"]))
+        """Arabic supplier text is retained raw but never presented as English."""
+        self.assertEqual(self.candidate["productName"], UNRELATED_ARABIC_TABLETS.name)
+        self.assertEqual(self.candidate["productNameEn"], "")
+        self.assertFalse(self.candidate["verified_brand_identity"])
 
     def test_h4_bilingual_fallback_is_not_needed_to_reproduce_false_acceptance(self) -> None:
         """Confirmed: fallback is not responsible for the false acceptance."""
@@ -101,5 +100,4 @@ class TestBarakaMatchingHypotheses(TestCase):
         """Confirmed: the sole shared input signal is generic pack/form evidence."""
         self.assertLess(_best_candidate_overlap(INODEP.name, self.candidate), 0.6)
         self.assertIn("30", _normalize_text(INODEP.name))
-        self.assertIn("30", _normalize_text(self.candidate["productNameEn"]))
-
+        self.assertIn("30", _normalize_text(self.candidate["productName"]))

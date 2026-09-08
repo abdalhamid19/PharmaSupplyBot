@@ -11,6 +11,11 @@ def _clean(value: object) -> str:
 
 
 def _decision_values(code_key: str, name_key: str, decision):
+    matching_source = _clean(decision.matching_source).lower().replace("_", "-")
+    if not matching_source:
+        matching_source = (
+            "excel-target" if _clean(decision.excel_target_key) else "legacy-unknown"
+        )
     return (
         code_key,
         name_key,
@@ -23,6 +28,12 @@ def _decision_values(code_key: str, name_key: str, decision):
         decision.correct_product_name_ar,
         decision.correct_query,
         decision.run_id,
+        decision.excel_target_key,
+        decision.excel_target_source_file,
+        matching_source,
+        decision.matching_source_label,
+        decision.identity_evidence_kind,
+        decision.identity_evidence,
     )
 
 
@@ -38,6 +49,12 @@ def _decision_from_row(row):
         _clean(row[7]),
         _clean(row[8]),
         _clean(row[4]),
+        _clean(row[9]) if len(row) > 9 else "",
+        _clean(row[10]) if len(row) > 10 else "",
+        _clean(row[11]) if len(row) > 11 else "",
+        _clean(row[12]) if len(row) > 12 else "",
+        _clean(row[13]) if len(row) > 13 else "",
+        _clean(row[14]) if len(row) > 14 else "",
     )
 
 

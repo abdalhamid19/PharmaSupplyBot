@@ -220,6 +220,24 @@ class PostFixAutoMatchedSavingTests(unittest.TestCase):
         self._run_flow(_decision(), config=config)
         self.assertEqual(len(self.store.list_decisions()), 0)
 
+    def test_8_excel_target_decision_does_not_block_tawreed_auto_save(self) -> None:
+        self.store.upsert(
+            ManualReviewDecision(
+                item_code="12345", item_name="PANADOL EXTRA 24 TAB",
+                approved=True, correct_store_product_id="BARAKA-1",
+                manual_decision="approved_match",
+                matching_source="excel-target",
+                matching_source_label="baraka@baraka.xlsx",
+                excel_target_key="baraka",
+            )
+        )
+
+        self._run_flow(_decision())
+
+        rows = self.store.lookup_all("12345", "PANADOL EXTRA 24 TAB")
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row.matching_source for row in rows}, {"excel-target", "tawreed"})
+
 
 if __name__ == "__main__":
     unittest.main()

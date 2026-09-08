@@ -242,20 +242,12 @@ class TestBilingualOfflineEvidence(TestCase):
             enable_bilingual_secondary_match=True,
             bilingual_min_score=0.75,
         )
-        # Mock cached translations: INODEP row is translated; SALBOVENT is translated to Salbovent
-        def fake_cached(ar_name: str) -> str:
-            if "اينوديب" in ar_name:
-                return "INODEP 30 CAPSULES"
-            if "سالبوفنت" in ar_name:
-                return "SALBOVENT 30 TABLETS"
-            return ""
-
         with patch(
-            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
-            return_value=None,
-        ), patch(
-            "src.core.normalization.translation.ar_to_en_cached_only",
-            side_effect=fake_cached,
+            "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+            return_value={
+                catalog[0].name: "INODEP 30 CAPSULES",
+                catalog[1].name: "SALBOVENT 30 TABLETS",
+            },
         ):
             match = find_best_match_in_target(item, "test", catalog, cfg)
             self.assertIsNotNone(match)
@@ -279,14 +271,9 @@ class TestBilingualOfflineEvidence(TestCase):
             enable_bilingual_secondary_match=True,
             bilingual_min_score=0.75,
         )
-        def fake_cached(ar_name: str) -> str:
-            if "سالبوفنت" in ar_name:
-                return "SALBOVENT 30 TABLETS"
-            return ""
-
         with patch(
-            "src.core.normalization.translation.ar_to_en_cached_only",
-            side_effect=fake_cached,
+            "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+            return_value={catalog[0].name: "SALBOVENT 30 TABLETS"},
         ):
             match = find_best_match_in_target(item, "test", catalog, cfg)
             self.assertIsNotNone(match)

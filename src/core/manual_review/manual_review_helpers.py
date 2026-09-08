@@ -10,12 +10,33 @@ from ..identity.manufacturer_identity import manufacturer_conflict
 logger = logging.getLogger(__name__)
 
 
-def _lookup_with_retry(item: Item, max_attempts: int = 3) -> ManualReviewDecision | None:
+def _lookup_with_retry(
+    item: Item,
+    max_attempts: int = 3,
+    *,
+    matching_source: str | None = "tawreed",
+    matching_source_label: str | None = None,
+    excel_target_key: str | None = None,
+    include_legacy: bool = True,
+) -> ManualReviewDecision | None:
     """Lookup decision with retry logic."""
     for attempt in range(max_attempts):
         try:
             # Use default path resolved at call time so tests can patch DEFAULT_MANUAL_REVIEW_DB
-            result = ManualReviewStore().lookup(item.code, item.name)
+            store = ManualReviewStore()
+            result = store.lookup(
+                item.code,
+                item.name,
+                matching_source=matching_source,
+                matching_source_label=matching_source_label,
+                excel_target_key=excel_target_key,
+            )
+            if result is None and include_legacy and matching_source == "tawreed":
+                result = store.lookup(
+                    item.code,
+                    item.name,
+                    matching_source="legacy-unknown",
+                )
             if attempt > 0:
                 logger.info(f"Manual review lookup succeeded on attempt {attempt + 1} for {item.code}/{item.name}")
             return result

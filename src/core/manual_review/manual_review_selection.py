@@ -47,4 +47,10 @@ def _create_approved(
         correct_product_name=option.name_en or "",
         correct_product_name_ar=option.name_ar or "",
         run_id=run_id, manual_decision="approved_match",
+        excel_target_key=option.excel_target_key or "",
+        excel_target_source_file=option.excel_target_source_file or "",
+        matching_source=option.matching_source or "",
+        matching_source_label=option.matching_source_label or "",
+        identity_evidence_kind=option.identity_evidence_kind or "",
+        identity_evidence=option.identity_evidence or "",
     )

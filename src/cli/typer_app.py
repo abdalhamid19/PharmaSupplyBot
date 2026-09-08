@@ -314,6 +314,11 @@ def order_cmd(
         False, "--all-excel-targets",
         help="Match against every configured Excel target catalog.",
     ),
+    excel_target_only: bool = typer.Option(
+        False,
+        "--excel-target-only",
+        help="Run selected Excel targets only; do not start any Tawreed profile.",
+    ),
     excel_target_path: list[str] = typer.Option(
         None, "--excel-target-path",
         help=(

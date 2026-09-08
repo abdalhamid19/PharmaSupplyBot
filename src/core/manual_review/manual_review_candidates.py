@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -32,6 +33,20 @@ class ReviewCandidateOption:
     score: float
     rejection_reason: str
     orderable: bool
+    # Provenance is optional for legacy Tawreed candidate artifacts. New
+    # Excel-target candidates populate these fields so an approval can retain
+    # the catalog and identity evidence that produced it.
+    matching_source: str = ""
+    matching_source_label: str = ""
+    target_key: str = ""
+    source_file: str = ""
+    identity_evidence_kind: str = ""
+    identity_evidence: str = ""
+    compatibility_status: str = ""
+    compatibility_rejection: str = ""
+    # Keep the explicit Excel names as persisted aliases for older callers.
+    excel_target_key: str = ""
+    excel_target_source_file: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Return dict representation."""
@@ -40,7 +55,31 @@ class ReviewCandidateOption:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ReviewCandidateOption:
         """Create from dict representation."""
-        return cls(**data)
+        payload = dict(data)
+        # New Excel-target writers call these fields ``source_kind`` and
+        # ``source_label``.  Normalize both spellings at the model boundary.
+        if not payload.get("matching_source"):
+            payload["matching_source"] = payload.get("source_kind", "")
+        if not payload.get("matching_source_label"):
+            payload["matching_source_label"] = payload.get("source_label", "")
+        if not payload.get("source_file"):
+            payload["source_file"] = payload.get("candidate_source_file", "")
+        if not payload.get("excel_target_key"):
+            payload["excel_target_key"] = payload.get("target_key", "")
+        if not payload.get("excel_target_source_file"):
+            payload["excel_target_source_file"] = payload.get("source_file", "")
+        field_names = {field.name for field in dataclasses.fields(cls)}
+        return cls(**{key: value for key, value in payload.items() if key in field_names})
+
+    @property
+    def source_kind(self) -> str:
+        """Compatibility alias used by Excel-target artifact writers."""
+        return self.matching_source
+
+    @property
+    def source_label(self) -> str:
+        """Compatibility alias used by Excel-target artifact writers."""
+        return self.matching_source_label
 def review_candidate_options(
     decision: MatchDecision, limit: int = 5
 ) -> list[ReviewCandidateOption]:

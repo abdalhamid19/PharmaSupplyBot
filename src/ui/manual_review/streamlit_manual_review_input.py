@@ -53,6 +53,25 @@ def _decision_from_row(row: dict, run_id: str) -> ManualReviewDecision | None:
         correct_query=correction[2],
         run_id=run_id,
         manual_decision=manual_decision,
+        # Preserve provenance when a row from an Excel-target candidate
+        # artifact is approved through the editable table rather than the
+        # candidate-card workflow.
+        excel_target_key=_clean(
+            row.get("excel_target_key") or row.get("target_key")
+        ),
+        excel_target_source_file=_clean(
+            row.get("excel_target_source_file") or row.get("source_file")
+        ),
+        matching_source=_clean(
+            row.get("matching_source")
+            or row.get("source_kind")
+            or row.get("source")
+        ),
+        matching_source_label=_clean(
+            row.get("matching_source_label") or row.get("source_label")
+        ),
+        identity_evidence_kind=_clean(row.get("identity_evidence_kind")),
+        identity_evidence=_clean(row.get("identity_evidence")),
     )
 
 
