@@ -407,7 +407,11 @@ def ar_to_en_cached_only(name: str) -> str:
 
 def ar_to_en_many_cached_only(names: list[str]) -> dict[str, str]:
     """Return cached translations for many names without contacting a provider."""
-    original_to_clean = {name: _clean(name) for name in names if _clean(name)}
+    original_to_clean: dict[str, str] = {}
+    for name in names:
+        cleaned = _clean(name)
+        if cleaned:
+            original_to_clean[name] = cleaned
     if not original_to_clean:
         return {}
     cache = _persistent()
