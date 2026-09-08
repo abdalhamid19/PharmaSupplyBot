@@ -10,7 +10,7 @@ import time
 import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from src.core.config.config_models import AppConfig, ExcelTargetConfig, MatchingConfig
 from src.core.matching.product_matching import explain_best_product_match
@@ -55,6 +55,14 @@ class ExcelTargetMatcher:
         self.target_key = target_key
         self.catalog = tuple(catalog)
         self.identity_index = ExcelTargetBilingualIndex.build(self.catalog)
+        self._catalog_by_id = {
+            product.store_product_id: product for product in self.catalog
+        }
+        self._native_english_candidate_templates = tuple(
+            product.to_candidate_dict()
+            for product in self.catalog
+            if product.trusted_name_en
+        )
 
     def match(self, item: Item, config: MatchingConfig) -> ExcelTargetMatch:
         started = time.perf_counter()
@@ -71,7 +79,9 @@ class ExcelTargetMatcher:
         elif len(accepted) > 1:
             decision = MatchDecision(None, [], "Ambiguous verified Excel-target candidates")
         else:
-            decision = _native_english_decision(item, self.catalog, config)
+            decision = _native_english_decision(
+                item, self._native_english_candidate_templates, config
+            )
             if decision.best_match is None:
                 reason = rejected[0] if rejected else "Arabic-only candidate lacks verified brand identity"
                 decision = MatchDecision(None, decision.diagnostics, reason)
@@ -81,6 +91,7 @@ class ExcelTargetMatcher:
             self.catalog,
             identified=identified,
             diagnostics=decision.diagnostics,
+            catalog_by_id=self._catalog_by_id,
         )
         return ExcelTargetMatch(
             self.target_key,
@@ -161,7 +172,7 @@ def _scoped_manual_review(
     saved_en = normalize_english_brand(decision.correct_product_name)
     saved_ar = normalize_arabic_brand(decision.correct_product_name_ar)
     for product in catalog:
-        current_id = candidate_store_product_id(product.to_candidate_dict())
+        current_id = product.store_product_id
         same_identity = bool(
             (decision.correct_store_product_id and current_id == decision.correct_store_product_id)
             or (saved_en and normalize_english_brand(product.trusted_name_en) == saved_en)
@@ -264,12 +275,14 @@ def _identity_decision(item: Item, identified: IdentifiedTarget, started: float)
 
 
 def _native_english_decision(
-    item: Item, catalog: Sequence[TargetProduct], config: MatchingConfig
+    item: Item,
+    candidate_templates: Sequence[dict[str, Any]],
+    config: MatchingConfig,
 ) -> MatchDecision:
     """Use the established threshold contract only for genuine English rows."""
-    candidates = [product.to_candidate_dict() for product in catalog if product.trusted_name_en]
-    if not candidates:
+    if not candidate_templates:
         return MatchDecision(None, [], "Arabic-only candidate lacks verified brand identity")
+    candidates = [_copy_candidate_template(template) for template in candidate_templates]
     queries = search_queries_for_item(item)
     decision = explain_best_product_match(item, [(query, candidates) for query in queries], config)
     if decision.best_match is None:
@@ -280,6 +293,13 @@ def _native_english_decision(
     if not compatibility.accepted:
         return MatchDecision(None, decision.diagnostics, compatibility.rejection_reason)
     return decision
+
+
+def _copy_candidate_template(template: dict[str, Any]) -> dict[str, Any]:
+    """Copy one cached candidate without sharing its mutable raw row."""
+    candidate = dict(template)
+    candidate["excelTargetRaw"] = dict(template["excelTargetRaw"])
+    return candidate
 
 
 def _empty_match(target_key: str) -> ExcelTargetMatch:

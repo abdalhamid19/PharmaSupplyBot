@@ -54,6 +54,11 @@ class TargetProduct:
         has_latin = any(char.isascii() and char.isalpha() for char in self.name)
         return self.name if has_latin and not has_arabic else ""
 
+    @property
+    def store_product_id(self) -> str:
+        """Return the stable candidate identity used by Excel-target matching."""
+        return self.code or f"row:{abs(hash(self.name))}"
+
     def to_candidate_dict(self) -> dict[str, Any]:
         """Return the candidate dict shape consumed by the core matcher.
 
@@ -73,7 +78,7 @@ class TargetProduct:
             "availableQuantity": 1,
             "productsCount": 1,
             "discountPercent": float(self.discount_percent or 0.0),
-            "storeProductId": self.code or f"row:{abs(hash(self.name))}",
+            "storeProductId": self.store_product_id,
             "excelTarget": True,
             "excelTargetSourceFile": self.source_file,
             "excelTargetRaw": dict(self.raw),

@@ -10,7 +10,7 @@ attaches the identity/variant evidence that a reviewer needs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from src.core.matching_types import CandidateMatchDiagnostic
 from src.core.utils.excel import Item
@@ -75,8 +75,7 @@ class ExcelTargetReviewCandidate:
         from this dict.  Keeping this adapter dependency-free prevents the
         Excel matcher from importing the UI/store implementation.
         """
-        candidate = self.product.to_candidate_dict()
-        product_id = str(candidate.get("storeProductId") or self.product.code)
+        product_id = self.product.store_product_id
         name_en = self.product.trusted_name_en
         reason = self.rejection_reason or self.compatibility_rejection
         return {
@@ -110,6 +109,7 @@ def build_review_candidates(
     identified: Iterable[IdentifiedTarget] = (),
     diagnostics: Iterable[CandidateMatchDiagnostic] = (),
     limit: int | None = None,
+    catalog_by_id: Mapping[str, TargetProduct] | None = None,
 ) -> tuple[ExcelTargetReviewCandidate, ...]:
     """Build review candidates from target rows and matching evidence.
 
@@ -120,7 +120,7 @@ def build_review_candidates(
     is the guard that prevents a Tawreed diagnostic from leaking into a
     Baraka review list.
     """
-    by_id = _catalog_by_id(catalog)
+    by_id = catalog_by_id if catalog_by_id is not None else _catalog_by_id(catalog)
     candidates: dict[str, ExcelTargetReviewCandidate] = {}
 
     for identified_target in identified:
@@ -187,8 +187,7 @@ def _catalog_by_id(catalog: Sequence[TargetProduct]) -> dict[str, TargetProduct]
 
 
 def _product_key(product: TargetProduct) -> str:
-    candidate = product.to_candidate_dict()
-    return str(candidate.get("storeProductId") or product.code or product.name)
+    return product.store_product_id
 
 
 def _keep_best(
