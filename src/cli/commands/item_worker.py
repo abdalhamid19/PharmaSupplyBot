@@ -12,6 +12,7 @@ from src.core.config.config import load_config
 from src.core.utils.excel import Item
 from src.tawreed.auth.tawreed_session import SessionInvalidError
 from ..cli_shared import build_bot, raise_invalid_session
+from ..cli_paths import config_path_from_arguments
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ def _cart_payload(
 ) -> dict[str, Any]:
     """Build one serializable cart-removal worker payload."""
     return {
-        "config_path": str(Path(getattr(args, "config", "state/config.yaml"))),
+        "config_path": str(config_path_from_arguments(args)),
         "profile_key": profile_key,
         "items": [(item.code, item.name) for item in chunk],
         "worker_id": index,

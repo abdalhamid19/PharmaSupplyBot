@@ -17,16 +17,14 @@ be removed in Task 14 once all subcommands are wired through here.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any
 
 import typer
 from typer import Context
 
 # Importing cli_commands has the side-effect of populating the command registry.
 from src.cli import cli_commands  # noqa: F401
-from src.cli.cli_runner import ns_from_ctx
-from src.cli.cli_config import apply_preset, inject_defaults
+from src.cli.cli_parsing import build_command_arguments
+from src.cli.cli_paths import DEFAULT_CONFIG_PATH, config_path_from_arguments
 from src.cli.logging_setup import LoggingConfig, configure_logging
 from src.cli.presenter import FormatFlags
 from src.cli.registry import get_command
@@ -148,18 +146,13 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
         )
     )
 
-    # 2. Materialise the legacy Namespace.
-    ns = ns_from_ctx(ctx, cmd=cmd_name)
-    ns._typer_defaults = _collect_defaults(ctx)
+    # 2. Materialise the legacy Namespace and apply user-config precedence.
+    ns = build_command_arguments(ctx, cmd_name)
 
-    # 3. Apply user-config precedence (CLI > preset > defaults).
-    ns = apply_preset(None, ns, getattr(ns, "preset", None))  # type: ignore[arg-type]
-    ns = inject_defaults(None, ns)  # type: ignore[arg-type]
-
-    # 4. Load config + dispatch (full wrap so PharmaSupplyError always logs).
+    # 3. Load config + dispatch (full wrap so PharmaSupplyError always logs).
     fmt = FormatFlags.resolve(explicit="json" if obj.get("json_logs") else None)
     try:
-        config_path = Path(getattr(ns, "config", "state/config.yaml"))
+        config_path = config_path_from_arguments(ns)
         app_config = load_config(config_path)
         logger.debug(
             "dispatching command",
@@ -186,19 +179,6 @@ def _run_registered(ctx: Context, cmd_name: str) -> int:
         raise typer.Exit(99)
 
 
-def _collect_defaults(ctx: Context) -> dict[str, Any]:
-    """Snapshot the declared parameter defaults for ``_was_passed`` to consult."""
-    defaults: dict[str, Any] = {}
-    cmd = ctx.command
-    if cmd is None:
-        return defaults
-    for param in cmd.params:
-        name = getattr(param, "name", None)
-        if name is not None:
-            defaults[name] = param.default
-    return defaults
-
-
 # ─────────────────────────── One stub subcommand (auth) ────────────────
 
 
@@ -206,7 +186,7 @@ def _collect_defaults(ctx: Context) -> dict[str, Any]:
 def auth_cmd(
     ctx: Context,
     config: str = typer.Option(
-        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+        str(DEFAULT_CONFIG_PATH), "--config", "-c", help="Path to config.yaml."
     ),
     profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
     all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
@@ -222,7 +202,7 @@ def auth_cmd(
 def export_products_cmd(
     ctx: Context,
     config: str = typer.Option(
-        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+        str(DEFAULT_CONFIG_PATH), "--config", "-c", help="Path to config.yaml."
     ),
     profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
     all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
@@ -252,7 +232,7 @@ def export_products_cmd(
 def remove_cart_cmd(
     ctx: Context,
     config: str = typer.Option(
-        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+        str(DEFAULT_CONFIG_PATH), "--config", "-c", help="Path to config.yaml."
     ),
     profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
     all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),
@@ -296,7 +276,7 @@ def remove_cart_cmd(
 def order_cmd(
     ctx: Context,
     config: str = typer.Option(
-        "state/config.yaml", "--config", "-c", help="Path to config.yaml."
+        str(DEFAULT_CONFIG_PATH), "--config", "-c", help="Path to config.yaml."
     ),
     profile: str | None = typer.Option(None, "--profile", "-p", help="Profile key."),
     all_profiles: bool = typer.Option(False, "--all-profiles", help="Run for all profiles."),

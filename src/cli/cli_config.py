@@ -116,6 +116,7 @@ def apply_preset(
     parser: ArgumentParser | None,
     args: Namespace,
     preset_name: str | None,
+    user_config: dict[str, Any] | None = None,
 ) -> Namespace:
     """Apply a named preset to ``args`` *underneath* the explicit CLI values.
 
@@ -134,7 +135,7 @@ def apply_preset(
     if not preset_name:
         return args
 
-    config = load_user_config()
+    config = user_config if user_config is not None else load_user_config()
     preset = get_preset(preset_name, config)
     if not preset:
         available = list_presets(config)
@@ -158,14 +159,18 @@ def apply_preset(
 # ─────────────────────────── Defaults injection ────────────────────────
 
 
-def inject_defaults(parser: ArgumentParser | None, args: Namespace) -> Namespace:
+def inject_defaults(
+    parser: ArgumentParser | None,
+    args: Namespace,
+    user_config: dict[str, Any] | None = None,
+) -> Namespace:
     """Fill any unset CLI argument from the user-config ``default`` block.
 
     This runs *after* ``parse_args()`` and *before* the command
     handler. It must never override a value the user typed on the
     command line — see ``_was_passed`` for the heuristic.
     """
-    config = load_user_config()
+    config = user_config if user_config is not None else load_user_config()
     defaults = config.get("default") or {}
     if not defaults:
         return args
