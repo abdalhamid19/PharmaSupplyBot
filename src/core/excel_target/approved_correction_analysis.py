@@ -156,6 +156,12 @@ def analyze_approved_corrections(
         str(target_key): catalog_fingerprint(str(target_key), tuple(catalog))
         for target_key, catalog in catalogs.items()
     }
+    approval_disabled_matchers = {
+        str(target_key): _build_approval_disabled_matcher(
+            factory, str(target_key), tuple(catalog)
+        )
+        for target_key, catalog in catalogs.items()
+    }
     findings: list[ApprovedCorrectionFinding] = []
     for decision in decision_values:
         if not _is_approved_excel_target(decision):
@@ -259,7 +265,7 @@ def analyze_approved_corrections(
             continue
 
         item = Item(str(decision.item_code or ""), str(decision.item_name or ""), 1)
-        matcher = _build_approval_disabled_matcher(factory, target_key, catalog)
+        matcher = approval_disabled_matchers[target_key]
         replay = matcher.match(item, matching_config)
         findings.append(
             _finding_from_replay(
@@ -415,7 +421,9 @@ def _finding_from_replay(
         final_reason=final_reason,
         compatibility_status="compatible" if compatibility.accepted else "rejected",
         candidate_method=_candidate_method(decision, match_decision, replay),
-        candidate_count_total=len(catalog),
+        candidate_count_total=len(
+            tuple(getattr(replay, "review_candidates", ()) or ())
+        ),
         decision_source=_decision_source(match_decision),
         match_origin=match_origin,
     )

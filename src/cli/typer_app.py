@@ -198,6 +198,39 @@ def auth_cmd(
     raise typer.Exit(_run_registered(ctx, "auth"))
 
 
+@app.command("approved-correction-report")
+def approved_correction_report_cmd(
+    ctx: Context,
+    config: str = typer.Option(
+        str(DEFAULT_CONFIG_PATH), "--config", "-c", help="Path to config.yaml."
+    ),
+    excel_target: list[str] = typer.Option(
+        None,
+        "--excel-target",
+        "-t",
+        help="Excel target catalog key to audit; repeat for several targets.",
+    ),
+    excel_target_path: list[str] = typer.Option(
+        None,
+        "--excel-target-path",
+        help="Workbook override in KEY=PATH form; required once per target.",
+    ),
+    output: str = typer.Option(
+        ...,
+        "--output",
+        "-o",
+        help="Directory receiving approved_correction_report.json and CSV.",
+    ),
+    manual_review_db: str = typer.Option(
+        "state/manual_review_decisions.db",
+        "--manual-review-db",
+        help="Saved Corrections SQLite database to read (read-only).",
+    ),
+) -> None:
+    """Audit approved Excel-target corrections and export root-cause reports."""
+    raise typer.Exit(_run_registered(ctx, "approved-correction-report"))
+
+
 @app.command("export-products")
 def export_products_cmd(
     ctx: Context,
