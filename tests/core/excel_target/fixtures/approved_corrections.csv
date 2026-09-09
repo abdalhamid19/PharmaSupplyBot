@@ -1,0 +1,2 @@
+item_code,item_name,target_key,source_file,source_row,manual_decision,approved
+item-1,INODEP CAPSULES 30,baraka,baraka.xlsx,2,approved_match,true

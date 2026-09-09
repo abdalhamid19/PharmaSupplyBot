@@ -65,9 +65,15 @@ class ExcelTargetMatcher:
         catalog: Sequence[TargetProduct],
         *,
         allow_live_translation: bool = False,
+        use_saved_approvals: bool = True,
     ) -> None:
         self.target_key = target_key
         self.catalog = tuple(catalog)
+        # Counterfactual analysis and offline evaluation must be able to
+        # replay ordinary matching without the saved-review short circuit.
+        # Keeping this explicit on the matcher prevents an injected analysis
+        # path from accidentally writing/rebinding manual-review decisions.
+        self.use_saved_approvals = bool(use_saved_approvals)
         self.identity_index = ExcelTargetBilingualIndex.build(
             self.catalog,
             allow_live_translation=allow_live_translation,
@@ -85,9 +91,10 @@ class ExcelTargetMatcher:
         if not self.catalog:
             return _empty_match(self.target_key)
 
-        manual = _scoped_manual_review(item, self.target_key, self.catalog)
-        if manual is not None:
-            return ExcelTargetMatch(self.target_key, manual, len(self.catalog))
+        if self.use_saved_approvals:
+            manual = _scoped_manual_review(item, self.target_key, self.catalog)
+            if manual is not None:
+                return ExcelTargetMatch(self.target_key, manual, len(self.catalog))
         identified = self.identity_index.identify(item.name)
         accepted, rejected = _compatible_identified(item, identified)
         if len(accepted) == 1:
@@ -134,12 +141,14 @@ def find_best_match_in_target(
     matching_config: MatchingConfig,
     *,
     allow_live_translation: bool = False,
+    use_saved_approvals: bool = True,
 ) -> ExcelTargetMatch:
     """Compatibility wrapper; batch callers must reuse :class:`ExcelTargetMatcher`."""
     return ExcelTargetMatcher(
         target_key,
         catalog,
         allow_live_translation=allow_live_translation,
+        use_saved_approvals=use_saved_approvals,
     ).match(item, matching_config)
 
 
@@ -149,12 +158,14 @@ def match_item_against_all_targets(
     catalogs: dict[str, list[TargetProduct]],
     *,
     allow_live_translation: bool = False,
+    use_saved_approvals: bool = True,
 ) -> dict[str, ExcelTargetMatch]:
     matchers = {
         target_key: ExcelTargetMatcher(
             target_key,
             catalog,
             allow_live_translation=allow_live_translation,
+            use_saved_approvals=use_saved_approvals,
         )
         for target_key, catalog in catalogs.items()
     }
