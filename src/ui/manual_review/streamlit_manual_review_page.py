@@ -85,7 +85,11 @@ def _group_runs_by_id(runs: Iterable[Path]) -> list[tuple[str, tuple[Path, ...]]
         grouped.setdefault(run_dir.name, []).append(run_dir)
     return [
         (run_id, tuple(sorted(grouped[run_id], key=str)))
-        for run_id in sorted(grouped, reverse=True)
+        for run_id in sorted(
+            grouped,
+            key=lambda run_id: max(_run_recency_key(path) for path in grouped[run_id]),
+            reverse=True,
+        )
     ]
 
 

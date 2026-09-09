@@ -270,6 +270,16 @@ class StreamlitManualReviewTests(unittest.TestCase):
         self.assertEqual([run_id for run_id, _ in groups], ["20260907_1839", "20260907_1700"])
         self.assertEqual(set(groups[0][1]), {tawreed, baraka})
 
+    def test_run_groups_do_not_default_to_non_timestamp_verification_run(self) -> None:
+        verification = Path("artifacts/excel-target/alnasr/impl_verify_20260908")
+        latest = Path("artifacts/order/wardany/20260908_1700")
+
+        groups = manual_review_page._group_runs_by_id([verification, latest])
+
+        self.assertEqual([run_id for run_id, _ in groups], [
+            "20260908_1700", "impl_verify_20260908",
+        ])
+
     def test_group_candidate_loader_combines_tawreed_and_baraka(self) -> None:
         tawreed_dir = Path("artifacts/order/wardany/20260907_1839")
         baraka_dir = Path("artifacts/excel-target/baraka/20260907_1839")
