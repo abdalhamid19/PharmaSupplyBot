@@ -552,18 +552,18 @@ def _recommendations(
 ) -> tuple[RuleRecommendation, ...]:
     groups: dict[tuple[str, str], list[ApprovedCorrectionFinding]] = {}
     for finding in findings:
-        if finding.root_cause not in {"identity_absent", "native_score_below_threshold"}:
+        if finding.root_cause not in {
+            "identity_absent",
+            "native_score_below_threshold",
+            "cohere_review_only",
+        }:
             continue
         groups.setdefault((finding.target_key, finding.root_cause), []).append(finding)
     recommendations: list[RuleRecommendation] = []
     for (target_key, root_cause), group in sorted(groups.items()):
         if len(group) < 2:
             continue
-        recommendation = (
-            "Review deterministic alias/normalization evidence and add gold cases"
-            if root_cause == "identity_absent"
-            else "Review exact normalized alias evidence against native score gates"
-        )
+        recommendation = _recommendation_text(root_cause)
         recommendations.append(
             RuleRecommendation(
                 target_key=target_key,
@@ -578,6 +578,18 @@ def _recommendations(
             )
         )
     return tuple(recommendations)
+
+
+def _recommendation_text(root_cause: str) -> str:
+    """Describe the human review needed before a rule can be proposed."""
+    if root_cause == "identity_absent":
+        return "Review deterministic alias/normalization evidence and add gold cases"
+    if root_cause == "cohere_review_only":
+        return (
+            "Find deterministic identity evidence to replace Cohere-only review; "
+            "keep Cohere-only matches manual"
+        )
+    return "Review exact normalized alias evidence against native score gates"
 
 
 __all__ = [

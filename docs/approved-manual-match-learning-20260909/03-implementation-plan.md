@@ -27,6 +27,9 @@ Streamlit, existing `scripts/evaluate_excel_target.py`.
 - [x] The report analyzed 140 saved approvals: 113 variant conflicts, 17
   Cohere-only cases, 4 ambiguous rows, 3 legacy-invalid records, 1 scope
   mismatch, and 1 counterfactually automatic match.
+- [x] The report emits two human-gated Cohere recommendations (13 Baraka
+  findings and 4 Caesar findings); these are investigation queues only and do
+  not enable Cohere-only automatic matching.
 - [x] The requested 100-item replay remained unchanged: Baraka 22 matched and
   Caesar 16 matched. Therefore the safe automatic gain in this release is
   `automatic_verified_after - automatic_verified_before = 0`.

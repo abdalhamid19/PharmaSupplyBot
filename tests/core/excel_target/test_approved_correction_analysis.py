@@ -178,6 +178,36 @@ def test_counterfactual_match_is_not_reported_as_learning_failure() -> None:
     assert report.counts_by_root_cause["unexpected_counterfactual_match"] == 1
 
 
+def test_repeated_cohere_only_findings_create_human_gated_recommendation() -> None:
+    product = _product()
+    approvals = [
+        _decision(
+            product=product,
+            item_code=f"item-{index}",
+            identity_evidence_kind="cohere_translation",
+        )
+        for index in range(2)
+    ]
+    report = analyze_approved_corrections(
+        approvals,
+        {TARGET_KEY: [product]},
+        MatchingConfig(),
+        _factory_for(
+            MatchDecision(
+                None,
+                [],
+                "Cohere identity requires manual review under safe policy",
+            ),
+            [],
+        ),
+    )
+    assert len(report.recommendations) == 1
+    recommendation = report.recommendations[0]
+    assert recommendation.root_cause == "cohere_review_only"
+    assert recommendation.requires_human_approval is True
+    assert "keep Cohere-only matches manual" in recommendation.recommendation
+
+
 def test_approval_outside_current_input_is_not_a_matching_failure() -> None:
     product = _product()
     approval = _decision(product=product)
