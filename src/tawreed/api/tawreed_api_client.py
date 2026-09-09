@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,7 @@ class TawreedApiClient:
         base_url: str,
         state_path: Path,
         contract_path: Path = DEFAULT_CONTRACT_PATH,
+        auth_refresh: Callable[[], None] | None = None,
     ):
         """Create an API client bound to one authenticated storage-state file."""
         self.base_url = base_url
@@ -43,6 +45,8 @@ class TawreedApiClient:
         self.contract = load_api_contract(contract_path)
         self._playwright = None
         self._request_context = None
+        self._auth_refresh = auth_refresh
+        self._auth_refreshing = False
         
         # Extract customer ID from token
         self.customer_id = customer_id_from_state(state_path)
@@ -67,6 +71,39 @@ class TawreedApiClient:
     def warm_up(self) -> None:
         """Open the reusable request context before item timing starts."""
         self._ensure_request_context()
+
+    def refresh_after_auth_expiry(self) -> None:
+        """Refresh auth and rebuild the request context after an auth failure.
+
+        API request contexts capture their authorization headers when they are
+        created.  A browser-side refresh therefore must be followed by closing
+        that context so the next request reads the newly saved token.
+        """
+        from .tawreed_api_contract import TawreedApiUnavailable
+
+        if self._auth_refresh is None:
+            raise TawreedApiUnavailable(
+                "Tawreed API authentication expired and no auth refresh callback is configured."
+            )
+        if self._auth_refreshing:
+            raise TawreedApiUnavailable(
+                "Tawreed API authentication refresh is already in progress."
+            )
+
+        self._auth_refreshing = True
+        try:
+            self._auth_refresh()
+        except TawreedApiUnavailable:
+            raise
+        except Exception as error:
+            raise TawreedApiUnavailable(
+                f"Tawreed API auth refresh failed: {error}"
+            ) from error
+        finally:
+            self._auth_refreshing = False
+
+        self.close()
+        self.customer_id = customer_id_from_state(self.state_path)
 
     # Delegate operations to helper methods
     def search_products(self, query: str) -> list[dict[str, Any]]:

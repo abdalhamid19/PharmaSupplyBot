@@ -24,15 +24,28 @@ def auto_refresh_auth_if_needed(
     debug: bool = False,
     auth_lock=None,
     worker_id: int | None = None,
+    force: bool = False,
 ) -> None:
     """Refresh the saved Tawreed browser state when its access token expired."""
-    if not is_token_expired(state_path):
+    if not force and not is_token_expired(state_path):
         return
+
+    observed_mtime = _state_mtime_ns(state_path)
 
     if auth_lock is None:
         _refresh_single_worker(base_url, state_path, runtime_config, selectors, profile_key)
     else:
-        _refresh_multi_worker(base_url, state_path, runtime_config, selectors, profile_key, auth_lock, worker_id)
+        _refresh_multi_worker(
+            base_url,
+            state_path,
+            runtime_config,
+            selectors,
+            profile_key,
+            auth_lock,
+            worker_id,
+            force=force,
+            observed_mtime=observed_mtime,
+        )
 
 
 def _refresh_single_worker(base_url, state_path, runtime_config, selectors, profile_key):
@@ -45,12 +58,27 @@ def _refresh_single_worker(base_url, state_path, runtime_config, selectors, prof
         raise RuntimeError(_expired_after_refresh_message(profile_key))
 
 
-def _refresh_multi_worker(base_url, state_path, runtime_config, selectors, profile_key, auth_lock, worker_id):
+def _refresh_multi_worker(
+    base_url,
+    state_path,
+    runtime_config,
+    selectors,
+    profile_key,
+    auth_lock,
+    worker_id,
+    *,
+    force: bool = False,
+    observed_mtime: int = 0,
+):
     """Refresh auth in multi-worker mode with lock coordination."""
     worker_label = f"Worker {worker_id}" if worker_id is not None else "Worker"
 
     with auth_lock:
-        if not is_token_expired(state_path):
+        current_mtime = _state_mtime_ns(state_path)
+        refreshed_by_other_worker = force and current_mtime > observed_mtime
+        if (not force and not is_token_expired(state_path)) or (
+            refreshed_by_other_worker and not is_token_expired(state_path)
+        ):
             logger.info(
                 "using refreshed session from another worker",
                 extra={"profile": profile_key, "worker": worker_label},
@@ -67,6 +95,14 @@ def _refresh_multi_worker(base_url, state_path, runtime_config, selectors, profi
         )
         if is_token_expired(state_path):
             raise RuntimeError(_expired_after_refresh_message(profile_key))
+
+
+def _state_mtime_ns(state_path: Path) -> int:
+    """Return a state-file generation marker for multi-worker refresh coordination."""
+    try:
+        return state_path.stat().st_mtime_ns
+    except OSError:
+        return 0
 
 
 def _expired_after_refresh_message(profile_key: str) -> str:

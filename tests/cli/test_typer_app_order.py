@@ -146,3 +146,35 @@ def test_order_accepts_repeated_excel_target_path_flag() -> None:
     handler_args = captured["args"]
     overrides = getattr(handler_args, "excel_target_path", None) or []
     assert list(overrides) == ["alnasr=file1.xlsx", "alnasr=file2.xlsx"]
+
+
+def test_order_accepts_repeated_excel_target_flag() -> None:
+    """The ``--excel-target`` flag can select several targets in order."""
+    runner = CliRunner()
+    captured: dict[str, object] = {}
+
+    def _capture(cfg, args):
+        captured["args"] = args
+        return 0
+
+    with patch("src.cli.typer_app.get_command") as get_cmd, \
+         patch("src.cli.typer_app.load_config") as load_cfg, \
+         patch("src.cli.typer_app.configure_logging"):
+        get_cmd.return_value = _capture
+        load_cfg.return_value = object()
+        result = runner.invoke(
+            app,
+            [
+                "order",
+                "--excel", "data/input/order.xlsx",
+                "--excel-target", "alnasr",
+                "--excel-target", "baraka",
+                "--match-only",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert list(getattr(captured["args"], "excel_target", [])) == [
+        "alnasr",
+        "baraka",
+    ]

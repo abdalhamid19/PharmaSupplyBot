@@ -20,6 +20,10 @@ class TawreedBotMethods:
         """Verify token is valid or refresh authentication automatically."""
         self.auth_flow.ensure_valid_auth()
 
+    def _refresh_api_auth(self) -> None:
+        """Force-refresh the session used by an API request context."""
+        self.auth_flow.refresh_auth()
+
     def auth_interactive(self, wait_seconds: int = 600) -> None:
         """Open a visible browser and persist session state after manual login."""
         self.auth_flow.auth_interactive(wait_seconds)

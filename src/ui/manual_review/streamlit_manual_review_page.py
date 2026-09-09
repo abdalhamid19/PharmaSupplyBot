@@ -237,7 +237,8 @@ def render_run_candidates(run_dir: Path | Iterable[Path], app_config=None) -> No
     page_items = _paginate_candidates(display_items)
     for item_key, options in page_items:
         item = _parse_item_from_key(item_key)
-        _render_item_card(item_key, item, options[:display_limit], run_context, store)
+        visible_options = _limit_candidates_by_source(options, display_limit)
+        _render_item_card(item_key, item, visible_options, run_context, store)
 
 
 def _load_group_candidates(
@@ -310,6 +311,32 @@ def _candidate_display_limit(app_config=None) -> int:
         help="Adds this many saved candidates below the default visible options.",
     )
     return base_limit + int(extra)
+
+
+def _limit_candidates_by_source(
+    options: list[ReviewCandidateOption], limit: int
+) -> list[ReviewCandidateOption]:
+    """Keep at least one candidate visible for every source when possible."""
+    if limit <= 0 or not options:
+        return []
+    groups = _group_options_by_source(options)
+    if len(groups) == 1:
+        return options[:limit]
+
+    selected: list[ReviewCandidateOption] = []
+    selected_ids: set[int] = set()
+    for _, group in groups[:limit]:
+        selected.append(group[0])
+        selected_ids.add(id(group[0]))
+    if len(selected) >= limit:
+        return selected[:limit]
+    for option in options:
+        if id(option) in selected_ids:
+            continue
+        selected.append(option)
+        if len(selected) >= limit:
+            break
+    return selected
 
 
 def _configured_candidate_limit(app_config=None) -> int:
@@ -445,6 +472,46 @@ def _render_candidate_provenance(options: list[ReviewCandidateOption]) -> None:
 
 # ============ Form Rendering ============
 
+def _candidate_scope_key(option: ReviewCandidateOption) -> tuple[str, str]:
+    """Return the persisted supplier scope represented by one candidate."""
+    source = _normalized_source(
+        getattr(option, "matching_source", "")
+        or getattr(option, "source_kind", "")
+    ) or "legacy-unknown"
+    if source == "excel-target":
+        scope = (
+            getattr(option, "excel_target_key", "")
+            or getattr(option, "target_key", "")
+            or getattr(option, "matching_source_label", "")
+            or getattr(option, "source_file", "")
+            or source
+        )
+    else:
+        scope = (
+            getattr(option, "matching_source_label", "")
+            or getattr(option, "source_file", "")
+            or getattr(option, "supplier", "")
+            or source
+        )
+    return source, str(scope)
+
+
+def _group_options_by_source(
+    options: list[ReviewCandidateOption],
+) -> list[tuple[tuple[str, str], list[ReviewCandidateOption]]]:
+    """Group candidates so each supplier/Excel target gets one selector."""
+    grouped: dict[tuple[str, str], list[ReviewCandidateOption]] = {}
+    for option in options:
+        grouped.setdefault(_candidate_scope_key(option), []).append(option)
+    return list(grouped.items())
+
+
+def _scope_display_name(scope: tuple[str, str]) -> str:
+    """Return a concise source label for a grouped selector."""
+    source, value = scope
+    return value if value else source
+
+
 def render_selection_form(
     item: Item,
     options: list[ReviewCandidateOption],
@@ -453,11 +520,100 @@ def render_selection_form(
     item_key: str
 ) -> None:
     """Render the selection UI and handle mutual exclusivity of inputs."""
+    groups = _group_options_by_source(options)
+    if len(groups) > 1:
+        _render_multi_source_selection_form(item, groups, run_dir, store, item_key)
+        return
     idx_key = f"radio_{item_key}"
     nm_key = f"nm_{item_key}"
     query_key = f"query_{item_key}"
     callbacks = _create_callbacks(item, options, run_dir, store, idx_key, nm_key, query_key)
     _render_form_ui(options, idx_key, nm_key, query_key, callbacks)
+
+
+def _render_multi_source_selection_form(
+    item: Item,
+    groups: list[tuple[tuple[str, str], list[ReviewCandidateOption]]],
+    run_dir: Path,
+    store: ManualReviewStore,
+    item_key: str,
+) -> None:
+    """Render one independent candidate selector for every source scope."""
+    nm_key = f"nm_{item_key}"
+    query_key = f"query_{item_key}"
+    radio_keys: list[str] = []
+    for position, (scope, group_options) in enumerate(groups):
+        radio_key = f"radio_{item_key}_{position}"
+        radio_keys.append(radio_key)
+        st.markdown(f"**Select best match — {_scope_display_name(scope)}:**")
+        radio_opts = _build_radio_opts(group_options)
+
+        def _save_group_selection(
+            *,
+            group_options=group_options,
+            radio_key=radio_key,
+        ) -> None:
+            st.session_state[nm_key] = False
+            st.session_state[query_key] = ""
+            _save(
+                item,
+                group_options,
+                int(st.session_state.get(radio_key, 0)),
+                False,
+                "",
+                run_dir,
+                store,
+            )
+
+        st.radio(
+            "Select best match:",
+            range(len(radio_opts)),
+            format_func=lambda index, radio_opts=radio_opts: radio_opts[index],
+            key=radio_key,
+            on_change=_save_group_selection,
+        )
+
+    _render_multi_source_fallback_controls(
+        item,
+        radio_keys,
+        nm_key,
+        query_key,
+        run_dir,
+        store,
+    )
+
+
+def _render_multi_source_fallback_controls(
+    item: Item,
+    radio_keys: list[str],
+    nm_key: str,
+    query_key: str,
+    run_dir: Path,
+    store: ManualReviewStore,
+) -> None:
+    """Render the legacy item-level no-match/query fallback controls."""
+    def _clear_group_radios() -> None:
+        for radio_key in radio_keys:
+            st.session_state[radio_key] = 0
+
+    def on_no_match() -> None:
+        if st.session_state.get(nm_key, False):
+            _clear_group_radios()
+            st.session_state[query_key] = ""
+            _save(item, [], 0, True, "", run_dir, store)
+
+    def on_query() -> None:
+        query = str(st.session_state.get(query_key, "") or "")
+        if query.strip():
+            _clear_group_radios()
+            st.session_state[nm_key] = False
+            _save(item, [], 0, False, query, run_dir, store)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.checkbox("No match exists (all sources)", key=nm_key, on_change=on_no_match)
+    with col2:
+        st.text_input("Or query (all sources):", key=query_key, on_change=on_query)
 
 
 def _create_callbacks(item, options, run_dir, store, idx_key, nm_key, query_key):
@@ -569,5 +725,6 @@ __all__ = [
     "render_manual_review_tab",
     "render_run_candidates",
     "render_selection_form",
+    "_group_options_by_source",
     "_configured_candidate_limit",
 ]

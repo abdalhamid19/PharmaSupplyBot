@@ -109,6 +109,26 @@ class OrderRunsWriterTests(unittest.TestCase):
         rows = self.store.db.execute_query("select status from run_items")
         self.assertEqual(rows[0][0], "added-to-cart")
 
+    def test_no_result_clears_stale_winner_without_store_snapshot(self) -> None:
+        """Rejected rows must not retain a winner from a previous summary."""
+        self.store.open_run(self.meta)
+        self.store.upsert_run_item(
+            _RUN_KEY,
+            _summary(status="no-results", matched=False),
+            now=_STARTED,
+            source_kind="excel-target",
+            source_label="qaysar",
+            store_source="excel_target",
+            store_source_owner="qaysar",
+            stores=[],
+            store_selections=[],
+        )
+        row = self.store.db.execute_query(
+            "select winner_store_product_id, winner_store_key, stores_offering "
+            "from run_items"
+        )[0]
+        self.assertEqual(tuple(row), (None, None, 0))
+
     def test_rewrite_preserves_first_seen_at(self) -> None:
         """first_seen_at is a historical fact and must never move forward."""
         self.store.open_run(self.meta)

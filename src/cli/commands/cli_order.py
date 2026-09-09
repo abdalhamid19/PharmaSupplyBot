@@ -255,7 +255,7 @@ def _reconcile_cross_source_winners(
         try:
             winners = conn.execute(
                 """
-                select ris.item_key, ris.source, ris.store_key,
+                select ris.item_key, ris.source, ris.source_label, ris.store_key,
                        ris.store_product_id, ris.purchase_price,
                        ris.public_price, ris.discount_percent
                   from run_item_stores ris
@@ -265,11 +265,12 @@ def _reconcile_cross_source_winners(
             ).fetchall()
             by_item: dict[str, dict] = {}
             for (
-                item_key, source, store_key, store_pid,
+                item_key, source, source_label, store_key, store_pid,
                 purchase_price, public_price, discount,
             ) in winners:
                 candidate = {
                     "source": source,
+                    "source_label": source_label or "",
                     "store_key": store_key,
                     "store_product_id": store_pid,
                     "purchase_price": purchase_price,
@@ -282,6 +283,14 @@ def _reconcile_cross_source_winners(
 
             conn.execute(
                 "update run_item_stores set is_winner = 0 where run_key = ?",
+                (run_key,),
+            )
+            # A previous reconciliation may have denormalised a winner onto
+            # every row of a source kind. Clear those fields first; the exact
+            # source label below is the only row that may receive the winner.
+            conn.execute(
+                "update run_items set winner_store_key = null, "
+                "winner_store_product_id = null where run_key = ?",
                 (run_key,),
             )
             for item_key, winner in by_item.items():
@@ -313,6 +322,7 @@ def _reconcile_cross_source_winners(
                      where run_key = ?
                        and item_key = ?
                        and source_kind = ?
+                       and source_label = ?
                     """,
                     (
                         winner["store_key"],
@@ -320,6 +330,7 @@ def _reconcile_cross_source_winners(
                         run_key,
                         item_key,
                         source_kind,
+                        winner["source_label"],
                     ),
                 )
             conn.commit()

@@ -49,7 +49,9 @@ def run_remove_cart_command(app_config: AppConfig, args: argparse.Namespace) -> 
                 # was actually attempted. cart_removal_items() may normalize
                 # duplicates or drop empty rows.
                 try:
-                    items_total += len(cart_removal_items(args, load_cart_removal_items))
+                    items_total += len(
+                        cart_removal_items(args, load_cart_removal_items, app_config)
+                    )
                 except Exception:  # noqa: BLE001 - logged; summary keeps running for other profiles
                     logger.exception("cli.remove-cart: cart_removal_items failed for profile")
 
@@ -74,7 +76,7 @@ def _run_remove_cart_profile(
 ) -> None:
     """Run one cart-removal profile with the active artifact context."""
     require_state_file(profile_key)
-    items = cart_removal_items(args, load_cart_removal_items)
+    items = cart_removal_items(args, load_cart_removal_items, app_config)
     item_workers = resolve_item_workers(app_config, args)
     if item_workers > 1 and len(items) > 1:
         _run_parallel_cart_removal(app_config, profile_key, items, args, item_workers)

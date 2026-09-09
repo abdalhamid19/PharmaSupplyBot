@@ -6,7 +6,7 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from src.tawreed.api.tawreed_api_client import (
     TawreedApiClient,
@@ -119,6 +119,57 @@ class _RecordingContext:
 
     def dispose(self) -> None:
         pass
+
+
+class _StatusResponse:
+    def __init__(self, status: int, payload: dict) -> None:
+        self.ok = 200 <= status < 300
+        self.status = status
+        self.status_text = "Unauthorized" if status == 401 else "OK"
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+class _SequencedContext:
+    def __init__(self, response: _StatusResponse) -> None:
+        self.response = response
+        self.dispose_calls = 0
+
+    def post(self, *args, **kwargs):
+        return self.response
+
+    def dispose(self) -> None:
+        self.dispose_calls += 1
+
+
+class _SequencedRequestFactory:
+    def __init__(self, contexts: list[_SequencedContext]) -> None:
+        self.contexts = contexts
+        self.new_context_calls = 0
+
+    def new_context(self, **kwargs):
+        context = self.contexts[self.new_context_calls]
+        self.new_context_calls += 1
+        return context
+
+
+class _SequencedPlaywright:
+    def __init__(self, contexts: list[_SequencedContext]) -> None:
+        self.request = _SequencedRequestFactory(contexts)
+        self.stop_calls = 0
+
+    def stop(self) -> None:
+        self.stop_calls += 1
+
+
+class _SequencedSyncPlaywright:
+    def __init__(self, playwright: _SequencedPlaywright) -> None:
+        self.playwright = playwright
+
+    def start(self):
+        return self.playwright
 
 
 def _add_to_cart_client(temp_dir: str, response_payload: dict):
@@ -370,6 +421,43 @@ class TawreedApiTests(unittest.TestCase):
 
         self.assertEqual(context.dispose_calls, 1)
         self.assertEqual(playwright.stop_calls, 1)
+
+    def test_api_client_refreshes_auth_and_retries_after_http_401(self) -> None:
+        first = _SequencedContext(_StatusResponse(401, {"message": "expired"}))
+        second = _SequencedContext(
+            _StatusResponse(200, {"data": [{"productNameEn": "PANADOL"}]})
+        )
+        playwright = _SequencedPlaywright([first, second])
+        refresh = Mock()
+
+        with (
+            TemporaryDirectory() as temp_dir,
+            patch(
+                "playwright.sync_api.sync_playwright",
+                return_value=_SequencedSyncPlaywright(playwright),
+            ),
+        ):
+            state_path = Path(temp_dir) / "state.json"
+            state_path.write_text("{}", encoding="utf-8")
+            contract_path = Path(temp_dir) / "contract.json"
+            contract_path.write_text(
+                json.dumps({"product_search_url": "/rest/v2/product-search"}),
+                encoding="utf-8",
+            )
+            client = TawreedApiClient(
+                "https://seller.tawreed.io/#/login",
+                state_path,
+                contract_path,
+                auth_refresh=refresh,
+            )
+
+            results = client.search_products("PANADOL")
+            client.close()
+
+        self.assertEqual(results[0]["productNameEn"], "PANADOL")
+        refresh.assert_called_once_with()
+        self.assertEqual(playwright.request.new_context_calls, 2)
+        self.assertEqual(first.dispose_calls, 1)
 
 
 if __name__ == "__main__":

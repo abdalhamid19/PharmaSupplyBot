@@ -41,13 +41,13 @@ def selected_excel_target_configs(
     """Resolve the list of Excel targets the run should match against.
 
     Resolution priority:
-    1. ``--excel-target <key>`` (single target by config key)
+    1. ``--excel-target <key>`` (repeatable; preserves argument order)
     2. ``--all-excel-targets`` (every enabled target)
     3. ``--excel-target-path <key>=<path>[,...]`` (override one or more paths)
 
     Each resolved entry is ``(target_key, [catalog_xlsx_paths])``. The list
-    holds a single path for a vanilla ``--excel-target`` run, or several
-    paths when the operator picked multiple files in the GUI.
+    holds one entry per selected target, with several paths allowed for each
+    target when the operator picked multiple files in the GUI.
     """
     enabled = app_config.enabled_excel_targets()
     if not enabled:
@@ -65,14 +65,23 @@ def selected_excel_target_configs(
             key, _, path = entry.partition("=")
             target_path_overrides.setdefault(key.strip(), []).append(path.strip())
 
-    if getattr(args, "excel_target", None):
-        key = str(args.excel_target)
-        if key not in enabled:
-            available = ", ".join(enabled.keys())
+    raw_targets = getattr(args, "excel_target", None) or []
+    if isinstance(raw_targets, str):
+        raw_targets = [raw_targets]
+    target_keys: list[str] = []
+    for raw_target in raw_targets:
+        key = str(raw_target).strip()
+        if key and key not in target_keys:
+            target_keys.append(key)
+
+    if target_keys:
+        available = ", ".join(enabled.keys())
+        unknown = [key for key in target_keys if key not in enabled]
+        if unknown:
             raise ValueError(
-                f"Unknown excel-target '{key}'. Available: {available}"
+                f"Unknown excel-target '{unknown[0]}'. Available: {available}"
             )
-        targets = [(key, enabled[key])]
+        targets = [(key, enabled[key]) for key in target_keys]
     elif getattr(args, "all_excel_targets", False):
         targets = list(enabled.items())
     else:
@@ -390,7 +399,12 @@ def run_excel_target_match_only(
                         status="no-results",
                         score=float(score or 0),
                         reason=decision.final_reason,
-                        source_file="",
+                        # Preserve the provenance of review candidates even
+                        # when no candidate was accepted.  The CSV and trace
+                        # already expose this file label; the DB row must use
+                        # the same source label so both views refer to the
+                        # same target catalog.
+                        source_file=candidate_source_file,
                         best=None,
                         candidate_count=candidate_count,
                         candidate_count_total=candidate_count_total,

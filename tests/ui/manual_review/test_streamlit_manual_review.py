@@ -21,9 +21,15 @@ from src.ui.manual_review.streamlit_manual_review_cli import (
 from src.ui.manual_review.streamlit_manual_review_page_saved import (
     _convert_to_approved,
     _decision_row,
+    _default_sort_preferences,
+    _prepare_display_df,
     deleted_identity_pairs,
 )
-from src.ui.manual_review.streamlit_manual_review_page import _configured_candidate_limit
+from src.ui.manual_review.streamlit_manual_review_page import (
+    _configured_candidate_limit,
+    _limit_candidates_by_source,
+)
+from src.ui.manual_review.streamlit_manual_review_page import _group_options_by_source
 from src.ui.manual_review import streamlit_manual_review_page as manual_review_page
 
 
@@ -179,6 +185,56 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         self.assertEqual(row["run_date"], "20260622_1425")
         self.assertEqual(row["run_id"], "20260622_1425")
+
+    def test_saved_corrections_default_to_newest_run_date_first(self) -> None:
+        self.assertEqual(
+            _default_sort_preferences(["item_name", "run_date"]),
+            ("run_date", False),
+        )
+
+    def test_saved_corrections_keep_newest_rows_at_top(self) -> None:
+        import pandas as pd
+
+        frame = pd.DataFrame(
+            [
+                {"item_code": "old", "run_date": "20260601_1000"},
+                {"item_code": "new", "run_date": "20260602_1000"},
+            ]
+        )
+
+        with patch(
+            "src.ui.manual_review.streamlit_manual_review_page_saved._get_sort_preferences",
+            return_value=("run_date", False),
+        ):
+            display = _prepare_display_df(
+                frame,
+                ["item_code", "run_date"],
+                ["item_code", "run_date"],
+            )
+
+        self.assertEqual(display["item_code"].tolist(), ["new", "old"])
+
+    def test_saved_corrections_keep_csv_import_after_timestamped_runs(self) -> None:
+        import pandas as pd
+
+        frame = pd.DataFrame(
+            [
+                {"item_code": "new", "run_date": "20260909_1259"},
+                {"item_code": "legacy", "run_date": "csv_import"},
+            ]
+        )
+
+        with patch(
+            "src.ui.manual_review.streamlit_manual_review_page_saved._get_sort_preferences",
+            return_value=("run_date", False),
+        ):
+            display = _prepare_display_df(
+                frame,
+                ["item_code", "run_date"],
+                ["item_code", "run_date"],
+            )
+
+        self.assertEqual(display["item_code"].tolist(), ["new", "legacy"])
 
     def test_saved_decision_row_exposes_matching_source_and_decision(self) -> None:
         from types import SimpleNamespace
@@ -425,6 +481,137 @@ class StreamlitManualReviewTests(unittest.TestCase):
         )
 
         self.assertEqual(_configured_candidate_limit(app_config), 9)
+
+    def test_candidate_options_are_grouped_by_excel_target_scope(self) -> None:
+        options = [
+            ReviewCandidateOption(
+                store_product_id="baraka-1",
+                name_en="ALPHAVIM",
+                name_ar="",
+                supplier="baraka",
+                available_quantity=1,
+                price=10.0,
+                score=20.0,
+                rejection_reason="",
+                orderable=True,
+                matching_source="excel-target",
+                matching_source_label="البركة شركات@محروس1.xlsx",
+                target_key="البركة شركات",
+                excel_target_key="البركة شركات",
+            ),
+            ReviewCandidateOption(
+                store_product_id="qaysar-1",
+                name_en="ALPHAVIM",
+                name_ar="",
+                supplier="qaysar",
+                available_quantity=1,
+                price=9.0,
+                score=20.0,
+                rejection_reason="",
+                orderable=True,
+                matching_source="excel-target",
+                matching_source_label="القيصر شركات@جملة محروس.xlsx",
+                target_key="القيصر شركات",
+                excel_target_key="القيصر شركات",
+            ),
+        ]
+
+        groups = _group_options_by_source(options)
+
+        self.assertEqual(
+            [scope for scope, _ in groups],
+            [
+                ("excel-target", "البركة شركات"),
+                ("excel-target", "القيصر شركات"),
+            ],
+        )
+        self.assertEqual([len(group) for _, group in groups], [1, 1])
+
+    def test_multi_source_selectors_save_one_decision_per_source(self) -> None:
+        from contextlib import nullcontext
+        from pathlib import Path
+        from src.core.utils.excel import Item
+        from src.ui.manual_review import streamlit_manual_review_page as page
+
+        options = [
+            ReviewCandidateOption(
+                store_product_id="baraka-1", name_en="ALPHAVIM", name_ar="",
+                supplier="baraka", available_quantity=1, price=10.0,
+                score=20.0, rejection_reason="", orderable=True,
+                matching_source="excel-target",
+                matching_source_label="baraka@baraka.xlsx",
+                target_key="baraka", excel_target_key="baraka",
+            ),
+            ReviewCandidateOption(
+                store_product_id="qaysar-1", name_en="ALPHAVIM", name_ar="",
+                supplier="qaysar", available_quantity=1, price=9.0,
+                score=20.0, rejection_reason="", orderable=True,
+                matching_source="excel-target",
+                matching_source_label="qaysar@qaysar.xlsx",
+                target_key="qaysar", excel_target_key="qaysar",
+            ),
+        ]
+        groups = _group_options_by_source(options)
+        store = Mock()
+        radio_calls = []
+
+        def capture_radio(*args, **kwargs):
+            radio_calls.append(kwargs)
+            return 0
+
+        with patch.object(page, "st") as streamlit:
+            streamlit.session_state = {}
+            streamlit.columns.return_value = (nullcontext(), nullcontext())
+            streamlit.radio.side_effect = capture_radio
+            page._render_multi_source_selection_form(
+                Item("ALP", "ALPHAVIM 600 MG 20 TAB", 1),
+                groups,
+                Path("20260909_1259"),
+                store,
+                "ALP::ALPHAVIM 600 MG 20 TAB",
+            )
+            self.assertEqual(len(radio_calls), 2)
+            for call in radio_calls:
+                streamlit.session_state[call["key"]] = 1
+                call["on_change"]()
+
+        saved = [call.args[0] for call in store.upsert.call_args_list]
+        self.assertEqual(
+            {decision.excel_target_key for decision in saved},
+            {"baraka", "qaysar"},
+        )
+
+    def test_candidate_display_limit_keeps_each_source_visible(self) -> None:
+        def option(source: str, target: str, index: int) -> ReviewCandidateOption:
+            return ReviewCandidateOption(
+                store_product_id=f"{target}-{index}",
+                name_en=f"ALPHAVIM {target} {index}",
+                name_ar="",
+                supplier=target,
+                available_quantity=1,
+                price=10.0,
+                score=20.0,
+                rejection_reason="",
+                orderable=True,
+                matching_source=source,
+                matching_source_label=f"{target}@file.xlsx",
+                target_key=target,
+                excel_target_key=target,
+            )
+
+        options = [
+            option("excel-target", "baraka", 1),
+            option("excel-target", "baraka", 2),
+            option("excel-target", "baraka", 3),
+            option("excel-target", "qaysar", 1),
+        ]
+
+        visible = _limit_candidates_by_source(options, limit=3)
+
+        self.assertEqual(
+            [candidate.excel_target_key for candidate in visible],
+            ["baraka", "qaysar", "baraka"],
+        )
 
 
 if __name__ == "__main__":

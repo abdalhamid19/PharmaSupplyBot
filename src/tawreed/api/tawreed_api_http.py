@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from ..auth.tawreed_auth import access_token_from_state
+
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -15,23 +19,67 @@ from ..auth.tawreed_auth import access_token_from_state
 def _post_json(client, url: str, body: dict[str, Any]) -> dict[str, Any]:
     """POST JSON with saved auth state without opening Chromium."""
     from .tawreed_api_contract import TawreedApiUnavailable
-    
-    response = client._ensure_request_context().post(url, data=body, timeout=60_000)
-    if not response.ok:
-        raise TawreedApiUnavailable(
-            f"Tawreed API returned HTTP {response.status}: {response.status_text}"
+
+    # A request context captures its Authorization header at creation time.
+    # When Tawreed returns an auth failure, refresh the browser session, rebuild
+    # that context, and retry this exact request once.
+    for attempt in range(2):
+        response = client._ensure_request_context().post(
+            url, data=body, timeout=60_000
         )
-    payload = response.json()
-    
-    # Check if response indicates failure
-    if isinstance(payload, dict):
-        status = payload.get("status")
-        if status and status >= 400:
+        response_status = _status_code(getattr(response, "status", None))
+        if _is_auth_failure_status(response_status):
+            if attempt == 0:
+                logger.warning(
+                    "Tawreed API authentication failed with HTTP %s; refreshing session and retrying",
+                    response_status,
+                )
+                client.refresh_after_auth_expiry()
+                continue
             raise TawreedApiUnavailable(
-                f"Tawreed API error {status}: {payload.get('message', 'Unknown error')}"
+                f"Tawreed API returned HTTP {response.status}: {response.status_text}"
             )
-    
-    return payload if isinstance(payload, dict) else {"data": payload}
+        if not response.ok:
+            raise TawreedApiUnavailable(
+                f"Tawreed API returned HTTP {response.status}: {response.status_text}"
+            )
+        payload = response.json()
+
+        # Some API routes return HTTP 200 with an error status in the JSON body.
+        if isinstance(payload, dict):
+            status = _status_code(payload.get("status"))
+            if _is_auth_failure_status(status):
+                if attempt == 0:
+                    logger.warning(
+                        "Tawreed API returned auth error %s; refreshing session and retrying",
+                        status,
+                    )
+                    client.refresh_after_auth_expiry()
+                    continue
+                raise TawreedApiUnavailable(
+                    f"Tawreed API error {status}: {payload.get('message', 'Unauthorized')}"
+                )
+            if status is not None and status >= 400:
+                raise TawreedApiUnavailable(
+                    f"Tawreed API error {status}: {payload.get('message', 'Unknown error')}"
+                )
+
+        return payload if isinstance(payload, dict) else {"data": payload}
+
+    raise TawreedApiUnavailable("Tawreed API request failed after auth retry.")
+
+
+def _status_code(value: Any) -> int | None:
+    """Normalize a response status that may be encoded as a string or integer."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _is_auth_failure_status(status: int | None) -> bool:
+    """Return whether a response indicates an expired/invalid session."""
+    return status in {401, 403}
 
 
 # ============================================================================
@@ -86,6 +134,7 @@ def _auth_headers_from_state(state_path: Path) -> dict[str, str]:
 
 __all__ = [
     "_post_json",
+    "_is_auth_failure_status",
     "_api_origin",
     "_is_trusted_add_to_cart_url",
     "_ensure_cart_item_added",

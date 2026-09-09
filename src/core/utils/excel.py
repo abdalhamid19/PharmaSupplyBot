@@ -221,15 +221,26 @@ def _read_item_rows(path: Path, config: ExcelConfig) -> Iterable[tuple]:
 
 
 def _read_match_only_rows(path: Path, config: ExcelConfig) -> Iterable[tuple]:
-    """Yield code, name, and a default quantity from two-column catalog sheets."""
+    """Yield identity plus quantity when the match-only sheet provides it.
+
+    Match-only still accepts two-column catalogs, so a missing quantity column
+    falls back to one.  Order sheets that include the configured quantity
+    column retain that requested amount in summaries and the run database.
+    """
     header_row_index = _detect_header_row(path, config) or 0
     with open(path, "rb") as f:
         workbook = openpyxl.load_workbook(f, read_only=True, data_only=True)
         try:
             sheet = cast(Any, workbook.active)
+            header_row = _sheet_header_row(sheet, header_row_index)
+            col_map = _header_col_map(header_row)
             indices = _resolve_col_indices(sheet, header_row_index, config, True)
+            quantity_index = _first_matching_index(
+                col_map, _required_column_aliases(config)[config.qty_col]
+            )
             for row in sheet.iter_rows(min_row=header_row_index + 2, values_only=True):
-                yield (row[indices[0]], row[indices[1]], 1)
+                quantity = row[quantity_index] if quantity_index is not None else 1
+                yield (row[indices[0]], row[indices[1]], quantity)
         finally:
             workbook.close()
 

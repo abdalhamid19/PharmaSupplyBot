@@ -52,7 +52,9 @@ def _select_saved_columns(df):
     default_columns = [col for col in default_columns if col in all_columns]
     return st.multiselect(
         "Select columns to display and download:",
-        options=all_columns, default=default_columns
+        options=all_columns,
+        default=default_columns,
+        key="saved_decisions_columns_v2",
     )
 
 
@@ -74,26 +76,61 @@ def _prepare_display_df(df, editor_columns, selected_columns):
     display_df = df[editor_columns].copy()
     display_df.insert(0, "تحديد (Select)", False)
     if sort_col:
-        display_df = display_df.sort_values(by=sort_col, ascending=is_ascending)
+        # Keep the store's newest-first order for rows sharing the same run
+        # timestamp (for example, decisions saved in one batch).
+        sort_key = None
+        if sort_col == "run_date":
+            # Legacy imports use values such as ``csv_import`` instead of a
+            # timestamp.  Treat those values as unknown dates so they stay
+            # below real timestamped runs when sorting newest first.
+            sort_key = lambda values: pd.to_datetime(
+                values.astype("string"),
+                format="%Y%m%d_%H%M",
+                errors="coerce",
+            )
+        display_df = display_df.sort_values(
+            by=sort_col,
+            ascending=is_ascending,
+            kind="stable",
+            key=sort_key,
+            na_position="last",
+        )
     return display_df
+
+
+def _default_sort_preferences(selected_columns):
+    """Return the default sort column and direction for saved corrections."""
+    if "run_date" in selected_columns:
+        return "run_date", False
+    if "item_name" in selected_columns:
+        return "item_name", True
+    if selected_columns:
+        return selected_columns[0], True
+    return None, True
 
 
 def _get_sort_preferences(selected_columns):
     """Get user sort column and order preferences."""
     col_sort, col_order = st.columns(2)
+    default_sort_col, default_ascending = _default_sort_preferences(selected_columns)
     with col_sort:
         default_idx = (
-            selected_columns.index("item_name")
-            if "item_name" in selected_columns else 0
+            selected_columns.index(default_sort_col)
+            if default_sort_col in selected_columns else 0
         )
         sort_col = st.selectbox(
-            "ترتيب حسب (Sort By):", options=selected_columns, index=default_idx
+            "ترتيب حسب (Sort By):",
+            options=selected_columns,
+            index=default_idx,
+            key="saved_decisions_sort_column_v2",
         )
     with col_order:
         sort_asc = st.radio(
             "ترتيب (Order):",
             options=["تصاعدي (Ascending)", "تنازلي (Descending)"],
-            horizontal=True
+            index=0 if default_ascending else 1,
+            horizontal=True,
+            key="saved_decisions_sort_order_v2",
         )
     is_ascending = sort_asc == "تصاعدي (Ascending)"
     return sort_col, is_ascending
@@ -169,8 +206,11 @@ def _show_saved_instructions():
 def _render_saved_editor(display_df):
     """Render the data editor for saved decisions."""
     return st.data_editor(
-        display_df, width="stretch", hide_index=True,
-        num_rows="dynamic", key="saved_decisions_editor"
+        display_df,
+        width="stretch",
+        hide_index=True,
+        num_rows="dynamic",
+        key="saved_decisions_editor_v2",
     )
 
 

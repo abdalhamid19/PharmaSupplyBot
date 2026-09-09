@@ -92,6 +92,29 @@ class ExcelTests(unittest.TestCase):
             [("22773", "RIRI MILK", 1)],
         )
 
+    def test_match_only_loader_preserves_quantity_when_column_exists(self) -> None:
+        config = ExcelConfig(
+            code_col="code", name_col="name", qty_col="qty"
+        )
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "order_catalog.xlsx"
+            pd.DataFrame(
+                [
+                    {
+                        "code": 90431,
+                        "name": "PANTOGAR 60 CAP",
+                        "qty": 3,
+                    }
+                ]
+            ).to_excel(path, index=False)
+
+            items = list(load_match_only_items_from_excel(path, config))
+
+        self.assertEqual(
+            [(item.code, item.name, item.qty) for item in items],
+            [("90431", "PANTOGAR 60 CAP", 3)],
+        )
+
     def test_load_items_coerces_and_limits_quantities_in_single_pass(self) -> None:
         config = ExcelConfig(
             code_col="code", name_col="name", qty_col="qty", min_qty=1, max_qty=4

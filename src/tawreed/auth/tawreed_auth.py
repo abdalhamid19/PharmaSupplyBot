@@ -162,6 +162,21 @@ class TawreedAuthFlow:
             worker_id=self.bot.worker_id,
         )
 
+    def refresh_auth(self) -> None:
+        """Force a session refresh after the API reports an expired token."""
+        from ..tawreed_auto_auth import auto_refresh_auth_if_needed
+
+        auto_refresh_auth_if_needed(
+            self.bot.config.base_url,
+            self.bot.state_path,
+            self.bot.config.runtime,
+            self.bot.selectors,
+            self.bot.profile_key,
+            force=True,
+            auth_lock=self.bot.auth_lock,
+            worker_id=self.bot.worker_id,
+        )
+
 
 __all__ = [
     # Token helpers

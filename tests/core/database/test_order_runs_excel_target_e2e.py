@@ -6,6 +6,7 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from src.core.config.config_models import ExcelTargetConfig
 from src.core.config.config import load_config
@@ -167,6 +168,47 @@ class ExcelTargetPersistenceContractTests(unittest.TestCase):
                 )
             ],
         )
+
+    def test_rejected_candidate_persists_its_source_file_label(self) -> None:
+        """A rejected candidate still belongs to the catalog file shown in CSV."""
+        config_path = Path(__file__).parents[2] / "cli" / "commands" / "fixtures" / "excel_target_with_target.yaml"
+        app_config = load_config(config_path)
+        item = Item(code="90951", name="INODEP CAPSULES 30", qty=1)
+        catalog = [
+            TargetProduct(
+                code="inodep-syrup",
+                name="INODEP SYRUP 100 ML",
+                price=10.0,
+                discount_percent=0.0,
+                source_file="vendor.xlsx",
+            )
+        ]
+
+        with TemporaryDirectory() as temp:
+            db_path = Path(temp) / "source-label.db"
+            app_config = replace(
+                app_config,
+                database=DatabaseConfig(order_runs_path=str(db_path)),
+            )
+            with patch(
+                "src.core.excel_target.excel_target_identity.lookup_en",
+                return_value=[{"ar": "INODEP", "en": "INODEP"}],
+            ):
+                totals = run_excel_target_match_only(
+                    app_config,
+                    "alnasr",
+                    [item],
+                    catalog,
+                    summary_path=Path(temp) / "summary.csv",
+                    run_key="wardany/source-label",
+                    run_id="source-label",
+                )
+            rows = OrderRunsStore(db_path).db.execute_query(
+                "select status, source_label from run_items"
+            )
+
+        self.assertEqual(totals["flagged"], 1)
+        self.assertEqual(rows, [("no-results", "alnasr@vendor.xlsx")])
 
 
 if __name__ == "__main__":

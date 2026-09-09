@@ -48,6 +48,23 @@ class TawreedAutoAuthTests(unittest.TestCase):
 
         refresh.assert_called_once()
 
+    def test_force_refresh_runs_even_when_token_is_valid(self) -> None:
+        with patch(
+            "src.tawreed.tawreed_auto_auth.is_token_expired",
+            side_effect=[False, False],
+        ):
+            with patch("src.tawreed.tawreed_auto_auth.run_headless_auth_refresh") as refresh:
+                auto_refresh_auth_if_needed(
+                    "https://seller.tawreed.io/#/login",
+                    Path("state/wardany.json"),
+                    runtime_config=object(),
+                    selectors=object(),
+                    profile_key="wardany",
+                    force=True,
+                )
+
+        refresh.assert_called_once()
+
     def test_missing_env_credentials_raise_clear_error(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(RuntimeError) as context:

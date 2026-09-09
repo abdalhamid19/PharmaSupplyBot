@@ -251,19 +251,21 @@ def test_order_item_workers_defaults_to_none() -> None:
 
 
 def test_remove_cart_accepts_excel_and_debug_browser() -> None:
-    captured: dict = {"excel": None, "debug_browser": None}
+    captured: dict = {"excel": None, "debug_browser": None, "limit": None}
     result = _invoke(
         [
             "remove-cart",
             "--excel", "data/input/remove_items/remove.xlsx",
             "--profile", "wardany",
             "--debug-browser",
+            "--limit", "30",
         ],
         captured,
     )
     assert result.exit_code == 0
     assert captured["excel"] == "data/input/remove_items/remove.xlsx"
     assert captured["debug_browser"] is True
+    assert captured["limit"] == 30
 
 
 def test_remove_cart_accepts_manual_review_source() -> None:

@@ -12,7 +12,11 @@ from .tawreed_api_contract import TawreedApiUnavailable
 
 def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
     """Match items through Tawreed API without opening Chromium."""
-    with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
+    with TawreedApiClient(
+        bot.config.base_url,
+        bot.state_path,
+        auth_refresh=getattr(bot, "_refresh_api_auth", None),
+    ) as api:
         _require_contract(api, "product_search_url")
         _warm_up_api_client(bot, api)
         for item in items:
@@ -36,7 +40,11 @@ def match_items_only_with_api(bot, items: Iterable[Item]) -> None:
 
 def place_order_with_api(bot, items: Iterable[Item]) -> None:
     """Add items to Tawreed cart through discovered API endpoints."""
-    with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
+    with TawreedApiClient(
+        bot.config.base_url,
+        bot.state_path,
+        auth_refresh=getattr(bot, "_refresh_api_auth", None),
+    ) as api:
         _require_contract(api, "product_search_url", "add_to_cart_url")
         if bot.config.runtime.submit_order:
             _require_contract(api, "submit_order_url")
@@ -48,7 +56,11 @@ def place_order_with_api(bot, items: Iterable[Item]) -> None:
 
 def remove_cart_items_with_api(bot, items: Iterable[object]) -> None:
     """Remove requested cart items through discovered API endpoints."""
-    with TawreedApiClient(bot.config.base_url, bot.state_path) as api:
+    with TawreedApiClient(
+        bot.config.base_url,
+        bot.state_path,
+        auth_refresh=getattr(bot, "_refresh_api_auth", None),
+    ) as api:
         _require_contract(api, "remove_cart_url")
         _warm_up_api_client(bot, api)
         for item in items:

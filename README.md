@@ -88,6 +88,11 @@ py run.py order --profile wardany --excel data/input/order.xlsx
 # مطابقة على Tawreed profile + Excel target catalog في نفس التشغيل
 py run.py order --profile wardany --excel-target <your_key> --excel data/input/order.xlsx --match-only
 
+# اختيار عدة Excel targets؛ كرر الخيار لكل target
+py run.py order --profile wardany \
+    --excel-target <first_key> --excel-target <second_key> \
+    --excel data/input/order.xlsx --match-only
+
 # مطابقة على كل الـ Excel targets المعرّفة
 py run.py order --all-excel-targets --excel data/input/order.xlsx --match-only
 
@@ -98,6 +103,9 @@ py run.py order --excel-target <your_key> \
 
 # حذف أصناف محددة من السلة
 py run.py remove-cart --profile wardany --excel data/input/items.xlsx
+
+# حذف أول 30 صنفًا صالحًا فقط بنفس ترتيب أمر order
+py run.py remove-cart --profile wardany --excel data/input/items.xlsx --limit 30
 ```
 
 ### Excel target cart gate

@@ -89,7 +89,25 @@ def _fact_row(
     """Return the ``run_items`` row with snapshot-derived fields merged in."""
     fields = dict(fact_fields)
     fields.update(snapshot_fact_fields(stores, selections))
-    return run_item_row(run_key, summary, **fields)
+    # A rejected/no-result item cannot have a winning store.  Clear a stale
+    # winner carried by an imported or reused summary even when a previous
+    # write for the same item/source had one.  Matched rows without a store
+    # snapshot retain their legacy summary winner for compatibility with
+    # imports that intentionally do not store candidates.
+    row_summary = summary
+    if not stores and str(summary.get("status") or "") in {
+        "no-results", "not-orderable",
+    }:
+        fields["winner_store_product_id"] = None
+        fields["winner_store_key"] = None
+        # ``run_item_row`` intentionally falls back to the summary winner
+        # when no snapshot override is supplied.  Replace those two summary
+        # values as well so an explicit rejection cannot resurrect stale
+        # metadata through that compatibility fallback.
+        row_summary = dict(summary)
+        row_summary["winner_store_product_id"] = None
+        row_summary["winner_store_key"] = None
+    return run_item_row(run_key, row_summary, **fields)
 
 
 def tawreed_fact_fields(profile_key: str) -> dict[str, str]:

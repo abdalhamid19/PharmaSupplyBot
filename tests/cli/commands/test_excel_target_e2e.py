@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import tempfile
 import unittest
@@ -66,6 +67,24 @@ excel_targets:
         target_key, xlsx_paths = selected[0]
         self.assertEqual(target_key, "alnasr")
         self.assertEqual(xlsx_paths, [ALNASR_PATH])
+
+    def test_selected_excel_target_configs_resolves_repeated_targets(self) -> None:
+        args = argparse.Namespace(
+            excel_target=["alnasr", "alnasr", "second"],
+            all_excel_targets=False,
+            excel_target_path=[
+                f"alnasr={ALNASR_PATH}",
+                "second=second.xlsx",
+            ],
+        )
+        app_config = copy.deepcopy(self.app_config)
+        app_config.excel_targets["second"] = app_config.excel_targets[
+            "alnasr"
+        ]
+
+        selected = selected_excel_target_configs(app_config, args)
+
+        self.assertEqual([key for key, _ in selected], ["alnasr", "second"])
 
     def test_selected_excel_target_configs_all(self) -> None:
         args = argparse.Namespace(
