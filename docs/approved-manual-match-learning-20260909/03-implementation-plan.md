@@ -17,6 +17,22 @@ Streamlit, existing `scripts/evaluate_excel_target.py`.
 **Spec:** `docs/approved-manual-match-learning-20260909/README.md` and
 `docs/approved-manual-match-learning-20260909/02-architecture.md`.
 
+## Execution status (2026-09-09)
+
+- [x] Tasks 1–4 implemented and committed in `6398ea4` and `0bba834`.
+- [x] Approval-disabled counterfactual replay reuses one matcher per target.
+- [x] Read-only CLI reports were generated for both configured targets under
+  `artifacts/excel-target/<target>/approved-correction-audit_20260909`.
+- [x] 229 focused/integration tests passed; 2 subtests passed.
+- [x] The report analyzed 140 saved approvals: 113 variant conflicts, 17
+  Cohere-only cases, 4 ambiguous rows, 3 legacy-invalid records, 1 scope
+  mismatch, and 1 counterfactually automatic match.
+- [x] The requested 100-item replay remained unchanged: Baraka 22 matched and
+  Caesar 16 matched. Therefore the safe automatic gain in this release is
+  `automatic_verified_after - automatic_verified_before = 0`.
+- [ ] Task 5 remains a human-gated follow-up: approve deterministic aliases or
+  parser fixes only after reviewing the report evidence and adding gold cases.
+
 ## Global constraints
 
 - Do not read, print, commit, or test with secrets from `.env`.
