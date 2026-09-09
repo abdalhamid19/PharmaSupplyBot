@@ -3,9 +3,9 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: use `executing-plans` and TDD
 > task-by-task. Steps use checkbox syntax.
 
-**Goal:** provide a per-Excel-target audit of `approved_match` decisions and a
-safe evidence pipeline for improving initial matching without weakening the
-automatic safety contract.
+**Goal:** increase safe `automatic_verified` Excel-target matches by finding
+why previously `approved_match` items were not matched initially, then applying
+only evidence-backed deterministic improvements without weakening safety.
 
 **Architecture:** add a pure counterfactual analyzer beside the Excel-target
 matcher; expose it through a CLI report and a read-only Streamlit view. The
@@ -28,6 +28,8 @@ Streamlit, existing `scripts/evaluate_excel_target.py`.
 - Only a uniquely binding `approved_match` with exact target-row provenance may
   yield `approved_manual_override`.
 - Keep manual review and automatic matching metrics separate.
+- Treat `approved_match` as labeled diagnostic evidence only; it never counts
+  as an automatic-matching improvement in before/after reporting.
 
 ## File structure
 
@@ -131,5 +133,9 @@ the CLI registration; create `tests/cli/commands/test_cli_approved_correction_re
 - [ ] Create an approval-disabled baseline for the same inputs. Compare
   improvements to that counterfactual as well as production; otherwise saved
   approvals would be misreported as feature gains.
+- [ ] Calculate and publish only this primary improvement metric:
+  `automatic_verified_after - automatic_verified_before`. Publish
+  `approved_manual_override` as a separate informational count and fail the
+  rollout if an apparent gain consists solely of existing manual overrides.
 - [ ] Commit final docs and report fixtures; push only the commits created for
   this feature, after confirming the branch and remote.

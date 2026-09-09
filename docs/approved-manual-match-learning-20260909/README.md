@@ -1,22 +1,26 @@
 # Approved Manual Matches: Design Record
 
-**Goal:** turn every Excel-target `approved_match` into a scoped, explainable
-future match, and use the accumulated decisions to identify the *real* reasons
-the safe matcher did not select the row initially.
+**Goal:** improve safe *automatic* matching for every Excel target by using
+previous `approved_match` decisions as labeled evidence to identify the *real*
+reason the matcher did not select the row initially.
 
 This is a planning package; it makes no matching-policy change. Its companion
 baseline is the requested 100-item run at `20260909_1826`.
 
 ## The key distinction
 
-An approval is ground truth for one order item and one target-row identity. It
-must not silently become a fuzzy rule for other items. The product should:
+An approval is diagnostic training evidence, not the success metric and not an
+automatic fuzzy rule for other items. The product should:
 
 1. apply a valid, row-scoped approval as `approved_manual_override`;
 2. record the original non-match reason and the later approval in an immutable
    learning/audit record; and
-3. aggregate that evidence into safe, reviewable recommendations, never into
-   an unreviewed relaxation of automatic matching.
+3. aggregate that evidence into safe, reviewable improvements (aliases,
+   normalization, and attribute parsing), never into an unreviewed relaxation
+   of automatic matching; and
+4. measure success only as an increase in `automatic_verified` matches with
+   no new unsafe automatic decisions. Existing human overrides are reported
+   separately and never counted as recall gained by the feature.
 
 ## Existing capability and missing capability
 

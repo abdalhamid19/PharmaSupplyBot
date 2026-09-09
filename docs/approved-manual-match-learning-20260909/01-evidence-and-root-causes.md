@@ -41,9 +41,10 @@ cases are exactly why a human approval must remain row-scoped.
 
 ## Metrics and acceptance criteria
 
-Report separate counts for automatic verified matches and approved overrides.
-No aggregate “matched improved” metric may hide an increase in false automatic
-matches.
+The feature succeeds only when it raises safe automatic matching. Report
+separate counts for automatic verified matches and approved overrides. No
+aggregate “matched improved” metric may count an already approved override as a
+new automatic match or hide an increase in false automatic matches.
 
 - zero auto-matches with `review_fuzzy` or `cohere_translation` evidence;
 - zero auto-matches with rejected compatibility except a valid
@@ -53,3 +54,6 @@ matches.
 - recommendation output is deterministic and contains evidence counts;
 - newly automated rules require a labeled evaluation pass with no false
   positives in the gold set and explicit human sign-off.
+- the before/after gain is `automatic_verified_after - automatic_verified_before`
+  on the same approval-disabled input; `approved_manual_override` is displayed
+  as diagnostic coverage, not as a gain.
