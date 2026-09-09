@@ -1,15 +1,14 @@
 """Test match_brand artifact logging inline."""
 import os
+from dotenv import load_dotenv
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+load_dotenv(REPO / ".env", override=False)
 sys.path.insert(0, str(REPO))
 
 os.environ['MATCH_ARTIFACT_PATH'] = 'artifacts/match_traces/test_inline.jsonl'
-os.environ['COHERE_API_KEY'] = 'kC7J5jmq5nOECPeHumKHWFYi1Dp1kBvtstAzHXLU'
-os.environ['COHERE_RATE_LIMIT_PER_MIN'] = '15'
-os.environ['COHERE_BATCH_SIZE'] = '50'
 
 Path('artifacts/match_traces').mkdir(parents=True, exist_ok=True)
 if Path('artifacts/match_traces/test_inline.jsonl').exists():

@@ -1,6 +1,9 @@
 """Contracts for strict medicine-variant compatibility."""
 
+import pytest
+
 from src.core.excel_target.product_attributes import validate_product_compatibility
+from src.core.excel_target.product_attributes import extract_product_attributes
 
 
 def test_gram_and_milligram_strengths_are_equivalent() -> None:
@@ -55,6 +58,35 @@ def test_arabic_singular_and_plural_forms_are_equivalent() -> None:
     assert result.accepted
 
 
+def test_arabic_nokot_is_an_explicit_drops_form() -> None:
+    result = validate_product_compatibility("PRODUCT DROPS 15 ML", "منتج نقط 15 مل")
+    assert result.accepted
+
+
+def test_bare_drops_dose_distinguishes_750_from_1000() -> None:
+    correct = validate_product_compatibility(
+        "LACTASE 750 DROPS 15 ML",
+        "لاكتيز 750 نقط 15 مل",
+    )
+    wrong = validate_product_compatibility(
+        "LACTASE 750 DROPS 15 ML",
+        "لاكتيز 1000 نقط 15 مل",
+    )
+
+    assert correct.accepted
+    assert not wrong.accepted
+    assert "strength" in wrong.rejection_reason
+
+
+def test_supplier_sharab_does_not_prove_suspension_presentation() -> None:
+    result = validate_product_compatibility(
+        "PRODUCT 457 MG SUSP 60 ML",
+        "منتج 457 مجم شراب 60 مل",
+    )
+    assert not result.accepted
+    assert result.rejection_reason == "candidate form conflicts with requested form"
+
+
 def test_arabic_film_pack_count_is_checked() -> None:
     result = validate_product_compatibility("PRODUCT FILM 20", "منتج 10 فيلم")
     assert not result.accepted
@@ -75,3 +107,164 @@ def test_unrequested_candidate_strength_stays_manual_review() -> None:
     )
     assert not result.accepted
     assert result.rejection_reason == "candidate has an unrequested strength"
+
+
+def test_reordered_compound_strengths_preserve_their_components() -> None:
+    result = validate_product_compatibility(
+        "PRODUCT 228/5 MG SUSP",
+        "منتج 5/228 مجم معلق",
+    )
+
+    assert result.accepted
+    assert len(result.query.concentrations) == 1
+    concentration = next(iter(result.query.concentrations))
+    assert concentration.denominator == ()
+    assert {(part.value, part.unit) for part in concentration.numerator} == {
+        (228.0, "mg"),
+        (5.0, "mg"),
+    }
+    assert result.query.concentrations == result.candidate.concentrations
+
+
+def test_ratio_concentration_preserves_direction_and_rejects_wrong_dilution() -> None:
+    result = validate_product_compatibility(
+        "PRODUCT 250MG/5ML SOLUTION",
+        "منتج 250 مجم / 5 مل محلول",
+    )
+    assert result.accepted
+    concentration = next(iter(result.query.concentrations))
+    assert len(concentration.numerator) == 1
+    assert len(concentration.denominator) == 1
+    assert concentration.numerator[0].value == 250.0
+    assert concentration.numerator[0].unit == "mg"
+    assert concentration.denominator[0].value == 5.0
+    assert concentration.denominator[0].unit == "ml"
+
+    reversed_ratio = validate_product_compatibility(
+        "PRODUCT 250MG/5ML SOLUTION",
+        "منتج 5 مل / 250 مجم محلول",
+    )
+    assert not reversed_ratio.accepted
+    assert "concentration" in reversed_ratio.rejection_reason
+
+    wrong_dilution = validate_product_compatibility(
+        "PRODUCT 250MG/5ML SOLUTION",
+        "منتج 250 مجم / 10 مل محلول",
+    )
+    assert not wrong_dilution.accepted
+    assert "concentration" in wrong_dilution.rejection_reason
+
+
+def test_two_explicit_same_unit_ratio_preserves_direction() -> None:
+    reversed_ratio = validate_product_compatibility(
+        "PRODUCT 1MG/100MG SOLUTION",
+        "منتج 100 مجم/1 مجم محلول",
+    )
+
+    assert not reversed_ratio.accepted
+    assert "concentration" in reversed_ratio.rejection_reason
+
+    missing_ratio = validate_product_compatibility(
+        "PRODUCT 250MG/5ML SOLUTION",
+        "منتج 250 مجم محلول",
+    )
+    assert not missing_ratio.accepted
+    assert missing_ratio.rejection_reason == "candidate concentration is not proven"
+
+
+def test_compound_strength_requires_all_components_but_not_their_order() -> None:
+    result = validate_product_compatibility(
+        "PRODUCT 5/12.5/40 MG POWDER",
+        "منتج 40/5/12.5 مجم بودرة",
+    )
+    assert result.accepted
+
+    missing_component = validate_product_compatibility(
+        "PRODUCT 5/12.5/40 MG POWDER",
+        "منتج 40/5/20 مجم بودرة",
+    )
+    assert not missing_component.accepted
+    assert "concentration" in missing_component.rejection_reason
+
+
+def test_backslash_compound_separator_is_equivalent_to_slash() -> None:
+    result = validate_product_compatibility(
+        "PRODUCT 10/160 MG 28 TAB",
+        r"منتج 10\160 مجم 28 قرص",
+    )
+    assert result.accepted
+
+
+def test_arabic_units_and_decimal_values_are_canonicalized() -> None:
+    result = validate_product_compatibility(
+        "PRODUCT 250MG/5ML SOLUTION",
+        "منتج 250 مجم/٥ مل محلول",
+    )
+    assert result.accepted
+
+    decimal_result = validate_product_compatibility(
+        "PRODUCT 12.5 MG",
+        "منتج ١٢٫٥ مجم",
+    )
+    assert decimal_result.accepted
+    assert decimal_result.query.strengths == decimal_result.candidate.strengths
+
+
+@pytest.mark.parametrize(
+    ("english_form", "arabic_form"),
+    [
+        ("SUSP", "معلق"),
+        ("SOLUTION", "محلول"),
+        ("LOTION", "لوشن"),
+        ("VIAL", "فيال"),
+        ("AMPOULE", "امبول"),
+        ("SUPPOSITORY", "لبوس"),
+        ("LOZENGE", "استحلاب"),
+        ("POWDER", "بودرة"),
+    ],
+)
+def test_distinct_form_vocabulary_matches_arabic_aliases(
+    english_form: str, arabic_form: str
+) -> None:
+    result = validate_product_compatibility(
+        f"PRODUCT {english_form}",
+        f"منتج {arabic_form}",
+    )
+    assert result.accepted
+
+
+@pytest.mark.parametrize(
+    ("query_form", "candidate_form"),
+    [
+        ("SUSP", "محلول"),
+        ("SOLUTION", "لوشن"),
+        ("VIAL", "امبول"),
+        ("SUPPOSITORY", "استحلاب"),
+        ("LOZENGE", "بودرة"),
+    ],
+)
+def test_distinct_forms_reject_conflicting_presentations(
+    query_form: str, candidate_form: str
+) -> None:
+    result = validate_product_compatibility(
+        f"PRODUCT {query_form}",
+        f"منتج {candidate_form}",
+    )
+    assert not result.accepted
+    assert result.rejection_reason == "candidate form conflicts with requested form"
+
+
+def test_ampoule_and_vial_are_distinct_counted_presentations() -> None:
+    result = validate_product_compatibility(
+        "PRODUCT 2 AMPOULES",
+        "منتج 1 امبول",
+    )
+    assert not result.accepted
+    assert result.rejection_reason == "candidate pack conflicts with requested pack"
+
+    injection_ampoule = validate_product_compatibility(
+        "PRODUCT INJECTION",
+        "منتج امبول",
+    )
+    assert not injection_ampoule.accepted
+    assert injection_ampoule.rejection_reason == "candidate form conflicts with requested form"

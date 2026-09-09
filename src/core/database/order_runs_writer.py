@@ -81,6 +81,8 @@ class OrderRunsWriterMixin:
                 raise
 
 
-_SNAPSHOT_KEYS = ("stores", "store_selections", "store_source")
+_SNAPSHOT_KEYS = (
+    "stores", "store_selections", "store_source", "store_source_owner",
+)
 
 __all__ = ["OrderRunsWriterMixin"]

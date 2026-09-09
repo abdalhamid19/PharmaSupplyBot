@@ -420,6 +420,22 @@ def _render_candidate_provenance(options: list[ReviewCandidateOption]) -> None:
             details.append(f"File: {option.source_file}")
         if option.identity_evidence_kind:
             details.append(f"Identity evidence: {option.identity_evidence_kind}")
+        if option.identity_evidence_kind == "review_fuzzy":
+            details.append("Review-only fuzzy candidate; human approval required")
+        if option.candidate_method:
+            details.append(f"Candidate method: {option.candidate_method}")
+        if option.review_status:
+            details.append(f"Review status: {option.review_status}")
+        if option.score_margin:
+            details.append(f"Score margin: {option.score_margin:.2f}")
+        if option.shared_brand_tokens:
+            details.append(
+                "Shared brand tokens: " + ", ".join(option.shared_brand_tokens)
+            )
+        if option.excel_target_source_row:
+            details.append(f"Target row: {option.excel_target_source_row}")
+        if option.excel_target_row_key:
+            details.append(f"Target row key: {option.excel_target_row_key}")
         st.caption(" · ".join(details))
 
 
@@ -493,6 +509,8 @@ def _build_radio_opts(options: list[ReviewCandidateOption]) -> list[str]:
             f"[{i+1}] {name} | {opt.supplier} | "
             f"Qty: {opt.available_quantity} | سعر الجمهور: {opt.price} EGP | {avail}"
         )
+        if opt.identity_evidence_kind == "review_fuzzy":
+            label += " | Review-only"
         source = getattr(opt, "matching_source", "") or getattr(opt, "source_kind", "")
         if source:
             label += f" | Source: {source}"

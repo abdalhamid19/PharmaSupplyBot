@@ -24,6 +24,10 @@ from .manual_review_store_sql import (
     ALTER_DECISIONS_TABLE_EVIDENCE,
     ALTER_DECISIONS_TABLE_SCOPE,
     ALTER_DECISIONS_TABLE_REBIND,
+    ALTER_DECISIONS_TABLE_ROW_KEY,
+    ALTER_DECISIONS_TABLE_SOURCE_ROW,
+    ALTER_DECISIONS_TABLE_CANDIDATE_METHOD,
+    ALTER_DECISIONS_TABLE_REVIEW_STATUS,
     CREATE_SOURCE_HISTORY_TABLE,
     UPSERT_SOURCE_HISTORY,
 )
@@ -34,6 +38,7 @@ from .manual_review_store_helpers import (
     _default_decision,
     _history_values,
     _history_values_from_decision_values,
+    is_scoped_excel_target_approval,
 )
 from .manual_review_store_query import (
     _unique_item_keys,
@@ -66,6 +71,10 @@ class ManualReviewDecision:
     identity_evidence: str = ""
     supplier_scope_key: str = ""
     last_rebind_status: str = ""
+    excel_target_row_key: str = ""
+    excel_target_source_row: int = 0
+    candidate_method: str = ""
+    review_status: str = ""
 
     def __post_init__(self) -> None:
         """Backfill the explicit decision for old approved-only call sites."""
@@ -186,6 +195,38 @@ class ManualReviewStore:
             (code_key, name_key),
         )
         return [_decision_from_row(row) for row in rows]
+
+    def lookup_scoped_approved_match(
+        self,
+        item_code: str,
+        item_name: str,
+        *,
+        target_key: str,
+        source_file: str,
+        source_row: int,
+        row_key: str,
+    ) -> ManualReviewDecision | None:
+        """Return only a fully row-scoped Excel approval.
+
+        This is intentionally stricter than :meth:`lookup`: item-level and
+        legacy approvals remain readable but cannot authorize a variant
+        compatibility override.
+        """
+        decision = self.lookup(
+            item_code,
+            item_name,
+            matching_source="excel-target",
+            excel_target_key=target_key,
+        )
+        if is_scoped_excel_target_approval(
+            decision,
+            target_key=target_key,
+            source_file=source_file,
+            source_row=source_row,
+            row_key=row_key,
+        ):
+            return decision
+        return None
 
     def lookup_many(
         self,
@@ -309,6 +350,16 @@ class ManualReviewStore:
         )
         _ensure_column(self.db, "supplier_scope_key", ALTER_DECISIONS_TABLE_SCOPE)
         _ensure_column(self.db, "last_rebind_status", ALTER_DECISIONS_TABLE_REBIND)
+        _ensure_column(self.db, "excel_target_row_key", ALTER_DECISIONS_TABLE_ROW_KEY)
+        _ensure_column(
+            self.db, "excel_target_source_row", ALTER_DECISIONS_TABLE_SOURCE_ROW
+        )
+        _ensure_column(
+            self.db, "candidate_method", ALTER_DECISIONS_TABLE_CANDIDATE_METHOD
+        )
+        _ensure_column(
+            self.db, "review_status", ALTER_DECISIONS_TABLE_REVIEW_STATUS
+        )
         self.db.execute_update(CREATE_SOURCE_HISTORY_TABLE)
         # Make provenance explicit for rows written before the source fields
         # existed.  We can prove an Excel target from its scoped key; all
@@ -371,7 +422,8 @@ class ManualReviewStore:
             "correct_product_name_ar,correct_query,run_id,excel_target_key,"
             "excel_target_source_file,matching_source,matching_source_label,"
             "identity_evidence_kind,identity_evidence,supplier_scope_key,"
-            "last_rebind_status,created_at,updated_at"
+            "last_rebind_status,excel_target_row_key,excel_target_source_row,"
+            "candidate_method,review_status,created_at,updated_at"
         )
         with self.db.get_connection() as conn:
             self._backup_before_scope_migration(conn)

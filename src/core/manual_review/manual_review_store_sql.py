@@ -5,7 +5,8 @@ SELECT_DECISIONS = (
     "correct_product_name,correct_product_name_ar,correct_query,run_id,excel_target_key,"
     "excel_target_source_file,matching_source,matching_source_label,"
     "identity_evidence_kind,identity_evidence,supplier_scope_key,"
-    "last_rebind_status from manual_review_decisions"
+    "last_rebind_status,excel_target_row_key,excel_target_source_row,"
+    "candidate_method,review_status from manual_review_decisions"
 )
 
 UPSERT_DECISION = """
@@ -13,8 +14,9 @@ insert into manual_review_decisions
 (item_code_key,item_name_key,item_code,item_name,approved,manual_decision,
  correct_store_product_id,correct_product_name,correct_product_name_ar,correct_query,run_id,
  excel_target_key,excel_target_source_file,matching_source,matching_source_label,
- identity_evidence_kind,identity_evidence,supplier_scope_key,last_rebind_status)
-values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+ identity_evidence_kind,identity_evidence,supplier_scope_key,last_rebind_status,
+ excel_target_row_key,excel_target_source_row,candidate_method,review_status)
+values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 on conflict(item_code_key,item_name_key,matching_source,supplier_scope_key) do update set
 approved=excluded.approved,
 manual_decision=excluded.manual_decision,
@@ -31,6 +33,10 @@ identity_evidence_kind=excluded.identity_evidence_kind,
 identity_evidence=excluded.identity_evidence,
 supplier_scope_key=excluded.supplier_scope_key,
 last_rebind_status=excluded.last_rebind_status,
+excel_target_row_key=excluded.excel_target_row_key,
+excel_target_source_row=excluded.excel_target_source_row,
+candidate_method=excluded.candidate_method,
+review_status=excluded.review_status,
 updated_at=CURRENT_TIMESTAMP
 """
 
@@ -55,6 +61,10 @@ create table if not exists manual_review_decisions (
     identity_evidence TEXT not null default '',
     supplier_scope_key TEXT not null default '',
     last_rebind_status TEXT not null default '',
+    excel_target_row_key TEXT not null default '',
+    excel_target_source_row INTEGER not null default 0,
+    candidate_method TEXT not null default '',
+    review_status TEXT not null default '',
     created_at TEXT not null default CURRENT_TIMESTAMP,
     updated_at TEXT not null default CURRENT_TIMESTAMP,
     primary key (
@@ -111,6 +121,26 @@ ALTER_DECISIONS_TABLE_SCOPE = (
 ALTER_DECISIONS_TABLE_REBIND = (
     "alter table manual_review_decisions "
     "add column last_rebind_status TEXT not null default ''"
+)
+
+ALTER_DECISIONS_TABLE_ROW_KEY = (
+    "alter table manual_review_decisions "
+    "add column excel_target_row_key TEXT not null default ''"
+)
+
+ALTER_DECISIONS_TABLE_SOURCE_ROW = (
+    "alter table manual_review_decisions "
+    "add column excel_target_source_row INTEGER not null default 0"
+)
+
+ALTER_DECISIONS_TABLE_CANDIDATE_METHOD = (
+    "alter table manual_review_decisions "
+    "add column candidate_method TEXT not null default ''"
+)
+
+ALTER_DECISIONS_TABLE_REVIEW_STATUS = (
+    "alter table manual_review_decisions "
+    "add column review_status TEXT not null default ''"
 )
 
 CREATE_SOURCE_HISTORY_TABLE = """

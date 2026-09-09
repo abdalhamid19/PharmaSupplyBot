@@ -41,6 +41,60 @@ def test_round_trip_preserves_source_and_identity_evidence(tmp_path: Path) -> No
     assert saved.excel_target_source_file == "baraka.xlsx"
 
 
+def test_round_trip_preserves_scoped_row_and_review_metadata(tmp_path: Path) -> None:
+    store = ManualReviewStore(tmp_path / "manual.sqlite3")
+    decision = ManualReviewDecision(
+        item_code="1",
+        item_name="INODEP CAPSULES 30",
+        approved=True,
+        correct_store_product_id="baraka-17",
+        correct_product_name="INODEP SYRUP 100 ML",
+        manual_decision="approved_match",
+        excel_target_key="baraka",
+        excel_target_source_file="baraka.xlsx",
+        excel_target_row_key="row-key-17",
+        excel_target_source_row=17,
+        matching_source="excel-target",
+        candidate_method="english_fuzzy",
+        review_status="variant_conflict",
+    )
+
+    store.upsert(decision)
+    saved = store.lookup(
+        "1",
+        "INODEP CAPSULES 30",
+        matching_source="excel-target",
+        excel_target_key="baraka",
+    )
+
+    assert saved is not None
+    assert saved.excel_target_row_key == "row-key-17"
+    assert saved.excel_target_source_row == 17
+    assert saved.candidate_method == "english_fuzzy"
+    assert saved.review_status == "variant_conflict"
+
+    rebound = store.lookup_scoped_approved_match(
+        "1",
+        "INODEP CAPSULES 30",
+        target_key="baraka",
+        source_file="baraka.xlsx",
+        source_row=17,
+        row_key="row-key-17",
+    )
+    assert rebound is not None
+    assert (
+        store.lookup_scoped_approved_match(
+            "1",
+            "INODEP CAPSULES 30",
+            target_key="baraka",
+            source_file="baraka.xlsx",
+            source_row=18,
+            row_key="row-key-17",
+        )
+        is None
+    )
+
+
 def test_same_item_keeps_independent_rows_per_matching_supplier(tmp_path: Path) -> None:
     store = ManualReviewStore(tmp_path / "manual.sqlite3")
     store.upsert(

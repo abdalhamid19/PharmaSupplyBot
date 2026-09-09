@@ -1,8 +1,8 @@
 """Bilingual Arabic↔English drug-name translation.
 
-Uses Cohere's specialized translation model as the primary engine, with a
-general-purpose LLM as a fallback for cases the translation model handles
-poorly (e.g. very noisy transcriptions). Translations are cached in two
+Uses Cohere's specialized translation model as the live fallback for names
+not resolved by local dictionaries or the persistent cache. Translations are
+cached in two
 layers:
 
 1. **SQLite** (``state/order_runs.db`` table ``translation_cache``) —
@@ -10,9 +10,9 @@ layers:
 2. **In-process LRU** — fast path for hot items.
 
 Environment:
-    ``COHERE_API_KEY`` must be set. When missing, the module degrades to
-    no-op identity translation so the rest of the matching pipeline can
-    still run.
+    ``COHERE_API_KEY_1`` and ``COHERE_API_KEY_2`` are tried in order.
+    ``COHERE_API_KEY`` remains supported as a legacy single-key fallback.
+    When no key is set, the module degrades to no-op translation.
 """
 from __future__ import annotations
 
@@ -27,11 +27,30 @@ logger = logging.getLogger(__name__)
 
 
 PRIMARY_MODEL = "command-a-translate-08-2025"
-FALLBACK_MODEL = "command-a-plus-05-2026"
+MAX_BATCH_SIZE = 50
+MAX_RATE_LIMIT_PER_MIN = 20
 
-# Cohere trial key is 20 calls/min; we use a token bucket so we don't
-# burn through it. The default leaves headroom for other API users.
-RATE_LIMIT_PER_MIN = int(os.environ.get("COHERE_RATE_LIMIT_PER_MIN", "15"))
+# Cohere trial keys allow 20 calls/min; each configured key gets its own
+# limiter so two keys can be used independently.
+def _configured_rate_limit_per_min() -> int:
+    try:
+        configured = int(os.environ.get("COHERE_RATE_LIMIT_PER_MIN", "20"))
+    except ValueError:
+        configured = MAX_RATE_LIMIT_PER_MIN
+    return min(max(configured, 1), MAX_RATE_LIMIT_PER_MIN)
+
+
+RATE_LIMIT_PER_MIN = _configured_rate_limit_per_min()
+
+
+def _load_api_keys() -> list[str]:
+    """Load configured Cohere keys without reading dotenv files."""
+    keys: list[str] = []
+    for variable in ("COHERE_API_KEY_1", "COHERE_API_KEY_2", "COHERE_API_KEY"):
+        value = os.environ.get(variable, "").strip()
+        if value and value not in keys:
+            keys.append(value)
+    return keys
 
 
 class _ProviderBreaker:
@@ -86,11 +105,14 @@ _quota_dead = threading.Event()
 
 def provider_status() -> dict[str, bool | int]:
     """Expose live-translation availability for run summaries."""
+    states = _get_provider_states()
     with _breaker._lock:
         return {
             "quota_dead": _quota_dead.is_set(),
             "breaker_open": _breaker._opened_at is not None,
             "consecutive_failures": _breaker._consecutive,
+            "configured_keys": len(states),
+            "terminal_keys": sum(state.terminal for state in states),
         }
 
 
@@ -106,9 +128,8 @@ _PROMPT = (
 )
 
 
-def _get_client():
-    """Lazily import cohere and instantiate the v2 client."""
-    api_key = os.environ.get("COHERE_API_KEY")
+def _get_client(api_key: str):
+    """Instantiate a Cohere client for one configured key."""
     if not api_key:
         return None
     try:
@@ -120,18 +141,6 @@ def _get_client():
         return cohere.ClientV2(api_key=api_key)
     except (AttributeError, TypeError):
         return cohere.Client(api_key)
-
-
-_client_lock = threading.Lock()
-_client = None
-
-
-def _client_singleton():
-    global _client
-    with _client_lock:
-        if _client is None:
-            _client = _get_client()
-    return _client
 
 
 class _RateLimiter:
@@ -159,7 +168,74 @@ class _RateLimiter:
             self.timestamps.append(time.monotonic())
 
 
-_limiter = _RateLimiter(RATE_LIMIT_PER_MIN)
+class _ProviderState:
+    def __init__(self, slot: str, api_key: str):
+        self.slot = slot
+        self.api_key = api_key
+        self.client = None
+        self.client_unavailable = False
+        self.terminal = False
+        self.failure_kind: str | None = None
+        self.lock = threading.Lock()
+        self.limiter = _RateLimiter(_configured_rate_limit_per_min())
+
+
+_provider_lock = threading.Lock()
+_provider_states: list[_ProviderState] | None = None
+_provider_keys: tuple[str, ...] | None = None
+
+
+def _reset_provider_state() -> None:
+    """Reset lazy provider state; useful for isolated process/test setup."""
+    global _provider_keys, _provider_states
+    with _provider_lock:
+        _provider_keys = None
+        _provider_states = None
+    _quota_dead.clear()
+    _breaker.record_success()
+
+
+def _get_provider_states() -> list[_ProviderState]:
+    global _provider_keys, _provider_states
+    keys = tuple(_load_api_keys())
+    with _provider_lock:
+        if _provider_states is None or _provider_keys != keys:
+            _provider_keys = keys
+            _provider_states = [
+                _ProviderState(str(index + 1), key)
+                for index, key in enumerate(keys)
+            ]
+            _quota_dead.clear()
+        return _provider_states
+
+
+def _client_for_provider(state: _ProviderState):
+    with state.lock:
+        if state.client_unavailable or state.terminal:
+            return None
+        if state.client is not None:
+            return state.client
+        try:
+            state.client = _get_client(state.api_key)
+        except Exception as error:
+            if _is_terminal_key_failure(error):
+                state.terminal = True
+                state.failure_kind = "quota_or_key"
+                logger.warning(
+                    "cohere key %s disabled: %s",
+                    state.slot,
+                    _safe_error_text(error),
+                )
+            else:
+                logger.warning(
+                    "cohere client initialization failed for key %s: %s",
+                    state.slot,
+                    _safe_error_text(error),
+                )
+            state.client_unavailable = True
+        if state.client is None:
+            state.client_unavailable = True
+        return state.client
 
 
 def _extract_text(content) -> str | None:
@@ -178,121 +254,163 @@ def _extract_text(content) -> str | None:
     return str(text).strip() if text else None
 
 
-def _classify_provider_failure(error: Exception) -> None:
-    """Flag terminal quota exhaustion so callers can stop trying.
-
-    Cohere returns 429 with two distinct bodies:
-    - "limited to 20 API calls / minute"  → transient, the rate limiter
-      paces us; no special handling needed.
-    - "limited to 1000 API calls / month" → terminal for the process:
-      waiting cannot help. Sets ``_quota_dead``.
-    """
-    text = str(error)
-    if "/ month" in text or "1000 API calls" in text:
-        if not _quota_dead.is_set():
-            logger.error(
-                "cohere monthly quota exhausted — live translation disabled "
-                "for the rest of this process (cache-only mode)"
-            )
-        _quota_dead.set()
+def _error_status(error: Exception) -> int | None:
+    status = getattr(error, "status_code", None)
+    return status if isinstance(status, int) else None
 
 
-def _call_cohere(model: str, text: str) -> str | None:
-    if _quota_dead.is_set() or not _breaker.allow():
-        return None
-    co = _client_singleton()
-    if co is None:
-        return None
-    _limiter.acquire()
-    try:
-        if hasattr(co, "chat_v2"):
-            response = co.chat_v2(
-                model=model,
-                messages=[{"role": "user", "content": f"{_PROMPT}\n\nName: {text}"}],
-                temperature=0,
-            )
-        else:
-            response = co.chat(
-                model=model,
-                messages=[{"role": "user", "content": f"{_PROMPT}\n\nName: {text}"}],
-                temperature=0,
-            )
-        text_out = _extract_text(response.message.content)
-        if text_out:
-            _breaker.record_success()
-        return text_out
-    except Exception as error:
-        logger.warning("cohere %s call failed: %s", model, error)
-        _classify_provider_failure(error)
-        _breaker.record_failure()
-        return None
+def _is_terminal_key_failure(error: Exception) -> bool:
+    text = str(error).lower()
+    status = _error_status(error)
+    if _is_rate_limit_failure(error):
+        return False
+    return status in {401, 402, 403, 498} or any(
+        phrase in text
+        for phrase in (
+            "1000 api calls",
+            "/ month",
+            "monthly quota",
+            "quota exceeded",
+            "quota exhausted",
+            "maximum billing",
+            "billing limit",
+            "billing quota",
+            "payment required",
+            "invalid api key",
+            "invalid api token",
+            "unauthorized",
+            "authentication failed",
+            "expired",
+        )
+    )
+
+
+def _is_rate_limit_failure(error: Exception) -> bool:
+    text = str(error).lower()
+    if any(
+        phrase in text
+        for phrase in (
+            "1000 api calls",
+            "/ month",
+            "monthly quota",
+            "quota exceeded",
+            "quota exhausted",
+            "billing limit",
+            "billing quota",
+        )
+    ):
+        return False
+    return any(
+        phrase in text
+        for phrase in ("per minute", "/ minute", "rate limit", "429")
+    )
+
+
+def _safe_error_text(error: Exception) -> str:
+    text = str(error).replace("\n", " ").strip()
+    for api_key in _load_api_keys():
+        text = text.replace(api_key, "<redacted>")
+    return text[:200] or error.__class__.__name__
+
+
+def _mark_provider_terminal(state: _ProviderState, error: Exception) -> None:
+    with state.lock:
+        state.terminal = True
+        state.failure_kind = "quota_or_key"
+    logger.warning(
+        "cohere key %s disabled: %s", state.slot, _safe_error_text(error)
+    )
+
+
+def _configured_model() -> str:
+    return (
+        os.environ.get("COHERE_TRANSLATION_MODEL", PRIMARY_MODEL).strip()
+        or PRIMARY_MODEL
+    )
+
+
+def _chat(client, model: str, prompt: str):
+    method = getattr(client, "chat_v2", None) or getattr(client, "chat", None)
+    if method is None:
+        raise AttributeError("Cohere client has no chat method")
+    return method(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+
+
+def _parse_batch_response(text: str | None, count: int) -> list[str | None]:
+    if not text:
+        return [None] * count
+    by_index: dict[int, str] = {}
+    for line in text.splitlines():
+        match = re.match(r"^\s*(\d+)\s*[.)-]\s*(.*?)\s*$", line)
+        if match and match.group(2):
+            index = int(match.group(1))
+            if 1 <= index <= count:
+                by_index[index] = match.group(2).strip()
+    return [by_index.get(index) for index in range(1, count + 1)]
 
 
 def _call_cohere_batch(model: str, texts: list[str]) -> list[str | None]:
-    """Translate up to ``len(texts)`` names in a single Cohere call.
-
-    Returns a list parallel to ``texts``; missing lines in the response
-    are returned as ``None`` so the caller can fall back to single
-    calls for just those names.
-    """
-    if _quota_dead.is_set() or not _breaker.allow():
+    """Translate one batch, failing over only on terminal key errors."""
+    if not texts:
+        return []
+    if not _breaker.allow():
         return [None] * len(texts)
-    co = _client_singleton()
-    if co is None or not texts:
+    states = _get_provider_states()
+    if not states:
         return [None] * len(texts)
-    _limiter.acquire()
-    numbered_lines = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts))
-    user_prompt = (
+    numbered_lines = "\n".join(
+        f"{i + 1}. {text}" for i, text in enumerate(texts)
+    )
+    prompt = (
         f"{_PROMPT}\n\n{numbered_lines}\n\n"
         f"Reply with exactly {len(texts)} lines in the format `<index>. <translation>`."
     )
-    try:
-        if hasattr(co, "chat_v2"):
-            response = co.chat_v2(
-                model=model,
-                messages=[{"role": "user", "content": user_prompt}],
-                temperature=0,
-            )
-        else:
-            response = co.chat(
-                model=model,
-                messages=[{"role": "user", "content": user_prompt}],
-                temperature=0,
-            )
-        text = _extract_text(response.message.content)
-        if text:
-            _breaker.record_success()
-    except Exception as error:
-        logger.warning("cohere %s batch failed: %s", model, error)
-        _classify_provider_failure(error)
-        _breaker.record_failure()
-        return [None] * len(texts)
-    if not text:
-        return [None] * len(texts)
-
-    by_index: dict[int, str] = {}
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line:
+    for state in states:
+        client = _client_for_provider(state)
+        if client is None:
             continue
-        head, _, rest = line.partition(".")
-        head = head.strip()
-        rest = rest.strip()
-        if not rest:
-            continue
-        if head.isdigit():
-            by_index[int(head)] = rest
-        elif head == "" and rest[:1].isdigit():
-            digits = ""
-            for ch in rest:
-                if ch.isdigit():
-                    digits += ch
-                else:
+        attempts = 0
+        while attempts < 2:
+            attempts += 1
+            state.limiter.acquire()
+            try:
+                response = _chat(client, model, prompt)
+                parsed = _parse_batch_response(
+                    _extract_text(response.message.content), len(texts)
+                )
+            except Exception as error:
+                logger.warning(
+                    "cohere batch failed for key %s: %s",
+                    state.slot,
+                    _safe_error_text(error),
+                )
+                if _is_terminal_key_failure(error):
+                    _mark_provider_terminal(state, error)
                     break
-            if digits:
-                by_index[int(digits)] = rest[len(digits):].lstrip(".) ").strip()
+                if _is_rate_limit_failure(error):
+                    if attempts == 1:
+                        time.sleep(1.0)
+                        continue
+                    # A per-minute limit is temporary for this key. Keep it
+                    # healthy and let the next batch try it again; do not
+                    # burn the other key as a quota failover.
+                    return [None] * len(texts)
+                _breaker.record_failure()
+                return [None] * len(texts)
+            _breaker.record_success()
+            return parsed
+    if states and all(state.terminal or state.client_unavailable for state in states):
+        _quota_dead.set()
+    return [None] * len(texts)
 
-    return [by_index.get(i + 1) for i in range(len(texts))]
+
+def _call_cohere(model: str, text: str) -> str | None:
+    results = _call_cohere_batch(model, [text])
+    return results[0] if results else None
 
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -345,12 +463,10 @@ def _lru_translate(name: str) -> str:
             pass
     if _quota_dead.is_set() or not _breaker.allow():
         return ""
-    primary = _call_cohere(PRIMARY_MODEL, cleaned)
-    if primary is None and not _quota_dead.is_set() and _breaker.allow():
-        primary = _call_cohere(FALLBACK_MODEL, cleaned)
+    primary = _call_cohere(_configured_model(), cleaned)
     if primary and cache is not None:
         try:
-            cache.put_many({cleaned: primary}, model=PRIMARY_MODEL)
+            cache.put_many({cleaned: primary}, model=_configured_model())
         except Exception:
             pass
     return primary or ""
@@ -405,6 +521,14 @@ def ar_to_en_cached_only(name: str) -> str:
         return ""
 
 
+class CachedTranslations(dict[str, str]):
+    """Cached translations carrying their source model without changing dict callers."""
+
+    def __init__(self, translations: dict[str, str], models: dict[str, str]) -> None:
+        super().__init__(translations)
+        self.models = models
+
+
 def ar_to_en_many_cached_only(names: list[str]) -> dict[str, str]:
     """Return cached translations for many names without contacting a provider."""
     original_to_clean: dict[str, str] = {}
@@ -418,63 +542,88 @@ def ar_to_en_many_cached_only(names: list[str]) -> dict[str, str]:
     if cache is None:
         return {}
     try:
-        cached = cache.get_many(list(set(original_to_clean.values())))
+        cached = cache.get_many_with_models(list(set(original_to_clean.values())))
+    except AttributeError:
+        cached = {
+            key: (translation, "")
+            for key, translation in cache.get_many(
+                list(set(original_to_clean.values()))
+            ).items()
+        }
     except Exception:
         return {}
-    return {
-        original: cached.get(normalize_key_for_lru(cleaned), "")
+    translations = {
+        original: cached.get(normalize_key_for_lru(cleaned), ("", ""))[0]
         for original, cleaned in original_to_clean.items()
-        if cached.get(normalize_key_for_lru(cleaned), "")
+        if cached.get(normalize_key_for_lru(cleaned), ("", ""))[0]
     }
+    models = {
+        original: cached.get(normalize_key_for_lru(cleaned), ("", ""))[1]
+        for original, cleaned in original_to_clean.items()
+        if cached.get(normalize_key_for_lru(cleaned), ("", ""))[0]
+    }
+    return CachedTranslations(translations, models)
 
 
-def ar_to_en_many(names: list[str]) -> dict[str, str]:
+def ar_to_en_many(
+    names: list[str], *, batch_size: int | None = None
+) -> dict[str, str]:
     """Translate many Arabic names, using the persistent cache and
     batched Cohere calls for the remainder.
 
     Returns a dict ``{raw_ar: en_text}``; missing entries are absent
     from the result.
     """
-    cleaned = [_clean(n) for n in names]
-    cleaned = [c for c in cleaned if c]
-    if not cleaned:
+    names_by_key: dict[str, list[str]] = {}
+    for name in names:
+        cleaned = _clean(name)
+        if cleaned:
+            key = normalize_key_for_lru(cleaned)
+            if key:
+                names_by_key.setdefault(key, []).append(cleaned)
+    if not names_by_key:
         return {}
     result: dict[str, str] = {}
     cache = _persistent()
     if cache is not None:
         try:
-            cached = cache.get_many(cleaned)
+            cached = cache.get_many(
+                [aliases[0] for aliases in names_by_key.values()]
+            )
         except Exception:
             cached = {}
     else:
         cached = {}
 
-    pending: list[str] = []
-    for raw in cleaned:
-        if raw in cached:
-            result[raw] = cached[raw]
+    pending: list[tuple[str, list[str]]] = []
+    for key, aliases in names_by_key.items():
+        cached_translation = cached.get(key)
+        if cached_translation:
+            for alias in aliases:
+                result[alias] = cached_translation
         else:
-            pending.append(raw)
+            pending.append((key, aliases))
 
     if pending:
-        BATCH_SIZE = int(os.environ.get("COHERE_BATCH_SIZE", "50"))
-        for i in range(0, len(pending), BATCH_SIZE):
-            chunk = pending[i : i + BATCH_SIZE]
-            batched = _call_cohere_batch(PRIMARY_MODEL, chunk)
-            for raw, en in zip(chunk, batched):
-                if en is None:
-                    en = (
-                        _call_cohere(FALLBACK_MODEL, raw)
-                        if not _quota_dead.is_set() and _breaker.allow()
-                        else None
-                    )
-                result[raw] = en or ""
+        if batch_size is None:
+            try:
+                batch_size = int(os.environ.get("COHERE_BATCH_SIZE", "50"))
+            except ValueError:
+                batch_size = MAX_BATCH_SIZE
+        batch_size = min(max(batch_size, 1), MAX_BATCH_SIZE)
+        for i in range(0, len(pending), batch_size):
+            chunk = pending[i : i + batch_size]
+            chunk_names = [aliases[0] for _, aliases in chunk]
+            batched = _call_cohere_batch(_configured_model(), chunk_names)
+            cache_entries: dict[str, str] = {}
+            for (_, aliases), en in zip(chunk, batched):
+                for alias in aliases:
+                    result[alias] = en or ""
+                if en:
+                    cache_entries[aliases[0]] = en
             if cache is not None:
                 try:
-                    cache.put_many(
-                        {raw: en for raw, en in zip(chunk, batched) if en},
-                        model=PRIMARY_MODEL,
-                    )
+                    cache.put_many(cache_entries, model=_configured_model())
                 except Exception:
                     pass
     return result

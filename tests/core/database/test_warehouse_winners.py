@@ -38,6 +38,14 @@ def test_stable_ties_and_currency_aliases():
     assert select_warehouse_winner(rows) == (None, "mixed_currencies")
 
 
+def test_excel_ties_do_not_use_tawreed_preference_names():
+    rows = [
+        offer(PREFERRED_WAREHOUSES[0], source="excel_target"),
+        offer("A.xlsx", source="excel_target"),
+    ]
+    assert select_warehouse_winner(rows)[0]["store_name"] == "A.xlsx"
+
+
 @pytest.mark.parametrize("price", [None, 0, -1, float("nan"), float("inf"), "bad"])
 def test_invalid_prices(price):
     assert select_warehouse_winner([offer(price=price)])[0] is None
@@ -132,3 +140,19 @@ def test_mixed_currency_exclusion_is_persisted(store):
         conn.commit()
     assert fetch_run_warehouse_winners("test/one", store.path) == []
     assert fetch_run_warehouse_exclusions("test/one", store.path)[0]["selection_reason"] == "mixed_currencies"
+
+
+def test_excel_owner_retry_removes_old_catalog_offer_but_keeps_other_target(store):
+    persist(store, "excel-target:target-a@old.xlsx", 6, "excel_target")
+    persist(store, "excel-target:target-b@other.xlsx", 8, "excel_target")
+    store.upsert_run_item(
+        "test/one", {"item_code": "001", "item_name": "Drug", "item_qty": 10},
+        source_kind="excel-target", source_label="target-a",
+        stores=[], store_selections=[], store_source="excel_target",
+        store_source_owner="target-a",
+    )
+    offers = store.db.execute_query(
+        "select source_label from run_item_stores order by source_label"
+    )
+    assert offers == [("target-b@other.xlsx",)]
+    assert fetch_run_warehouse_winners("test/one", store.path)[0]["purchase_price"] == 8

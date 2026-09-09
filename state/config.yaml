@@ -68,6 +68,14 @@ matching:
   reject_extra_brand_token: false
   enable_bilingual_secondary_match: true
   bilingual_min_score: 0.75
+  excel_target_review_candidates_enabled: true
+  excel_target_review_candidate_limit: 5
+  excel_target_review_fuzzy_strong_score: 90.0
+  excel_target_review_fuzzy_strong_margin: 8.0
+  excel_target_review_fuzzy_medium_score: 86.0
+  excel_target_review_fuzzy_medium_margin: 12.0
+  excel_target_review_ambiguous_score: 88.0
+  excel_target_review_ambiguous_margin: 8.0
 runtime:
   headless: true
   slow_mo_ms: 0

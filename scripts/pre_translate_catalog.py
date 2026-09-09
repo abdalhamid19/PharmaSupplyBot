@@ -2,14 +2,14 @@
 
 Reads a single Excel file, pulls the product-name column, dedupes the
 values, and translates everything that isn't already in the
-persistent cache using Cohere's batch endpoint (100 names per call).
+persistent cache using Cohere's batch endpoint (50 names per call).
 
 Usage::
 
     python scripts/pre_translate_catalog.py ^
         --excel "data/input/excel target/البركة شركات.xlsx" ^
         --name-col الصنف ^
-        --batch-size 100
+        --batch-size 50
 
 The script is idempotent: re-running it is cheap because the cache
 short-circuits already-translated names. It also supports
@@ -19,17 +19,25 @@ hitting the network.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(REPO_ROOT / ".env", override=False)
 sys.path.insert(0, str(REPO_ROOT))
 
 import pandas as pd  # noqa: E402
 
-from src.core.database.translation_cache import TranslationCache  # noqa: E402
+from src.core.database.translation_cache import (  # noqa: E402
+    TranslationCache,
+    normalize_key,
+)
 from src.core.normalization.translation import (  # noqa: E402
+    MAX_BATCH_SIZE,
     RATE_LIMIT_PER_MIN,
     ar_to_en_many,
 )
@@ -63,8 +71,8 @@ def main() -> None:
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=int(__import__("os").environ.get("COHERE_BATCH_SIZE", "100")),
-        help="How many names to send per Cohere call (default: 100)",
+        default=int(os.environ.get("COHERE_BATCH_SIZE", "50")),
+        help="How many names to send per Cohere call (maximum: 50)",
     )
     parser.add_argument(
         "--dry-run",
@@ -82,7 +90,7 @@ def main() -> None:
 
     cache = TranslationCache()
     cached = cache.get_many(names)
-    pending = [n for n in names if n not in cached]
+    pending = [n for n in names if normalize_key(n) not in cached]
     print(f"already cached: {len(cached)}")
     print(f"to translate: {len(pending)}")
 
@@ -90,7 +98,7 @@ def main() -> None:
         print("nothing to do; cache hit 100%")
         return
 
-    batch_size = max(1, args.batch_size)
+    batch_size = min(max(1, args.batch_size), MAX_BATCH_SIZE)
     n_calls = (len(pending) + batch_size - 1) // batch_size
     est_seconds = n_calls * 60.0 / max(1, RATE_LIMIT_PER_MIN)
     print(
@@ -102,7 +110,7 @@ def main() -> None:
         return
 
     started = time.monotonic()
-    translated = ar_to_en_many(pending)
+    translated = ar_to_en_many(pending, batch_size=batch_size)
     elapsed = time.monotonic() - started
     print(
         f"translated: {len(translated)} in {elapsed:.1f}s "

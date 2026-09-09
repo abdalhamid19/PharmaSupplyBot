@@ -25,14 +25,14 @@ Such handlers silently hide failures from the operator.
 
 | File:Line | Function | Snippet |
 |-----------|----------|---------|
-| `src\core\database\order_runs_store.py:81` | `_read_schema_version` | `except Exception:` |
-| `src\core\normalization\translation.py:368` | `normalize_key_for_lru` | `except Exception:` |
-| `src\core\normalization\translation.py:404` | `ar_to_en_cached_only` | `except Exception:` |
-| `src\core\normalization\translation.py:418` | `ar_to_en_many_cached_only` | `except Exception:` |
-| `src\core\normalization\translation.py:344` | `_lru_translate` | `except Exception:` |
-| `src\core\normalization\translation.py:354` | `_lru_translate` | `except Exception:` |
-| `src\core\normalization\translation.py:443` | `ar_to_en_many` | `except Exception:` |
-| `src\core\normalization\translation.py:474` | `ar_to_en_many` | `except Exception:` |
+| `src\core\database\order_runs_store.py:86` | `_read_schema_version` | `except Exception:` |
+| `src\core\normalization\translation.py:480` | `normalize_key_for_lru` | `except Exception:` |
+| `src\core\normalization\translation.py:516` | `ar_to_en_cached_only` | `except Exception:` |
+| `src\core\normalization\translation.py:534` | `ar_to_en_many_cached_only` | `except Exception:` |
+| `src\core\normalization\translation.py:458` | `_lru_translate` | `except Exception:` |
+| `src\core\normalization\translation.py:466` | `_lru_translate` | `except Exception:` |
+| `src\core\normalization\translation.py:566` | `ar_to_en_many` | `except Exception:` |
+| `src\core\normalization\translation.py:599` | `ar_to_en_many` | `except Exception:` |
 | `src\ui\order\streamlit_order_command.py:157` | `_configured_profiles` | `except Exception:` |
 | `src\ui\order\streamlit_order_command.py:161` | `_configured_profiles` | `except Exception:` |
 

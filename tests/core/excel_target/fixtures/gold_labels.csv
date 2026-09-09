@@ -1,0 +1,7 @@
+item_code,item_name,target_key,expected_category,expected_store_product_id
+gold-1,EXACT VERIFIED,baraka,identity_compatible,exact-1
+gold-2,SAME BRAND DIFFERENT CONCENTRATION,baraka,excel_target_candidate_available,
+gold-3,SAME BRAND DIFFERENT FORM,baraka,excel_target_candidate_available,
+gold-4,SAME BRAND DIFFERENT PACK,baraka,excel_target_candidate_available,
+gold-5,UNRELATED BRAND,baraka,identity_absent,
+gold-6,AMBIGUOUS TWO VARIANT BRAND,baraka,excel_target_candidate_available,

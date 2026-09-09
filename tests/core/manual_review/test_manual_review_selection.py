@@ -71,6 +71,43 @@ class ManualReviewSelectionTests(unittest.TestCase):
         
         self.assertIsNone(decision)
 
+    def test_approved_match_carries_scoped_excel_variant_override_metadata(self) -> None:
+        option = ReviewCandidateOption(
+            store_product_id="baraka-17",
+            name_en="INODEP SYRUP 100 ML",
+            name_ar="اينوديب شراب 100 مل",
+            supplier="excel-target:baraka",
+            available_quantity=1,
+            price=10.0,
+            score=91.5,
+            rejection_reason="form conflict",
+            orderable=True,
+            matching_source="excel-target",
+            matching_source_label="baraka@baraka.xlsx",
+            target_key="baraka",
+            source_file="baraka.xlsx",
+            identity_evidence_kind="review_fuzzy",
+            candidate_method="english_fuzzy",
+            review_status="variant_conflict",
+            excel_target_key="baraka",
+            excel_target_source_file="baraka.xlsx",
+            excel_target_row_key="row-key-17",
+            excel_target_source_row=17,
+        )
+
+        decision = decision_from_selection(
+            self.item, option, not_matching=False, free_text_query="", run_id=self.run_id
+        )
+
+        self.assertEqual(decision.manual_decision, "approved_match")
+        self.assertTrue(decision.approved)
+        self.assertEqual(decision.excel_target_key, "baraka")
+        self.assertEqual(decision.excel_target_source_file, "baraka.xlsx")
+        self.assertEqual(decision.excel_target_row_key, "row-key-17")
+        self.assertEqual(decision.excel_target_source_row, 17)
+        self.assertEqual(decision.candidate_method, "english_fuzzy")
+        self.assertEqual(decision.review_status, "variant_conflict")
+
 
 if __name__ == "__main__":
     unittest.main()

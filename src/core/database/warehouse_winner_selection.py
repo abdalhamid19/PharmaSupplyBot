@@ -39,18 +39,23 @@ def currency_code(value: str) -> str:
 
 def _priority(row: dict[str, Any]) -> tuple:
     name = warehouse_display_name(row)
-    preferred = [normalized_name(value) for value in PREFERRED_WAREHOUSES]
-    normalized = normalized_name(name)
-    rank = preferred.index(normalized) if normalized in preferred else len(preferred)
+    kind = source_kind(row.get("source", ""))
+    rank = _warehouse_rank(name) if kind == "tawreed" else 0
     return (
-        0 if source_kind(row.get("source", "")) == "excel-target" else 1,
+        0 if kind == "excel-target" else 1,
         rank, name.casefold(), row["store_key"], row["store_product_id"],
     )
 
 
+def _warehouse_rank(name: str) -> int:
+    preferred = [normalized_name(value) for value in PREFERRED_WAREHOUSES]
+    normalized = normalized_name(name)
+    return preferred.index(normalized) if normalized in preferred else len(preferred)
+
+
 def warehouse_display_name(row: dict[str, Any]) -> str:
     """Show the catalog filename while retaining its full identity elsewhere."""
-    name = row.get("store_name") or row.get("source_label") or ""
+    name = row.get("store_name") or row.get("source_label") or row.get("store_key") or ""
     if source_kind(row.get("source", "")) == "excel-target":
         return name.split("@", 1)[-1].removeprefix("excel-target:")
     return name

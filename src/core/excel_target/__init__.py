@@ -17,6 +17,12 @@ from .coverage import CoverageRecord, build_coverage_records
 from .excel_target_review_candidates import (
     ExcelTargetReviewCandidate,
     build_review_candidates,
+    excel_target_row_key,
+)
+from .excel_target_review_discovery import (
+    ExcelTargetReviewDiscoveryIndex,
+    ReviewDiscoveryConfig,
+    ReviewDiscoveryHit,
 )
 
 __all__ = [
@@ -33,4 +39,8 @@ __all__ = [
     "build_coverage_records",
     "ExcelTargetReviewCandidate",
     "build_review_candidates",
+    "excel_target_row_key",
+    "ExcelTargetReviewDiscoveryIndex",
+    "ReviewDiscoveryConfig",
+    "ReviewDiscoveryHit",
 ]

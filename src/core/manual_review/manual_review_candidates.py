@@ -47,6 +47,12 @@ class ReviewCandidateOption:
     # Keep the explicit Excel names as persisted aliases for older callers.
     excel_target_key: str = ""
     excel_target_source_file: str = ""
+    candidate_method: str = ""
+    score_margin: float = 0.0
+    shared_brand_tokens: tuple[str, ...] = ()
+    review_status: str = ""
+    excel_target_row_key: str = ""
+    excel_target_source_row: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         """Return dict representation."""
@@ -68,6 +74,26 @@ class ReviewCandidateOption:
             payload["excel_target_key"] = payload.get("target_key", "")
         if not payload.get("excel_target_source_file"):
             payload["excel_target_source_file"] = payload.get("source_file", "")
+        if not payload.get("excel_target_row_key"):
+            payload["excel_target_row_key"] = payload.get("target_row_key", "")
+        if not payload.get("excel_target_source_row"):
+            payload["excel_target_source_row"] = payload.get("source_row_number", 0)
+        if not payload.get("review_status"):
+            payload["review_status"] = payload.get("compatibility_status", "")
+        if "shared_brand_tokens" in payload:
+            payload["shared_brand_tokens"] = _coerce_tokens(
+                payload["shared_brand_tokens"]
+            )
+        try:
+            payload["score_margin"] = float(payload.get("score_margin", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            payload["score_margin"] = 0.0
+        try:
+            payload["excel_target_source_row"] = int(
+                payload.get("excel_target_source_row", 0) or 0
+            )
+        except (TypeError, ValueError):
+            payload["excel_target_source_row"] = 0
         field_names = {field.name for field in dataclasses.fields(cls)}
         return cls(**{key: value for key, value in payload.items() if key in field_names})
 
@@ -144,3 +170,14 @@ def _parse_float(val: Any) -> float:
         return float(val)
     except (ValueError, TypeError):
         return 0.0
+
+
+def _coerce_tokens(value: object) -> tuple[str, ...]:
+    """Normalize persisted token metadata without breaking old JSON artifacts."""
+    if isinstance(value, str):
+        values = value.split(",")
+    elif isinstance(value, (list, tuple, set)):
+        values = value
+    else:
+        return ()
+    return tuple(str(token).strip() for token in values if str(token).strip())

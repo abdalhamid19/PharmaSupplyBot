@@ -19,6 +19,9 @@ from src.core.matching_types import DecisionSource, MatchDecision, SearchMatch
 from src.core.matching.candidate_identity import candidate_store_product_id
 from src.core.manual_review.manual_review_runtime import saved_manual_review_decision
 from src.core.manual_review.manual_review_store import ManualReviewStore
+from src.core.manual_review.manual_review_store_helpers import (
+    is_scoped_excel_target_approval,
+)
 from src.core.utils.excel import Item
 
 from .excel_target_identity import (
@@ -33,6 +36,11 @@ from .product_attributes import CompatibilityResult, validate_product_compatibil
 from .excel_target_review_candidates import (
     ExcelTargetReviewCandidate,
     build_review_candidates,
+    excel_target_row_key,
+)
+from .excel_target_review_discovery import (
+    ExcelTargetReviewDiscoveryIndex,
+    ReviewDiscoveryConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,15 +57,23 @@ class ExcelTargetMatch:
 
 
 class ExcelTargetMatcher:
-    """Reusable, offline matcher for one loaded target catalog."""
+    """Reusable matcher whose optional live translation runs only at index build."""
 
-    def __init__(self, target_key: str, catalog: Sequence[TargetProduct]) -> None:
+    def __init__(
+        self,
+        target_key: str,
+        catalog: Sequence[TargetProduct],
+        *,
+        allow_live_translation: bool = False,
+    ) -> None:
         self.target_key = target_key
         self.catalog = tuple(catalog)
-        self.identity_index = ExcelTargetBilingualIndex.build(self.catalog)
-        self._catalog_by_id = {
-            product.store_product_id: product for product in self.catalog
-        }
+        self.identity_index = ExcelTargetBilingualIndex.build(
+            self.catalog,
+            allow_live_translation=allow_live_translation,
+        )
+        self.review_discovery = ExcelTargetReviewDiscoveryIndex.build(self.catalog)
+        self._catalog_by_id = _catalog_products_by_id(self.catalog)
         self._native_english_candidate_templates = tuple(
             product.to_candidate_dict()
             for product in self.catalog
@@ -85,12 +101,17 @@ class ExcelTargetMatcher:
             if decision.best_match is None:
                 reason = rejected[0] if rejected else "Arabic-only candidate lacks verified brand identity"
                 decision = MatchDecision(None, decision.diagnostics, reason)
+        discovery_hits = self.review_discovery.discover(
+            item,
+            config=_review_discovery_config(config),
+        )
         review_candidates = build_review_candidates(
             item,
             self.target_key,
             self.catalog,
             identified=identified,
             diagnostics=decision.diagnostics,
+            discovery_hits=discovery_hits,
             catalog_by_id=self._catalog_by_id,
         )
         return ExcelTargetMatch(
@@ -111,19 +132,35 @@ def find_best_match_in_target(
     target_key: str,
     catalog: list[TargetProduct],
     matching_config: MatchingConfig,
+    *,
+    allow_live_translation: bool = False,
 ) -> ExcelTargetMatch:
     """Compatibility wrapper; batch callers must reuse :class:`ExcelTargetMatcher`."""
-    return ExcelTargetMatcher(target_key, catalog).match(item, matching_config)
+    return ExcelTargetMatcher(
+        target_key,
+        catalog,
+        allow_live_translation=allow_live_translation,
+    ).match(item, matching_config)
 
 
 def match_item_against_all_targets(
     item: Item,
     app_config: AppConfig,
     catalogs: dict[str, list[TargetProduct]],
+    *,
+    allow_live_translation: bool = False,
 ) -> dict[str, ExcelTargetMatch]:
-    return {
-        target_key: ExcelTargetMatcher(target_key, catalog).match(item, app_config.matching)
+    matchers = {
+        target_key: ExcelTargetMatcher(
+            target_key,
+            catalog,
+            allow_live_translation=allow_live_translation,
+        )
         for target_key, catalog in catalogs.items()
+    }
+    return {
+        target_key: matcher.match(item, app_config.matching)
+        for target_key, matcher in matchers.items()
     }
 
 
@@ -142,6 +179,9 @@ def _compatible_identified(
     accepted: list[tuple[IdentifiedTarget, CompatibilityResult]] = []
     rejected: list[str] = []
     for candidate in identified:
+        if candidate.evidence.kind == "cohere_translation":
+            rejected.append("Cohere identity requires manual review under safe policy")
+            continue
         compatibility = validate_product_compatibility(item.name, candidate.product.name_ar)
         if compatibility.accepted:
             accepted.append((candidate, compatibility))
@@ -166,6 +206,9 @@ def _scoped_manual_review(
         return MatchDecision(None, [], f"Saved {decision.manual_decision} requires manual review")
     if not decision.approved:
         return MatchDecision(None, [], "Saved decision is not approved")
+
+    if decision.excel_target_row_key:
+        return _scoped_row_approval(item, target_key, catalog, decision)
 
     compatible: list[TargetProduct] = []
     rejected: list[str] = []
@@ -209,7 +252,94 @@ def _scoped_manual_review(
     return replace(rebound, source=DecisionSource.MANUAL_REVIEW_SAVED)
 
 
-def _record_manual_rebind(decision, target_key: str, product: TargetProduct) -> None:
+def _scoped_row_approval(
+    item: Item,
+    target_key: str,
+    catalog: Sequence[TargetProduct],
+    decision,
+) -> MatchDecision | None:
+    """Apply a human approval to exactly one saved Excel target row.
+
+    A scoped approval is the only path allowed to override a variant conflict.
+    The row key includes target, source file, row number, code, and name, so a
+    changed or duplicated workbook row cannot inherit an old approval.
+    """
+    matches = [
+        product
+        for product in catalog
+        if excel_target_row_key(target_key, product) == decision.excel_target_row_key
+    ]
+    if len(matches) != 1:
+        reason = (
+            "Saved approved Excel row is ambiguous in current Excel file"
+            if len(matches) > 1
+            else "Saved approved Excel row is absent from current Excel file"
+        )
+        _record_manual_rebind_failure(decision, target_key, catalog, reason)
+        return None
+
+    product = matches[0]
+    if not is_scoped_excel_target_approval(
+        decision,
+        target_key=target_key,
+        source_file=product.source_file,
+        source_row=product.source_row_number,
+        row_key=decision.excel_target_row_key,
+    ):
+        reason = "Saved approved Excel row scope does not match current target row"
+        _record_manual_rebind_failure(decision, target_key, catalog, reason)
+        return None
+    if (
+        decision.correct_store_product_id
+        and decision.correct_store_product_id != product.store_product_id
+    ):
+        reason = "Saved approved Excel row product id changed"
+        _record_manual_rebind_failure(decision, target_key, catalog, reason)
+        return None
+
+    compatibility = validate_product_compatibility(item.name, product.name_ar)
+    identified = IdentifiedTarget(
+        product,
+        IdentityEvidence(
+            "manual_review_rebound",
+            normalize_english_brand(product.trusted_name_en)
+            or normalize_arabic_brand(product.name_ar),
+            "saved approved_match rebound to exact Excel target row",
+            1.0,
+        ),
+    )
+    _record_manual_rebind(
+        decision,
+        target_key,
+        product,
+        rebind_status="approved_manual_override",
+    )
+    rebound = _identity_decision(item, identified, time.perf_counter())
+    if rebound.best_match is not None:
+        rebound.best_match.data.update(
+            {
+                "compatibility_status": "approved_manual_override",
+                "compatibility_rejection": compatibility.rejection_reason,
+                "manual_override": True,
+            }
+        )
+    return replace(
+        rebound,
+        source=DecisionSource.MANUAL_REVIEW_SAVED,
+        final_reason=(
+            "Excel-target approved_manual_override: saved approved_match "
+            "rebound to exact target row"
+        ),
+    )
+
+
+def _record_manual_rebind(
+    decision,
+    target_key: str,
+    product: TargetProduct,
+    *,
+    rebind_status: str = "compatible_rebound",
+) -> None:
     """Update current catalog metadata while retaining the logical approval."""
     try:
         ManualReviewStore().upsert(
@@ -224,7 +354,9 @@ def _record_manual_rebind(decision, target_key: str, product: TargetProduct) -> 
                 matching_source_label=(
                     f"{target_key}@{product.source_file}" if product.source_file else target_key
                 ),
-                last_rebind_status="compatible_rebound",
+                excel_target_row_key=excel_target_row_key(target_key, product),
+                excel_target_source_row=int(product.source_row_number or 0),
+                last_rebind_status=rebind_status,
             )
         )
     except Exception:
@@ -257,6 +389,8 @@ def _record_manual_rebind_failure(
 def _identity_decision(item: Item, identified: IdentifiedTarget, started: float) -> MatchDecision:
     product = identified.product
     evidence = identified.evidence
+    if evidence.kind == "review_fuzzy":
+        raise ValueError("review_fuzzy evidence cannot produce an automatic match")
     data = product.to_candidate_dict()
     data.update(
         {
@@ -301,6 +435,42 @@ def _copy_candidate_template(template: dict[str, Any]) -> dict[str, Any]:
     candidate = dict(template)
     candidate["excelTargetRaw"] = dict(template["excelTargetRaw"])
     return candidate
+
+
+def _catalog_products_by_id(
+    catalog: Sequence[TargetProduct],
+) -> dict[str, tuple[TargetProduct, ...]]:
+    products_by_id: dict[str, list[TargetProduct]] = {}
+    for product in catalog:
+        product_id = product.store_product_id
+        products_by_id.setdefault(product_id, []).append(product)
+    return {key: tuple(value) for key, value in products_by_id.items()}
+
+
+def _review_discovery_config(config: MatchingConfig) -> ReviewDiscoveryConfig:
+    """Translate app matching settings into the review-only discovery contract."""
+    return ReviewDiscoveryConfig(
+        enabled=bool(getattr(config, "excel_target_review_candidates_enabled", True)),
+        limit=int(getattr(config, "excel_target_review_candidate_limit", 5)),
+        strong_score=float(
+            getattr(config, "excel_target_review_fuzzy_strong_score", 90.0)
+        ),
+        strong_margin=float(
+            getattr(config, "excel_target_review_fuzzy_strong_margin", 8.0)
+        ),
+        medium_score=float(
+            getattr(config, "excel_target_review_fuzzy_medium_score", 86.0)
+        ),
+        medium_margin=float(
+            getattr(config, "excel_target_review_fuzzy_medium_margin", 12.0)
+        ),
+        ambiguous_score=float(
+            getattr(config, "excel_target_review_ambiguous_score", 88.0)
+        ),
+        ambiguous_margin=float(
+            getattr(config, "excel_target_review_ambiguous_margin", 8.0)
+        ),
+    )
 
 
 def _empty_match(target_key: str) -> ExcelTargetMatch:

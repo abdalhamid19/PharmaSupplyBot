@@ -12,6 +12,7 @@ from unittest.mock import patch
 from src.cli.commands.cli_order_excel_target import (
     load_target_catalogs,
     run_excel_target_match_only,
+    run_excel_target_match_only_multi,
     selected_excel_target_configs,
 )
 from src.core.config.config import load_config
@@ -222,7 +223,7 @@ excel_targets:
             with summary_path.open(newline="", encoding="utf-8") as fh:
                 row = next(csv.DictReader(fh))
         self.assertEqual(row["status"], "no-results")
-        self.assertEqual(row["identity_evidence_kind"], "dictionary")
+        self.assertEqual(row["identity_evidence_kind"], "tawreed_catalog")
         self.assertEqual(row["compatibility_status"], "rejected")
         self.assertIn("form", row["compatibility_rejection"])
 
@@ -269,6 +270,23 @@ excel_targets:
         finally:
             if alt_path.exists():
                 alt_path.unlink()
+
+    def test_multi_target_match_only_allows_live_translation_at_index_build(self) -> None:
+        selected = [("alnasr", [ALNASR_PATH])]
+        catalogs = {"alnasr": [TargetProduct("1", "ALNASR ITEM", 1.0, 0.0)]}
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
+            "src.cli.commands.cli_order_excel_target.run_excel_target_match_only",
+            return_value={"processed": 0, "matched": 0, "flagged": 0},
+        ) as run_target:
+            run_excel_target_match_only_multi(
+                self.app_config,
+                selected,
+                catalogs,
+                [Item("1", "ALNASR ITEM", 1)],
+                Path(temp_dir) / "summary.csv",
+            )
+
+        assert run_target.call_args.kwargs["allow_live_translation"] is True
 
 
 if __name__ == "__main__":

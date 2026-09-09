@@ -10,6 +10,8 @@ from src.core.excel_target import (
     ExcelTargetMatcher,
     TargetProduct,
 )
+from src.core.excel_target.excel_target_identity import IdentityEvidence
+from src.core.excel_target.excel_target_review_candidates import excel_target_row_key
 from src.core.excel_target.product_attributes import validate_product_compatibility
 from src.core.utils.excel import Item
 
@@ -93,6 +95,69 @@ class ExcelTargetReviewCandidateTests(TestCase):
         self.assertEqual(data["source_file"], "baraka.xlsx")
         self.assertEqual(data["compatibility_status"], "compatible")
         self.assertNotIn("tawreed", str(data).lower())
+
+    def test_review_candidate_persists_fuzzy_provenance_and_stable_row_identity(self) -> None:
+        product = TargetProduct(
+            "inodep-17",
+            "INODEP SYRUP 100 ML",
+            42.0,
+            5.0,
+            source_file="Baraka\\catalog.xlsx",
+            source_row_number=17,
+        )
+        candidate = ExcelTargetReviewCandidate(
+            target_key="baraka",
+            product=product,
+            score=91.5,
+            compatibility=validate_product_compatibility(
+                "INODEP CAPSULES 30", product.name_ar
+            ),
+            identity_evidence=IdentityEvidence(
+                "review_fuzzy",
+                "INODEP",
+                "english fuzzy candidate",
+                0.915,
+            ),
+            rejection_reason="form: TABLET vs SYRUP",
+            candidate_method="english_fuzzy",
+            score_margin=8.5,
+            shared_brand_tokens=("INODEP",),
+        )
+
+        data = candidate.to_review_candidate_dict()
+
+        self.assertEqual(data["identity_evidence_kind"], "review_fuzzy")
+        self.assertEqual(data["candidate_method"], "english_fuzzy")
+        self.assertEqual(data["score_margin"], 8.5)
+        self.assertEqual(data["shared_brand_tokens"], ("INODEP",))
+        self.assertEqual(data["review_status"], "variant_conflict")
+        self.assertEqual(data["excel_target_source_row"], 17)
+        self.assertEqual(
+            data["excel_target_row_key"], excel_target_row_key("baraka", product)
+        )
+
+    def test_stable_row_key_distinguishes_duplicate_codes_and_rows(self) -> None:
+        first = TargetProduct(
+            "duplicate",
+            "INODEP 20 CAPS",
+            1.0,
+            0.0,
+            source_file="baraka.xlsx",
+            source_row_number=17,
+        )
+        second = TargetProduct(
+            "duplicate",
+            "INODEP 30 CAPS",
+            1.0,
+            0.0,
+            source_file="baraka.xlsx",
+            source_row_number=18,
+        )
+
+        self.assertNotEqual(
+            excel_target_row_key("baraka", first),
+            excel_target_row_key("baraka", second),
+        )
 
 
 if __name__ == "__main__":

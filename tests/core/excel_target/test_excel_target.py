@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 from src.core.config.config_models import (
     ExcelTargetConfig,
@@ -17,6 +18,7 @@ from src.core.excel_target import (
     load_target_catalog_from_excel,
     match_item_against_all_targets,
 )
+from src.core.excel_target.excel_target_identity import ExcelTargetBilingualIndex
 from src.core.utils.excel import Item
 
 
@@ -278,3 +280,291 @@ class TestBilingualOfflineEvidence(TestCase):
             match = find_best_match_in_target(item, "test", catalog, cfg)
             self.assertIsNotNone(match)
             self.assertIsNone(match.decision.best_match)
+
+
+class TestExcelTargetIdentityTranslationFallback(TestCase):
+    def test_dictionary_identity_precedes_live_translation(self) -> None:
+        arabic_name = "براند قاموسي 30 كبسول"
+        catalog = [TargetProduct("dictionary-row", arabic_name, 50.0, 0.0)]
+
+        with (
+            patch(
+                "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+                return_value={"rows": []},
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.load_dictionary",
+                return_value={
+                    "by_en": {
+                        "DICTIONARYBRAND": [
+                            {"ar": "براند قاموسي", "en": "DICTIONARYBRAND"}
+                        ]
+                    }
+                },
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.lookup_en",
+                return_value=[{"ar": "براند قاموسي", "en": "DICTIONARYBRAND"}],
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+                return_value={},
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many",
+                return_value={arabic_name: "DICTIONARYBRAND 30 CAPSULES"},
+            ) as live_translation,
+        ):
+            index = ExcelTargetBilingualIndex.build(
+                catalog,
+                allow_live_translation=True,
+            )
+
+        live_translation.assert_not_called()
+        identified = index.identify("DICTIONARYBRAND CAPSULES 30")
+        self.assertEqual(len(identified), 1)
+        self.assertEqual(identified[0].evidence.kind, "dictionary")
+
+    def test_tawreed_identity_precedes_live_translation(self) -> None:
+        arabic_name = "اينوديب 30 كبسول"
+        catalog = [TargetProduct("tawreed-row", arabic_name, 50.0, 0.0)]
+
+        with (
+            patch(
+                "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+                return_value={
+                    "rows": [{"ar": arabic_name, "en": "INODEP 30 CAPS"}]
+                },
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+                return_value={},
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many",
+                return_value={arabic_name: "INODEP 30 CAPSULES"},
+            ) as live_translation,
+        ):
+            index = ExcelTargetBilingualIndex.build(
+                catalog,
+                allow_live_translation=True,
+            )
+
+        live_translation.assert_not_called()
+        identified = index.identify("INODEP CAPSULES 30")
+        self.assertEqual(len(identified), 1)
+        self.assertEqual(identified[0].evidence.kind, "tawreed_catalog")
+
+    def test_index_can_disable_live_translation_deterministically(self) -> None:
+        arabic_name = "اسم عربي غير مخزن"
+        catalog = [TargetProduct("offline-row", arabic_name, 50.0, 0.0)]
+
+        with (
+            patch(
+                "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+                return_value={"rows": []},
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+                return_value={},
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many",
+            ) as live_translation,
+        ):
+            index = ExcelTargetBilingualIndex.build(
+                catalog,
+                allow_live_translation=False,
+            )
+
+        live_translation.assert_not_called()
+        self.assertEqual(index.identify("UNKNOWN BRAND"), ())
+
+    def test_index_uses_stable_batch_translation_api_for_unresolved_names(self) -> None:
+        arabic_name = "براند غير معروف 30 كبسول"
+        catalog = [
+            TargetProduct(
+                code="cohere-row",
+                name=arabic_name,
+                price=50.0,
+                discount_percent=0.0,
+            )
+        ]
+
+        with (
+            patch(
+                "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+                return_value={"rows": []},
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.lookup_en",
+                return_value=[],
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+                return_value={},
+            ),
+            patch(
+                "src.core.excel_target.excel_target_identity.ar_to_en_many",
+                return_value={arabic_name: "MYSTERYBRAND 30 CAPSULES"},
+            ) as live_translation,
+        ):
+            index = ExcelTargetBilingualIndex.build(
+                catalog,
+                allow_live_translation=True,
+            )
+
+        live_translation.assert_called_once_with([arabic_name])
+        identified = index.identify("MYSTERYBRAND CAPSULES 30")
+        self.assertEqual(len(identified), 1)
+        self.assertEqual(identified[0].product.code, "cohere-row")
+        self.assertEqual(identified[0].evidence.kind, "cohere_translation")
+
+
+class TestExcelTargetStableRowIdentity(TestCase):
+    """Regression tests for deterministic Excel-row candidate identities."""
+
+    def test_loaded_products_record_their_excel_row_number(self) -> None:
+        catalog = _build_catalog()
+
+        self.assertEqual(catalog[0].source_row_number, 2)
+        self.assertEqual(catalog[-1].source_row_number, 23)
+
+    def test_code_less_id_is_sha256_of_normalized_source_row_and_name(self) -> None:
+        import hashlib
+
+        product = TargetProduct(
+            code="",
+            name="  BRAND   NAME  ",
+            price=10.0,
+            discount_percent=0.0,
+            source_file=r"Warehouse\Catalog.xlsx",
+            source_row_number=12,
+        )
+
+        expected_material = "warehouse/catalog.xlsx|12|brand name"
+        expected_id = hashlib.sha256(
+            expected_material.encode("utf-8")
+        ).hexdigest()
+        self.assertEqual(product.store_product_id, expected_id)
+        self.assertEqual(len(product.store_product_id), 64)
+
+    def test_code_less_id_is_stable_and_distinguishes_source_rows_and_files(self) -> None:
+        product = TargetProduct(
+            code="",
+            name="BRAND NAME",
+            price=10.0,
+            discount_percent=0.0,
+            source_file="catalog.xlsx",
+            source_row_number=12,
+        )
+        same_row_rebuilt = TargetProduct(
+            code="",
+            name="BRAND NAME",
+            price=99.0,
+            discount_percent=5.0,
+            source_file="catalog.xlsx",
+            source_row_number=12,
+        )
+        different_row = TargetProduct(
+            code="",
+            name="BRAND NAME",
+            price=10.0,
+            discount_percent=0.0,
+            source_file="catalog.xlsx",
+            source_row_number=13,
+        )
+        different_file = TargetProduct(
+            code="",
+            name="BRAND NAME",
+            price=10.0,
+            discount_percent=0.0,
+            source_file="another_catalog.xlsx",
+            source_row_number=12,
+        )
+
+        self.assertEqual(product.store_product_id, same_row_rebuilt.store_product_id)
+        self.assertNotEqual(product.store_product_id, different_row.store_product_id)
+        self.assertNotEqual(product.store_product_id, different_file.store_product_id)
+
+    def test_explicit_code_remains_primary_identity(self) -> None:
+        first = TargetProduct(
+            code="DUPLICATE-CODE",
+            name="FIRST VARIANT",
+            price=10.0,
+            discount_percent=0.0,
+            source_file="catalog.xlsx",
+            source_row_number=12,
+        )
+        second = TargetProduct(
+            code="DUPLICATE-CODE",
+            name="SECOND VARIANT",
+            price=12.0,
+            discount_percent=0.0,
+            source_file="catalog.xlsx",
+            source_row_number=13,
+        )
+
+        self.assertEqual(first.store_product_id, "DUPLICATE-CODE")
+        self.assertEqual(second.store_product_id, "DUPLICATE-CODE")
+
+    def test_existing_positional_constructor_keeps_raw_argument_and_safe_default(self) -> None:
+        product = TargetProduct(
+            "legacy-code",
+            "LEGACY PRODUCT",
+            10.0,
+            0.0,
+            "legacy.xlsx",
+            {"name": "LEGACY PRODUCT"},
+        )
+
+        self.assertEqual(product.raw, {"name": "LEGACY PRODUCT"})
+        self.assertEqual(product.source_row_number, 0)
+        self.assertEqual(product.store_product_id, "legacy-code")
+
+    def test_code_less_candidates_keep_distinct_stable_ids(self) -> None:
+        products = [
+            TargetProduct(
+                code="",
+                name="SAME PRODUCT",
+                price=10.0,
+                discount_percent=0.0,
+                source_file="catalog.xlsx",
+                source_row_number=12,
+            ),
+            TargetProduct(
+                code="",
+                name="SAME PRODUCT",
+                price=11.0,
+                discount_percent=0.0,
+                source_file="catalog.xlsx",
+                source_row_number=13,
+            ),
+        ]
+
+        candidates = [product.to_candidate_dict() for product in products]
+        self.assertEqual(len(candidates), 2)
+        self.assertEqual(
+            len({candidate["storeProductId"] for candidate in candidates}),
+            2,
+        )
+
+
+class TestExcelTargetDigitBearingBrands(TestCase):
+    def test_brand_digits_are_not_erased_from_identity(self) -> None:
+        from src.core.excel_target.excel_target_identity import normalize_english_brand
+
+        self.assertEqual(normalize_english_brand("VITAMIN B12 30 TAB"), "VITAMIN B12")
+        self.assertEqual(normalize_english_brand("7UP 250 ML"), "7UP")
+        self.assertNotEqual(
+            normalize_english_brand("VITAMIN B12"),
+            normalize_english_brand("VITAMIN B6"),
+        )
+
+    def test_arabic_brand_digits_are_not_erased(self) -> None:
+        from src.core.excel_target.excel_target_identity import normalize_arabic_brand
+
+        self.assertNotEqual(
+            normalize_arabic_brand("فيتامين ب12"),
+            normalize_arabic_brand("فيتامين ب6"),
+        )

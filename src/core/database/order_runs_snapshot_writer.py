@@ -50,6 +50,7 @@ class OrderRunsSnapshotMixin:
                 "item_key": plan.item_key,
                 "source": plan.source,
                 "source_label": plan.fact_row["source_label"],
+                "source_owner": plan.source_owner,
             },
         )
         if usable:

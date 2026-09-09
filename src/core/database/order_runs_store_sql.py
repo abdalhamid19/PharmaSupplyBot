@@ -61,8 +61,11 @@ on conflict(run_key, item_key, store_product_id) do update set
 
 DELETE_RUN_ITEM_STORES = (
     "delete from run_item_stores"
-    " where run_key = :run_key and item_key = :item_key and source = :source"
-    " and (:source not in ('excel_target', 'excel-target') or source_label = :source_label)"
+    " where run_key = :run_key and item_key = :item_key"
+    " and (source = :source or (:source = 'excel_target' and source = 'excel-target'))"
+    " and ((:source_owner = '' and source_label = :source_label)"
+    "      or (:source_owner <> '' and (source_label = :source_owner"
+    "          or source_label like :source_owner || '@%')))"
 )
 
 SELECT_RUN_ITEM_STORE_COUNT = (

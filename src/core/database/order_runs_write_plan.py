@@ -27,6 +27,7 @@ class ItemWritePlan:
     stores: tuple
     selections: tuple
     source: str
+    source_owner: str
 
 
 def item_write_plan(
@@ -37,7 +38,7 @@ def item_write_plan(
     fact_fields: dict[str, Any],
 ) -> ItemWritePlan:
     """Return the write plan for one order-run item."""
-    stores, selections, source = _snapshot_parts(snapshot)
+    stores, selections, source, source_owner = _snapshot_parts(snapshot)
     code, name = summary.get("item_code"), summary.get("item_name")
     return ItemWritePlan(
         run_key=run_key,
@@ -48,19 +49,21 @@ def item_write_plan(
         stores=stores,
         selections=selections,
         source=source,
+        source_owner=source_owner,
     )
 
 
-def _snapshot_parts(snapshot: dict[str, Any]) -> tuple[tuple, tuple, str]:
+def _snapshot_parts(snapshot: dict[str, Any]) -> tuple[tuple, tuple, str, str]:
     """Return the store rows, selections, and source from a snapshot payload."""
     source = str(snapshot.get("store_source") or "")
+    source = "excel_target" if source in {"excel_target", "excel-target"} else source
     stores = tuple(snapshot.get("stores") or ())
     selections = tuple(snapshot.get("store_selections") or ())
     if source in {"excel_target", "excel-target"}:
         stores = tuple(_excel_snapshot_identity(row) for row in stores)
         selections = tuple((_excel_snapshot_identity(row), qty) for row, qty in selections)
     return (
-        stores, selections, source,
+        stores, selections, source, str(snapshot.get("store_source_owner") or ""),
     )
 
 

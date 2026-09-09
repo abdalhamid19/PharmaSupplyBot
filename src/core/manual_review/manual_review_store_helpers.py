@@ -45,11 +45,23 @@ def _decision_values(code_key: str, name_key: str, decision):
         decision.identity_evidence,
         supplier_scope_key,
         _clean(getattr(decision, "last_rebind_status", "")),
+        _clean(getattr(decision, "excel_target_row_key", "")),
+        _safe_int(getattr(decision, "excel_target_source_row", 0)),
+        _clean(getattr(decision, "candidate_method", "")),
+        _clean(getattr(decision, "review_status", "")),
     )
 
 
 def _decision_from_row(row):
     from .manual_review_store import ManualReviewDecision
+    raw_manual_decision = _clean(row[4])
+    matching_source = _clean(row[11]) if len(row) > 11 else ""
+    if (
+        not raw_manual_decision
+        and bool(row[2])
+        and matching_source.casefold().replace("_", "-") == "excel-target"
+    ):
+        raw_manual_decision = "legacy_approved"
     return ManualReviewDecision(
         _clean(row[0]),
         _clean(row[1]),
@@ -59,7 +71,7 @@ def _decision_from_row(row):
         _clean(row[6]),
         _clean(row[7]),
         _clean(row[8]),
-        _clean(row[4]),
+        raw_manual_decision,
         _clean(row[9]) if len(row) > 9 else "",
         _clean(row[10]) if len(row) > 10 else "",
         _clean(row[11]) if len(row) > 11 else "",
@@ -68,6 +80,10 @@ def _decision_from_row(row):
         _clean(row[14]) if len(row) > 14 else "",
         _clean(row[15]) if len(row) > 15 else "",
         _clean(row[16]) if len(row) > 16 else "",
+        _clean(row[17]) if len(row) > 17 else "",
+        _safe_int(row[18]) if len(row) > 18 else 0,
+        _clean(row[19]) if len(row) > 19 else "",
+        _clean(row[20]) if len(row) > 20 else "",
     )
 
 
@@ -114,6 +130,55 @@ def _default_decision(approved: bool) -> str:
     return "approved_match" if approved else ""
 
 
+def _safe_int(value: object) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def is_scoped_excel_target_approval(
+    decision,
+    *,
+    target_key: str,
+    source_file: str,
+    source_row: int,
+    row_key: str,
+) -> bool:
+    """Return whether an approval is safe to rebind to one Excel row.
+
+    A legacy item-level approval may still be loaded for compatibility, but it
+    deliberately fails this predicate and therefore cannot override a form,
+    strength, concentration, or pack conflict.
+    """
+    if not decision or not decision.approved:
+        return False
+    if decision.manual_decision != "approved_match":
+        return False
+    if str(getattr(decision, "matching_source", "")).strip().lower().replace("_", "-") != "excel-target":
+        return False
+    if not _clean(target_key) or not _clean(getattr(decision, "excel_target_key", "")):
+        return False
+    return (
+        _normalize_scope(getattr(decision, "excel_target_key", ""))
+        == _normalize_scope(target_key)
+        and _normalize_scope(getattr(decision, "excel_target_source_file", ""))
+        == _normalize_scope(source_file, path=True)
+        and _safe_int(getattr(decision, "excel_target_source_row", 0))
+        == _safe_int(source_row)
+        and _clean(getattr(decision, "excel_target_row_key", ""))
+        == _clean(row_key)
+        and bool(_clean(row_key))
+        and bool(_clean(source_file))
+        and _safe_int(source_row) > 0
+    )
+
+
+def _normalize_scope(value: object, *, path: bool = False) -> str:
+    text = " ".join(str(value or "").strip().casefold().split())
+    return text.replace("\\", "/") if path else text
+
+
 __all__ = [
     "_clean",
     "_decision_values",
@@ -122,4 +187,5 @@ __all__ = [
     "_default_decision",
     "_history_values",
     "_history_values_from_decision_values",
+    "is_scoped_excel_target_approval",
 ]

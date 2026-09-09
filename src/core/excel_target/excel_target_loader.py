@@ -11,8 +11,10 @@ same way it treats a Tawreed search response.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, cast
@@ -23,6 +25,17 @@ from ..config.config_models import ExcelTargetConfig
 
 
 logger = logging.getLogger(__name__)
+
+
+_IDENTITY_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def _normalize_identity_component(value: object, *, path: bool = False) -> str:
+    """Return a stable, case-insensitive identity component."""
+    text = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
+    if path:
+        text = text.replace("\\", "/")
+    return _IDENTITY_WHITESPACE_RE.sub(" ", text)
 
 
 @dataclass(frozen=True)
@@ -39,6 +52,7 @@ class TargetProduct:
     public_price: float | None = None
     purchase_price: float | None = None
     name_en: str | None = None
+    source_row_number: int = 0
 
     @property
     def name_ar(self) -> str:
@@ -57,7 +71,18 @@ class TargetProduct:
     @property
     def store_product_id(self) -> str:
         """Return the stable candidate identity used by Excel-target matching."""
-        return self.code or f"row:{abs(hash(self.name))}"
+        code = str(self.code or "").strip()
+        if code:
+            return code
+
+        identity_material = "|".join(
+            (
+                _normalize_identity_component(self.source_file, path=True),
+                str(self.source_row_number),
+                _normalize_identity_component(self.name),
+            )
+        )
+        return hashlib.sha256(identity_material.encode("utf-8")).hexdigest()
 
     def to_candidate_dict(self) -> dict[str, Any]:
         """Return the candidate dict shape consumed by the core matcher.
@@ -139,10 +164,17 @@ def load_target_catalog_from_excel(
         header_index = _resolve_header_index(sheet, config)
         column_indices = _resolve_column_indices(sheet, header_index, config)
         products: list[TargetProduct] = []
-        for row in sheet.iter_rows(
-            min_row=header_index + 2, values_only=True
+        for source_row_number, row in enumerate(
+            sheet.iter_rows(min_row=header_index + 2, values_only=True),
+            start=header_index + 2,
         ):
-            product = _row_to_product(row, column_indices, config, source_file)
+            product = _row_to_product(
+                row,
+                column_indices,
+                config,
+                source_file,
+                source_row_number,
+            )
             if product is not None:
                 products.append(product)
         return products
@@ -227,6 +259,7 @@ def _row_to_product(
     indices: dict[str, int],
     config: ExcelTargetConfig,
     source_file: str = "",
+    source_row_number: int = 0,
 ) -> TargetProduct | None:
     """Convert one Excel row tuple into a TargetProduct."""
     name_cell = row[indices["name"]] if "name" in indices else None
@@ -258,6 +291,7 @@ def _row_to_product(
         price=price,
         discount_percent=discount,
         source_file=source_file,
+        source_row_number=source_row_number,
         raw=raw,
         price_meaning=getattr(config, "price_meaning", "public_with_discount"),
     )

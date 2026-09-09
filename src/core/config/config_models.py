@@ -100,6 +100,14 @@ class MatchingConfig:
     reject_extra_brand_token: bool = False
     enable_bilingual_secondary_match: bool = False
     bilingual_min_score: float = 0.75
+    excel_target_review_candidates_enabled: bool = True
+    excel_target_review_candidate_limit: int = 5
+    excel_target_review_fuzzy_strong_score: float = 90.0
+    excel_target_review_fuzzy_strong_margin: float = 8.0
+    excel_target_review_fuzzy_medium_score: float = 86.0
+    excel_target_review_fuzzy_medium_margin: float = 12.0
+    excel_target_review_ambiguous_score: float = 88.0
+    excel_target_review_ambiguous_margin: float = 8.0
 
 @dataclass(frozen=True)
 class DatabaseConfig:

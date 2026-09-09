@@ -145,6 +145,26 @@ class TranslationCache:
                 )
         return result
 
+    def get_many_with_models(
+        self, arabic_texts: Iterable[str]
+    ) -> dict[str, tuple[str, str]]:
+        """Return normalized keys mapped to translation text and its provenance model."""
+        keys = [normalize_key(text) for text in arabic_texts]
+        keys = [key for key in keys if key]
+        if not keys:
+            return {}
+        with self._connect() as conn:
+            placeholders = ",".join("?" for _ in keys)
+            rows = conn.execute(
+                f"select normalized_ar, en_text, model from translation_cache "
+                f"where normalized_ar in ({placeholders})",
+                keys,
+            ).fetchall()
+        return {
+            row["normalized_ar"]: (row["en_text"], row["model"])
+            for row in rows
+        }
+
     def get_many_by_raw(self, raw_arabic_texts: Iterable[str]) -> dict[str, str]:
         """Like :meth:`get_many` but matches against ``raw_ar`` (the original
         text as written, before any normalization) and returns the

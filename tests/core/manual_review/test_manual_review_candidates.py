@@ -157,6 +157,55 @@ class ManualReviewCandidatesTests(TestCase):
         self.assertEqual(baraka.matching_source_label, "baraka@baraka.xlsx")
         self.assertEqual(baraka.target_key, "baraka")
 
+    def test_review_only_provenance_round_trips_and_legacy_fields_default(self) -> None:
+        option = ReviewCandidateOption(
+            store_product_id="baraka-17",
+            name_en="INODEP SYRUP 100 ML",
+            name_ar="اينوديب شراب 100 مل",
+            supplier="excel-target:baraka",
+            available_quantity=1,
+            price=10.0,
+            score=91.5,
+            rejection_reason="form conflict",
+            orderable=True,
+            matching_source="excel-target",
+            target_key="baraka",
+            source_file="baraka.xlsx",
+            identity_evidence_kind="review_fuzzy",
+            candidate_method="english_fuzzy",
+            score_margin=8.5,
+            shared_brand_tokens=("INODEP",),
+            review_status="variant_conflict",
+            excel_target_key="baraka",
+            excel_target_source_file="baraka.xlsx",
+            excel_target_row_key="row-key-17",
+            excel_target_source_row=17,
+        )
+
+        restored = ReviewCandidateOption.from_dict(option.to_dict())
+        legacy = ReviewCandidateOption.from_dict(
+            {
+                "store_product_id": "legacy",
+                "name_en": "Legacy",
+                "name_ar": "",
+                "supplier": "supplier",
+                "available_quantity": 1,
+                "price": 1.0,
+                "score": 1.0,
+                "rejection_reason": "",
+                "orderable": True,
+            }
+        )
+
+        self.assertEqual(restored.candidate_method, "english_fuzzy")
+        self.assertEqual(restored.review_status, "variant_conflict")
+        self.assertEqual(restored.shared_brand_tokens, ("INODEP",))
+        self.assertEqual(restored.excel_target_row_key, "row-key-17")
+        self.assertEqual(restored.excel_target_source_row, 17)
+        self.assertEqual(legacy.candidate_method, "")
+        self.assertEqual(legacy.review_status, "")
+        self.assertEqual(legacy.excel_target_source_row, 0)
+
 def _diag(
     english_name: str,
     score: float,

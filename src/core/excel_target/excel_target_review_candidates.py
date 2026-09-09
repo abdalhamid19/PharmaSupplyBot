@@ -9,6 +9,9 @@ attaches the identity/variant evidence that a reviewer needs.
 
 from __future__ import annotations
 
+import hashlib
+import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Sequence
 
@@ -18,6 +21,7 @@ from src.core.utils.excel import Item
 from .excel_target_identity import IdentifiedTarget, IdentityEvidence
 from .excel_target_loader import TargetProduct
 from .product_attributes import CompatibilityResult, validate_product_compatibility
+from .excel_target_review_discovery import ReviewDiscoveryHit
 
 
 @dataclass(frozen=True)
@@ -37,6 +41,30 @@ class ExcelTargetReviewCandidate:
     compatibility: CompatibilityResult
     identity_evidence: IdentityEvidence | None = None
     rejection_reason: str = ""
+    candidate_method: str = ""
+    score_margin: float = 0.0
+    shared_brand_tokens: tuple[str, ...] = ()
+    review_status_hint: str = ""
+
+    def __post_init__(self) -> None:
+        """Give every candidate an explicit review state for artifact consumers."""
+        if not self.candidate_method:
+            object.__setattr__(
+                self,
+                "candidate_method",
+                _candidate_method(self.identity_evidence_kind),
+            )
+        if not self.shared_brand_tokens:
+            object.__setattr__(
+                self,
+                "shared_brand_tokens",
+                _shared_brand_tokens(
+                    self.identity_evidence.canonical_brand
+                    if self.identity_evidence
+                    else "",
+                    self.product.trusted_name_en or self.product.name_ar,
+                ),
+            )
 
     @property
     def source_kind(self) -> str:
@@ -68,6 +96,26 @@ class ExcelTargetReviewCandidate:
     def compatibility_rejection(self) -> str:
         return self.compatibility.rejection_reason
 
+    @property
+    def review_status(self) -> str:
+        """Return a human-review state without treating it as auto-match evidence."""
+        if self.review_status_hint:
+            return self.review_status_hint
+        if self.compatibility.accepted:
+            return "compatible"
+        reason = self.compatibility.rejection_reason.casefold()
+        if not reason or "not proven" in reason or "unknown" in reason:
+            return "variant_unproven"
+        return "variant_conflict"
+
+    @property
+    def excel_target_row_key(self) -> str:
+        return excel_target_row_key(self.target_key, self.product)
+
+    @property
+    def excel_target_source_row(self) -> int:
+        return int(self.product.source_row_number or 0)
+
     def to_review_candidate_dict(self) -> dict[str, object]:
         """Return the generic review-option shape without importing UI code.
 
@@ -96,8 +144,14 @@ class ExcelTargetReviewCandidate:
             "identity_evidence": self.identity_evidence_detail,
             "compatibility_status": self.compatibility_status,
             "compatibility_rejection": self.compatibility_rejection,
+            "review_status": self.review_status,
+            "candidate_method": self.candidate_method,
+            "score_margin": float(self.score_margin),
+            "shared_brand_tokens": self.shared_brand_tokens,
             "excel_target_key": self.target_key,
             "excel_target_source_file": self.product.source_file,
+            "excel_target_row_key": self.excel_target_row_key,
+            "excel_target_source_row": self.excel_target_source_row,
         }
 
 
@@ -108,8 +162,9 @@ def build_review_candidates(
     *,
     identified: Iterable[IdentifiedTarget] = (),
     diagnostics: Iterable[CandidateMatchDiagnostic] = (),
+    discovery_hits: Iterable[ReviewDiscoveryHit] = (),
     limit: int | None = None,
-    catalog_by_id: Mapping[str, TargetProduct] | None = None,
+    catalog_by_id: Mapping[str, TargetProduct | tuple[TargetProduct, ...]] | None = None,
 ) -> tuple[ExcelTargetReviewCandidate, ...]:
     """Build review candidates from target rows and matching evidence.
 
@@ -121,12 +176,38 @@ def build_review_candidates(
     Baraka review list.
     """
     by_id = catalog_by_id if catalog_by_id is not None else _catalog_by_id(catalog)
+    catalog_row_keys = {_product_key(target_key, product) for product in catalog}
     candidates: dict[str, ExcelTargetReviewCandidate] = {}
+
+    for hit in discovery_hits:
+        product = hit.product
+        key = _product_key(target_key, product)
+        if key not in catalog_row_keys:
+            continue
+        compatibility = validate_product_compatibility(item.name, product.name_ar)
+        candidate = ExcelTargetReviewCandidate(
+            target_key=target_key,
+            product=product,
+            score=float(hit.score),
+            score_margin=float(hit.score_margin),
+            compatibility=compatibility,
+            identity_evidence=IdentityEvidence(
+                "review_fuzzy",
+                hit.strategy,
+                f"{hit.strategy} review candidate ({hit.score:.1f}, margin {hit.score_margin:.1f})",
+                max(0.0, min(1.0, hit.score / 100.0)),
+            ),
+            rejection_reason=compatibility.rejection_reason,
+            candidate_method=hit.strategy,
+            shared_brand_tokens=hit.shared_brand_tokens,
+            review_status_hint=hit.review_status,
+        )
+        _keep_best(candidates, key, candidate)
 
     for identified_target in identified:
         product = identified_target.product
-        key = _product_key(product)
-        if key not in by_id:
+        key = _product_key(target_key, product)
+        if key not in catalog_row_keys:
             continue
         compatibility = validate_product_compatibility(item.name, product.name_ar)
         candidate = ExcelTargetReviewCandidate(
@@ -136,34 +217,37 @@ def build_review_candidates(
             compatibility=compatibility,
             identity_evidence=identified_target.evidence,
             rejection_reason=compatibility.rejection_reason,
+            candidate_method=_candidate_method(identified_target.evidence.kind),
         )
         _keep_best(candidates, key, candidate)
 
     for diagnostic in diagnostics:
         raw = diagnostic.candidate
-        product = by_id.get(str(raw.get("storeProductId") or ""))
-        if product is None:
+        products = _products_for_id(by_id, str(raw.get("storeProductId") or ""))
+        if not products:
             continue
-        compatibility = validate_product_compatibility(item.name, product.name_ar)
-        evidence = IdentityEvidence(
-            "native_english",
-            product.trusted_name_en,
-            "native English supplier name",
-            1.0,
-        ) if product.trusted_name_en else None
-        rejection = (
-            compatibility.rejection_reason
-            or str(getattr(diagnostic, "rejection_reason", "") or "")
-        )
-        candidate = ExcelTargetReviewCandidate(
-            target_key=target_key,
-            product=product,
-            score=float(getattr(diagnostic, "score", 0.0) or 0.0),
-            compatibility=compatibility,
-            identity_evidence=evidence,
-            rejection_reason=rejection,
-        )
-        _keep_best(candidates, _product_key(product), candidate)
+        for product in products:
+            compatibility = validate_product_compatibility(item.name, product.name_ar)
+            evidence = IdentityEvidence(
+                "review_fuzzy",
+                product.trusted_name_en,
+                "English fuzzy target-row candidate",
+                1.0,
+            ) if product.trusted_name_en else None
+            rejection = (
+                compatibility.rejection_reason
+                or str(getattr(diagnostic, "rejection_reason", "") or "")
+            )
+            candidate = ExcelTargetReviewCandidate(
+                target_key=target_key,
+                product=product,
+                score=float(getattr(diagnostic, "score", 0.0) or 0.0),
+                compatibility=compatibility,
+                identity_evidence=evidence,
+                rejection_reason=rejection,
+                candidate_method="english_fuzzy",
+            )
+            _keep_best(candidates, _product_key(target_key, product), candidate)
 
     ordered = sorted(
         candidates.values(),
@@ -182,12 +266,29 @@ def build_review_candidates(
     return tuple(ordered)
 
 
-def _catalog_by_id(catalog: Sequence[TargetProduct]) -> dict[str, TargetProduct]:
-    return {_product_key(product): product for product in catalog}
+def _catalog_by_id(
+    catalog: Sequence[TargetProduct],
+) -> dict[str, tuple[TargetProduct, ...]]:
+    grouped: dict[str, list[TargetProduct]] = {}
+    for product in catalog:
+        grouped.setdefault(str(product.store_product_id), []).append(product)
+    return {key: tuple(value) for key, value in grouped.items()}
 
 
-def _product_key(product: TargetProduct) -> str:
-    return product.store_product_id
+def _products_for_id(
+    catalog_by_id: Mapping[str, TargetProduct | tuple[TargetProduct, ...]],
+    product_id: str,
+) -> tuple[TargetProduct, ...]:
+    value = catalog_by_id.get(product_id)
+    if value is None:
+        return ()
+    if isinstance(value, TargetProduct):
+        return (value,)
+    return tuple(value)
+
+
+def _product_key(target_key: str, product: TargetProduct) -> str:
+    return excel_target_row_key(target_key, product)
 
 
 def _keep_best(
@@ -203,4 +304,81 @@ def _keep_best(
 __all__ = [
     "ExcelTargetReviewCandidate",
     "build_review_candidates",
+    "excel_target_row_key",
 ]
+
+
+_WHITESPACE_RE = re.compile(r"\s+")
+_BRAND_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+/-]*")
+_NON_BRAND_TOKENS = {
+    "AMP",
+    "AMPOULE",
+    "CAP",
+    "CAPS",
+    "CAPSULE",
+    "CAPSULES",
+    "CREAM",
+    "FILM",
+    "GEL",
+    "INJ",
+    "INJECTION",
+    "ML",
+    "MG",
+    "SYP",
+    "SYRUP",
+    "TAB",
+    "TABS",
+    "TABLET",
+    "TABLETS",
+}
+
+
+def _normalize_row_component(value: object, *, path: bool = False) -> str:
+    text = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
+    if path:
+        text = text.replace("\\", "/")
+    return _WHITESPACE_RE.sub(" ", text)
+
+
+def excel_target_row_key(target_key: str, product: TargetProduct) -> str:
+    """Return the deterministic identity of one target workbook row.
+
+    The product code alone is intentionally insufficient: a workbook may
+    contain duplicate codes for different strengths, forms, or pack sizes.
+    """
+    material = "|".join(
+        (
+            _normalize_row_component(target_key),
+            _normalize_row_component(product.source_file, path=True),
+            str(int(product.source_row_number or 0)),
+            _normalize_row_component(product.store_product_id),
+            _normalize_row_component(product.name),
+        )
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _candidate_method(identity_kind: str) -> str:
+    return {
+        "review_fuzzy": "english_fuzzy",
+        "safe_alias": "safe_alias",
+        "cohere_translation": "cached_cohere",
+        "cached_translation": "cached_translation",
+        "tawreed_catalog": "tawreed_dictionary",
+        "dictionary": "egyptian_dictionary",
+        "native_english": "native_english",
+    }.get(identity_kind, identity_kind or "")
+
+
+def _shared_brand_tokens(left: str, right: str) -> tuple[str, ...]:
+    left_tokens = {
+        token.upper()
+        for token in _BRAND_TOKEN_RE.findall(left or "")
+        if token.upper() not in _NON_BRAND_TOKENS
+    }
+    right_tokens = {
+        token.upper()
+        for token in _BRAND_TOKEN_RE.findall(right or "")
+        if token.upper() not in _NON_BRAND_TOKENS
+    }
+    return tuple(sorted(left_tokens & right_tokens))

@@ -8,9 +8,11 @@ from unittest.mock import patch
 from src.core.config.config_models import MatchingConfig
 from src.core.excel_target.excel_target_loader import TargetProduct
 from src.core.excel_target.excel_target_matching import ExcelTargetMatcher
+from src.core.excel_target.excel_target_review_candidates import excel_target_row_key
 from src.core.manual_review.manual_review_store import ManualReviewDecision
 from src.core.matching_types import DecisionSource
 from src.core.utils.excel import Item
+from src.core.normalization.translation import CachedTranslations
 
 
 ITEM = Item(code="90951", name="INODEP CAPSULES 30", qty=1)
@@ -40,7 +42,9 @@ class TestBarakaSafeMatching(TestCase):
 
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["storeProductId"], "4")
-        self.assertEqual(decision.best_match.data["identity_evidence_kind"], "dictionary")
+        self.assertEqual(
+            decision.best_match.data["identity_evidence_kind"], "tawreed_catalog"
+        )
         self.assertEqual(decision.best_match.data["compatibility_status"], "compatible")
 
     def test_arabic_only_rows_never_claim_to_be_english(self) -> None:
@@ -108,6 +112,108 @@ class TestBarakaSafeMatching(TestCase):
         self.assertIsNotNone(decision.best_match)
         self.assertEqual(decision.best_match.data["identity_evidence_kind"], "tawreed_catalog")
         self.assertEqual(decision.best_match.data["storeProductId"], "1")
+
+    def test_safe_policy_keeps_cohere_only_identity_for_manual_review(self) -> None:
+        arabic_name = "براند غير معروف 30 كبسول"
+        with patch(
+            "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+            return_value={"rows": []},
+        ), patch(
+            "src.core.excel_target.excel_target_identity.load_dictionary",
+            return_value={"by_en": {}},
+        ), patch(
+            "src.core.excel_target.excel_target_identity.lookup_en",
+            return_value=[],
+        ), patch(
+            "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+            return_value={},
+        ), patch(
+            "src.core.excel_target.excel_target_identity.ar_to_en_many",
+            return_value={arabic_name: "MYSTERYBRAND 30 CAPSULES"},
+        ):
+            matcher = ExcelTargetMatcher(
+                "baraka",
+                [TargetProduct("cohere-row", arabic_name, 50.0, 0.0)],
+                allow_live_translation=True,
+            )
+
+        match = matcher.match(
+            Item(code="mystery", name="MYSTERYBRAND CAPSULES 30", qty=1),
+            MatchingConfig(),
+        )
+
+        self.assertIsNone(match.decision.best_match)
+        self.assertIn("Cohere", match.decision.final_reason)
+        self.assertTrue(match.review_candidates)
+
+    def test_cached_cohere_identity_remains_manual_review_only(self) -> None:
+        arabic_name = "براند غير معروف 30 كبسول"
+        cached = CachedTranslations(
+            {arabic_name: "MYSTERYBRAND 30 CAPSULES"},
+            {arabic_name: "command-a-translate-08-2025"},
+        )
+        with patch(
+            "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+            return_value={"rows": []},
+        ), patch(
+            "src.core.excel_target.excel_target_identity.load_dictionary",
+            return_value={"by_en": {}},
+        ), patch(
+            "src.core.excel_target.excel_target_identity.lookup_en",
+            return_value=[],
+        ), patch(
+            "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+            return_value=cached,
+        ):
+            matcher = ExcelTargetMatcher(
+                "baraka",
+                [TargetProduct("cached-row", arabic_name, 50.0, 0.0)],
+            )
+
+        match = matcher.match(
+            Item(code="mystery", name="MYSTERYBRAND CAPSULES 30", qty=1),
+            MatchingConfig(),
+        )
+
+        self.assertIsNone(match.decision.best_match)
+        self.assertIn("Cohere", match.decision.final_reason)
+
+    def test_safe_alias_typo_matches_only_after_variant_compatibility(self) -> None:
+        target_name = "اكسومايلين الترا 600 مجم 30 قرص"
+        with patch(
+            "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+            return_value={
+                "rows": [
+                    {
+                        "en": "AXOMYELIN ULTRA 600 MG 30 TAB",
+                        "ar": target_name,
+                    }
+                ]
+            },
+        ), patch(
+            "src.core.excel_target.excel_target_identity.load_dictionary",
+            return_value={"by_en": {}},
+        ), patch(
+            "src.core.excel_target.excel_target_identity.lookup_en",
+            return_value=[],
+        ), patch(
+            "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+            return_value={},
+        ):
+            matcher = ExcelTargetMatcher(
+                "baraka",
+                [TargetProduct("target", target_name, 50.0, 0.0)],
+            )
+
+        decision = matcher.match(
+            Item(code="90266", name="AXOMYELIN ULLTRA 30TAB 600MG", qty=1),
+            MatchingConfig(),
+        ).decision
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(
+            decision.best_match.data["identity_evidence_kind"], "safe_alias"
+        )
 
     def test_tawreed_alias_keeps_all_target_variants_for_compatibility_filtering(self) -> None:
         """An alias must not discard another target row before variant checks."""
@@ -195,6 +301,86 @@ class TestBarakaSafeMatching(TestCase):
         self.assertEqual(best.data["identity_evidence_kind"], "manual_review_rebound")
         self.assertEqual(decision.source, DecisionSource.MANUAL_REVIEW_SAVED)
         record.assert_called_once()
+
+    def test_scoped_approved_match_can_override_saved_variant_conflict(self) -> None:
+        """A human approval may intentionally select a different product variant."""
+        product = TargetProduct(
+            "target",
+            "DANTRELAX 25 MG 30 CAPS",
+            10,
+            0,
+            "baraka.xlsx",
+            source_row_number=7,
+        )
+        matcher = ExcelTargetMatcher("baraka", [product])
+        scoped = ManualReviewDecision(
+            "dantrelax",
+            "DANTRELAX 30 CAP",
+            True,
+            "target",
+            correct_product_name="DANTRELAX 25 MG 30 CAPS",
+            manual_decision="approved_match",
+            excel_target_key="baraka",
+            excel_target_source_file="baraka.xlsx",
+            excel_target_row_key=excel_target_row_key("baraka", product),
+            excel_target_source_row=7,
+            matching_source="excel-target",
+            matching_source_label="baraka@baraka.xlsx",
+        )
+        with patch(
+            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+            return_value=scoped,
+        ), patch(
+            "src.core.excel_target.excel_target_matching._record_manual_rebind"
+        ) as record:
+            decision = matcher.match(
+                Item(code="dantrelax", name="DANTRELAX 30 CAP", qty=1),
+                MatchingConfig(),
+            ).decision
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.source, DecisionSource.MANUAL_REVIEW_SAVED)
+        self.assertEqual(
+            decision.best_match.data["compatibility_status"],
+            "approved_manual_override",
+        )
+        self.assertTrue(decision.best_match.data["manual_override"])
+        self.assertIn("approved_manual_override", decision.final_reason)
+        record.assert_called_once()
+
+    def test_stale_scoped_approval_does_not_block_current_discovery(self) -> None:
+        product = TargetProduct(
+            "current",
+            "INODEP CAPSULES 30",
+            10,
+            0,
+            "new.xlsx",
+            source_row_number=9,
+        )
+        matcher = ExcelTargetMatcher("baraka", [product])
+        stale = ManualReviewDecision(
+            ITEM.code,
+            ITEM.name,
+            True,
+            "old",
+            correct_product_name="INODEP CAPSULES 30",
+            manual_decision="approved_match",
+            excel_target_key="baraka",
+            excel_target_source_file="old.xlsx",
+            excel_target_row_key="old-row",
+            excel_target_source_row=2,
+            matching_source="excel-target",
+        )
+        with patch(
+            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+            return_value=stale,
+        ), patch(
+            "src.core.excel_target.excel_target_matching._record_manual_rebind_failure"
+        ):
+            decision = matcher.match(ITEM, MatchingConfig()).decision
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["storeProductId"], "current")
 
     def test_non_approved_target_decisions_remain_manual_across_excel_files(self) -> None:
         matcher = ExcelTargetMatcher(

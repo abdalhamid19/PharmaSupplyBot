@@ -1,17 +1,16 @@
 """Run full order with match-trace artifact and reload config explicitly."""
 import os
+from dotenv import load_dotenv
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+load_dotenv(REPO / ".env", override=False)
 os.chdir(REPO)
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
-os.environ['COHERE_API_KEY'] = 'kC7J5jmq5nOECPeHumKHWFYi1Dp1kBvtstAzHXLU'
-os.environ['COHERE_RATE_LIMIT_PER_MIN'] = '15'
-os.environ['COHERE_BATCH_SIZE'] = '50'
 os.environ['MATCH_ARTIFACT_PATH'] = 'artifacts/match_traces/wardany_50.jsonl'
 
 artifact = REPO / os.environ['MATCH_ARTIFACT_PATH']

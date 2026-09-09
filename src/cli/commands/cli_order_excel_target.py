@@ -130,6 +130,7 @@ def run_excel_target_match_only(
     summary_path: Path,
     run_key: str | None = None,
     run_id: str | None = None,
+    allow_live_translation: bool = False,
 ) -> dict[str, int]:
     """Run match-only for one Excel target and persist a summary CSV.
 
@@ -150,7 +151,11 @@ def run_excel_target_match_only(
     """
     matched = flagged = manual_review_count = 0
     items_list = list(items)
-    matcher = ExcelTargetMatcher(target_key, catalog)
+    matcher = ExcelTargetMatcher(
+        target_key,
+        catalog,
+        allow_live_translation=allow_live_translation,
+    )
     deadline = time.monotonic() + 300
     timed_out = False
     db_persist = _build_db_persister(run_key, target_key)
@@ -199,6 +204,7 @@ def run_excel_target_match_only(
                     "compatibility_rejection",
                     "match_elapsed_ms",
                     "candidate_source_file",
+                    "candidate_count_total",
                     "candidate_count",
                     "manual_review_required",
                     "manual_review_category",
@@ -228,7 +234,7 @@ def run_excel_target_match_only(
                             "0",
                             "no catalog",
                             "", "", "rejected", "no catalog", elapsed_ms, "",
-                            0, False, "", "excel-target", target_key,
+                            0, 0, False, "identity_absent", "excel-target", target_key,
                         ]
                     )
                     trace.write(json.dumps({
@@ -243,7 +249,9 @@ def run_excel_target_match_only(
                         "match_elapsed_ms": elapsed_ms,
                         "catalog_size": 0,
                         "candidate_count": 0,
+                        "candidate_count_total": 0,
                         "manual_review_required": False,
+                        "manual_review_category": "identity_absent",
                         "matching_source": "excel-target",
                         "matching_source_label": target_key,
                     }, ensure_ascii=False) + "\n")
@@ -278,12 +286,14 @@ def run_excel_target_match_only(
                         else "0"
                     )
                     review_limit = _review_candidate_limit(app_config)
-                    review_candidates = tuple(result.review_candidates[:review_limit])
+                    all_review_candidates = tuple(result.review_candidates)
+                    review_candidates = all_review_candidates[:review_limit]
+                    candidate_count_total = len(all_review_candidates)
                     candidate_count = len(review_candidates)
-                    review_required = candidate_count > 0
+                    review_required = candidate_count_total > 0
                     review_category = (
                         "excel_target_candidate_available" if review_required
-                        else _excel_target_no_candidate_category(decision.final_reason)
+                        else _excel_target_no_candidate_category(bool(identified))
                     )
                     candidate_source_file = ";".join(
                         dict.fromkeys(
@@ -306,6 +316,12 @@ def run_excel_target_match_only(
                             if candidate.identity_evidence_detail
                         )
                     )
+                    reported_identity_kinds = _merge_evidence_values(
+                        identity_kinds, candidate_evidence_kinds
+                    )
+                    reported_identity_details = _merge_evidence_values(
+                        identity_details, candidate_evidence_details, separator="; "
+                    )
                     if review_required:
                         _append_excel_target_review_artifacts(
                             review_csv_path,
@@ -316,6 +332,7 @@ def run_excel_target_match_only(
                             identity_evidence_kind=candidate_evidence_kinds or identity_kinds,
                             identity_evidence=candidate_evidence_details or identity_details,
                             compatibility_rejection=compatibility_rejection,
+                            candidate_count_total=candidate_count_total,
                         )
                         manual_review_count += 1
                     writer.writerow(
@@ -331,12 +348,13 @@ def run_excel_target_match_only(
                             "no-results",
                             score,
                             decision.final_reason,
-                            identity_kinds,
-                            identity_details,
+                            reported_identity_kinds,
+                            reported_identity_details,
                             "rejected",
                             compatibility_rejection,
                             elapsed_ms,
                             candidate_source_file,
+                            candidate_count_total,
                             candidate_count,
                             review_required,
                             review_category,
@@ -349,13 +367,14 @@ def run_excel_target_match_only(
                         "item_name": item.name,
                         "status": "no-results",
                         "reason": decision.final_reason,
-                        "identity_evidence_kind": identity_kinds,
-                        "identity_evidence": identity_details,
+                        "identity_evidence_kind": reported_identity_kinds,
+                        "identity_evidence": reported_identity_details,
                         "compatibility_status": "rejected",
                         "compatibility_rejection": compatibility_rejection,
                         "match_elapsed_ms": elapsed_ms,
                         "catalog_size": len(catalog),
                         "candidate_count": candidate_count,
+                        "candidate_count_total": candidate_count_total,
                         "manual_review_required": review_required,
                         "manual_review_category": review_category,
                         "candidate_source_file": candidate_source_file,
@@ -373,6 +392,7 @@ def run_excel_target_match_only(
                         source_file="",
                         best=None,
                         candidate_count=candidate_count,
+                        candidate_count_total=candidate_count_total,
                         manual_review_required=review_required,
                         manual_review_category=review_category,
                     )
@@ -398,6 +418,7 @@ def run_excel_target_match_only(
                         str(best.data.get("match_elapsed_ms", "")),
                         source_file,
                         0,
+                        0,
                         False,
                         "",
                         "excel-target",
@@ -415,7 +436,9 @@ def run_excel_target_match_only(
                     "match_elapsed_ms": best.data.get("match_elapsed_ms", ""),
                     "catalog_size": len(catalog),
                     "candidate_count": 0,
+                    "candidate_count_total": 0,
                     "manual_review_required": False,
+                    "manual_review_category": "identity_compatible",
                     "matching_source": "excel-target",
                     "matching_source_label": _excel_target_source_label(
                         target_key, source_file
@@ -433,7 +456,9 @@ def run_excel_target_match_only(
                     matched_price=str(best.data.get("salePrice", "")),
                     matched_discount=str(best.data.get("discountPercent", "")),
                     candidate_count=0,
+                    candidate_count_total=0,
                     manual_review_required=False,
+                    manual_review_category="identity_compatible",
                 )
                 _auto_save_excel_target_match(
                     app_config,
@@ -507,6 +532,7 @@ def run_excel_target_match_only_multi(
             ),
             run_key=run_key,
             run_id=run_id,
+            allow_live_translation=True,
         )
     return totals
 
@@ -529,14 +555,18 @@ def _excel_target_source_label(target_key: str, source_file: str = "") -> str:
     return f"{target_key}@{source_file}" if source_file else str(target_key or "")
 
 
-def _excel_target_no_candidate_category(reason: str) -> str:
+def _excel_target_no_candidate_category(has_identity: bool) -> str:
     """Classify a blocked target row that has no review candidate."""
-    text = str(reason or "").lower()
-    if "identity" in text or "brand" in text:
-        return "identity_not_proven"
-    if "form" in text or "strength" in text or "pack" in text or "compatib" in text:
-        return "compatibility_conflict"
-    return "no_safe_candidate"
+    return "identity_variant_rejected" if has_identity else "identity_absent"
+
+
+def _merge_evidence_values(
+    primary: str, secondary: str, *, separator: str = ";"
+) -> str:
+    """Combine evidence labels while preserving their original order."""
+    return separator.join(
+        dict.fromkeys(value for value in (primary, secondary) if value)
+    )
 
 
 def _append_excel_target_review_artifacts(
@@ -549,6 +579,7 @@ def _append_excel_target_review_artifacts(
     identity_evidence_kind: str,
     identity_evidence: str,
     compatibility_rejection: str,
+    candidate_count_total: int,
 ) -> None:
     """Persist one Baraka review row and its target-only candidates."""
     if not candidates:
@@ -571,10 +602,12 @@ def _append_excel_target_review_artifacts(
             fh,
             fieldnames=[
                 "item_code", "item_name", "status", "manual_review_required",
-                "manual_review_category", "candidate_count", "matching_source",
+                "manual_review_category", "candidate_count", "candidate_count_total",
+                "candidate_count_saved", "matching_source",
                 "matching_source_label", "target_key", "source_file",
                 "identity_evidence_kind", "identity_evidence",
-                "compatibility_status", "compatibility_rejection", "reason",
+                "compatibility_status", "candidate_compatibility_status",
+                "compatibility_rejection", "reason",
             ],
         )
         if needs_header:
@@ -587,6 +620,8 @@ def _append_excel_target_review_artifacts(
                 "manual_review_required": True,
                 "manual_review_category": "excel_target_candidate_available",
                 "candidate_count": len(candidates),
+                "candidate_count_total": candidate_count_total,
+                "candidate_count_saved": len(candidates),
                 "matching_source": "excel-target",
                 "matching_source_label": source_label,
                 "target_key": candidates[0].target_key,
@@ -594,6 +629,7 @@ def _append_excel_target_review_artifacts(
                 "identity_evidence_kind": identity_evidence_kind,
                 "identity_evidence": identity_evidence,
                 "compatibility_status": "rejected",
+                "candidate_compatibility_status": _candidate_compatibility_status(candidates),
                 "compatibility_rejection": compatibility_rejection,
                 "reason": reason,
             }
@@ -612,13 +648,25 @@ def _append_excel_target_review_artifacts(
         "identity_evidence_kind": identity_evidence_kind,
         "identity_evidence": identity_evidence,
         "compatibility_status": "rejected",
+        "candidate_compatibility_status": _candidate_compatibility_status(candidates),
         "compatibility_rejection": compatibility_rejection,
+        "candidate_count_total": candidate_count_total,
+        "candidate_count_saved": len(candidates),
         "options": [
             candidate.to_review_candidate_dict() for candidate in candidates
         ],
     }
     with candidates_path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def _candidate_compatibility_status(candidates) -> str:
+    statuses = {candidate.compatibility_status for candidate in candidates}
+    if "compatible" in statuses:
+        return "compatible"
+    if "rejected" in statuses:
+        return "rejected"
+    return "unknown"
 
 
 def _auto_save_excel_target_match(
@@ -777,6 +825,7 @@ def _build_db_persister(run_key: str | None, target_key: str):
         matched_price: str = "",
         matched_discount: str = "",
         candidate_count: int = 0,
+        candidate_count_total: int = 0,
         manual_review_required: bool = False,
         manual_review_category: str = "",
     ) -> None:
@@ -790,6 +839,7 @@ def _build_db_persister(run_key: str | None, target_key: str):
             "manual_review_required": bool(manual_review_required),
             "manual_review_category": str(manual_review_category or ""),
             "candidate_count": int(candidate_count or 0),
+            "candidate_count_total": int(candidate_count_total or 0),
             "matched_query": "",
             "deterministic_score": float(score or 0.0),
             "winner_store_key": "",
@@ -809,8 +859,15 @@ def _build_db_persister(run_key: str | None, target_key: str):
         label = str(target_key or "")
         if source_file:
             label = f"{label}@{source_file}"
-        snapshot_kwargs: dict = {"source_kind": "excel-target", "source_label": label}
-        snapshot_kwargs["candidates_considered"] = int(candidate_count or 0)
+        snapshot_kwargs: dict = {
+            "source_kind": "excel-target",
+            "source_label": label,
+            "store_source": "excel_target",
+            "store_source_owner": str(target_key or ""),
+            "stores": [],
+            "store_selections": [],
+        }
+        snapshot_kwargs["candidates_considered"] = int(candidate_count_total or candidate_count or 0)
         if best is not None:
             store_dict = _excel_target_store_dict(
                 target_key, source_file, best
@@ -819,7 +876,6 @@ def _build_db_persister(run_key: str | None, target_key: str):
                 {
                     "stores": [store_dict],
                     "store_selections": [(store_dict, 0)],
-                    "store_source": "excel_target",
                 }
             )
         record_run_item(run_key, summary_row, **snapshot_kwargs)

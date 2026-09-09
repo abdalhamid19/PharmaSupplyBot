@@ -53,4 +53,8 @@ def _create_approved(
         matching_source_label=option.matching_source_label or "",
         identity_evidence_kind=option.identity_evidence_kind or "",
         identity_evidence=option.identity_evidence or "",
+        candidate_method=option.candidate_method or "",
+        review_status=option.review_status or option.compatibility_status or "",
+        excel_target_row_key=option.excel_target_row_key or "",
+        excel_target_source_row=int(option.excel_target_source_row or 0),
     )

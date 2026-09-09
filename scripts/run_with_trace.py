@@ -5,18 +5,17 @@ PowerShell encoding mangle: we set env vars and shell out via
 subprocess with a list argv.
 """
 import os
+from dotenv import load_dotenv
 import subprocess
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+load_dotenv(REPO / ".env", override=False)
 os.chdir(REPO)
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 os.environ['PYTHONUNBUFFERED'] = '1'
-os.environ['COHERE_API_KEY'] = 'kC7J5jmq5nOECPeHumKHWFYi1Dp1kBvtstAzHXLU'
-os.environ['COHERE_RATE_LIMIT_PER_MIN'] = '15'
-os.environ['COHERE_BATCH_SIZE'] = '50'
 os.environ['MATCH_ARTIFACT_PATH'] = 'artifacts/match_traces/wardany_20260905_1300.jsonl'
 
 artifact = REPO / os.environ['MATCH_ARTIFACT_PATH']
