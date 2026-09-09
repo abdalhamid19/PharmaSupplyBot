@@ -24,6 +24,22 @@ def active_order_run_key() -> str:
     return f"{run.profile_key}/{run.run_id}" if run else ""
 
 
+def excel_target_cart_gate_run_key(bot=None) -> str:
+    """Return the explicit Excel Target comparison scope for this order.
+
+    A combined order allocates one shared Excel/Tawreed run key before
+    profile execution.  Prefer that key so every profile sees the same
+    persisted Excel rows; retain the active artifact key as the fallback for
+    legacy single-profile callers and tests.
+    """
+    configured = getattr(
+        getattr(getattr(bot, "config", None), "excel_target_cart_gate_run_key", ""),
+        "strip",
+        lambda: "",
+    )()
+    return configured or active_order_run_key()
+
+
 def store_snapshot_payload(bot) -> dict[str, Any]:
     """Return the offering-store snapshot keywords for one item write."""
     return {
@@ -41,6 +57,7 @@ def persistence_options(bot) -> dict[str, Any] | None:
 
 __all__ = [
     "active_order_run_key",
+    "excel_target_cart_gate_run_key",
     "store_snapshot_payload",
     "persistence_options",
 ]

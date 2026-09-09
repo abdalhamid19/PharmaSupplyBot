@@ -6,11 +6,38 @@ import logging
 import time
 from typing import Iterable
 
+from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
 from src.core.utils.excel import Item
 from .tawreed_api_client import TawreedApiClient
 
 
 logger = logging.getLogger(__name__)
+
+
+def _raise_if_excel_target_cart_blocked(bot, item: Item, tawreed_store: dict) -> None:
+    """Stop a real API cart mutation when Excel Target is cheaper or equal."""
+    if getattr(bot, "match_only", False):
+        return
+
+    from ..store.tawreed_store_run_payload import excel_target_cart_gate_run_key
+
+    run_key = excel_target_cart_gate_run_key(bot)
+    if not run_key:
+        return
+    database = getattr(getattr(bot, "config", None), "database", None)
+    options_factory = getattr(database, "persistence_options", None)
+    if callable(options_factory):
+        database_options = options_factory()
+        if not database_options.get("enabled", True):
+            return
+        db_path = database_options.get("path")
+    else:
+        if database is not None and not getattr(database, "order_runs_enabled", True):
+            return
+        db_path = getattr(database, "order_runs_path", "") or None
+    decision = ExcelTargetCartGate(db_path).evaluate(run_key, item, tawreed_store)
+    if decision.blocked:
+        raise bot.skip_item_exception(decision.reason)
 
 
 def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> bool:
@@ -85,6 +112,7 @@ def _add_single_item_to_cart(bot, api, match, item, record_timing):
                 f"Store discount ({store_discount:g}%) is below minimum ({min_discount:g}%)."
             )
 
+    _raise_if_excel_target_cart_blocked(bot, item, match.data)
     cart_start = time.perf_counter()
     try:
         api.add_to_cart(match, int(item.qty))
@@ -124,6 +152,7 @@ __all__ = [
     "_add_api_order_items",
     "_add_single_api_item",
     "_add_single_item_to_cart",
+    "_raise_if_excel_target_cart_blocked",
     "_record_single_store_item",
     "_submit_order_if_enabled",
 ]

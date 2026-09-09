@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from playwright.sync_api import Page
 
 from src.core.matching_types import SearchMatch
+from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
 from src.core.utils.excel import Item
 from ..tawreed_constants import MAX_DOM_SEARCH_ROWS, STORE_DETAILS_ENDPOINT
 from ..tawreed_dialogs import close_visible_dialogs
@@ -22,6 +23,10 @@ from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR
 from ..api.tawreed_api_payloads import stores_from_payload
 from ..store.tawreed_store_selection import choose_next_store_for_remaining_quantity
 from ..store.tawreed_store_summary import record_single_store, record_selected_stores
+from ..store.tawreed_store_run_payload import (
+    excel_target_cart_gate_run_key,
+    persistence_options,
+)
 from ..tawreed_ui import (
     cart_button,
     fill_quantity_input,
@@ -70,6 +75,26 @@ def _selected_max_discount(sels) -> float:
     return max(
         discount_value_as_percent(first_discount_value(store)) for store, _ in sels
     )
+
+
+def _cart_gate(bot) -> ExcelTargetCartGate:
+    """Build the shared cart gate using this run's configured DB path."""
+    options = persistence_options(bot) or {}
+    return ExcelTargetCartGate(options.get("path"))
+
+
+def _check_cart_gate(bot, item: Item, tawreed_store: dict[str, Any]) -> None:
+    """Raise the bot's skip exception before a blocked cart mutation."""
+    if getattr(bot, "match_only", False):
+        return
+    options = persistence_options(bot) or {}
+    if not options.get("enabled", True):
+        return
+    decision = _cart_gate(bot).evaluate(
+        excel_target_cart_gate_run_key(bot), item, tawreed_store
+    )
+    if decision.blocked:
+        raise bot.skip_item_exception(decision.reason)
 
 
 # ============================================================================
@@ -154,6 +179,7 @@ def _open_add_to_cart_for_match(
             if not _cart_enabled(row):
                 raise
             close_visible_dialogs(page)
+    _check_cart_gate(bot, item, match.data)
     _click_cart(bot, row, item, match)
     bot.last_ordered_total_qty = fill_add_to_cart_dialog(bot, page, item.qty)
     _record_single_store_selection(bot, match.data, bot.last_ordered_total_qty)
@@ -174,18 +200,23 @@ def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
                 f"Highest discount ({max_discount_value:g}%) is below minimum ({min_discount:g}%)."
             )
     
+    planned: list[tuple[Any, int]] = []
     while rem > 0:
         try:
-            choice = _next_store_choice(bot, page, store_rows, used_ids, sels)
+            choice = _next_store_choice(
+                bot, page, store_rows, used_ids, sels, click_cart=False
+            )
         except bot.skip_item_exception:
             if sels:
                 break
             raise
         if choice is None:
             break
-        ordered = fill_add_to_cart_dialog(
-            bot, page, min(rem, choice.available_quantity)
-        )
+        ordered = min(rem, choice.available_quantity)
+        # Resolve every selected store before opening the first quantity dialog.
+        # This prevents a later Excel Target win from leaving a partial cart.
+        _check_cart_gate(bot, item, choice.store)
+        planned.append((choice, ordered))
         sels.append((choice.store, ordered))
         used_ids.add(choice.identity)
         rem -= ordered
@@ -196,11 +227,21 @@ def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
             
     if not sels:
         raise bot.skip_item_exception("All stores out of stock.")
-    bot.last_ordered_total_qty = sum(q for _, q in sels)
-    _record_stores(bot, sels)
+
+    # The preflight above only selects stores. Perform cart mutations after all
+    # selected choices have passed the gate.
+    actual_sels = []
+    for choice, ordered in planned:
+        visible_dialog(page, bot.config.runtime.timeout_ms)
+        store_dialog_cart_buttons(visible_dialog(page, 0)).nth(choice.index).click()
+        actual_ordered = fill_add_to_cart_dialog(bot, page, ordered)
+        actual_sels.append((choice.store, actual_ordered))
+
+    bot.last_ordered_total_qty = sum(q for _, q in actual_sels)
+    _record_stores(bot, actual_sels)
 
 
-def _next_store_choice(bot, page, store_rows, used_ids, sels):
+def _next_store_choice(bot, page, store_rows, used_ids, sels, *, click_cart: bool = True):
     """Return the next eligible store or None if supply is exhausted."""
     try:
         choice = choose_next_store_for_remaining_quantity(
@@ -214,8 +255,9 @@ def _next_store_choice(bot, page, store_rows, used_ids, sels):
         if choice is None:
             close_visible_dialogs(page)
             return None
-        visible_dialog(page, bot.config.runtime.timeout_ms)
-        store_dialog_cart_buttons(visible_dialog(page, 0)).nth(choice.index).click()
+        if click_cart:
+            visible_dialog(page, bot.config.runtime.timeout_ms)
+            store_dialog_cart_buttons(visible_dialog(page, 0)).nth(choice.index).click()
         return choice
     except bot.skip_item_exception:
         close_visible_dialogs(page)
@@ -367,6 +409,8 @@ __all__ = [
     "_find_max_discount",
     "_effective_min_discount",
     "_selected_max_discount",
+    "_cart_gate",
+    "_check_cart_gate",
     # UI components (exported for external use)
     "cart_button",
     "visible_dialog",

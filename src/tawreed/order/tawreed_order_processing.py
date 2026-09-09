@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from playwright.sync_api import Page
 
 from src.core.utils.excel import Item
+from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
 from ..tawreed_constants import PRODUCTS_PAGE_ROUTE
 from ..tawreed_navigation import go_to_orders, maybe_switch_pharmacy, start_new_order
 from ..products.tawreed_products_flow import add_item_from_products_page
@@ -18,6 +19,10 @@ from ..products.tawreed_match_only_metadata import record_match_only_store_metad
 from ..matching.tawreed_search_logic import require_product_match
 from ..auth.tawreed_session import close_browser, close_context, open_order_page
 from ..matching.tawreed_strategy import max_available_warehouse_row
+from ..store.tawreed_store_run_payload import (
+    excel_target_cart_gate_run_key,
+    persistence_options,
+)
 
 
 class OrderItemProcessor:
@@ -65,10 +70,32 @@ class OrderItemProcessor:
         search.fill(query)
 
         self.pick_configured_search_result(page, search)
+        self.skip_legacy_item_when_excel_target_is_priced(item)
         self.fill_configured_quantity(page, item.qty)
         page.locator(self.bot.selectors.add_item_button).first.click()
         self.bot.last_ordered_total_qty = int(item.qty)
         self.wait_for_legacy_add_completion(page)
+
+    def skip_legacy_item_when_excel_target_is_priced(self, item: Item) -> None:
+        """Skip legacy selector adds when Excel has a priced offer.
+
+        The selector-driven page does not expose a structured Tawreed price,
+        so comparing prices would be unsafe. A persisted Excel purchase price
+        therefore conservatively blocks the add instead of ordering blindly.
+        """
+        if getattr(self.bot, "match_only", False):
+            return
+        options = persistence_options(self.bot) or {}
+        if not options.get("enabled", True):
+            return
+        decision = ExcelTargetCartGate(options.get("path")).evaluate(
+            excel_target_cart_gate_run_key(self.bot), item, {}
+        )
+        if decision.excel_purchase_price is not None:
+            raise self.bot.skip_item_exception(
+                "Cannot compare legacy Tawreed price with Excel Target purchase "
+                f"price {decision.excel_purchase_price:.2f}; skipping item."
+            )
 
     def pick_configured_search_result(self, page: Page, search) -> None:
         """Select the configured search result when that selector exists."""

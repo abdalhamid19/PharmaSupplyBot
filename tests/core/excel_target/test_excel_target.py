@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
+
+import openpyxl
 
 from src.core.config.config_models import (
     ExcelTargetConfig,
@@ -75,6 +78,31 @@ class TestExcelTargetLoader(TestCase):
         self.assertEqual(candidate["price"], 55.0)
         self.assertTrue(candidate["excelTarget"])
         self.assertEqual(candidate["priceMeaning"], "public_with_discount")
+
+    def test_blank_price_stays_unknown_while_zero_price_stays_zero(self) -> None:
+        """Empty price cells must not become synthetic zero-price offers."""
+        with TemporaryDirectory() as temp:
+            path = Path(temp) / "prices.xlsx"
+            workbook = openpyxl.Workbook()
+            sheet = workbook.active
+            sheet.append(["Name", "Price", "Discount"])
+            sheet.append(["BLANK PRICE", None, None])
+            sheet.append(["ZERO PRICE", 0, 0])
+            workbook.save(path)
+            workbook.close()
+
+            products = load_target_catalog_from_excel(
+                path,
+                ExcelTargetConfig(
+                    name_col="Name", price_col="Price", discount_col="Discount"
+                ),
+            )
+
+        self.assertEqual([product.price for product in products], [None, 0.0])
+        blank_candidate = products[0].to_candidate_dict()
+        zero_candidate = products[1].to_candidate_dict()
+        self.assertNotIn("price", blank_candidate)
+        self.assertEqual(zero_candidate["price"], 0.0)
 
     def test_target_product_purchase_only_uses_saleprice_key(self) -> None:
         """Purchase-only catalog exposes ``salePrice`` so the matcher reads it."""

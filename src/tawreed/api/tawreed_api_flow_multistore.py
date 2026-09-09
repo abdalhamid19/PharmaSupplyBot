@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.core.utils.excel import Item
 from .tawreed_api_client import TawreedApiClient
+from .tawreed_api_flow_cart import _raise_if_excel_target_cart_blocked
 
 
 def _add_multi_store_item_api(bot, api: TawreedApiClient, match, item: Item, record_timing) -> None:
@@ -53,6 +54,7 @@ def _select_stores_and_add_to_cart(
     from ..products.tawreed_products_flow import _effective_min_discount
     
     rem, used_ids, sels = int(item.qty), set(), []
+    choices_to_order = []
     while rem > 0:
         choice = choose_next_store_for_remaining_quantity(
             store_rows, used_ids, mode, bot.skip_item_exception,
@@ -61,18 +63,32 @@ def _select_stores_and_add_to_cart(
         if not choice or min(rem, choice.available_quantity) <= 0:
             break
         ordered = min(rem, choice.available_quantity)
-        _add_store_to_cart(api, choice, ordered, bot, record_timing)
         sels.append((choice.store, ordered))
+        choices_to_order.append((choice, ordered))
         used_ids.add(choice.identity)
         rem -= ordered
         if _should_stop_in_max_discount_mode(mode, max_discount_value, choice):
             break
+
+    # Validate every selected store before the first API mutation. This keeps a
+    # cheaper/equal Excel Target offer from leaving a partially-filled cart.
+    for choice, _ordered in choices_to_order:
+        _raise_if_excel_target_cart_blocked(bot, item, choice.store)
+
+    for choice, ordered in choices_to_order:
+        _add_store_to_cart(api, choice, ordered, bot, record_timing, gate_checked=True, item=item)
     return sels
 
 
-def _add_store_to_cart(api, choice, ordered, bot, record_timing):
+def _add_store_to_cart(
+    api, choice, ordered, bot, record_timing, *, gate_checked: bool = False, item: Item | None = None
+):
     """Add a single store to cart and record timing."""
     import time
+    if not gate_checked:
+        if item is None:
+            raise ValueError("item is required for the Excel Target cart gate")
+        _raise_if_excel_target_cart_blocked(bot, item, choice.store)
     cart_start = time.perf_counter()
     api.add_to_cart(choice.store, ordered)
     record_timing(bot, "add_to_cart_seconds", time.perf_counter() - cart_start)

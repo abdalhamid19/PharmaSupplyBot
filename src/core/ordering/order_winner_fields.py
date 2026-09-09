@@ -78,20 +78,22 @@ def _extract_store_info(candidate: dict, summary) -> tuple[str, str]:
     return store_name, discount
 
 
-def _extract_public_price(candidate: dict) -> str:
+def _extract_public_price(candidate: dict) -> object:
     """Extract public price with fallbacks."""
-    return (
-        candidate.get("retailPrice")
-        or candidate.get("publicPrice")
-        or candidate.get("price")
-        or candidate.get("sellingPrice")
-        or ""
-    )
+    for key in ("retailPrice", "publicPrice", "price", "sellingPrice"):
+        value = candidate.get(key)
+        if value is not None and value != "":
+            return value
+    return ""
 
 
-def _extract_sales_price(candidate: dict) -> str:
+def _extract_sales_price(candidate: dict) -> object:
     """Extract the actual selected sale price."""
-    return candidate.get("salePrice") or candidate.get("salesPrice") or ""
+    for key in ("salePrice", "salesPrice"):
+        value = candidate.get(key)
+        if value is not None and value != "":
+            return value
+    return ""
 
 
 def _tie_break_reason(decision, match) -> str:

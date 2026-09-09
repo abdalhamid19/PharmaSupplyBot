@@ -153,6 +153,7 @@ def _build_worker_bot(payload: dict[str, Any]):
     profile_key = payload["profile_key"]
     options = payload.get("options", {})
     _apply_warehouse_overrides(config, options)
+    _apply_excel_target_cart_gate_scope(config, options)
     bot = build_bot(
         config,
         profile_key,
@@ -186,6 +187,18 @@ def _apply_warehouse_overrides(config, options: dict) -> None:
     min_discount = options.get("min_discount_percent")
     if min_discount is not None:
         config.warehouse_strategy["min_discount_percent"] = float(min_discount)
+
+
+def _apply_excel_target_cart_gate_scope(config, options: dict) -> None:
+    """Restore the parent command's shared Excel scope in a worker config."""
+    run_key = str(options.get("excel_target_cart_gate_run_key", "") or "")
+    if not run_key:
+        return
+    setter = getattr(config, "set_excel_target_cart_gate_run_key", None)
+    if callable(setter):
+        setter(run_key)
+    else:
+        setattr(config, "excel_target_cart_gate_run_key", run_key)
 
 
 def _opt_path(value: str | None) -> Path | None:

@@ -99,11 +99,25 @@ def run_order_command(app_config: AppConfig, args: argparse.Namespace) -> int:
     # ``run_items`` / ``run_item_stores`` tables.
     shared_run_id: str | None = None
     selected_targets = selected_excel_target_configs(app_config, args)
+    # Clear a value if this AppConfig instance is reused by a caller.  The
+    # field is the explicit cross-profile scope consumed by cart-gate
+    # helpers; without it a later profile would fall back to its own run key
+    # and miss Excel rows persisted under the first profile's shared key.
+    set_gate_scope = getattr(app_config, "set_excel_target_cart_gate_run_key", None)
+    if callable(set_gate_scope):
+        set_gate_scope(None)
+    else:
+        setattr(app_config, "excel_target_cart_gate_run_key", "")
     if selected_targets and profiles:
         from src.core.artifact_run import unique_run_id
 
         first_profile_key = profiles[0][0]
         shared_run_id = unique_run_id("order", first_profile_key)
+        shared_gate_run_key = f"{first_profile_key}/{shared_run_id}"
+        if callable(set_gate_scope):
+            set_gate_scope(shared_gate_run_key)
+        else:
+            setattr(app_config, "excel_target_cart_gate_run_key", shared_gate_run_key)
         _open_shared_run_record(app_config, first_profile_key, shared_run_id, args)
 
     target_catalogs = (

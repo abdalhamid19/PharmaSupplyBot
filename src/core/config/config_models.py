@@ -141,6 +141,21 @@ class AppConfig:
     runtime: RuntimeConfig
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     excel_targets: dict[str, ExcelTargetConfig] = field(default_factory=dict)
+    # When a real order runs Tawreed profiles together with Excel Targets,
+    # the latter are persisted under one shared run key before the profiles
+    # start.  Cart-gate callers use this explicit scope instead of guessing
+    # from whichever profile's artifact context happens to be active.
+    excel_target_cart_gate_run_key: str = ""
+
+    def set_excel_target_cart_gate_run_key(self, run_key: str | None) -> None:
+        """Set the per-command Excel Target cart-gate persistence scope.
+
+        ``AppConfig`` remains frozen for normal configuration semantics, but
+        the CLI needs one small runtime hand-off after it allocates a shared
+        run id.  Keeping this mutation behind a named method documents that
+        boundary and avoids callers reaching for ``object.__setattr__``.
+        """
+        object.__setattr__(self, "excel_target_cart_gate_run_key", str(run_key or ""))
 
     def profiles_to_run(
         self,

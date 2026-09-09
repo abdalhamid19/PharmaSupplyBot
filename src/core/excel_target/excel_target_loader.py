@@ -44,7 +44,7 @@ class TargetProduct:
 
     code: str
     name: str
-    price: float
+    price: float | None
     discount_percent: float
     source_file: str = ""
     raw: dict[str, Any] = field(default_factory=dict)
@@ -112,10 +112,15 @@ class TargetProduct:
             "identity_evidence": "native English supplier name" if self.trusted_name_en else "",
             "identity_evidence_kind": "native_english" if self.trusted_name_en else "",
         }
-        if self.price_meaning == "purchase_only":
-            candidate["salePrice"] = float(self.price or 0.0)
-        else:
-            candidate["price"] = float(self.price or 0.0)
+        # Keep a blank catalog price absent.  Emitting ``0`` for an empty
+        # cell would make the pricing resolver treat an unknown offer as a
+        # free one and could incorrectly win the cart gate.  ``0`` itself is
+        # valid and therefore must remain a real numeric value.
+        if self.price is not None:
+            if self.price_meaning == "purchase_only":
+                candidate["salePrice"] = float(self.price)
+            else:
+                candidate["price"] = float(self.price)
         if self.public_price is not None:
             candidate["publicPrice"] = float(self.public_price)
             candidate["public_price_col_value"] = float(self.public_price)
@@ -268,14 +273,14 @@ def _row_to_product(
         return None
 
     raw: dict[str, Any] = {"name": name}
-    price = 0.0
+    price: float | None = None
     if "price" in indices:
         price = _to_float(row[indices["price"]])
         raw["price"] = price
 
     discount = 0.0
     if "discount" in indices:
-        discount = _to_float(row[indices["discount"]])
+        discount = _to_float(row[indices["discount"]]) or 0.0
         raw["discount"] = discount
 
     code = ""
@@ -297,22 +302,27 @@ def _row_to_product(
     )
 
 
-def _to_float(value: Any) -> float:
-    """Coerce one Excel cell to ``float``, treating empties as zero."""
+def _to_float(value: Any) -> float | None:
+    """Coerce one Excel cell to ``float`` while preserving empty cells.
+
+    The caller decides whether a missing value is allowed to default (the
+    discount column does) or must remain unknown (the price column does).
+    Numeric zero is intentionally returned unchanged.
+    """
     if value is None:
-        return 0.0
+        return None
     if isinstance(value, float) and value != value:
-        return 0.0
+        return None
     try:
         return float(value)
     except (TypeError, ValueError):
         text = str(value).strip()
         if not text:
-            return 0.0
+            return None
         try:
             return float(text)
         except ValueError:
-            return 0.0
+            return None
 
 
 def iter_target_candidates(

@@ -132,7 +132,14 @@ class ExcelTargetReviewCandidate:
             "name_ar": self.product.name_ar,
             "supplier": f"excel-target:{self.source_label}",
             "available_quantity": 1,
-            "price": float(self.product.price or 0.0),
+            # Preserve an unknown catalog price as ``None``.  A blank Excel
+            # cell must not become a synthetic zero-price offer in review
+            # artifacts or subsequent persistence.
+            "price": (
+                float(self.product.price)
+                if self.product.price is not None
+                else None
+            ),
             "score": float(self.score),
             "rejection_reason": reason,
             "orderable": bool(product_id),

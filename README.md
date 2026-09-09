@@ -100,6 +100,12 @@ py run.py order --excel-target <your_key> \
 py run.py remove-cart --profile wardany --excel data/input/items.xlsx
 ```
 
+### Excel target cart gate
+
+During a real order run, a Tawreed item is not added to the cart when any accepted Excel target has a purchase price less than or equal to Tawreed's selected purchase price. The comparison is inclusive (`excel_price <= tawreed_price`) and is applied before any cart mutation, including multi-store runs. `--match-only` keeps its existing behavior and never performs the cart gate.
+
+Blank or invalid Excel target prices are treated as unavailable; a valid numeric zero remains a real price.
+
 استخدم `--help` مع أي أمر لعرض خياراته. مثال:
 
 ```bash

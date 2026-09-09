@@ -26,6 +26,7 @@ from src.core.manual_review.manual_review_store import (
     ManualReviewDecision,
     ManualReviewStore,
 )
+from src.core.database.order_runs_keys import order_run_item_key
 from src.core.matching.candidate_identity import candidate_store_product_id
 from src.core.utils.excel import Item
 from src.tawreed.matching.tawreed_match_only import MATCH_ONLY_SUMMARY_LABEL
@@ -158,7 +159,7 @@ def run_excel_target_match_only(
     )
     deadline = time.monotonic() + 300
     timed_out = False
-    db_persist = _build_db_persister(run_key, target_key)
+    db_persist = _build_db_persister(app_config, run_key, target_key)
     provided_run_id = run_id or (
         _extract_run_id(run_key) if run_key else None
     )
@@ -635,10 +636,8 @@ def _append_excel_target_review_artifacts(
             }
         )
 
-    code_key = str(item.code or "").strip().upper()
-    name_key = str(item.name or "").strip().upper()
     payload = {
-        "item_key": f"{code_key}::{name_key}",
+        "item_key": order_run_item_key(item.code, item.name),
         "item_code": str(item.code or ""),
         "item_name": str(item.name or ""),
         "source_kind": "excel-target",
@@ -801,7 +800,9 @@ def _finish_run_record(app_config: AppConfig, run_key: str | None) -> None:
     finish_run_record(run_key, options)
 
 
-def _build_db_persister(run_key: str | None, target_key: str):
+def _build_db_persister(
+    app_config: AppConfig, run_key: str | None, target_key: str
+):
     """Return a callback that mirrors one match result into order_runs.db.
 
     When ``run_key`` is None the callback is a no-op so the legacy callers
@@ -812,6 +813,9 @@ def _build_db_persister(run_key: str | None, target_key: str):
         return lambda *args, **kwargs: None
 
     from src.core.ordering.order_run_persistence import record_run_item
+
+    database = getattr(app_config, "database", None)
+    options = database.persistence_options() if database else {}
 
     def _persist(
         item,
@@ -878,7 +882,7 @@ def _build_db_persister(run_key: str | None, target_key: str):
                     "store_selections": [(store_dict, 0)],
                 }
             )
-        record_run_item(run_key, summary_row, **snapshot_kwargs)
+        record_run_item(run_key, summary_row, options=options, **snapshot_kwargs)
 
     return _persist
 
@@ -914,7 +918,9 @@ def _excel_target_store_dict(
         or ""
     )
     discount = best.get("discountPercent", best.get("discount", 0)) or 0
-    price = best.get("salePrice", best.get("price", 0)) or 0
+    price = best.get("salePrice")
+    if price is None:
+        price = best.get("price")
     price_meaning = best.get("priceMeaning") or "public_with_discount"
     label = f"excel-target:{target_key}"
     if source_file:
@@ -933,10 +939,11 @@ def _excel_target_store_dict(
         "priceMeaning": price_meaning,
         "excelTarget": True,
     }
-    if price_meaning == "purchase_only":
-        row["salePrice"] = float(price)
-    elif price_meaning == "public_only":
-        row["price"] = float(price)
-    else:
-        row["price"] = float(price)
+    # Keep an absent/blank catalog price absent.  A real numeric zero remains
+    # valid and must be retained as zero for the resolver and cart gate.
+    if price is not None:
+        if price_meaning == "purchase_only":
+            row["salePrice"] = float(price)
+        else:
+            row["price"] = float(price)
     return row

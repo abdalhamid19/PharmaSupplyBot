@@ -132,7 +132,9 @@ def run_parallel_order(
     manager = Manager()
     auth_lock = manager.Lock()
 
-    payloads = build_order_payloads(profile_key, chunks, args, auth_lock)
+    payloads = build_order_payloads(
+        profile_key, chunks, args, auth_lock, app_config=app_config
+    )
     results = execute_order_workers(profile_key, chunks, payloads)
     merge_order_worker_outputs(profile_key, args)
     report_worker_results(app_config.base_url, profile_key, results)
@@ -159,10 +161,12 @@ def build_order_payloads(
     chunks: list[list[Any]],
     args,
     auth_lock,
+    *,
+    app_config=None,
 ) -> list[dict[str, Any]]:
     """Build serializable payloads for each order worker."""
     config_path = str(Path(getattr(args, "config", "state/config.yaml")))
-    options = worker_options(args, auth_lock)
+    options = worker_options(args, auth_lock, app_config=app_config)
     return [
         {
             "config_path": config_path,
@@ -175,7 +179,7 @@ def build_order_payloads(
     ]
 
 
-def worker_options(args, auth_lock=None) -> dict[str, Any]:
+def worker_options(args, auth_lock=None, *, app_config=None) -> dict[str, Any]:
     """Extract serializable worker options from the CLI namespace."""
     run = current_artifact_run()
     return {
@@ -192,6 +196,12 @@ def worker_options(args, auth_lock=None) -> dict[str, Any]:
         "stop_flag": getattr(args, "stop_flag", None),
         "warehouse_mode": getattr(args, "warehouse_mode", None),
         "min_discount_percent": getattr(args, "min_discount_percent", None),
+        # Item workers reload AppConfig from disk in a subprocess.  Carry the
+        # runtime shared Excel scope explicitly so every worker uses the same
+        # persisted target rows as the parent profile.
+        "excel_target_cart_gate_run_key": str(
+            getattr(app_config, "excel_target_cart_gate_run_key", "") or ""
+        ),
         "auth_lock": auth_lock,
     }
 
