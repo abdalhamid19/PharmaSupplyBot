@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 from typing import cast
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ from src.tawreed.cart.tawreed_cart_removal import (
     remove_matching_cart_rows,
     resolve_cart_removal_targets,
 )
+from src.tawreed.cart.tawreed_cart_flow import TawreedCartFlow
 
 
 class _FakeButton:
@@ -112,6 +114,19 @@ class _FakeDialogPage:
 
 
 class TawreedCartRemovalTests(unittest.TestCase):
+    def test_cart_flow_uses_available_session_login_guard(self) -> None:
+        """Browser fallback must import the session guard from its owner module."""
+        bot = SimpleNamespace(
+            selectors=SimpleNamespace(logged_in_marker="text=Home", item_search_input="input"),
+            config=SimpleNamespace(runtime=SimpleNamespace(timeout_ms=45000)),
+        )
+        flow = TawreedCartFlow(bot)
+
+        with patch("src.tawreed.auth.tawreed_session.ensure_logged_in") as guard:
+            flow._ensure_logged_in(object())
+
+        guard.assert_called_once()
+
     def test_confirm_delete_clicks_button_inside_visible_dialog(self) -> None:
         button = _FakeConfirmButton()
         dialog = _FakeDialog(button)

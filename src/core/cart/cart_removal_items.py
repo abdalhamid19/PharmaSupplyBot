@@ -19,6 +19,8 @@ REMOVE_ITEMS_DIR = Path("data/input") / "remove_items"
 DEFAULT_REMOVE_ITEMS_PATH = REMOVE_ITEMS_DIR / "remove.xlsx"
 REMOVE_CODE_COLUMN = "كود"
 REMOVE_NAME_COLUMN = "إسم الصنف"
+REMOVE_CODE_COLUMN_ALIASES = (REMOVE_CODE_COLUMN, "الكود", "كود الصنف")
+REMOVE_NAME_COLUMN_ALIASES = (REMOVE_NAME_COLUMN, "اسم الصنف")
 
 
 @dataclass(frozen=True)
@@ -47,7 +49,8 @@ def _parse_cart_removal_rows(rows, path) -> Iterable[CartRemovalItem]:
     """Parse Excel rows into CartRemovalItem objects."""
     header = [str(cell).strip() if cell else "" for cell in next(rows)]
     try:
-        code_idx, name_idx = header.index(REMOVE_CODE_COLUMN), header.index(REMOVE_NAME_COLUMN)
+        code_idx = _header_index(header, REMOVE_CODE_COLUMN_ALIASES)
+        name_idx = _header_index(header, REMOVE_NAME_COLUMN_ALIASES)
     except ValueError:
         raise KeyError(f"Missing columns in {path}. Found: {header}")
     seen_keys: set[tuple[str, str]] = set()
@@ -58,6 +61,14 @@ def _parse_cart_removal_rows(rows, path) -> Iterable[CartRemovalItem]:
         if key not in seen_keys:
             seen_keys.add(key)
             yield CartRemovalItem(code=code, name=name)
+
+
+def _header_index(header: list[str], aliases: tuple[str, ...]) -> int:
+    """Return the first matching column index from a set of known aliases."""
+    for alias in aliases:
+        if alias in header:
+            return header.index(alias)
+    raise ValueError(f"None of the aliases are present: {aliases}")
 
 
 

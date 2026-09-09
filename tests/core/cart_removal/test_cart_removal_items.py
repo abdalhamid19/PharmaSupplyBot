@@ -58,6 +58,21 @@ class CartRemovalItemsTests(unittest.TestCase):
             )
         )
 
+    def test_load_cart_removal_items_accepts_order_sheet_code_header(self) -> None:
+        """The order sheet's ``الكود`` header is valid for cart removal too."""
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "order-items.xlsx"
+            pd.DataFrame(
+                [{"الكود": 47273, "إسم الصنف": "DEVAROL", "الكمية المطلوبة": 2}]
+            ).to_excel(path, index=False)
+
+            items = list(load_cart_removal_items(path))
+
+        self.assertEqual(
+            items,
+            [CartRemovalItem(code="47273", name="DEVAROL")],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

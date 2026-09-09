@@ -67,7 +67,7 @@ class TawreedCartFlow:
         """Open Tawreed's cart page for cart-removal processing."""
         from ..auth.tawreed_session import resilient_goto
         resilient_goto(page, self._cart_page_url(), self.bot.config.runtime.timeout_ms)
-        from ..auth.tawreed_auth import ensure_logged_in
+        from ..auth.tawreed_session import ensure_logged_in
         ensure_logged_in(
             page,
             self.bot.selectors,
@@ -98,7 +98,7 @@ class TawreedCartFlow:
 
     def _ensure_logged_in(self, page) -> None:
         """Verify that the saved session is still authenticated before ordering begins."""
-        from ..auth.tawreed_auth import ensure_logged_in
+        from ..auth.tawreed_session import ensure_logged_in
         ensure_logged_in(
             page,
             self.bot.selectors,

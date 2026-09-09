@@ -150,6 +150,27 @@ def _ready_surface_visible(
         return False
 
 
+def ensure_logged_in(
+    page: Page,
+    selectors,
+    timeout_ms: int,
+    ready_selector: str = "",
+) -> None:
+    """Verify that the saved session exposes an authenticated page surface."""
+    page.wait_for_load_state("domcontentloaded")
+    if _ready_surface_visible(page, ready_selector):
+        return
+    if _is_login_form_visible(page, selectors):
+        return
+    short_timeout_ms = min(timeout_ms, 2000)
+    if _has_logged_in_marker(page, selectors.logged_in_marker, short_timeout_ms):
+        return
+    if _ready_surface_visible(page, ready_selector):
+        return
+    if _is_login_form_visible(page, selectors):
+        return
+
+
 def validate_saved_session(
     playwright,
     runtime,
@@ -187,6 +208,7 @@ __all__ = [
     "open_auth_page",
     "open_order_page",
     "resilient_goto",
+    "ensure_logged_in",
     "NAVIGATION_TIMEOUT_FLOOR_MS",
     "close_context",
     "close_browser",
