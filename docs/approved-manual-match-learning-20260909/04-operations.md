@@ -1,30 +1,38 @@
 # Approved-correction audit operations
 
-This page describes how to use the read-only audit shown in **Saved
-Corrections (Manual Review Store)**. The report explains why an
-`approved_match` was not selected by the Excel-target matcher before a human
-approved it. It does not change the matcher and it does not apply rules.
+The approved-correction audit is intentionally **artifact-only**. It explains
+why an `approved_match` was not selected by the Excel-target matcher before a
+human approved it, without changing the matcher or applying rules. The
+**Saved Corrections (Manual Review Store)** page does not discover, load, or
+render this report; it remains focused on reviewing and managing saved
+decisions.
 
-## What the page displays
+## Generate and inspect the artifact
 
-The page discovers the newest JSON report below
-`artifacts/excel-target/<target-key>/` for each Excel target represented in the
-saved decisions. When more than one target is available, the operator selects
-the target from the list. The page only reads the report and renders:
+Run the explicit read-only CLI command after selecting the input order and the
+Excel-target workbooks:
 
-- summary counts, kept separate for `automatic_verified`,
-  `approved_manual_override`, `saved_auto_matched`, and stale/invalid data;
-- root-cause counts, such as `identity_absent`, `variant_conflict`,
-  `cohere_review_only`, or `native_score_below_threshold`;
-- a bounded sample of findings and stale/invalid approvals;
-- recommendation evidence and sample item keys.
+```powershell
+& '.venv\Scripts\python.exe' run.py approved-correction-report `
+  --config state\config.yaml `
+  --excel-target 'البركة شركات' `
+  --excel-target-path 'البركة شركات=C:\pc\py\pyreview\PharmaSupplyBot\data\input\excel target\محروس1.xlsx' `
+  --excel-target 'القيصر شركات' `
+  --excel-target-path 'القيصر شركات=C:\pc\py\pyreview\PharmaSupplyBot\data\input\excel target\جملة محروس.xlsx' `
+  --output artifacts\approved-correction-reports\<run-id>
+```
 
-Only the report fields needed for the audit are sent to the browser. Source
-file values are reduced to workbook basenames; arbitrary report metadata (for
-example a database path) is not displayed. The view has no **Apply rule** or
-equivalent mutation action. Existing Saved Corrections actions (delete and
-approval conversion) remain separate and retain their existing confirmation
-behavior.
+The command writes a JSON report and a UTF-8-SIG CSV under the caller-selected
+artifact directory. Keep both files with the run evidence; neither file is
+read by the Streamlit Saved Corrections page. Inspect the JSON for the complete
+schema, counts, root-cause taxonomy, findings, and human-gated
+recommendations. Use the CSV for filtering and spreadsheet analysis.
+
+The report keeps these outcomes separate: `automatic_verified`,
+`approved_manual_override`, `saved_auto_matched`, stale/invalid approvals,
+and approvals outside the current input. Root causes include
+`identity_absent`, `variant_conflict`, `cohere_review_only`, and
+`native_score_below_threshold`.
 
 ## Human approval checklist
 
@@ -68,4 +76,3 @@ rule, preserve the report and comparison artifacts, and restore the previous
 matching configuration. Existing row-scoped `approved_match` decisions may
 continue to serve as exact manual overrides, but must never be converted into
 a broad automatic rule during incident response.
-

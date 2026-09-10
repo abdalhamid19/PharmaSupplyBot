@@ -8,8 +8,10 @@ why previously `approved_match` items were not matched initially, then applying
 only evidence-backed deterministic improvements without weakening safety.
 
 **Architecture:** add a pure counterfactual analyzer beside the Excel-target
-matcher; expose it through a CLI report and a read-only Streamlit view. The
-existing exact-row approval path remains the only variant-conflict override.
+matcher and expose it through a read-only CLI report. The report is kept as a
+JSON/CSV artifact for offline inspection; the Saved Corrections Streamlit page
+does not render it. The existing exact-row approval path remains the only
+variant-conflict override.
 
 **Tech Stack:** Python 3.10+, dataclasses, SQLite, CSV/JSON, pytest,
 Streamlit, existing `scripts/evaluate_excel_target.py`.
@@ -58,8 +60,8 @@ Streamlit, existing `scripts/evaluate_excel_target.py`.
   adapter that writes JSON and CSV.
 - Modify `run.py`/existing CLI registration module: register a report command
   without changing `order` semantics.
-- Modify `src/ui/manual_review/streamlit_manual_review_page_saved.py`: link to
-  latest report and render a read-only root-cause aggregate.
+- Keep `src/ui/manual_review/streamlit_manual_review_page_saved.py` focused on
+  saved decisions; do not link to or render the counterfactual report there.
 - Create focused tests under `tests/core/excel_target`, `tests/cli/commands`,
   and `tests/ui/manual_review`.
 
@@ -124,14 +126,16 @@ the CLI registration; create `tests/cli/commands/test_cli_approved_correction_re
 
 ### Task 4: Present and govern recommendations
 
-**Files:** modify `streamlit_manual_review_page_saved.py`; create
+**Files:** create an artifact-only regression test at
 `tests/ui/manual_review/test_saved_correction_report.py`; create
 `docs/approved-manual-match-learning-20260909/04-operations.md`.
 
-- [ ] Write a failing UI helper test asserting root-cause counts and stale
-  approvals render without exposing the raw database path or mutating a row.
-- [ ] Add a read-only expander for the latest selected report: counts, samples,
+- [x] Remove the report expander from Saved Corrections so the UI never reads
+  or renders counterfactual artifacts.
+- [x] Keep the read-only report available through the CLI JSON/CSV artifact;
+  no GUI action can apply a rule or mutate a row. <!--
   stale approvals, and recommendation evidence. No “apply rule” button.
+  -->
 - [ ] Document the human approval checklist: inspect all candidate aliases,
   add gold cases, test a single deterministic rule, rerun shadow evaluation,
   and audit every new auto-match.
