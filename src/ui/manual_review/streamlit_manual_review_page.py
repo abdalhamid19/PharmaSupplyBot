@@ -440,6 +440,7 @@ def _render_candidate_provenance(options: list[ReviewCandidateOption]) -> None:
             option.target_key,
             option.source_file,
             option.identity_evidence_kind,
+            option.excel_target_row_key,
         )
         scopes.setdefault(scope, option)
     for option in scopes.values():

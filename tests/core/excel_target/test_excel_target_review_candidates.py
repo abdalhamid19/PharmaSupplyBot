@@ -65,6 +65,30 @@ class ExcelTargetReviewCandidateTests(TestCase):
         assert candidates[0].candidate_method == "review_identity"
         assert candidates[0].ranking_tier == 2
 
+    def test_cohere_evidence_is_not_ranked_as_trusted_identity(self) -> None:
+        product = TargetProduct(
+            "cohere-row",
+            "INODEP 30 CAPS",
+            10.0,
+            0.0,
+            source_file="baraka.xlsx",
+            source_row_number=3,
+        )
+        candidate = ExcelTargetReviewCandidate(
+            target_key="baraka",
+            product=product,
+            score=18.0,
+            compatibility=validate_product_compatibility(product.name, product.name),
+            identity_evidence=IdentityEvidence(
+                "cohere_translation",
+                "INODEP",
+                "cached Cohere translation",
+                0.9,
+            ),
+        )
+
+        self.assertEqual(candidate.ranking_tier, 4)
+
     def test_candidates_are_target_rows_with_variant_rejection_metadata(self) -> None:
         matcher = ExcelTargetMatcher(
             "baraka",

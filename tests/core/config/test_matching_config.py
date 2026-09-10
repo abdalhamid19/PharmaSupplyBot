@@ -10,6 +10,7 @@ def test_excel_review_discovery_defaults_are_conservative() -> None:
     config = MatchingConfig()
 
     assert config.excel_target_review_candidates_enabled is True
+    assert config.excel_target_review_cross_language_aliases_enabled is False
     assert config.excel_target_review_candidate_limit == 5
     assert config.excel_target_review_fuzzy_strong_score == 90.0
     assert config.excel_target_review_fuzzy_strong_margin == 8.0

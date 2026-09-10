@@ -139,14 +139,15 @@ invariants are covered by an end-to-end test.
 - Test: tests/core/excel_target/test_excel_target_review_discovery.py
 - Test: tests/core/excel_target/test_excel_target_candidate_recall.py
 
-- [ ] Add an English-query/Arabic-only-catalog failing test with a generic alias
+- [x] Add an English-query/Arabic-only-catalog failing test with a generic alias
   fixture.
-- [ ] Implement a review-only alias channel resolved to rows in the current
+- [x] Implement a review-only alias channel resolved to rows in the current
   catalog only; do not call live translation or network services.
-- [ ] Add negative tests for short roots, shared prefixes, manufacturer-only
+- [x] Add negative tests for short roots, shared prefixes, manufacturer-only
   suffixes, and unrelated brands.
-- [ ] Run the full Excel-target suite and compare automatic results before and
-  after.
+- [ ] Run the production-configured shadow comparison of automatic results
+  before and after. The code-level suite passes, but the feature flag remains
+  disabled until the replay and precision gates approve rollout.
 
 ## Task 6: Controlled discovery expansion
 
@@ -156,7 +157,7 @@ invariants are covered by an end-to-end test.
 - Modify: state/config.yaml only after replay approval
 - Test: tests/core/excel_target/test_excel_target_review_discovery.py
 
-- [ ] Keep thresholds unchanged by default and add a separate feature gate for
+- [x] Keep thresholds unchanged by default and add a separate feature gate for
   any new discovery channel.
 - [ ] Run shadow replay with positive and negative gold cases.
 - [ ] Stop rollout if candidate-count p99 or reviewed precision exceeds the

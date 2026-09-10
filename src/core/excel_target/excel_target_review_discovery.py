@@ -9,19 +9,28 @@ Tawreed, or any other network service.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Sequence
+from typing import Literal, Mapping, Sequence
 
 from rapidfuzz import fuzz
 from rapidfuzz.distance import Levenshtein
 
 from src.core.utils.excel import Item
 
-from .excel_target_identity import normalize_arabic_brand, normalize_english_brand
+from .excel_target_aliases import APPROVED_ALIAS_ENTRIES, AliasEntry
+from .excel_target_identity import (
+    normalize_arabic_brand,
+    normalize_arabic_review_brand,
+    normalize_english_brand,
+)
 from .excel_target_loader import TargetProduct
 from .product_attributes import validate_product_compatibility
 
 
-ReviewStrategy = Literal["english_fuzzy", "arabic_fuzzy"]
+ReviewStrategy = Literal[
+    "english_fuzzy",
+    "arabic_fuzzy",
+    "cross_language_alias",
+]
 ReviewStatus = Literal[
     "strong",
     "medium",
@@ -36,6 +45,7 @@ class ReviewDiscoveryConfig:
     """Conservative gates for review-only catalog discovery."""
 
     enabled: bool = True
+    cross_language_aliases_enabled: bool = False
     limit: int = 5
     strong_score: float = 90.0
     strong_margin: float = 8.0
@@ -81,8 +91,19 @@ class _CatalogEntry:
         return _target_row_identity(self.product)
 
 
+@dataclass(frozen=True)
+class _ReviewAlias:
+    english_key: str
+    arabic_key: str
+    source: str
+    products: tuple[TargetProduct, ...]
+
+
 _ScoredCandidate = tuple[_CatalogEntry, float, tuple[str, ...]]
 _SelectedCandidate = tuple[_CatalogEntry, float, float, float, tuple[str, ...]]
+_GENERIC_ALIAS_TOKENS = frozenset(
+    {"CO", "COMPANY", "GROUP", "LAB", "LABS", "MEDICAL", "PHARMA", "TRADING"}
+)
 
 
 @dataclass(frozen=True)
@@ -91,9 +112,15 @@ class ExcelTargetReviewDiscoveryIndex:
 
     _english_entries: tuple[_CatalogEntry, ...]
     _arabic_entries: tuple[_CatalogEntry, ...]
+    _cross_language_aliases: tuple[_ReviewAlias, ...] = ()
 
     @classmethod
-    def build(cls, catalog: Sequence[TargetProduct]) -> "ExcelTargetReviewDiscoveryIndex":
+    def build(
+        cls,
+        catalog: Sequence[TargetProduct],
+        *,
+        review_aliases: Sequence[AliasEntry | Mapping[str, object]] = (),
+    ) -> "ExcelTargetReviewDiscoveryIndex":
         """Build an offline index while preserving distinct target rows.
 
         A repeated copy of the same physical row is removed, but the same
@@ -137,9 +164,14 @@ class ExcelTargetReviewDiscoveryIndex:
                         )
                     )
 
+        aliases = _build_review_aliases(
+            catalog,
+            (*APPROVED_ALIAS_ENTRIES, *review_aliases),
+        )
         return cls(
             _english_entries=tuple(sorted(english, key=_entry_sort_key)),
             _arabic_entries=tuple(sorted(arabic, key=_entry_sort_key)),
+            _cross_language_aliases=aliases,
         )
 
     def discover(
@@ -165,27 +197,133 @@ class ExcelTargetReviewDiscoveryIndex:
         strategy, normalized_query = projection
         entries = self._entries_for(strategy)
         scored = _score_entries(normalized_query, entries, config)
-        selection = _select_scored_candidates(scored, config)
-        if selection is None:
-            return ()
-        selected, base_status = selection
-        return tuple(
-            _build_discovery_hit(
-                item,
-                entry,
-                score,
-                runner_up_score,
-                score_margin,
-                base_status,
-                shared_tokens,
+        selected_hits: list[ReviewDiscoveryHit] = []
+        if config.cross_language_aliases_enabled and strategy == "english_fuzzy":
+            selected_hits.extend(
+                _cross_language_alias_hits(item, normalized_query, self._cross_language_aliases)
             )
-            for entry, score, runner_up_score, score_margin, shared_tokens in selected[
-                : max(0, int(config.limit))
-            ]
+
+        selection = _select_scored_candidates(scored, config)
+        if selection is not None:
+            selected, base_status = selection
+            selected_hits.extend(
+                _build_discovery_hit(
+                    item,
+                    entry,
+                    score,
+                    runner_up_score,
+                    score_margin,
+                    base_status,
+                    shared_tokens,
+                )
+                for entry, score, runner_up_score, score_margin, shared_tokens in selected
+            )
+
+        if not selected_hits:
+            return ()
+        deduped: list[ReviewDiscoveryHit] = []
+        seen_rows: set[tuple[str, str, int, str]] = set()
+        for hit in selected_hits:
+            if hit.target_row_key in seen_rows:
+                continue
+            seen_rows.add(hit.target_row_key)
+            deduped.append(hit)
+        return tuple(
+            deduped[: max(0, int(config.limit))]
         )
 
     def _entries_for(self, strategy: ReviewStrategy) -> tuple[_CatalogEntry, ...]:
         return self._arabic_entries if strategy == "arabic_fuzzy" else self._english_entries
+
+
+def _build_review_aliases(
+    catalog: Sequence[TargetProduct],
+    raw_aliases: Sequence[AliasEntry | Mapping[str, object]],
+) -> tuple[_ReviewAlias, ...]:
+    """Build target-scoped aliases for the gated review-only channel."""
+    products_by_arabic: dict[str, list[TargetProduct]] = {}
+    for product in catalog:
+        arabic_key = normalize_arabic_review_brand(product.name_ar)
+        if arabic_key:
+            products_by_arabic.setdefault(arabic_key, []).append(product)
+
+    aliases: list[_ReviewAlias] = []
+    seen: set[tuple[str, str, str]] = set()
+    for raw_alias in raw_aliases:
+        if isinstance(raw_alias, AliasEntry):
+            english, arabic, source = (
+                raw_alias.english,
+                raw_alias.arabic,
+                raw_alias.source,
+            )
+        else:
+            english = str(raw_alias.get("en") or raw_alias.get("english") or "")
+            arabic = str(raw_alias.get("ar") or raw_alias.get("arabic") or "")
+            source = str(raw_alias.get("source") or "local_alias")
+        english_key = normalize_english_brand(english)
+        arabic_key = normalize_arabic_review_brand(arabic)
+        if not _is_safe_review_alias_key(english_key):
+            continue
+        products = tuple(
+            sorted(
+                products_by_arabic.get(arabic_key, ()),
+                key=_entry_sort_key_for_product,
+            )
+        )
+        identity = (english_key, arabic_key, source)
+        if english_key and arabic_key and products and identity not in seen:
+            seen.add(identity)
+            aliases.append(_ReviewAlias(english_key, arabic_key, source, products))
+    return tuple(
+        sorted(
+            aliases,
+            key=lambda alias: (alias.english_key, alias.source, alias.arabic_key),
+        )
+    )
+
+
+def _is_safe_review_alias_key(english_key: str) -> bool:
+    tokens = tuple(english_key.split())
+    meaningful = tuple(
+        token
+        for token in tokens
+        if len(token) >= 4 and token not in _GENERIC_ALIAS_TOKENS
+    )
+    return bool(meaningful)
+
+
+def _cross_language_alias_hits(
+    item: Item,
+    normalized_query: str,
+    aliases: Sequence[_ReviewAlias],
+) -> tuple[ReviewDiscoveryHit, ...]:
+    """Return exact audited English-to-Arabic rows for manual review only."""
+    hits: list[ReviewDiscoveryHit] = []
+    for alias in aliases:
+        if alias.english_key != normalized_query:
+            continue
+        shared_tokens = _shared_brand_tokens(
+            tuple(normalized_query.split()), tuple(alias.english_key.split())
+        )
+        for product in alias.products:
+            compatibility = validate_product_compatibility(item.name, product.name_ar)
+            reason = compatibility.rejection_reason
+            hits.append(
+                ReviewDiscoveryHit(
+                    product=product,
+                    score=100.0,
+                    runner_up_score=0.0,
+                    score_margin=100.0,
+                    strategy="cross_language_alias",
+                    review_status=_status_for_compatibility("strong", reason),
+                    shared_brand_tokens=shared_tokens,
+                    attribute_note=(
+                        f"review-only audited alias ({alias.source})"
+                        + (f"; {reason}" if reason else "")
+                    ),
+                )
+            )
+    return tuple(hits)
 
 
 def _query_projection(raw_name: str) -> tuple[ReviewStrategy, str] | None:
@@ -194,6 +332,15 @@ def _query_projection(raw_name: str) -> tuple[ReviewStrategy, str] | None:
         return ("arabic_fuzzy", normalized) if normalized else None
     normalized = normalize_english_brand(raw_name)
     return ("english_fuzzy", normalized) if normalized else None
+
+
+def _entry_sort_key_for_product(product: TargetProduct) -> tuple[str, str, int, str]:
+    return (
+        str(product.store_product_id).casefold(),
+        str(product.source_file).casefold(),
+        int(product.source_row_number or 0),
+        str(product.name).casefold(),
+    )
 
 
 def _score_entries(

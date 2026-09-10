@@ -405,6 +405,30 @@ class StreamlitManualReviewTests(unittest.TestCase):
         )
         self.assertEqual({option.ranking_tier for option in merged["1::TEST"]}, {2})
 
+    def test_candidate_provenance_keeps_distinct_physical_rows(self) -> None:
+        first = ReviewCandidateOption(
+            store_product_id="same-product",
+            name_en="TEST",
+            name_ar="\u0645\u0646\u062a\u062c",
+            supplier="excel-target:baraka",
+            available_quantity=1,
+            price=10.0,
+            score=15.0,
+            rejection_reason="",
+            orderable=True,
+            matching_source="excel-target",
+            target_key="baraka",
+            source_file="baraka.xlsx",
+            excel_target_row_key="row-a",
+        )
+        second = ReviewCandidateOption(
+            **{**first.to_dict(), "excel_target_row_key": "row-b"}
+        )
+        with patch.object(manual_review_page.st, "caption") as caption:
+            manual_review_page._render_candidate_provenance([first, second])
+
+        assert caption.call_count == 2
+
     def test_tawreed_saved_decision_does_not_hide_baraka_candidates(self) -> None:
         option = ReviewCandidateOption(
             store_product_id="baraka-1",

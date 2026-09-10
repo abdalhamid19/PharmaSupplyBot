@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.core.excel_target.excel_target_loader import TargetProduct
+from src.core.excel_target.excel_target_aliases import AliasEntry
 from src.core.excel_target.excel_target_review_discovery import (
     ExcelTargetReviewDiscoveryIndex,
     ReviewDiscoveryConfig,
@@ -213,3 +214,60 @@ def test_disabled_discovery_and_zero_limit_return_no_hits() -> None:
 
     assert index.discover(_item("AMOXICILIN 30 TABS"), config=ReviewDiscoveryConfig(enabled=False)) == ()
     assert index.discover(_item("AMOXICILIN 30 TABS"), config=ReviewDiscoveryConfig(limit=0)) == ()
+
+
+def test_cross_language_alias_is_gated_and_target_scoped() -> None:
+    catalog = [
+        TargetProduct(
+            "generic-row",
+            "\u0628\u0631\u0627\u0646\u062f \u062a\u062c\u0631\u064a\u0628\u064a 30 \u0642\u0631\u0635",
+            10,
+            0,
+            source_file="arabic-only.xlsx",
+            source_row_number=7,
+        )
+    ]
+    index = ExcelTargetReviewDiscoveryIndex.build(
+        catalog,
+        review_aliases=(
+            AliasEntry(
+                "GENERIC BRAND",
+                "\u0628\u0631\u0627\u0646\u062f \u062a\u062c\u0631\u064a\u0628\u064a",
+                "fixture",
+            ),
+        ),
+    )
+    item = _item("GENERIC BRAND 30 CAPS")
+
+    assert index.discover(item, config=ReviewDiscoveryConfig()) == ()
+    hits = index.discover(
+        item,
+        config=ReviewDiscoveryConfig(cross_language_aliases_enabled=True),
+    )
+
+    assert len(hits) == 1
+    assert hits[0].strategy == "cross_language_alias"
+    assert hits[0].product.code == "generic-row"
+    assert hits[0].review_status == "variant_conflict"
+    assert index.discover(
+        _item("UNRELATED BRAND 30 CAPS"),
+        config=ReviewDiscoveryConfig(cross_language_aliases_enabled=True),
+    ) == ()
+
+
+def test_cross_language_alias_rejects_short_and_manufacturer_only_roots() -> None:
+    catalog = [
+        TargetProduct("short-row", "\u0628\u0631\0627\0646\062f \u0642\u0635\u064a\u0631 30 \u0642\u0631\u0635", 10, 0),
+        TargetProduct("manufacturer-row", "\u0628\u0631\0627\0646\062f \u0634\u0631\0643\u0629 30 \u0642\u0631\u0635", 10, 0),
+    ]
+    index = ExcelTargetReviewDiscoveryIndex.build(
+        catalog,
+        review_aliases=(
+            AliasEntry("AB", "\u0628\u0631\0627\0646\062f \u0642\u0635\u064a\u0631", "fixture"),
+            AliasEntry("PHARMA", "\u0628\u0631\0627\0646\062f \u0634\u0631\0643\u0629", "fixture"),
+        ),
+    )
+    config = ReviewDiscoveryConfig(cross_language_aliases_enabled=True)
+
+    assert index.discover(_item("AB 30 CAPS"), config=config) == ()
+    assert index.discover(_item("PHARMA 30 CAPS"), config=config) == ()

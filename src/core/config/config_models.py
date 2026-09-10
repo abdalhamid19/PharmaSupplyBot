@@ -101,6 +101,10 @@ class MatchingConfig:
     enable_bilingual_secondary_match: bool = False
     bilingual_min_score: float = 0.75
     excel_target_review_candidates_enabled: bool = True
+    # Disabled until a labelled cross-language review set passes the rollout
+    # gates. When enabled, only audited local aliases are used and the channel
+    # remains review-only.
+    excel_target_review_cross_language_aliases_enabled: bool = False
     excel_target_review_candidate_limit: int = 5
     excel_target_review_fuzzy_strong_score: float = 90.0
     excel_target_review_fuzzy_strong_margin: float = 8.0

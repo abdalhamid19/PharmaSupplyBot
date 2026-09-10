@@ -24,6 +24,7 @@ from src.core.manual_review.manual_review_store_helpers import (
 )
 from src.core.utils.excel import Item
 
+from .excel_target_aliases import AliasEntry
 from .excel_target_identity import (
     ExcelTargetBilingualIndex,
     IdentifiedTarget,
@@ -44,6 +45,17 @@ from .excel_target_review_discovery import (
 )
 
 logger = logging.getLogger(__name__)
+
+_AUTOMATIC_IDENTITY_KINDS = frozenset(
+    {
+        "native_english",
+        "dictionary",
+        "cached_translation",
+        "safe_alias",
+        "tawreed_catalog",
+        "manual_review_rebound",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -66,6 +78,7 @@ class ExcelTargetMatcher:
         *,
         allow_live_translation: bool = False,
         use_saved_approvals: bool = True,
+        review_aliases: Sequence[AliasEntry] = (),
     ) -> None:
         self.target_key = target_key
         self.catalog = tuple(catalog)
@@ -78,7 +91,10 @@ class ExcelTargetMatcher:
             self.catalog,
             allow_live_translation=allow_live_translation,
         )
-        self.review_discovery = ExcelTargetReviewDiscoveryIndex.build(self.catalog)
+        self.review_discovery = ExcelTargetReviewDiscoveryIndex.build(
+            self.catalog,
+            review_aliases=review_aliases,
+        )
         self._catalog_by_id = _catalog_products_by_id(self.catalog)
         self._native_english_candidate_templates = tuple(
             product.to_candidate_dict()
@@ -143,6 +159,7 @@ def find_best_match_in_target(
     *,
     allow_live_translation: bool = False,
     use_saved_approvals: bool = True,
+    review_aliases: Sequence[AliasEntry] = (),
 ) -> ExcelTargetMatch:
     """Compatibility wrapper; batch callers must reuse :class:`ExcelTargetMatcher`."""
     return ExcelTargetMatcher(
@@ -150,6 +167,7 @@ def find_best_match_in_target(
         catalog,
         allow_live_translation=allow_live_translation,
         use_saved_approvals=use_saved_approvals,
+        review_aliases=review_aliases,
     ).match(item, matching_config)
 
 
@@ -199,6 +217,9 @@ def _compatible_identified(
             "review_identity_prefix",
             "review_fuzzy",
         }:
+            rejected.append(f"{candidate.evidence.kind} evidence requires manual review")
+            continue
+        if candidate.evidence.kind not in _AUTOMATIC_IDENTITY_KINDS:
             rejected.append(f"{candidate.evidence.kind} evidence requires manual review")
             continue
         compatibility = validate_product_compatibility(item.name, candidate.product.name_ar)
@@ -408,11 +429,7 @@ def _record_manual_rebind_failure(
 def _identity_decision(item: Item, identified: IdentifiedTarget, started: float) -> MatchDecision:
     product = identified.product
     evidence = identified.evidence
-    if evidence.kind in {
-        "review_identity",
-        "review_identity_prefix",
-        "review_fuzzy",
-    }:
+    if evidence.kind not in _AUTOMATIC_IDENTITY_KINDS:
         raise ValueError(
             f"{evidence.kind} evidence cannot produce an automatic match"
         )
@@ -476,6 +493,9 @@ def _review_discovery_config(config: MatchingConfig) -> ReviewDiscoveryConfig:
     """Translate app matching settings into the review-only discovery contract."""
     return ReviewDiscoveryConfig(
         enabled=bool(getattr(config, "excel_target_review_candidates_enabled", True)),
+        cross_language_aliases_enabled=bool(
+            getattr(config, "excel_target_review_cross_language_aliases_enabled", False)
+        ),
         limit=int(getattr(config, "excel_target_review_candidate_limit", 5)),
         strong_score=float(
             getattr(config, "excel_target_review_fuzzy_strong_score", 90.0)

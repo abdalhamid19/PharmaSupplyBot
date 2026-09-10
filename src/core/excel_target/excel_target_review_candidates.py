@@ -118,17 +118,22 @@ class ExcelTargetReviewCandidate:
             "tawreed_catalog",
             "dictionary",
             "cached_translation",
-            "cohere_translation",
             "tawreed_dictionary",
             "egyptian_dictionary",
-            "cached_cohere",
         }:
             return 0 if self.compatibility.accepted else 1
         if kind == "review_identity":
             return 2
         if kind == "review_identity_prefix":
             return 3
-        if kind in {"review_fuzzy", "english_fuzzy", "arabic_fuzzy"}:
+        if kind in {
+            "review_fuzzy",
+            "english_fuzzy",
+            "arabic_fuzzy",
+            "cross_language_alias",
+            "cohere_translation",
+            "cached_cohere",
+        }:
             return 4
         return 4
 

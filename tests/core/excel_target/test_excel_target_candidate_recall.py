@@ -10,6 +10,7 @@ from src.core.excel_target.excel_target_identity import (
     IdentifiedTarget,
     IdentityEvidence,
 )
+from src.core.excel_target.excel_target_aliases import AliasEntry
 from src.core.excel_target.excel_target_matching import (
     ExcelTargetMatcher,
     _compatible_identified,
@@ -47,6 +48,31 @@ def test_review_only_identity_is_rejected_by_automatic_compatibility_gate() -> N
     assert accepted == []
     assert rejected == ["review_identity evidence requires manual review"]
     with pytest.raises(ValueError, match="review_identity"):
+        _identity_decision(Item("vol3", "VOLTAREN 3AMP", 1), identified, 0.0)
+
+
+@pytest.mark.parametrize("evidence_kind", ["unknown_future", "discovery_only"])
+def test_unknown_identity_evidence_fails_closed_for_automatic_matching(
+    evidence_kind: str,
+) -> None:
+    product = TargetProduct(
+        "",
+        "\u0641\u0648\u0644\u062a\u0627\u0631\u064a\u0646 3\u0645\u0628\u0648\u0644",
+        51.0,
+        0.0,
+    )
+    identified = IdentifiedTarget(
+        product,
+        IdentityEvidence(evidence_kind, "VOLTAREN", "future evidence", 1.0),
+    )
+
+    accepted, rejected = _compatible_identified(
+        Item("vol3", "VOLTAREN 3AMP", 1), (identified,)
+    )
+
+    assert accepted == []
+    assert rejected == [f"{evidence_kind} evidence requires manual review"]
+    with pytest.raises(ValueError, match=evidence_kind):
         _identity_decision(Item("vol3", "VOLTAREN 3AMP", 1), identified, 0.0)
 
 
@@ -165,6 +191,58 @@ def test_review_alias_anchor_works_without_a_bare_arabic_target_row() -> None:
         3100
     ]
     assert match.review_candidates[0].candidate_method == "review_identity"
+
+
+def test_cross_language_review_alias_never_becomes_automatic_match() -> None:
+    arabic_brand = "".join(
+        chr(codepoint)
+        for codepoint in (
+            0x628,
+            0x631,
+            0x627,
+            0x646,
+            0x62F,
+            0x20,
+            0x62A,
+            0x62C,
+            0x631,
+            0x64A,
+            0x628,
+            0x64A,
+        )
+    )
+    arabic_pack = "".join(chr(codepoint) for codepoint in (0x642, 0x631, 0x635))
+    catalog = [
+        TargetProduct(
+            "generic-row",
+            f"{arabic_brand} 30 {arabic_pack}",
+            51.0,
+            0.0,
+            source_file="arabic-only.xlsx",
+            source_row_number=7,
+        )
+    ]
+    matcher = ExcelTargetMatcher(
+        "baraka",
+        catalog,
+        review_aliases=(
+            AliasEntry(
+                "GENERIC BRAND",
+                "\u0628\u0631\u0627\0646\u062f \u062a\062c\0631\u064a\u0628\u064a",
+                "fixture",
+            ),
+            AliasEntry("GENERIC BRAND", arabic_brand, "fixture-correct"),
+        ),
+    )
+
+    match = matcher.match(
+        Item("generic", "GENERIC BRAND 30 CAPS", 1),
+        MatchingConfig(excel_target_review_cross_language_aliases_enabled=True),
+    )
+
+    assert match.decision.best_match is None
+    assert len(match.review_candidates) == 1
+    assert match.review_candidates[0].candidate_method == "cross_language_alias"
 
 
 def test_review_candidates_include_the_correct_xithrone_pack_variant() -> None:
