@@ -38,3 +38,6 @@ backfill, and controlled improvement loop.
 Read [01-evidence-and-root-causes.md](01-evidence-and-root-causes.md) before
 [02-architecture.md](02-architecture.md), then execute
 [03-implementation-plan.md](03-implementation-plan.md).
+
+The current human-gated proposal queue is in
+[05-deterministic-alias-proposals.md](05-deterministic-alias-proposals.md).
