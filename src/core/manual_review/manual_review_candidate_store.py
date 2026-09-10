@@ -84,6 +84,7 @@ def load_review_candidates(run_dir: Path) -> dict[str, list[ReviewCandidateOptio
                         option.matching_source,
                         option.target_key,
                         option.source_file,
+                        option.excel_target_row_key,
                     )
                     if identity in bucket_seen:
                         continue

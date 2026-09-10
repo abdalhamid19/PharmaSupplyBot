@@ -118,12 +118,17 @@ artifacts, existing Excel-target matcher and manual-review store.
 - Test: tests/cli/commands/test_excel_target_manual_review_artifacts.py
 - Create: tools/report_excel_target_candidate_coverage.py
 
-- [ ] Add an artifact regression with more candidates than the save limit.
+- [x] Add an artifact regression with more candidates than the save limit.
   Assert the total is the generated union and saved count is capped.
-- [ ] Add a read-only report tool that calculates coverage, recall, and
-  precision samples without writing SQLite or input workbooks.
-- [ ] Run the report against historical Baraka/Qaysar artifacts and record
+- [x] Add a read-only report tool that calculates coverage, recall, and
+  precision samples without writing SQLite or input workbooks. The report
+  leaves C_display null unless the UI emits an explicit display count.
+- [x] Run the report against historical Baraka/Qaysar artifacts and record
   p50, p95, p99, and maximum candidate counts.
+
+Gate note: Task 4 measurement is usable for generated/union/saved counts, but
+the rollout gate remains open until the UI display count and full round-trip
+invariants are covered by an end-to-end test.
 
 ## Task 5: Add target-scoped cross-language review discovery
 

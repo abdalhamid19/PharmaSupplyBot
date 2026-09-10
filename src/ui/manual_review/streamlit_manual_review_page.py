@@ -261,6 +261,7 @@ def _load_group_candidates(
                     option.matching_source_label,
                     option.target_key,
                     option.source_file,
+                    option.excel_target_row_key,
                 )
                 if identity in bucket_seen:
                     continue

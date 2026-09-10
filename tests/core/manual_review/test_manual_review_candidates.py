@@ -180,6 +180,7 @@ class ManualReviewCandidatesTests(TestCase):
             excel_target_source_file="baraka.xlsx",
             excel_target_row_key="row-key-17",
             excel_target_source_row=17,
+            ranking_tier=3,
         )
 
         restored = ReviewCandidateOption.from_dict(option.to_dict())
@@ -202,9 +203,59 @@ class ManualReviewCandidatesTests(TestCase):
         self.assertEqual(restored.shared_brand_tokens, ("INODEP",))
         self.assertEqual(restored.excel_target_row_key, "row-key-17")
         self.assertEqual(restored.excel_target_source_row, 17)
+        self.assertEqual(restored.ranking_tier, 3)
         self.assertEqual(legacy.candidate_method, "")
         self.assertEqual(legacy.review_status, "")
         self.assertEqual(legacy.excel_target_source_row, 0)
+
+    def test_loader_keeps_distinct_excel_rows_with_same_product_identity(self) -> None:
+        base = {
+            "store_product_id": "duplicate-product",
+            "name_en": "DUPLICATE",
+            "name_ar": "\u0645\u0643\u0631\u0631",
+            "supplier": "excel-target:baraka",
+            "available_quantity": 1,
+            "price": 10.0,
+            "score": 10.0,
+            "rejection_reason": "",
+            "orderable": True,
+            "matching_source": "excel-target",
+            "target_key": "baraka",
+            "source_file": "baraka.xlsx",
+            "candidate_method": "review_identity",
+            "ranking_tier": 2,
+        }
+        with TemporaryDirectory() as temp_dir:
+            run_dir = Path(temp_dir) / "row-key-run"
+            run_dir.mkdir()
+            rows = []
+            for row_key, source_row in (("row-a", 10), ("row-b", 20)):
+                option = dict(
+                    base,
+                    excel_target_row_key=row_key,
+                    excel_target_source_row=source_row,
+                )
+                rows.append(option)
+            (run_dir / "manual_review_candidates_excel-target_baraka.jsonl").write_text(
+                json.dumps(
+                    {
+                        "item_key": "1::DUPLICATE",
+                        "target_key": "baraka",
+                        "source_file": "baraka.xlsx",
+                        "options": rows,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            loaded = load_review_candidates(run_dir)
+
+        values = loaded["1::DUPLICATE"]
+        self.assertEqual(
+            {value.excel_target_row_key for value in values}, {"row-a", "row-b"}
+        )
+        self.assertEqual({value.ranking_tier for value in values}, {2})
 
 def _diag(
     english_name: str,

@@ -369,6 +369,42 @@ class StreamlitManualReviewTests(unittest.TestCase):
             {"tawreed", "excel-target"},
         )
 
+    def test_group_candidate_loader_keeps_distinct_excel_row_keys(self) -> None:
+        run_dir = Path("artifacts/excel-target/baraka/20260907_1839")
+        first = ReviewCandidateOption(
+            store_product_id="same-product",
+            name_en="TEST",
+            name_ar="\u0645\u0646\u062a\u062c",
+            supplier="excel-target:baraka",
+            available_quantity=1,
+            price=10.0,
+            score=15.0,
+            rejection_reason="",
+            orderable=True,
+            matching_source="excel-target",
+            matching_source_label="baraka@baraka.xlsx",
+            target_key="baraka",
+            source_file="baraka.xlsx",
+            excel_target_row_key="row-a",
+            ranking_tier=2,
+        )
+        second = ReviewCandidateOption(
+            **{**first.to_dict(), "excel_target_row_key": "row-b"}
+        )
+
+        with patch.object(
+            manual_review_page,
+            "load_review_candidates",
+            return_value={"1::TEST": [first, second]},
+        ):
+            merged = manual_review_page._load_group_candidates((run_dir,))
+
+        self.assertEqual(
+            {option.excel_target_row_key for option in merged["1::TEST"]},
+            {"row-a", "row-b"},
+        )
+        self.assertEqual({option.ranking_tier for option in merged["1::TEST"]}, {2})
+
     def test_tawreed_saved_decision_does_not_hide_baraka_candidates(self) -> None:
         option = ReviewCandidateOption(
             store_product_id="baraka-1",

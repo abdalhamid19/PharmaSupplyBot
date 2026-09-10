@@ -15,8 +15,15 @@ from src.core.artifact_run import ArtifactRun
 from src.core.config.config import load_config
 from src.core.excel_target.excel_target_review_discovery import ReviewDiscoveryHit
 from src.core.excel_target.excel_target_loader import TargetProduct
+from src.core.excel_target.excel_target_matching import ExcelTargetMatch
+from src.core.excel_target.excel_target_review_candidates import (
+    ExcelTargetReviewCandidate,
+)
+from src.core.excel_target.excel_target_identity import IdentityEvidence
 from src.core.manual_review.manual_review_store import ManualReviewStore
 from src.core.utils.excel import Item
+from src.core.matching_types import MatchDecision
+from src.core.excel_target.product_attributes import validate_product_compatibility
 
 
 class ExcelTargetManualReviewArtifactTests(TestCase):
@@ -144,6 +151,63 @@ class ExcelTargetManualReviewArtifactTests(TestCase):
         payload = json.loads(candidates_text)
         self.assertEqual(payload["options"][0]["candidate_method"], "english_fuzzy")
         self.assertEqual(payload["options"][0]["excel_target_source_row"], 44)
+
+    def test_total_candidates_are_distinct_from_saved_candidate_cap(self) -> None:
+        catalog = [
+            TargetProduct(
+                f"row-{index}",
+                f"\u0635\u0646\u0641 \u062a\u062c\u0631\u064a\u0628\u064a {index}",
+                10.0 + index,
+                0.0,
+                "baraka.xlsx",
+                source_row_number=index,
+            )
+            for index in range(1, 5)
+        ]
+        item = Item("90954", "TEST BRAND 30", 1)
+        compatibility = validate_product_compatibility(item.name, catalog[0].name_ar)
+        candidates = tuple(
+            ExcelTargetReviewCandidate(
+                target_key="alnasr",
+                product=product,
+                score=90.0 - index,
+                compatibility=compatibility,
+                identity_evidence=IdentityEvidence(
+                    "review_identity",
+                    "test",
+                    "test-only review identity",
+                    0.9,
+                ),
+                candidate_method="review_identity",
+            )
+            for index, product in enumerate(catalog)
+        )
+        match = ExcelTargetMatch(
+            "alnasr",
+            MatchDecision(None, [], "test review candidates"),
+            len(catalog),
+            candidates,
+        )
+        with patch.object(
+            cli_order_excel_target.ExcelTargetMatcher,
+            "match",
+            return_value=match,
+        ), patch.object(
+            cli_order_excel_target,
+            "_review_candidate_limit",
+            return_value=2,
+        ):
+            _totals, review_text, candidates_text = self._run_with_temp_artifacts(
+                catalog, item
+            )
+
+        row = next(csv.DictReader(review_text.splitlines()))
+        self.assertEqual(row["candidate_count_total"], "4")
+        self.assertEqual(row["candidate_count_saved"], "2")
+        payload = json.loads(candidates_text)
+        self.assertEqual(payload["candidate_count_total"], 4)
+        self.assertEqual(payload["candidate_count_saved"], 2)
+        self.assertEqual(len(payload["options"]), 2)
 
     def test_auto_matched_excel_target_records_source(self) -> None:
         with TemporaryDirectory() as temp_dir:

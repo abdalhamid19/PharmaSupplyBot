@@ -53,6 +53,7 @@ class ReviewCandidateOption:
     review_status: str = ""
     excel_target_row_key: str = ""
     excel_target_source_row: int = 0
+    ranking_tier: int = 4
 
     def to_dict(self) -> dict[str, Any]:
         """Return dict representation."""
@@ -94,6 +95,10 @@ class ReviewCandidateOption:
             )
         except (TypeError, ValueError):
             payload["excel_target_source_row"] = 0
+        try:
+            payload["ranking_tier"] = int(payload.get("ranking_tier", 4) or 4)
+        except (TypeError, ValueError):
+            payload["ranking_tier"] = 4
         field_names = {field.name for field in dataclasses.fields(cls)}
         return cls(**{key: value for key, value in payload.items() if key in field_names})
 
