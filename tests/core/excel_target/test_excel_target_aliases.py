@@ -216,3 +216,83 @@ def test_duplicate_source_evidence_for_one_product_keeps_tawreed_provenance() ->
     assert len(candidates) == 1
     assert candidates[0].product_id == "inodep"
     assert candidates[0].source == "tawreed"
+
+
+def test_p001_cogicine_uses_the_reviewed_tawreed_spelling_variant() -> None:
+    resolver = ExcelTargetAliasResolver(
+        alias_entries=[
+            {
+                "en": "COGICIN 30 TABS",
+                "ar": "كوجيسين 30 اقراص",
+                "source": "tawreed",
+            }
+        ],
+        target_products=[
+            TargetProduct("cogicin", "كوجيسين 30 قرص", 95.0, 0.0),
+        ],
+    )
+
+    candidates = resolver.resolve("COGICINE 30 TABS")
+
+    assert candidates == (
+        AliasCandidate(
+            product_id="cogicin",
+            canonical_brand="COGICINE",
+            source="tawreed",
+            score=100.0,
+            runner_up_margin=100.0,
+        ),
+    )
+
+
+def test_p007_explicit_bilingual_alias_is_scoped_to_the_confirmed_target_name() -> None:
+    resolver = ExcelTargetAliasResolver(
+        alias_entries=[
+            {
+                "en": "HERO BABY LF",
+                "ar": "هيرو بابي لف ميلك",
+                "source": "egyptian",
+            }
+        ],
+        target_products=[
+            TargetProduct("lf", "لبن هيرو بيبى ال اف 400 جم", 399.0, 0.0),
+            TargetProduct("ha", "هيرو بيبي اتش ايه لبن 400 جم", 419.0, 0.0),
+        ],
+    )
+
+    candidates = resolver.resolve("HERO BABY LF MILK")
+
+    assert candidates == (
+        AliasCandidate(
+            product_id="lf",
+            canonical_brand="HERO BABY LF MILK",
+            source="egyptian",
+            score=100.0,
+            runner_up_margin=100.0,
+        ),
+    )
+
+
+def test_existing_custom_alias_sources_remain_supported() -> None:
+    resolver = ExcelTargetAliasResolver(
+        alias_entries=[
+            {
+                "en": "UNAPPROVED BRAND",
+                "ar": "براند غير معتمد",
+                "source": "manual_review_note",
+            }
+        ],
+        target_products=[
+            TargetProduct("unapproved", "براند غير معتمد 30 قرص", 10.0, 0.0),
+        ],
+    )
+
+    assert resolver.resolve("UNAPPROVED BRAND 30 TABS") == (
+        AliasCandidate(
+            product_id="unapproved",
+            canonical_brand="UNAPPROVED BRAND",
+            source="manual_review_note",
+            score=100.0,
+            runner_up_margin=100.0,
+        ),
+    )

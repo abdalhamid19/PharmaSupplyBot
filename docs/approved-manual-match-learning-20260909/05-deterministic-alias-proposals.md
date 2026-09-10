@@ -8,10 +8,11 @@ This document is the human-approval queue produced from the read-only
 
 ## Safety status
 
-No proposal in this document is active. No alias, parser rule, threshold, or
-automatic-matching policy was changed while producing this list. The existing
-saved row-scoped approval behavior remains the only way these examples can be
-matched automatically at runtime.
+The queue was approved for implementation on 2026-09-10. The deterministic
+rules below are now active in the candidate matcher, with the compatibility
+and target-row gates still required before an automatic result is returned.
+No fuzzy threshold was lowered, and the saved row-scoped approval behavior
+remains the only variant-conflict override.
 
 An approval means “implement and test this proposal in a shadow/candidate
 matcher.” It does not mean “convert every similar string into an automatic
@@ -68,7 +69,34 @@ The candidate matcher must demonstrate all of the following:
 
 ## What I need from the product owner
 
-Please approve proposals by ID, for example: `P-001, P-006` or “لا تفعّل أي
-اقتراح”. Approval only authorizes a test-first shadow implementation; a second
-review is still required before enabling a rule in production.
+## Implementation result
 
+The product owner approved all seven proposals. They were implemented with
+positive and negative tests:
+
+- `P-001`: exact audited `COGICINE` alias, indexed only when `كوجيسين` exists
+  in the current target catalog.
+- `P-002`: controlled spray/form and millilitre normalization, including the
+  `/ مل` topical spelling.
+- `P-003`: `قديم` is ignored only after actual catalog attributes are present.
+- `P-004`: drops strength is retained across `ORAL DROPS`, `نقط`, and
+  `قطره`; 750 and 1000 variants remain distinct.
+- `P-005`: trailing `س` is removed only for an attributed `اتور` name; a bare
+  `اتور س` remains distinct.
+- `P-006`: ampoule singular/plural forms share an identity key while count
+  compatibility remains strict.
+- `P-007`: exact bilingual `HERO BABY LF MILK` alias, indexed only when the
+  confirmed Arabic row exists in the target catalog.
+
+The previously manual-only items (`ARIPIPREX`, `L CARNITINE`, `ISOPTIN`,
+`XARELTO`, `TRIGASTCARE`, and `TOPOPRAZAN`) remain manual-only; “نفذ كله” did
+not turn them into unverified transliteration rules.
+
+The approval-disabled report changed from 1 to 11 `automatic_verified`
+findings (+10) and reduced `cohere_review_only` from 17 to 9. Existing
+`approved_manual_override` findings are reported separately and are not part
+of that gain. The exact 100-item operational replay completed successfully
+with 100 processed items; its target summaries were 15 matched/85 flagged/1
+manual-review for Baraka and 10 matched/90 flagged/7 manual-review for Caesar.
+Those operational totals should be compared only with a run using the same
+input ordering and Saved Corrections snapshot.

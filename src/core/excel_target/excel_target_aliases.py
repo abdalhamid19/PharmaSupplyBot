@@ -3,6 +3,10 @@
 This module deliberately stops at candidate generation.  It does not decide
 whether a candidate is safe to order: callers must still apply product
 attribute compatibility and target-row uniqueness checks.
+
+Built-in aliases are audited ``tawreed``/``egyptian`` entries. Caller-provided
+alias entries retain their existing source contract and are still subject to
+the resolver's score, margin, compatibility, and target-row gates.
 """
 
 from __future__ import annotations
@@ -40,6 +44,18 @@ class AliasCandidate:
     source: str
     score: float
     runner_up_margin: float
+
+
+APPROVED_ALIAS_ENTRIES: tuple[AliasEntry, ...] = (
+    # P-001: the final ``E`` is a reviewed spelling variant of the local
+    # Tawreed/dictionary spelling ``COGICIN``.  The Arabic side is the
+    # catalog identity; target-row attributes are deliberately left to the
+    # caller's compatibility gate.
+    AliasEntry("COGICINE", "كوجيسين", "tawreed"),
+    # P-007: this is an explicit, catalog-owner-confirmed bilingual relation.
+    # It is intentionally not a general transliteration or word-order rule.
+    AliasEntry("HERO BABY LF MILK", "لبن هيرو بيبى ال اف", "egyptian"),
+)
 
 
 _DEFAULT_MIN_SCORE = 96.0
@@ -168,14 +184,15 @@ class _IndexedAlias:
     signature: _BrandSignature
     arabic_key: str
     source: str
+    deterministic: bool = False
 
 
 class ExcelTargetAliasResolver:
     """Resolve conservative English aliases to loaded target products.
 
     ``alias_entries`` may contain :class:`AliasEntry`, mappings with ``en`` /
-    ``ar`` / ``source`` keys, or two/three-item tuples.  Only aliases whose
-    Arabic side maps to a supplied target product are indexed.
+    ``ar`` / ``source`` keys, or two/three-item tuples. Caller-provided aliases
+    whose Arabic side maps to a supplied target product are indexed.
     """
 
     def __init__(
@@ -213,6 +230,17 @@ class ExcelTargetAliasResolver:
                 continue
             indexed.append(_IndexedAlias(signature, arabic_key, entry.source))
 
+        # Approved aliases are indexed only when their Arabic identity is a
+        # real row in the supplied target catalog.  This is the target scope
+        # boundary that prevents either rule from becoming a global alias.
+        for entry in APPROVED_ALIAS_ENTRIES:
+            signature = _brand_signature(entry.english)
+            arabic_key = _normalize_arabic_brand(entry.arabic)
+            if signature.canonical and targets_by_arabic.get(arabic_key):
+                indexed.append(
+                    _IndexedAlias(signature, arabic_key, entry.source, deterministic=True)
+                )
+
         self._aliases = tuple(_deduplicate_aliases(indexed))
         self._targets_by_arabic = {
             key: tuple(products) for key, products in targets_by_arabic.items()
@@ -231,6 +259,11 @@ class ExcelTargetAliasResolver:
 
         scored: list[tuple[float, _IndexedAlias]] = []
         for alias in self._aliases:
+            if alias.deterministic:
+                if query.canonical != alias.signature.canonical:
+                    continue
+                scored.append((100.0, alias))
+                continue
             if not _same_meaningful_tokens(query, alias.signature):
                 continue
             score = _brand_score(query, alias.signature)
@@ -340,10 +373,15 @@ def _first_value(mapping: Mapping[str, Any], *keys: str) -> Any:
 
 
 def _deduplicate_aliases(entries: Iterable[_IndexedAlias]) -> list[_IndexedAlias]:
-    seen: set[tuple[str, str, str]] = set()
+    seen: set[tuple[str, str, str, bool]] = set()
     result: list[_IndexedAlias] = []
     for entry in entries:
-        key = (entry.signature.canonical, entry.arabic_key, entry.source)
+        key = (
+            entry.signature.canonical,
+            entry.arabic_key,
+            entry.source,
+            entry.deterministic,
+        )
         if key not in seen:
             seen.add(key)
             result.append(entry)

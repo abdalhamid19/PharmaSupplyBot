@@ -23,7 +23,7 @@ _FORMS = {
     "LOZENGE": ("LOZENGE", "LOZENGES", "\u0627\u0633\u062a\u062d\u0644\u0627\u0628"),
     "POWDER": ("POWDER", "POWDERS", "\u0628\u0648\u062f\u0631\u0629", "\u0628\u0648\u062f\u0631\u0647", "\u0645\u0633\u062d\u0648\u0642"),
     "INJECTION": ("INJ", "INJECTION", "\u062d\u0642\u0646"),
-    "DROPS": ("DROP", "DROPS", "\u0642\u0637\u0631\u0629", "\u0642\u0637\u0631\u0627\u062a", "\u0646\u0642\u0637"),
+    "DROPS": ("DROP", "DROPS", "\u0642\u0637\u0631\u0629", "\u0642\u0637\u0631\u0627\u062a", "\u0642\u0637\u0631\u0647", "\u0646\u0642\u0637"),
     "SPRAY": ("SPRAY", "\u0628\u062e\u0627\u062e", "\u0633\u0628\u0631\u0627\u0649", "\u0633\u0628\u0631\u0627\u064a"),
     "SACHET": ("SACHET", "SACHETS", "\u0643\u064a\u0633", "\u0627\u0643\u064a\u0627\u0633", "\u0623\u0643\u064a\u0627\u0633"),
 }
@@ -48,7 +48,7 @@ _COMPOUND_PART_RE = re.compile(
     re.IGNORECASE,
 )
 _BARE_DROPS_DOSE_RE = re.compile(
-    r"(\d+(?:\.\d+)?)\s*(?:drops?|\u0646\u0642\u0637)(?![\w])",
+    r"(\d+(?:\.\d+)?)\s*(?:oral\s+)?(?:drops?|\u0646\u0642\u0637|\u0642\u0637\u0631\u0629|\u0642\u0637\u0631\u0627\u062a|\u0642\u0637\u0631\u0647)(?![\w])",
     re.IGNORECASE,
 )
 _PACK_RE = re.compile(
@@ -247,7 +247,15 @@ def _mismatch_reason(query: ProductAttributes, candidate: ProductAttributes) -> 
             return "candidate concentration conflicts with requested concentration"
     if query.strengths and not candidate.strengths:
         return "candidate strength is not proven"
-    if query.strengths and not query.strengths.issubset(candidate.strengths):
+    if query.strengths and not all(
+        _strength_is_proven(
+            required,
+            candidate.strengths,
+            query.forms,
+            candidate.forms,
+        )
+        for required in query.strengths
+    ):
         return "candidate strength conflicts with requested strength"
     if not query.strengths and candidate.strengths:
         return "candidate has an unrequested strength"
@@ -256,6 +264,25 @@ def _mismatch_reason(query: ProductAttributes, candidate: ProductAttributes) -> 
     if query.packs and not (query.packs & candidate.packs):
         return "candidate pack conflicts with requested pack"
     return ""
+
+
+def _strength_is_proven(
+    required: CanonicalStrength,
+    candidate_strengths: frozenset[CanonicalStrength],
+    query_forms: frozenset[str],
+    candidate_forms: frozenset[str],
+) -> bool:
+    """Allow an unqualified drops dose to match an explicit mg drops strength."""
+    if required in candidate_strengths:
+        return True
+    if required.unit != "drops-dose":
+        return False
+    if "DROPS" not in query_forms or "DROPS" not in candidate_forms:
+        return False
+    return any(
+        strength.unit == "mg" and strength.value == required.value
+        for strength in candidate_strengths
+    )
 
 
 __all__ = [

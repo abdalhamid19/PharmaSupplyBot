@@ -28,15 +28,19 @@ IdentityKind = Literal[
     "manual_review_rebound",
 ]
 _ARABIC_DECORATION_RE = re.compile(
-    r"\d+(?:\.\d+)?\s*(?:\u0645\u062c\u0645|\u0645\u0644\u062c\u0645|\u0645\u064a\u0643\u0631\u0648\u062c\u0631\u0627\u0645|\u062c\u0631\u0627\u0645|\u062c\u0645|\u0645\u0644|\u0648\u062d\u062f\u0629|%|"
-    r"\u0642\u0631\u0635|\u0623\u0642\u0631\u0627\u0635|\u0627\u0642\u0631\u0627\u0635|\u0643\u0628\u0633\u0648\u0644\u0627\u062a|\u0643\u0628\u0633\u0648\u0644\u0629|\u0643\u0628\u0633\u0648\u0644|\u0634\u0631\u0627\u0628|\u0643\u0631\u064a\u0645|\u062c\u0644|\u062d\u0642\u0646|\u0642\u0637\u0631\u0629|\u0628\u062e\u0627\u062e|\u0643\u064a\u0633)|"
-    r"(?:\u0642\u0631\u0635|\u0623\u0642\u0631\u0627\u0635|\u0627\u0642\u0631\u0627\u0635|\u0643\u0628\u0633\u0648\u0644\u0627\u062a|\u0643\u0628\u0633\u0648\u0644\u0629|\u0643\u0628\u0633\u0648\u0644|\u0634\u0631\u0627\u0628|\u0643\u0631\u064a\u0645|\u062c\u0644|\u062c\u064a\u0644|\u062d\u0642\u0646|\u0642\u0637\u0631\u0629|\u0628\u062e\u0627\u062e|\u0633\u0628\u0631\u0627\u0649|\u063a\u0633\u0648\u0644|\u0644\u0644\u0648\u062c\u0647|\u0644\u0644\u0628\u0634\u0631\u0647|\u0644\u0644\u0628\u0634\u0631\u0629|\u0645\u0644\u064a\u0646|\u0645\u0631\u0637\u0628|\u0648\u0645\u0631\u0637\u0628|\u0628\u062f\u064a\u0644|\u0643\u0631\u062a\u0648\u0646|\u062c\u062f\u064a\u062f|\u0643\u064a\u0633)",
+    r"\d+(?:\.\d+)?\s*(?:\u0645\u062c\u0645|\u0645\u0644\u062c\u0645|\u0645\u064a\u0643\u0631\u0648\u062c\u0631\u0627\u0645|\u062c\u0631\u0627\u0645|\u062c\u0645|\u0645\u0644\u0644\u0649|\u0645\u0644|\u0648\u062d\u062f\u0629|%|"
+    r"\u0642\u0631\u0635|\u0623\u0642\u0631\u0627\u0635|\u0627\u0642\u0631\u0627\u0635|\u0643\u0628\u0633\u0648\u0644\u0627\u062a|\u0643\u0628\u0633\u0648\u0644\u0629|\u0643\u0628\u0633\u0648\u0644|\u0627\u0645\u0628\u0648\u0644\u0627\u062a|\u0627\u0645\u0628\u0648\u0644|\u0634\u0631\u0627\u0628|\u0643\u0631\u064a\u0645|\u062c\u0644|\u062d\u0642\u0646|\u0642\u0637\u0631\u0629|\u0628\u062e\u0627\u062e|\u0643\u064a\u0633)|"
+    r"(?:\u0642\u0631\u0635|\u0623\u0642\u0631\u0627\u0635|\u0627\u0642\u0631\u0627\u0635|\u0643\u0628\u0633\u0648\u0644\u0627\u062a|\u0643\u0628\u0633\u0648\u0644\u0629|\u0643\u0628\u0633\u0648\u0644|\u0627\u0645\u0628\u0648\u0644\u0627\u062a|\u0627\u0645\u0628\u0648\u0644|\u0634\u0631\u0627\u0628|\u0643\u0631\u064a\u0645|\u062c\u0644|\u062c\u064a\u0644|\u062d\u0642\u0646|\u0646\u0642\u0637|\u0642\u0637\u0631\u0629|\u0642\u0637\u0631\u0647|\u0628\u0627\u0644\u0641\u0645|\u0627\u0644\u0641\u0645|\u0645\u0644\u064a\u0646|\u0628\u062e\u0627\u062e\s+\u0645\u0648\u0636\u0639\u064a|\u0628\u062e\u0627\u062e|\u0633\u0628\u0631\u0627\u0649|\u063a\u0633\u0648\u0644|\u0644\u0644\u0648\u062c\u0647|\u0644\u0644\u0628\u0634\u0631\u0647|\u0644\u0644\u0628\u0634\u0631\u0629|\u0645\u0631\u0637\u0628|\u0648\u0645\u0631\u0637\u0628|\u0628\u062f\u064a\u0644|\u0643\u0631\u062a\u0648\u0646|\u062c\u062f\u064a\u062f|\u0643\u064a\u0633)",
     re.IGNORECASE,
 )
 _ARABIC_METADATA_RE = re.compile(
     r"\d+\s*شريط|\bس\s*(?:ج|ق)\b|\bس\s*جديد\b",
     re.IGNORECASE,
 )
+_ARABIC_LEGACY_STATUS_RE = re.compile(r"\s+\u0642\u062f\u064a\u0645\s*$")
+_ARABIC_ATOR_PREFIX_RE = re.compile(r"^\s*\u0627\u062a\u0648\u0631(?:\s|$)")
+_ARABIC_ATOR_SUFFIX_RE = re.compile(r"\s+\u0633\s*$")
+_ARABIC_SLASH_UNIT_RE = re.compile(r"(?<=/)\s*\u0645\u0644(?=\s|$)")
 _REVIEWED_ARABIC_SPELLING_VARIANTS = {
     "اجريكس": "اجركس",
     "الفينترن": "الفنترن",
@@ -213,6 +217,17 @@ class ExcelTargetBilingualIndex:
                 found.setdefault(_target_identity_key(product), IdentifiedTarget(
                     product, IdentityEvidence("dictionary", brand, "dictionary direct hit (EN↔AR)", 0.97)
                 ))
+        for alias in self.alias_resolver.resolve(item_name):
+            for product in self.alias_products_by_id.get(alias.product_id, ()):
+                found.setdefault(_target_identity_key(product), IdentifiedTarget(
+                    product,
+                    IdentityEvidence(
+                        "safe_alias",
+                        alias.canonical_brand,
+                        f"{alias.source} audited alias ({alias.score:.1f}, margin {alias.runner_up_margin:.1f})",
+                        alias.score / 100.0,
+                    ),
+                ))
         for product in self.by_cached_translation_brand.get(brand, ()):
             found.setdefault(_target_identity_key(product), IdentifiedTarget(
                 product, IdentityEvidence("cached_translation", brand, "cached translation exact brand", 0.95)
@@ -227,17 +242,6 @@ class ExcelTargetBilingualIndex:
                     0.90,
                 ),
             ))
-        for alias in self.alias_resolver.resolve(item_name):
-            for product in self.alias_products_by_id.get(alias.product_id, ()):
-                found.setdefault(_target_identity_key(product), IdentifiedTarget(
-                    product,
-                    IdentityEvidence(
-                        "safe_alias",
-                        alias.canonical_brand,
-                        f"{alias.source} audited alias ({alias.score:.1f}, margin {alias.runner_up_margin:.1f})",
-                        alias.score / 100.0,
-                    ),
-                ))
         for product in self.by_cohere_translation_brand.get(brand, ()):
             found.setdefault(_target_identity_key(product), IdentifiedTarget(
                 product, IdentityEvidence("cohere_translation", brand, "Cohere translation exact brand", 0.90)
@@ -261,8 +265,27 @@ def normalize_english_brand(value: str) -> str:
     return " ".join(token.upper() for token in tokens)
 
 
+def _strip_narrow_arabic_catalog_status(value: str) -> str:
+    """Drop only audited catalog suffixes when a variant is also present.
+
+    ``قديم`` is a status marker only in the approved REGCOR-style shape, and
+    the one-letter ``س`` suffix is scoped to the Arabic ATOR brand. Requiring
+    a preceding dosage/form token keeps either word available as brand text
+    in an otherwise unqualified name.
+    """
+    value = _ARABIC_SLASH_UNIT_RE.sub(" ", value)
+    has_catalog_attributes = _ARABIC_DECORATION_RE.search(value) is not None
+    if not has_catalog_attributes:
+        return value
+    cleaned = _ARABIC_LEGACY_STATUS_RE.sub("", value)
+    if _ARABIC_ATOR_PREFIX_RE.match(cleaned):
+        cleaned = _ARABIC_ATOR_SUFFIX_RE.sub("", cleaned)
+    return cleaned
+
+
 def normalize_arabic_brand(value: str) -> str:
     cleaned = (value or "").translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+    cleaned = _strip_narrow_arabic_catalog_status(cleaned)
     cleaned = _ARABIC_DECORATION_RE.sub(" ", cleaned)
     cleaned = _ARABIC_METADATA_RE.sub(" ", cleaned)
     cleaned = re.sub(r"[\u064b-\u065f\u0670]", "", cleaned)

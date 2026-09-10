@@ -78,6 +78,31 @@ def test_bare_drops_dose_distinguishes_750_from_1000() -> None:
     assert "strength" in wrong.rejection_reason
 
 
+@pytest.mark.parametrize(
+    ("candidate", "accepted"),
+    [
+        ("LACTASE 1000 ORAL DROPS 15 ML", True),
+        ("LACTASE 750 ORAL DROPS 15 ML", False),
+        ("\u0644\u0627\u0643\u062a\u064a\u0632 1000 \u0646\u0642\u0637 15 \u0645\u0644", True),
+        ("\u0644\u0627\u0643\u062a\u064a\u0632 750 \u0646\u0642\u0637 15 \u0645\u0644", False),
+        ("\u0644\u0627\u0643\u062a\u064a\u0632 1000 \u0642\u0637\u0631\u0647 15 \u0645\u0644", True),
+        ("\u0644\u0627\u0643\u062a\u064a\u0632 750 \u0642\u0637\u0631\u0647 15 \u0645\u0644", False),
+        ("\u0644\u0627\u0643\u062a\u064a\u0632 1000 \u0645\u062c\u0645 \u0642\u0637\u0631\u0647 \u0628\u0627\u0644\u0641\u0645 15 \u0645\u0644", True),
+        ("\u0644\u0627\u0643\u062a\u064a\u0632 750 \u0645\u062c\u0645 \u0642\u0637\u0631\u0647 \u0628\u0627\u0644\u0641\u0645 15 \u0645\u0644", False),
+    ],
+)
+def test_lactase_oral_drops_strength_is_pinned_across_languages(
+    candidate: str, accepted: bool
+) -> None:
+    result = validate_product_compatibility(
+        "LACTASE 1000 ORAL DROPS 15 ML", candidate
+    )
+
+    assert result.accepted is accepted
+    if not accepted:
+        assert "strength" in result.rejection_reason
+
+
 def test_supplier_sharab_does_not_prove_suspension_presentation() -> None:
     result = validate_product_compatibility(
         "PRODUCT 457 MG SUSP 60 ML",

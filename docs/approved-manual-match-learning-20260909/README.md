@@ -4,8 +4,9 @@
 previous `approved_match` decisions as labeled evidence to identify the *real*
 reason the matcher did not select the row initially.
 
-This is a planning package; it makes no matching-policy change. Its companion
-baseline is the requested 100-item run at `20260909_1826`.
+This package began as a planning/audit record. The approved deterministic
+follow-up was implemented on 2026-09-10; the companion before/after evidence
+and safety boundaries remain part of this record.
 
 ## The key distinction
 
