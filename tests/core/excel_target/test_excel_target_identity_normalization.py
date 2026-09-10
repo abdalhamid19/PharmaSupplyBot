@@ -82,6 +82,7 @@ def test_review_brand_normalization_removes_fused_tablet_and_status_suffix() -> 
 
 def test_review_brand_normalization_does_not_strip_unqualified_brand_suffix() -> None:
     assert normalize_arabic_review_brand("\u0627\u062a\u0648\u0631 \u0633") == "\u0627\u062a\u0648\u0631 \u0633"
+    assert normalize_arabic_review_brand("\u0627\u062a\u0648\u0631 \u0633 \u062c\u062f\u064a\u062f") == "\u0627\u062a\u0648\u0631 \u0633"
 
 
 def test_index_uses_audited_alias_keys_without_cross_target_rows() -> None:

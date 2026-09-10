@@ -112,11 +112,12 @@ class ExcelTargetMatcher:
             item,
             config=_review_discovery_config(config),
         )
+        review_identified = self.identity_index.identify_review_candidates(item.name)
         review_candidates = build_review_candidates(
             item,
             self.target_key,
             self.catalog,
-            identified=identified,
+            identified=(*identified, *review_identified),
             diagnostics=decision.diagnostics,
             discovery_hits=discovery_hits,
             catalog_by_id=self._catalog_by_id,

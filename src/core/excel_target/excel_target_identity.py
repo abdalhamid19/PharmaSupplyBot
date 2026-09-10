@@ -26,6 +26,7 @@ IdentityKind = Literal[
     "tawreed_catalog",
     "manual_review",
     "manual_review_rebound",
+    "review_identity",
 ]
 _ARABIC_DECORATION_RE = re.compile(
     r"\d+(?:\.\d+)?\s*(?:\u0645\u062c\u0645|\u0645\u0644\u062c\u0645|\u0645\u064a\u0643\u0631\u0648\u062c\u0631\u0627\u0645|\u062c\u0631\u0627\u0645|\u062c\u0645|\u0645\u0644\u0644\u0649|\u0645\u0644|\u0648\u062d\u062f\u0629|%|"
@@ -36,6 +37,19 @@ _ARABIC_DECORATION_RE = re.compile(
 _ARABIC_METADATA_RE = re.compile(
     r"\d+\s*شريط|\bس\s*(?:ج|ق)\b|\bس\s*جديد\b",
     re.IGNORECASE,
+)
+_ARABIC_REVIEW_DECORATION_RE = re.compile(
+    r"\d+(?:\.\d+)?\s*(?:مجم|ملجم|ميكروجرام|جرام|جم|مل|وحدة|%|"
+    r"مبول|مبولة|مبولات|امبول|امبولة|امبولات|قرص|اقراص|أقراص|"
+    r"كبسول|كبسولة|كبسولات|شريط|شراب|كريم|جل|جيل|حقن|قطرة|قطرات|"
+    r"بخاخ|سبراي|ساشيه|كيس)|"
+    r"(?:مبول|مبولة|مبولات|امبول|امبولة|امبولات|قرص|اقراص|أقراص|"
+    r"كبسول|كبسولة|كبسولات|شريط|شراب|كريم|جل|جيل|حقن|قطرة|قطرات|"
+    r"بخاخ|سبراي|ساشيه|كيس)",
+    re.IGNORECASE,
+)
+_ARABIC_REVIEW_STATUS_RE = re.compile(
+    r"\s+(?:س(?:\s+(?:ج|جديد))?|جديد|قديم)\b", re.IGNORECASE
 )
 _ARABIC_LEGACY_STATUS_RE = re.compile(r"\s+\u0642\u062f\u064a\u0645\s*$")
 _ARABIC_ATOR_PREFIX_RE = re.compile(r"^\s*\u0627\u062a\u0648\u0631(?:\s|$)")
@@ -89,6 +103,7 @@ class ExcelTargetBilingualIndex:
     by_cached_cohere_translation_brand: Mapping[str, tuple[TargetProduct, ...]]
     by_cohere_translation_brand: Mapping[str, tuple[TargetProduct, ...]]
     by_tawreed_brand: Mapping[str, tuple[TargetProduct, ...]]
+    by_review_english_brand: Mapping[str, tuple[TargetProduct, ...]]
     alias_resolver: ExcelTargetAliasResolver
     alias_products_by_id: Mapping[str, tuple[TargetProduct, ...]]
 
@@ -109,14 +124,22 @@ class ExcelTargetBilingualIndex:
         tawreed: dict[str, list[TargetProduct]] = {}
         dictionary: dict[str, list[TargetProduct]] = {}
         target_by_arabic: dict[str, list[TargetProduct]] = {}
+        review_target_by_root: dict[str, list[tuple[str, TargetProduct]]] = {}
         tawreed_arabic_names: set[str] = set()
         dictionary_arabic_names: set[str] = set()
         for product in catalog:
             arabic_brand = normalize_arabic_brand(product.name_ar)
             if arabic_brand:
                 target_by_arabic.setdefault(arabic_brand, []).append(product)
+            review_brand = normalize_arabic_review_brand(product.name_ar)
+            if review_brand:
+                review_root = review_brand.split(" ", 1)[0]
+                review_target_by_root.setdefault(review_root, []).append(
+                    (review_brand, product)
+                )
         tawreed_rows = tuple(load_tawreed_catalog().get("rows", ()))
         alias_entries: list[AliasEntry] = []
+        review_aliases: list[tuple[str, str]] = []
         for row in tawreed_rows:
             english_brand = normalize_english_brand(row.get("en", ""))
             arabic_brand = normalize_arabic_brand(row.get("ar", ""))
@@ -130,6 +153,7 @@ class ExcelTargetBilingualIndex:
                     alias_entries.append(
                         AliasEntry(row.get("en", ""), row.get("ar", ""), "tawreed")
                     )
+                    review_aliases.append((english_brand, arabic_brand))
 
         dictionary_rows = load_dictionary().get("by_en", {})
         for english_name, rows in dictionary_rows.items():
@@ -147,6 +171,19 @@ class ExcelTargetBilingualIndex:
                     alias_entries.append(
                         AliasEntry(english_name, row.get("ar", ""), "egyptian")
                     )
+                    review_aliases.append((english_brand, arabic_brand))
+
+        review: dict[str, list[TargetProduct]] = {}
+        for english_brand, arabic_brand in review_aliases:
+            review_brand = normalize_arabic_review_brand(arabic_brand)
+            if not review_brand:
+                continue
+            review_root = review_brand.split(" ", 1)[0]
+            for target_brand, product in review_target_by_root.get(review_root, ()):
+                if target_brand == review_brand or target_brand.startswith(
+                    f"{review_brand} "
+                ):
+                    review.setdefault(english_brand, []).append(product)
 
         names = [product.name_ar for product in catalog if product.name_ar]
         cached_translations = ar_to_en_many_cached_only(names)
@@ -193,6 +230,7 @@ class ExcelTargetBilingualIndex:
             _freeze(cached_cohere),
             _freeze(live),
             _freeze(tawreed),
+            _freeze(review),
             ExcelTargetAliasResolver(alias_entries, catalog),
             _freeze(alias_products),
         )
@@ -248,6 +286,22 @@ class ExcelTargetBilingualIndex:
             ))
         return tuple(found.values())
 
+    def identify_review_candidates(self, item_name: str) -> tuple[IdentifiedTarget, ...]:
+        """Return review-only rows anchored by audited bilingual identity."""
+        brand = normalize_english_brand(item_name)
+        found: dict[tuple[str, str, int, str], IdentifiedTarget] = {}
+        for product in self.by_review_english_brand.get(brand, ()):
+            found[_target_identity_key(product)] = IdentifiedTarget(
+                product,
+                IdentityEvidence(
+                    "review_identity",
+                    brand,
+                    "review-only anchored Arabic brand expansion",
+                    0.90,
+                ),
+            )
+        return tuple(found.values())
+
 
 def _target_identity_key(product: TargetProduct) -> tuple[str, str, int, str]:
     return (
@@ -295,6 +349,16 @@ def normalize_arabic_brand(value: str) -> str:
     return _REVIEWED_ARABIC_SPELLING_VARIANTS.get(normalized, normalized)
 
 
+def normalize_arabic_review_brand(value: str) -> str:
+    """Normalize Arabic catalog variants for manual-review recall only."""
+    text = (value or "").translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+    has_decoration = bool(_ARABIC_REVIEW_DECORATION_RE.search(text))
+    if has_decoration:
+        text = _ARABIC_REVIEW_STATUS_RE.sub(" ", text)
+    text = _ARABIC_REVIEW_DECORATION_RE.sub(" ", text)
+    return normalize_arabic_brand(text)
+
+
 def _freeze(mapping: dict[str, list[TargetProduct]]) -> Mapping[str, tuple[TargetProduct, ...]]:
     return {key: tuple(value) for key, value in mapping.items() if key}
 
@@ -310,5 +374,6 @@ __all__ = [
     "IdentifiedTarget",
     "IdentityEvidence",
     "normalize_arabic_brand",
+    "normalize_arabic_review_brand",
     "normalize_english_brand",
 ]

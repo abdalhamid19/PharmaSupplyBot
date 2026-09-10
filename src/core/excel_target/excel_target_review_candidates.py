@@ -374,6 +374,7 @@ def _candidate_method(identity_kind: str) -> str:
         "tawreed_catalog": "tawreed_dictionary",
         "dictionary": "egyptian_dictionary",
         "native_english": "native_english",
+        "review_identity": "review_identity",
     }.get(identity_kind, identity_kind or "")
 
 
