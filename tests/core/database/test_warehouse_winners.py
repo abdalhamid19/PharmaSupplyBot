@@ -22,6 +22,30 @@ def test_price_precedes_source_and_preference():
     assert select_warehouse_winner([offer(), offer("Excel", 8, "excel_target")])[1] == "excel_preferred"
 
 
+def test_tawreed_nearby_prices_use_preferred_warehouse_order():
+    rows = [
+        offer(PREFERRED_WAREHOUSES[1], 100.0),
+        offer(PREFERRED_WAREHOUSES[0], 100.9),
+    ]
+    assert select_warehouse_winner(rows)[0]["store_name"] == PREFERRED_WAREHOUSES[0]
+
+
+def test_tawreed_price_difference_of_one_pound_is_not_a_tie():
+    rows = [
+        offer(PREFERRED_WAREHOUSES[0], 101.0),
+        offer(PREFERRED_WAREHOUSES[1], 100.0),
+    ]
+    assert select_warehouse_winner(rows)[0]["store_name"] == PREFERRED_WAREHOUSES[1]
+
+
+def test_cross_source_comparison_keeps_exact_price_rule():
+    rows = [
+        offer("Excel", 100.5, "excel_target"),
+        offer("Tawreed", 100.0, "store_details"),
+    ]
+    assert select_warehouse_winner(rows)[0]["store_name"] == "Tawreed"
+
+
 @pytest.mark.parametrize("index", range(7))
 def test_preferred_warehouse_order(index):
     rows = [offer(name) for name in PREFERRED_WAREHOUSES[index:]] + [offer()]

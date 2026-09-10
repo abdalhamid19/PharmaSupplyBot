@@ -54,22 +54,22 @@ warehouse_strategy:
   mode: "first_available"
   # Set to 0 to allow any discount, or e.g. 12 to require stores with >= 12% discount.
   min_discount_percent: 0
-  # When true, the cross-source reconciliation ranks stores by the
-  # purchase price after discount (``public × (1 − discount)``) instead
-  # of the raw ``purchase_price``. Default false so existing runs stay
-  # reproducible; flip on with the CLI flag ``--sort-by-net``.
+  # Optional legacy comparison for non-Tawreed source rows. Tawreed winner
+  # selection always uses raw purchase_price and the 1 EGP tie tolerance.
   sort_by_net: false
   
   # Preferred warehouses (highest to lowest priority)
-  # When discounts are equal (within 0.3%), prefer these warehouses in order
+  # When Tawreed purchase prices differ by less than 1 EGP, prefer these
+  # warehouses in the listed order.
   preferred_warehouses:
     - "شركه البركه (الجيزه)"
     - "شركه الماسه (مالك سابقا ) (الجيزه)"
     - "شركه الشفاء ميدكو - الريحان سابقا (الجيزه)"
     - "شركه الفا فارما (الجيزه)"
-    - "شركه مصر مديكال (الجيزه)"
-    - "شركه نيو سيدرا (القليوبيه)"
     - "شركه الريان (القاهره)"
+    - "شركه ابو عميره (الجيزه)"
+    - "شركه الادهم (الجيزه)"
+    - "شركه التحرير (الجيزه)"
   
   selectors:
     warehouse_rows: ".warehouse-row, [data-testid='warehouse-row']"

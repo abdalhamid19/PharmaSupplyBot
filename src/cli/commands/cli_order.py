@@ -9,6 +9,11 @@ from pathlib import Path
 
 from src.core.artifact_run import artifact_run
 from src.core.config.config_models import AppConfig, ProfileConfig
+from src.core.database.warehouse_winner_selection import (
+    PREFERRED_WAREHOUSES,
+    purchase_prices_are_tied,
+    warehouse_priority_rank,
+)
 from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
 from ..cli_shared import build_bot
@@ -226,9 +231,9 @@ def _reconcile_cross_source_winners(
     then flips the single cheapest row back to 1, so the Run Results
     tab shows exactly one ✅ per item regardless of source.
 
-    Items with no rows at all, or rows with a NULL ``purchase_price``,
-    fall back to the highest ``discount_percent`` so a 100% discount
-    catalog row still wins over an empty Tawreed snapshot.
+    Across sources, Excel Target wins only when its purchase price is less
+    than or equal to Tawreed's. Within Tawreed, a difference below one pound
+    is treated as a tie and resolved by warehouse priority.
 
     The same pass also rewrites ``run_items.winner_store_key`` and
     ``run_items.winner_store_product_id`` for the row whose
@@ -240,7 +245,6 @@ def _reconcile_cross_source_winners(
 
     from src.core.database.order_runs_paths import default_order_runs_db
     from src.core.database.order_runs_store import OrderRunsStore
-
     database = getattr(app_config, "database", None)
     options = database.persistence_options() if database else {}
     db_path = options.get("path") or default_order_runs_db()
@@ -248,6 +252,9 @@ def _reconcile_cross_source_winners(
     sort_by_net = bool(
         (getattr(app_config, "warehouse_strategy", {}) or {}).get("sort_by_net")
     )
+    warehouse_strategy = getattr(app_config, "warehouse_strategy", {}) or {}
+    configured_preferred = warehouse_strategy.get("preferred_warehouses")
+    preferred_warehouses = tuple(configured_preferred or PREFERRED_WAREHOUSES)
     try:
         # Touch the store so any pending migration runs.
         OrderRunsStore(db_path)
@@ -256,16 +263,17 @@ def _reconcile_cross_source_winners(
             winners = conn.execute(
                 """
                 select ris.item_key, ris.source, ris.source_label, ris.store_key,
-                       ris.store_product_id, ris.purchase_price,
+                       ris.store_product_id, s.store_name, ris.purchase_price,
                        ris.public_price, ris.discount_percent
                   from run_item_stores ris
+                  left join stores s on s.store_key = ris.store_key
                  where ris.run_key = ?
                 """,
                 (run_key,),
             ).fetchall()
             by_item: dict[str, dict] = {}
             for (
-                item_key, source, source_label, store_key, store_pid,
+                item_key, source, source_label, store_key, store_pid, store_name,
                 purchase_price, public_price, discount,
             ) in winners:
                 candidate = {
@@ -273,12 +281,15 @@ def _reconcile_cross_source_winners(
                     "source_label": source_label or "",
                     "store_key": store_key,
                     "store_product_id": store_pid,
+                    "store_name": store_name or "",
                     "purchase_price": purchase_price,
                     "public_price": public_price,
                     "discount_percent": discount,
                 }
                 current = by_item.get(item_key)
-                if current is None or _cheaper(candidate, current, sort_by_net):
+                if current is None or _cross_source_should_replace(
+                    candidate, current, sort_by_net, preferred_warehouses
+                ):
                     by_item[item_key] = candidate
 
             conn.execute(
@@ -354,6 +365,57 @@ def _net_for(row: dict) -> float | None:
     discount = row.get("discount_percent") or 0.0
     rate = max(0.0, 1.0 - float(discount) / 100.0)
     return round(float(purchase) * rate, 2)
+
+
+def _cross_source_should_replace(
+    candidate: dict,
+    current: dict,
+    sort_by_net: bool = False,
+    preferred_warehouses: tuple[str, ...] = (),
+) -> bool:
+    """Apply the source-aware purchase-price rule before local tie-breaks."""
+    candidate_is_excel = candidate.get("source") in {"excel_target", "excel-target"}
+    current_is_excel = current.get("source") in {"excel_target", "excel-target"}
+    if candidate_is_excel == current_is_excel:
+        return _same_source_should_replace(
+            candidate, current, sort_by_net, preferred_warehouses
+        )
+
+    candidate_price = candidate.get("purchase_price")
+    current_price = current.get("purchase_price")
+    if candidate_price is None or current_price is None:
+        return _cheaper(candidate, current, sort_by_net)
+    if candidate_is_excel:
+        return candidate_price <= current_price
+    return candidate_price < current_price
+
+
+def _same_source_should_replace(
+    candidate: dict,
+    current: dict,
+    sort_by_net: bool,
+    preferred_warehouses: tuple[str, ...],
+) -> bool:
+    """Compare Tawreed offers by purchase price, then warehouse priority."""
+    if candidate.get("source") not in {"store_details", "search", "tawreed"}:
+        return _cheaper(candidate, current, sort_by_net)
+    return _tawreed_should_replace(candidate, current, preferred_warehouses)
+
+
+def _tawreed_should_replace(
+    candidate: dict, current: dict, preferred_warehouses: tuple[str, ...]
+) -> bool:
+    """Compare Tawreed purchase prices and resolve near ties by priority."""
+    candidate_price = candidate.get("purchase_price")
+    current_price = current.get("purchase_price")
+    if candidate_price is None or current_price is None:
+        return _cheaper(candidate, current)
+
+    if purchase_prices_are_tied(candidate_price, current_price):
+        candidate_rank = warehouse_priority_rank(candidate, preferred_warehouses)
+        current_rank = warehouse_priority_rank(current, preferred_warehouses)
+        return candidate_rank < current_rank
+    return candidate_price < current_price
 
 
 def _cheaper(candidate: dict, current: dict, sort_by_net: bool = False) -> bool:

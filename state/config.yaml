@@ -40,9 +40,10 @@ warehouse_strategy:
   - شركه الماسه (مالك سابقا ) (الجيزه)
   - شركه الشفاء ميدكو - الريحان سابقا (الجيزه)
   - شركه الفا فارما (الجيزه)
-  - شركه مصر مديكال (الجيزه)
-  - شركه نيو سيدرا (القليوبيه)
   - شركه الريان (القاهره)
+  - شركه ابو عميره (الجيزه)
+  - شركه الادهم (الجيزه)
+  - شركه التحرير (الجيزه)
   selectors:
     warehouse_rows: .warehouse-row, [data-testid='warehouse-row']
     available_qty: .available, [data-testid='available']
