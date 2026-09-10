@@ -10,7 +10,8 @@ layers:
 2. **In-process LRU** — fast path for hot items.
 
 Environment:
-    ``COHERE_API_KEY_1`` and ``COHERE_API_KEY_2`` are tried in order.
+    All numbered variables matching ``COHERE_API_KEY_<number>`` are tried in
+    numeric order, so any number of keys can be configured.
     ``COHERE_API_KEY`` remains supported as a legacy single-key fallback.
     When no key is set, the module degrades to no-op translation.
 """
@@ -44,12 +45,30 @@ RATE_LIMIT_PER_MIN = _configured_rate_limit_per_min()
 
 
 def _load_api_keys() -> list[str]:
-    """Load configured Cohere keys without reading dotenv files."""
+    """Load all configured Cohere keys without reading dotenv files.
+
+    Numbered keys are sorted by their numeric suffix rather than by their
+    environment-variable names, so ``_2`` is tried before ``_10``.  Empty
+    values and duplicate key values are ignored.  The unnumbered legacy key
+    is appended after all numbered keys when it is configured.
+    """
     keys: list[str] = []
-    for variable in ("COHERE_API_KEY_1", "COHERE_API_KEY_2", "COHERE_API_KEY"):
-        value = os.environ.get(variable, "").strip()
-        if value and value not in keys:
-            keys.append(value)
+    numbered: list[tuple[int, str]] = []
+    for variable, raw_value in os.environ.items():
+        match = re.fullmatch(r"COHERE_API_KEY_(\d+)", variable)
+        if match is None:
+            continue
+        api_key = raw_value.strip()
+        if api_key:
+            numbered.append((int(match.group(1)), api_key))
+
+    for _, api_key in sorted(numbered, key=lambda item: item[0]):
+        if api_key not in keys:
+            keys.append(api_key)
+
+    legacy = os.environ.get("COHERE_API_KEY", "").strip()
+    if legacy and legacy not in keys:
+        keys.append(legacy)
     return keys
 
 

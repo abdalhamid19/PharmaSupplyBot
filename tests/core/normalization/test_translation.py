@@ -109,6 +109,50 @@ class TranslationProviderFailoverTests(unittest.TestCase):
     def tearDown(self) -> None:
         translation._reset_provider_state()
 
+    def test_loads_any_number_of_numbered_keys_in_numeric_order(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "COHERE_API_KEY_10": "tenth",
+                "COHERE_API_KEY_2": "second",
+                "COHERE_API_KEY_1": "first",
+                "COHERE_API_KEY_3": "third",
+                "COHERE_API_KEY_4": "",
+                "COHERE_API_KEY": "legacy",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                translation._load_api_keys(),
+                ["first", "second", "third", "tenth", "legacy"],
+            )
+
+    def test_terminal_failure_fails_over_across_more_than_two_keys(self) -> None:
+        first = _FakeCohereClient(RuntimeError("maximum billing reached"))
+        second = _FakeCohereClient(RuntimeError("invalid api token"))
+        third = _FakeCohereClient("1. PANADOL")
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "COHERE_API_KEY_1": "first",
+                    "COHERE_API_KEY_2": "second",
+                    "COHERE_API_KEY_3": "third",
+                },
+                clear=True,
+            ),
+            patch.object(
+                translation, "_get_client", side_effect=[first, second, third]
+            ),
+        ):
+            result = translation._call_cohere_batch("model", ["بانادول"])
+
+        self.assertEqual(result, ["PANADOL"])
+        self.assertEqual(first.calls, 1)
+        self.assertEqual(second.calls, 1)
+        self.assertEqual(third.calls, 1)
+
     def test_monthly_quota_failure_moves_batch_to_next_key(self) -> None:
         first = _FakeCohereClient(
             RuntimeError("429: limited to 1000 API calls / month")
