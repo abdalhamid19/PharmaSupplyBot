@@ -2,13 +2,52 @@
 
 from __future__ import annotations
 
+import pytest
 from unittest.mock import patch
 
 from src.core.config.config_models import MatchingConfig
-from src.core.excel_target.excel_target_matching import ExcelTargetMatcher
+from src.core.excel_target.excel_target_identity import (
+    IdentifiedTarget,
+    IdentityEvidence,
+)
+from src.core.excel_target.excel_target_matching import (
+    ExcelTargetMatcher,
+    _compatible_identified,
+    _identity_decision,
+)
 from src.core.excel_target.excel_target_review_candidates import excel_target_row_key
 from src.core.excel_target.excel_target_loader import TargetProduct
 from src.core.utils.excel import Item
+
+
+def test_review_only_identity_is_rejected_by_automatic_compatibility_gate() -> None:
+    product = TargetProduct(
+        code="",
+        name="\u0641\u0648\u0644\u062a\u0627\u0631\u064a\u0646 3\u0645\u0628\u0648\u0644 \u0633 \u062c\u062f\u064a\u062f",
+        price=51.0,
+        discount_percent=0.0,
+        source_file="\u0645\u062d\u0631\u0648\u06331.xlsx",
+        source_row_number=3100,
+    )
+    identified = IdentifiedTarget(
+        product,
+        IdentityEvidence(
+            "review_identity",
+            "VOLTAREN",
+            "review-only anchored Arabic brand expansion",
+            0.90,
+        ),
+    )
+
+    accepted, rejected = _compatible_identified(
+        Item("vol3", "VOLTAREN 3AMP", 1),
+        (identified,),
+    )
+
+    assert accepted == []
+    assert rejected == ["review_identity evidence requires manual review"]
+    with pytest.raises(ValueError, match="review_identity"):
+        _identity_decision(Item("vol3", "VOLTAREN 3AMP", 1), identified, 0.0)
 
 
 def _catalog() -> list[TargetProduct]:
@@ -80,6 +119,52 @@ def test_review_candidates_include_the_correct_arabic_variant_without_auto_match
         3100,
         3102,
     }
+    prefixed = next(
+        candidate
+        for candidate in match.review_candidates
+        if candidate.product.source_row_number == 3102
+    )
+    assert prefixed.candidate_method == "review_identity_prefix"
+
+
+def test_review_alias_anchor_works_without_a_bare_arabic_target_row() -> None:
+    catalog = [
+        TargetProduct(
+            code="",
+            name="\u0641\u0648\u0644\u062a\u0627\u0631\u064a\u0646 3\u0645\u0628\u0648\u0644 \u0633 \u062c\u062f\u064a\u062f",
+            price=51.0,
+            discount_percent=0.0,
+            source_file="\u0645\u062d\u0631\u0648\u06331.xlsx",
+            source_row_number=3100,
+        )
+    ]
+    with (
+        patch(
+            "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+            return_value={"rows": [{"en": "VOLTAREN", "ar": "\u0641\u0648\u0644\u062a\u0627\u0631\u064a\u0646"}]},
+        ),
+        patch(
+            "src.core.excel_target.excel_target_identity.load_dictionary",
+            return_value={"by_en": {}},
+        ),
+        patch(
+            "src.core.excel_target.excel_target_identity.lookup_en",
+            return_value=[],
+        ),
+        patch(
+            "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+            return_value={},
+        ),
+    ):
+        match = ExcelTargetMatcher("baraka", catalog).match(
+            Item("vol3", "VOLTAREN 3AMP", 1), MatchingConfig()
+        )
+
+    assert match.decision.best_match is None
+    assert [candidate.product.source_row_number for candidate in match.review_candidates] == [
+        3100
+    ]
+    assert match.review_candidates[0].candidate_method == "review_identity"
 
 
 def test_review_candidates_include_the_correct_xithrone_pack_variant() -> None:

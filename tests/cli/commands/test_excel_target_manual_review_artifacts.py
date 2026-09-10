@@ -13,6 +13,7 @@ from unittest.mock import patch
 from src.cli.commands import cli_order_excel_target
 from src.core.artifact_run import ArtifactRun
 from src.core.config.config import load_config
+from src.core.excel_target.excel_target_review_discovery import ReviewDiscoveryHit
 from src.core.excel_target.excel_target_loader import TargetProduct
 from src.core.manual_review.manual_review_store import ManualReviewStore
 from src.core.utils.excel import Item
@@ -102,6 +103,47 @@ class ExcelTargetManualReviewArtifactTests(TestCase):
         self.assertEqual(totals["manual_review"], 0)
         self.assertEqual(review_text, "")
         self.assertEqual(candidates_text, "")
+
+    def test_identity_absent_with_discovery_candidate_enters_manual_review(self) -> None:
+        catalog = [
+            TargetProduct(
+                "unknown-row",
+                "\u0639\u0644\u0627\u062c \u0645\u062c\u0647\u0648\u0644 \u0634\u0631\u0627\u0628",
+                10.0,
+                0.0,
+                "baraka.xlsx",
+                source_row_number=44,
+            )
+        ]
+        item = Item("90953", "UNKNOWN BRAND CAPSULES 30", 1)
+        discovery_hit = ReviewDiscoveryHit(
+            product=catalog[0],
+            score=94.0,
+            runner_up_score=70.0,
+            score_margin=24.0,
+            strategy="english_fuzzy",
+            review_status="strong",
+            shared_brand_tokens=("UNKNOWN",),
+            attribute_note="",
+        )
+        with patch(
+            "src.core.excel_target.excel_target_review_discovery."
+            "ExcelTargetReviewDiscoveryIndex.discover",
+            return_value=(discovery_hit,),
+        ):
+            totals, review_text, candidates_text = self._run_with_temp_artifacts(
+                catalog, item
+            )
+
+        self.assertEqual(totals["manual_review"], 1)
+        self.assertTrue(review_text)
+        self.assertTrue(candidates_text)
+        row = next(csv.DictReader(review_text.splitlines()))
+        self.assertEqual(row["manual_review_required"], "True")
+        self.assertEqual(row["manual_review_category"], "excel_target_candidate_available")
+        payload = json.loads(candidates_text)
+        self.assertEqual(payload["options"][0]["candidate_method"], "english_fuzzy")
+        self.assertEqual(payload["options"][0]["excel_target_source_row"], 44)
 
     def test_auto_matched_excel_target_records_source(self) -> None:
         with TemporaryDirectory() as temp_dir:

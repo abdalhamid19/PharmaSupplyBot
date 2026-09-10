@@ -109,6 +109,30 @@ class ExcelTargetReviewCandidate:
         return "variant_conflict"
 
     @property
+    def ranking_tier(self) -> int:
+        """Return the review-only priority tier for deterministic ordering."""
+        kind = self.identity_evidence_kind or self.candidate_method
+        if kind in {
+            "native_english",
+            "safe_alias",
+            "tawreed_catalog",
+            "dictionary",
+            "cached_translation",
+            "cohere_translation",
+            "tawreed_dictionary",
+            "egyptian_dictionary",
+            "cached_cohere",
+        }:
+            return 0 if self.compatibility.accepted else 1
+        if kind == "review_identity":
+            return 2
+        if kind == "review_identity_prefix":
+            return 3
+        if kind in {"review_fuzzy", "english_fuzzy", "arabic_fuzzy"}:
+            return 4
+        return 4
+
+    @property
     def excel_target_row_key(self) -> str:
         return excel_target_row_key(self.target_key, self.product)
 
@@ -152,6 +176,7 @@ class ExcelTargetReviewCandidate:
             "compatibility_status": self.compatibility_status,
             "compatibility_rejection": self.compatibility_rejection,
             "review_status": self.review_status,
+            "ranking_tier": self.ranking_tier,
             "candidate_method": self.candidate_method,
             "score_margin": float(self.score_margin),
             "shared_brand_tokens": self.shared_brand_tokens,
@@ -256,18 +281,7 @@ def build_review_candidates(
             )
             _keep_best(candidates, _product_key(target_key, product), candidate)
 
-    ordered = sorted(
-        candidates.values(),
-        key=lambda candidate: (
-            candidate.score,
-            candidate.identity_evidence.confidence
-            if candidate.identity_evidence
-            else 0.0,
-            candidate.product.code,
-            candidate.product.name,
-        ),
-        reverse=True,
-    )
+    ordered = sorted(candidates.values(), key=_candidate_order_key)
     if limit is not None:
         ordered = ordered[: max(0, int(limit))]
     return tuple(ordered)
@@ -304,8 +318,24 @@ def _keep_best(
     candidate: ExcelTargetReviewCandidate,
 ) -> None:
     existing = candidates.get(key)
-    if existing is None or candidate.score > existing.score:
+    if existing is None or _candidate_order_key(candidate) < _candidate_order_key(existing):
         candidates[key] = candidate
+
+
+def _candidate_order_key(
+    candidate: ExcelTargetReviewCandidate,
+) -> tuple[int, int, float, float, str]:
+    """Rank candidates without comparing incompatible evidence scores directly."""
+    compatibility_bucket = 2 if candidate.compatibility.accepted else (
+        1 if candidate.review_status == "variant_unproven" else 0
+    )
+    return (
+        candidate.ranking_tier,
+        -compatibility_bucket,
+        -float(candidate.score),
+        -float(candidate.score_margin),
+        candidate.excel_target_row_key,
+    )
 
 
 __all__ = [
@@ -375,6 +405,7 @@ def _candidate_method(identity_kind: str) -> str:
         "dictionary": "egyptian_dictionary",
         "native_english": "native_english",
         "review_identity": "review_identity",
+        "review_identity_prefix": "review_identity_prefix",
     }.get(identity_kind, identity_kind or "")
 
 

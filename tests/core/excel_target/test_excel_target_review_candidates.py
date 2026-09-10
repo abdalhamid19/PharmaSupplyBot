@@ -11,12 +11,60 @@ from src.core.excel_target import (
     TargetProduct,
 )
 from src.core.excel_target.excel_target_identity import IdentityEvidence
-from src.core.excel_target.excel_target_review_candidates import excel_target_row_key
+from src.core.excel_target.excel_target_identity import IdentifiedTarget
+from src.core.excel_target.excel_target_review_candidates import (
+    build_review_candidates,
+    excel_target_row_key,
+)
+from src.core.excel_target.excel_target_review_discovery import ReviewDiscoveryHit
 from src.core.excel_target.product_attributes import validate_product_compatibility
 from src.core.utils.excel import Item
 
 
 class ExcelTargetReviewCandidateTests(TestCase):
+    def test_anchored_identity_wins_over_higher_fuzzy_score_for_same_row(self) -> None:
+        product = TargetProduct(
+            "",
+            "\u0641\u0648\u0644\u062a\u0627\u0631\u064a\u0646 3\u0645\u0628\u0648\u0644 \u0633 \u062c\u062f\u064a\u062f",
+            51.0,
+            0.0,
+            source_file="\u0645\u062d\u0631\u0648\u06331.xlsx",
+            source_row_number=3100,
+        )
+        item = Item(code="vol3", name="VOLTAREN 3AMP", qty=1)
+        candidates = build_review_candidates(
+            item,
+            "baraka",
+            [product],
+            identified=(
+                IdentifiedTarget(
+                    product,
+                    IdentityEvidence(
+                        "review_identity",
+                        "VOLTAREN",
+                        "anchored review identity",
+                        0.90,
+                    ),
+                ),
+            ),
+            discovery_hits=(
+                ReviewDiscoveryHit(
+                    product=product,
+                    score=96.0,
+                    runner_up_score=80.0,
+                    score_margin=16.0,
+                    strategy="english_fuzzy",
+                    review_status="variant_unproven",
+                    shared_brand_tokens=("VOLTAREN",),
+                    attribute_note="",
+                ),
+            ),
+        )
+
+        assert len(candidates) == 1
+        assert candidates[0].candidate_method == "review_identity"
+        assert candidates[0].ranking_tier == 2
+
     def test_candidates_are_target_rows_with_variant_rejection_metadata(self) -> None:
         matcher = ExcelTargetMatcher(
             "baraka",

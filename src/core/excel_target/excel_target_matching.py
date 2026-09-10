@@ -194,6 +194,13 @@ def _compatible_identified(
         if candidate.evidence.kind == "cohere_translation":
             rejected.append("Cohere identity requires manual review under safe policy")
             continue
+        if candidate.evidence.kind in {
+            "review_identity",
+            "review_identity_prefix",
+            "review_fuzzy",
+        }:
+            rejected.append(f"{candidate.evidence.kind} evidence requires manual review")
+            continue
         compatibility = validate_product_compatibility(item.name, candidate.product.name_ar)
         if compatibility.accepted:
             accepted.append((candidate, compatibility))
@@ -401,8 +408,14 @@ def _record_manual_rebind_failure(
 def _identity_decision(item: Item, identified: IdentifiedTarget, started: float) -> MatchDecision:
     product = identified.product
     evidence = identified.evidence
-    if evidence.kind == "review_fuzzy":
-        raise ValueError("review_fuzzy evidence cannot produce an automatic match")
+    if evidence.kind in {
+        "review_identity",
+        "review_identity_prefix",
+        "review_fuzzy",
+    }:
+        raise ValueError(
+            f"{evidence.kind} evidence cannot produce an automatic match"
+        )
     data = product.to_candidate_dict()
     data.update(
         {

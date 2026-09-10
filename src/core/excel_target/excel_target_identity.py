@@ -27,6 +27,7 @@ IdentityKind = Literal[
     "manual_review",
     "manual_review_rebound",
     "review_identity",
+    "review_identity_prefix",
 ]
 _ARABIC_DECORATION_RE = re.compile(
     r"\d+(?:\.\d+)?\s*(?:\u0645\u062c\u0645|\u0645\u0644\u062c\u0645|\u0645\u064a\u0643\u0631\u0648\u062c\u0631\u0627\u0645|\u062c\u0631\u0627\u0645|\u062c\u0645|\u0645\u0644\u0644\u0649|\u0645\u0644|\u0648\u062d\u062f\u0629|%|"
@@ -103,7 +104,9 @@ class ExcelTargetBilingualIndex:
     by_cached_cohere_translation_brand: Mapping[str, tuple[TargetProduct, ...]]
     by_cohere_translation_brand: Mapping[str, tuple[TargetProduct, ...]]
     by_tawreed_brand: Mapping[str, tuple[TargetProduct, ...]]
-    by_review_english_brand: Mapping[str, tuple[TargetProduct, ...]]
+    by_review_english_brand: Mapping[
+        str, tuple[tuple[TargetProduct, bool], ...]
+    ]
     alias_resolver: ExcelTargetAliasResolver
     alias_products_by_id: Mapping[str, tuple[TargetProduct, ...]]
 
@@ -146,14 +149,20 @@ class ExcelTargetBilingualIndex:
             if not arabic_brand:
                 continue
             targets = target_by_arabic.get(arabic_brand, ())
+            review_targets = _review_targets_for_alias(
+                review_target_by_root, arabic_brand
+            )
             if english_brand:
                 tawreed.setdefault(english_brand, []).extend(targets)
+                if targets or review_targets:
+                    if targets:
+                        alias_entries.append(
+                            AliasEntry(row.get("en", ""), row.get("ar", ""), "tawreed")
+                        )
+                    if review_targets:
+                        review_aliases.append((english_brand, arabic_brand))
                 if targets:
                     tawreed_arabic_names.add(arabic_brand)
-                    alias_entries.append(
-                        AliasEntry(row.get("en", ""), row.get("ar", ""), "tawreed")
-                    )
-                    review_aliases.append((english_brand, arabic_brand))
 
         dictionary_rows = load_dictionary().get("by_en", {})
         for english_name, rows in dictionary_rows.items():
@@ -165,25 +174,24 @@ class ExcelTargetBilingualIndex:
                 if not arabic_brand:
                     continue
                 targets = target_by_arabic.get(arabic_brand, ())
+                review_targets = _review_targets_for_alias(
+                    review_target_by_root, arabic_brand
+                )
                 if targets:
                     dictionary.setdefault(english_brand, []).extend(targets)
                     dictionary_arabic_names.add(arabic_brand)
                     alias_entries.append(
                         AliasEntry(english_name, row.get("ar", ""), "egyptian")
                     )
+                if review_targets:
                     review_aliases.append((english_brand, arabic_brand))
 
-        review: dict[str, list[TargetProduct]] = {}
+        review: dict[str, list[tuple[TargetProduct, bool]]] = {}
         for english_brand, arabic_brand in review_aliases:
-            review_brand = normalize_arabic_review_brand(arabic_brand)
-            if not review_brand:
-                continue
-            review_root = review_brand.split(" ", 1)[0]
-            for target_brand, product in review_target_by_root.get(review_root, ()):
-                if target_brand == review_brand or target_brand.startswith(
-                    f"{review_brand} "
-                ):
-                    review.setdefault(english_brand, []).append(product)
+            for product, is_prefix in _review_targets_for_alias(
+                review_target_by_root, arabic_brand
+            ):
+                review.setdefault(english_brand, []).append((product, is_prefix))
 
         names = [product.name_ar for product in catalog if product.name_ar]
         cached_translations = ar_to_en_many_cached_only(names)
@@ -230,7 +238,7 @@ class ExcelTargetBilingualIndex:
             _freeze(cached_cohere),
             _freeze(live),
             _freeze(tawreed),
-            _freeze(review),
+            _freeze_review(review),
             ExcelTargetAliasResolver(alias_entries, catalog),
             _freeze(alias_products),
         )
@@ -290,14 +298,21 @@ class ExcelTargetBilingualIndex:
         """Return review-only rows anchored by audited bilingual identity."""
         brand = normalize_english_brand(item_name)
         found: dict[tuple[str, str, int, str], IdentifiedTarget] = {}
-        for product in self.by_review_english_brand.get(brand, ()):
+        for product, is_prefix in self.by_review_english_brand.get(brand, ()):
+            evidence_kind = (
+                "review_identity_prefix" if is_prefix else "review_identity"
+            )
             found[_target_identity_key(product)] = IdentifiedTarget(
                 product,
                 IdentityEvidence(
-                    "review_identity",
+                    evidence_kind,
                     brand,
-                    "review-only anchored Arabic brand expansion",
-                    0.90,
+                    (
+                        "review-only anchored Arabic prefix expansion"
+                        if is_prefix
+                        else "review-only anchored Arabic brand expansion"
+                    ),
+                    0.82 if is_prefix else 0.90,
                 ),
             )
         return tuple(found.values())
@@ -309,6 +324,23 @@ def _target_identity_key(product: TargetProduct) -> tuple[str, str, int, str]:
         product.source_file,
         product.source_row_number,
         product.name,
+    )
+
+
+def _review_targets_for_alias(
+    review_target_by_root: Mapping[str, list[tuple[str, TargetProduct]]],
+    arabic_brand: str,
+) -> tuple[tuple[TargetProduct, bool], ...]:
+    """Return target rows anchored by a review-only Arabic alias."""
+    review_brand = normalize_arabic_review_brand(arabic_brand)
+    if not review_brand:
+        return ()
+    review_root = review_brand.split(" ", 1)[0]
+    return tuple(
+        (product, target_brand != review_brand)
+        for target_brand, product in review_target_by_root.get(review_root, ())
+        if target_brand == review_brand
+        or target_brand.startswith(f"{review_brand} ")
     )
 
 
@@ -360,6 +392,12 @@ def normalize_arabic_review_brand(value: str) -> str:
 
 
 def _freeze(mapping: dict[str, list[TargetProduct]]) -> Mapping[str, tuple[TargetProduct, ...]]:
+    return {key: tuple(value) for key, value in mapping.items() if key}
+
+
+def _freeze_review(
+    mapping: dict[str, list[tuple[TargetProduct, bool]]],
+) -> Mapping[str, tuple[tuple[TargetProduct, bool], ...]]:
     return {key: tuple(value) for key, value in mapping.items() if key}
 
 
