@@ -159,7 +159,9 @@ invariants are covered by an end-to-end test.
 
 - [x] Keep thresholds unchanged by default and add a separate feature gate for
   any new discovery channel.
-- [ ] Run shadow replay with positive and negative gold cases.
+- [ ] Run shadow replay with positive and negative gold cases. Initial A/B
+  replay completed on 2026-09-11, but it produced no new cross-language
+  candidates; labeled alias cases and C_display measurement are still needed.
 - [ ] Stop rollout if candidate-count p99 or reviewed precision exceeds the
   declared budget.
 - [ ] Enable only after artifact and safety acceptance gates pass.

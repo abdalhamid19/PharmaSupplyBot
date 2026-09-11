@@ -17,6 +17,7 @@ from src.core.excel_target.excel_target_matching import (
     _identity_decision,
 )
 from src.core.excel_target.excel_target_review_candidates import excel_target_row_key
+from src.core.excel_target.excel_target_review_discovery import ReviewDiscoveryConfig
 from src.core.excel_target.excel_target_loader import TargetProduct
 from src.core.utils.excel import Item
 
@@ -243,6 +244,66 @@ def test_cross_language_review_alias_never_becomes_automatic_match() -> None:
     assert match.decision.best_match is None
     assert len(match.review_candidates) == 1
     assert match.review_candidates[0].candidate_method == "cross_language_alias"
+
+
+def test_bilingual_review_aliases_reach_discovery_without_manual_injection() -> None:
+    arabic_brand = "".join(
+        chr(codepoint)
+        for codepoint in (
+            0x628,
+            0x631,
+            0x627,
+            0x646,
+            0x62F,
+            0x20,
+            0x62A,
+            0x62C,
+            0x631,
+            0x64A,
+            0x628,
+            0x64A,
+        )
+    )
+    arabic_status = "".join(
+        chr(codepoint) for codepoint in (0x633, 0x20, 0x62C, 0x62F, 0x64A, 0x62F)
+    )
+    catalog = [
+        TargetProduct(
+            "generic-row",
+            f"{arabic_brand} 30 {''.join(chr(codepoint) for codepoint in (0x642, 0x631, 0x635))} {arabic_status}",
+            51.0,
+            0.0,
+            source_file="arabic-only.xlsx",
+            source_row_number=7,
+        )
+    ]
+    with (
+        patch(
+            "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+            return_value={"rows": [{"en": "GENERIC BRAND", "ar": arabic_brand}]},
+        ),
+        patch(
+            "src.core.excel_target.excel_target_identity.load_dictionary",
+            return_value={"by_en": {}},
+        ),
+        patch(
+            "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+            return_value={},
+        ),
+    ):
+        matcher = ExcelTargetMatcher("baraka", catalog)
+        match = matcher.match(
+            Item("generic", "GENERIC BRAND 30 CAPS", 1),
+            MatchingConfig(excel_target_review_cross_language_aliases_enabled=True),
+        )
+
+    assert match.decision.best_match is None
+    hits = matcher.review_discovery.discover(
+        Item("generic", "GENERIC BRAND 30 CAPS", 1),
+        config=ReviewDiscoveryConfig(cross_language_aliases_enabled=True),
+    )
+    assert len(hits) == 1
+    assert hits[0].strategy == "cross_language_alias"
 
 
 def test_review_candidates_include_the_correct_xithrone_pack_variant() -> None:

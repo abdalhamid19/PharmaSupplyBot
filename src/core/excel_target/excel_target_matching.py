@@ -93,7 +93,10 @@ class ExcelTargetMatcher:
         )
         self.review_discovery = ExcelTargetReviewDiscoveryIndex.build(
             self.catalog,
-            review_aliases=review_aliases,
+            review_aliases=(
+                *self.identity_index.review_aliases,
+                *review_aliases,
+            ),
         )
         self._catalog_by_id = _catalog_products_by_id(self.catalog)
         self._native_english_candidate_templates = tuple(

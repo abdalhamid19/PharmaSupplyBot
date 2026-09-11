@@ -109,6 +109,7 @@ class ExcelTargetBilingualIndex:
     ]
     alias_resolver: ExcelTargetAliasResolver
     alias_products_by_id: Mapping[str, tuple[TargetProduct, ...]]
+    review_aliases: tuple[AliasEntry, ...] = ()
 
     @classmethod
     def build(
@@ -143,6 +144,7 @@ class ExcelTargetBilingualIndex:
         tawreed_rows = tuple(load_tawreed_catalog().get("rows", ()))
         alias_entries: list[AliasEntry] = []
         review_aliases: list[tuple[str, str]] = []
+        review_alias_entries: list[AliasEntry] = []
         for row in tawreed_rows:
             english_brand = normalize_english_brand(row.get("en", ""))
             arabic_brand = normalize_arabic_brand(row.get("ar", ""))
@@ -161,6 +163,9 @@ class ExcelTargetBilingualIndex:
                         )
                     if review_targets:
                         review_aliases.append((english_brand, arabic_brand))
+                        review_alias_entries.append(
+                            AliasEntry(row.get("en", ""), row.get("ar", ""), "tawreed")
+                        )
                 if targets:
                     tawreed_arabic_names.add(arabic_brand)
 
@@ -185,6 +190,9 @@ class ExcelTargetBilingualIndex:
                     )
                 if review_targets:
                     review_aliases.append((english_brand, arabic_brand))
+                    review_alias_entries.append(
+                        AliasEntry(english_name, row.get("ar", ""), "egyptian")
+                    )
 
         review: dict[str, list[tuple[TargetProduct, bool]]] = {}
         for english_brand, arabic_brand in review_aliases:
@@ -241,6 +249,7 @@ class ExcelTargetBilingualIndex:
             _freeze_review(review),
             ExcelTargetAliasResolver(alias_entries, catalog),
             _freeze(alias_products),
+            tuple(review_alias_entries),
         )
 
     def identify(self, item_name: str) -> tuple[IdentifiedTarget, ...]:
