@@ -139,6 +139,7 @@ def test_review_candidates_include_the_correct_arabic_variant_without_auto_match
     assert correct.candidate_method == "review_identity"
     assert correct.compatibility_status == "compatible"
     assert correct.compatibility_rejection == ""
+    assert match.review_candidates[0].product.source_row_number == 3100
     assert correct.source_kind == "excel-target"
     assert correct.excel_target_source_row == 3100
     assert correct.excel_target_row_key == excel_target_row_key(

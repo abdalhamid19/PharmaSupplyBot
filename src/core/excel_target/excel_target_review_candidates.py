@@ -330,17 +330,24 @@ def _keep_best(
 def _candidate_order_key(
     candidate: ExcelTargetReviewCandidate,
 ) -> tuple[int, int, float, float, str]:
-    """Rank candidates without comparing incompatible evidence scores directly."""
-    compatibility_bucket = 2 if candidate.compatibility.accepted else (
-        1 if candidate.review_status == "variant_unproven" else 0
-    )
+    """Rank compatible review rows before incompatible evidence."""
+    compatibility_rank = _compatibility_rank(candidate)
     return (
+        compatibility_rank,
         candidate.ranking_tier,
-        -compatibility_bucket,
         -float(candidate.score),
         -float(candidate.score_margin),
         candidate.excel_target_row_key,
     )
+
+
+def _compatibility_rank(candidate: ExcelTargetReviewCandidate) -> int:
+    """Return a deterministic rank for explicit attribute compatibility."""
+    if candidate.compatibility.accepted:
+        return 0
+    if candidate.review_status == "variant_unproven":
+        return 1
+    return 2
 
 
 __all__ = [
