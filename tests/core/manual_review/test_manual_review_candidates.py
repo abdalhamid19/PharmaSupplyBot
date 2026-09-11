@@ -107,6 +107,12 @@ class ManualReviewCandidatesTests(TestCase):
             append_review_candidates(run_dir, "C1", "Item One", options)
             append_review_candidates(run_dir, "C2", "Item Two", options)
             loaded = load_review_candidates(run_dir)
+            payload = json.loads(
+                (run_dir / "manual_review_candidates_test_run.jsonl").read_text(
+                    encoding="utf-8"
+                ).splitlines()[0]
+            )
+            self.assertEqual(payload["candidate_count_saved"], 1)
             self.assertEqual(len(loaded), 2)
             item_one_key = "C1::ITEM ONE"
             self.assertIn(item_one_key, loaded)

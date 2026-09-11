@@ -20,6 +20,7 @@ def append_review_candidates(
         "item_key": item_key,
         "item_code": item_code,
         "item_name": item_name,
+        "candidate_count_saved": len(options),
         "options": [opt.to_dict() for opt in options],
     }
     
