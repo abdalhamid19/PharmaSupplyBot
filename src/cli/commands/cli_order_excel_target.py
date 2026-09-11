@@ -26,6 +26,7 @@ from src.core.manual_review.manual_review_store import (
     ManualReviewDecision,
     ManualReviewStore,
 )
+from src.core.manual_review.candidate_limits import normalize_candidate_limit
 from src.core.database.order_runs_keys import order_run_item_key
 from src.core.matching.candidate_identity import candidate_store_product_id
 from src.core.utils.excel import Item
@@ -559,10 +560,7 @@ def _review_candidate_limit(app_config: AppConfig) -> int:
         "manual_review_save_candidate_limit",
         5,
     )
-    try:
-        return max(1, int(value))
-    except (TypeError, ValueError):
-        return 5
+    return normalize_candidate_limit(value)
 
 
 def _excel_target_source_label(target_key: str, source_file: str = "") -> str:

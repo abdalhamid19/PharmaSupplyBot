@@ -8,6 +8,7 @@ from typing import Iterable
 import streamlit as st
 
 from ...core.manual_review.manual_review_candidate_store import load_review_candidates
+from ...core.manual_review.candidate_limits import normalize_candidate_limit
 from ...core.manual_review.manual_review_candidates import ReviewCandidateOption
 from ...core.manual_review.manual_review_selection import decision_from_selection
 from ...core.manual_review.manual_review_store import ManualReviewStore
@@ -356,7 +357,7 @@ def _configured_candidate_limit(app_config=None) -> int:
     """Return configured Manual Review candidate count with default fallback."""
     matching = getattr(app_config, "matching", None)
     value = getattr(matching, "manual_review_display_candidate_limit", 5)
-    return max(1, int(value))
+    return normalize_candidate_limit(value)
 
 
 def _filter_and_prepare_items(candidates_dict, store, hide_completed):

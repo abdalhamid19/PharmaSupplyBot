@@ -77,6 +77,49 @@ def test_unknown_identity_evidence_fails_closed_for_automatic_matching(
         _identity_decision(Item("vol3", "VOLTAREN 3AMP", 1), identified, 0.0)
 
 
+@pytest.mark.parametrize(
+    "evidence_kind",
+    [
+        "review_identity",
+        "review_identity_prefix",
+        "review_fuzzy",
+        "english_fuzzy",
+        "arabic_fuzzy",
+        "cross_language_alias",
+        "cohere_translation",
+        "discovery_only",
+    ],
+)
+def test_full_match_fails_closed_for_every_review_only_evidence_kind(
+    evidence_kind: str,
+) -> None:
+    product = TargetProduct(
+        code="",
+        name="فولتارين 3مبول س جديد",
+        price=51.0,
+        discount_percent=0.0,
+        source_file="محروس1.xlsx",
+        source_row_number=3100,
+    )
+    identified = IdentifiedTarget(
+        product,
+        IdentityEvidence(evidence_kind, "VOLTAREN", "review-only fixture", 1.0),
+    )
+    matcher = ExcelTargetMatcher("baraka", [product], use_saved_approvals=False)
+
+    with (
+        patch.object(type(matcher.identity_index), "identify", return_value=(identified,)),
+        patch.object(type(matcher.review_discovery), "discover", return_value=()),
+        patch("src.core.excel_target.excel_target_matching.ManualReviewStore") as store,
+    ):
+        match = matcher.match(Item("vol3", "VOLTAREN 3AMP", 1), MatchingConfig())
+
+    assert match.decision.best_match is None
+    assert match.review_candidates
+    assert match.review_candidates[0].product.source_row_number == 3100
+    store.return_value.upsert.assert_not_called()
+
+
 def _catalog() -> list[TargetProduct]:
     return [
         TargetProduct(

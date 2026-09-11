@@ -7,6 +7,7 @@ import logging
 from src.core.artifact_run import current_artifact_run
 from src.core.manual_review.manual_review_candidate_store import append_review_candidates
 from src.core.manual_review.manual_review_candidates import review_candidate_options
+from src.core.manual_review.candidate_limits import normalize_candidate_limit
 from src.core.manual_review.manual_review_store import ManualReviewDecision, ManualReviewStore, DEFAULT_MANUAL_REVIEW_DB
 from src.core.ordering.order_run_artifact_rows import manual_review_required, manual_review_row, order_item_summary_row
 from src.core.ordering.order_run_persistence import record_run_item
@@ -203,7 +204,7 @@ def _save_review_candidates_if_available(decision, item, matching_config=None) -
 def _review_candidate_limit(matching_config=None) -> int:
     """Return configured Manual Review candidate limit for this run."""
     value = getattr(matching_config, "manual_review_save_candidate_limit", 5)
-    return max(1, int(value))
+    return normalize_candidate_limit(value)
 
 
 __all__ = [

@@ -83,7 +83,21 @@ def test_report_separates_generated_saved_and_unmeasured_display(tmp_path: Path)
     assert metrics["candidate_displayed_total"] is None
     assert metrics["candidate_count_total_distribution"]["p95"] == 3
     assert metrics["candidate_count_total_distribution"]["max"] == 3
+    assert metrics["candidate_budget"]["status"] == "pass"
     assert metrics["precision_sample"]["status"] == "labels_not_provided"
+
+
+def test_report_fails_candidate_budget_thresholds(tmp_path: Path) -> None:
+    artifact = _write_artifact(tmp_path / "run")
+
+    report = build_report(
+        [artifact], candidate_p99_limit=2, candidate_max_limit=2
+    )
+
+    budget = report["reports"][0]["candidate_budget"]
+    assert budget["status"] == "fail"
+    assert "candidate_count_generated.p99=3 > 2" in budget["violations"]
+    assert "candidate_count_generated.max=3 > 2" in budget["violations"]
 
 
 def test_report_rejects_duplicate_item_records(tmp_path: Path) -> None:

@@ -8,6 +8,7 @@ from typing import Any
 
 from ..matching.candidate_identity import candidate_store_product_id
 from ..matching_types import MatchDecision
+from .candidate_limits import normalize_candidate_limit
 
 
 def candidate_name(candidate: dict) -> str:
@@ -117,7 +118,9 @@ def review_candidate_options(
     """Extract top N review options from match diagnostics."""
     if not decision or not decision.diagnostics:
         return []
-    selected = _selected_review_diagnostics(decision.diagnostics, limit)
+    selected = _selected_review_diagnostics(
+        decision.diagnostics, normalize_candidate_limit(limit)
+    )
     return [_create_option(diag) for diag in selected]
 def _selected_review_diagnostics(diagnostics, limit: int) -> list:
     """Blend top-ranked diagnostics with highly similar rejected candidates."""

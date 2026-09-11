@@ -38,6 +38,8 @@ IDENTITY_METHODS = {
     "arabic_identity",
     "english_identity",
 }
+DEFAULT_CANDIDATE_P99_LIMIT = 10
+DEFAULT_CANDIDATE_MAX_LIMIT = 25
 
 
 def _as_int(value: Any, default: int = 0) -> int:
@@ -80,6 +82,36 @@ def _distribution(values: Iterable[int]) -> dict[str, int | float | None]:
         "p99": _percentile(values, 0.99),
         "max": max(values) if values else None,
     }
+
+
+def _budget_report(
+    total_distribution: dict[str, int | float | None],
+    saved_distribution: dict[str, int | float | None],
+    p99_limit: int,
+    max_limit: int,
+) -> dict[str, Any]:
+    violations = []
+    for label, distribution in (
+        ("candidate_count_generated", total_distribution),
+        ("candidate_count_saved", saved_distribution),
+    ):
+        violations.extend(
+            _budget_violations(label, distribution, p99_limit, max_limit)
+        )
+    return {
+        "status": "pass" if not violations else "fail",
+        "limits": {"p99": p99_limit, "max": max_limit},
+        "violations": violations,
+    }
+
+
+def _budget_violations(label, distribution, p99_limit, max_limit) -> list[str]:
+    violations = []
+    if distribution["p99"] is not None and distribution["p99"] > p99_limit:
+        violations.append(f"{label}.p99={distribution['p99']} > {p99_limit}")
+    if distribution["max"] is not None and distribution["max"] > max_limit:
+        violations.append(f"{label}.max={distribution['max']} > {max_limit}")
+    return violations
 
 
 def _first_file(artifact_dir: Path, pattern: str) -> Path | None:
@@ -319,6 +351,8 @@ def report_artifact_dir(
     artifact_dir: Path,
     *,
     labels: dict[tuple[str, str], str] | None = None,
+    candidate_p99_limit: int = DEFAULT_CANDIDATE_P99_LIMIT,
+    candidate_max_limit: int = DEFAULT_CANDIDATE_MAX_LIMIT,
 ) -> dict[str, Any]:
     """Return metrics for one completed target artifact directory."""
     summary_path = _first_file(artifact_dir, "match_only_summary_*.csv")
@@ -403,6 +437,8 @@ def report_artifact_dir(
                 unique_row_keys.add(row_key)
 
     labels = labels or {}
+    total_distribution = _distribution(total_counts)
+    saved_distribution = _distribution(saved_counts)
     return {
         "artifact_dir": str(artifact_dir),
         "summary_file": str(summary_path),
@@ -424,18 +460,36 @@ def report_artifact_dir(
         "candidate_discovery_saved_total": discovery_saved,
         "unique_saved_row_keys": len(unique_row_keys),
         "candidate_method_counts_saved": dict(sorted(method_counts.items())),
-        "candidate_count_total_distribution": _distribution(total_counts),
-        "candidate_count_saved_distribution": _distribution(saved_counts),
+        "candidate_count_total_distribution": total_distribution,
+        "candidate_count_saved_distribution": saved_distribution,
         "candidate_count_displayed_distribution": _distribution(displayed_counts),
+        "candidate_budget": _budget_report(
+            total_distribution,
+            saved_distribution,
+            candidate_p99_limit,
+            candidate_max_limit,
+        ),
         "precision_sample": _precision_sample(candidate_records, labels),
     }
 
 
 def build_report(
-    artifact_dirs: list[Path], labels_path: Path | None = None
+    artifact_dirs: list[Path],
+    labels_path: Path | None = None,
+    *,
+    candidate_p99_limit: int = DEFAULT_CANDIDATE_P99_LIMIT,
+    candidate_max_limit: int = DEFAULT_CANDIDATE_MAX_LIMIT,
 ) -> dict[str, Any]:
     labels = _load_labels(labels_path)
-    reports = [report_artifact_dir(path, labels=labels) for path in artifact_dirs]
+    reports = [
+        report_artifact_dir(
+            path,
+            labels=labels,
+            candidate_p99_limit=candidate_p99_limit,
+            candidate_max_limit=candidate_max_limit,
+        )
+        for path in artifact_dirs
+    ]
     return {
         "schema_version": 1,
         "read_only": True,
@@ -455,15 +509,29 @@ def main() -> int:
     )
     parser.add_argument("--labels", type=Path, help="optional reviewed-label CSV")
     parser.add_argument("--output", type=Path, help="optional JSON report path")
+    parser.add_argument("--candidate-p99-limit", type=int, default=DEFAULT_CANDIDATE_P99_LIMIT)
+    parser.add_argument("--candidate-max-limit", type=int, default=DEFAULT_CANDIDATE_MAX_LIMIT)
     args = parser.parse_args()
-    report = build_report(args.artifact_dir, args.labels)
+    report = build_report(
+        args.artifact_dir,
+        args.labels,
+        candidate_p99_limit=max(0, args.candidate_p99_limit),
+        candidate_max_limit=max(0, args.candidate_max_limit),
+    )
     payload = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(payload, encoding="utf-8")
     else:
         sys.stdout.buffer.write(payload.encode("utf-8"))
-    return 0
+    return 0 if _budget_gate_passes(report) else 2
+
+
+def _budget_gate_passes(report: dict[str, Any]) -> bool:
+    return all(
+        item.get("candidate_budget", {}).get("status") == "pass"
+        for item in report.get("reports", [])
+    )
 
 
 if __name__ == "__main__":

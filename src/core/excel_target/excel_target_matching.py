@@ -18,6 +18,7 @@ from src.core.matching.product_matching_queries import search_queries_for_item
 from src.core.matching_types import DecisionSource, MatchDecision, SearchMatch
 from src.core.matching.candidate_identity import candidate_store_product_id
 from src.core.manual_review.manual_review_runtime import saved_manual_review_decision
+from src.core.manual_review.candidate_limits import normalize_candidate_limit
 from src.core.manual_review.manual_review_store import ManualReviewStore
 from src.core.manual_review.manual_review_store_helpers import (
     is_scoped_excel_target_approval,
@@ -499,7 +500,9 @@ def _review_discovery_config(config: MatchingConfig) -> ReviewDiscoveryConfig:
         cross_language_aliases_enabled=bool(
             getattr(config, "excel_target_review_cross_language_aliases_enabled", False)
         ),
-        limit=int(getattr(config, "excel_target_review_candidate_limit", 5)),
+        limit=normalize_candidate_limit(
+            getattr(config, "excel_target_review_candidate_limit", 5)
+        ),
         strong_score=float(
             getattr(config, "excel_target_review_fuzzy_strong_score", 90.0)
         ),
