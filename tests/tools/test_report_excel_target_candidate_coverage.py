@@ -131,4 +131,7 @@ def test_report_accepts_gold_schema_and_excludes_uncertain_labels(tmp_path: Path
     assert precision["negative_candidates"] == 1
     assert precision["uncertain_candidates"] == 0
     assert precision["precision_percent"] == 50.0
+    assert precision["precision_interval_percent"]["lower_percent"] < 50.0
+    assert precision["precision_interval_percent"]["upper_percent"] > 50.0
     assert precision["recall_at_saved_percent"] == 100.0
+    assert precision["recall_at_saved_interval_percent"]["upper_percent"] == 100.0

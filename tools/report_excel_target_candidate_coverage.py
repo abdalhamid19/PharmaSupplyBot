@@ -59,6 +59,22 @@ def _percent(numerator: int, denominator: int) -> float | None:
     return round(100.0 * numerator / denominator, 4)
 
 
+def _wilson_interval(
+    successes: int, trials: int, *, z: float = 1.959963984540054
+) -> dict[str, float | None]:
+    """Return a score-independent 95% Wilson interval in percent."""
+    if trials <= 0:
+        return {"lower_percent": None, "upper_percent": None}
+    ratio = successes / trials
+    denominator = 1.0 + z * z / trials
+    centre = (ratio + z * z / (2 * trials)) / denominator
+    spread = z * math.sqrt((ratio * (1 - ratio) + z * z / (4 * trials)) / trials)
+    return {
+        "lower_percent": round(100.0 * max(0.0, centre - spread / denominator), 4),
+        "upper_percent": round(100.0 * min(1.0, centre + spread / denominator), 4),
+    }
+
+
 def _percentile(values: list[int], percentile: float) -> int | None:
     if not values:
         return None
@@ -257,19 +273,38 @@ def _precision_counts(counts, labeled_items, labeled_candidates, positive_candid
         "uncertain_candidates": counts["U"],
         "stale_candidates": counts["E"],
         "precision_percent": _percent(positive_candidates, labeled_candidates),
+        "precision_interval_percent": _wilson_interval(
+            positive_candidates, labeled_candidates
+        ),
     }
 
 
 def _precision_recall(positive_saved, positive_ranks, positive_label_items):
     """Return saved-candidate recall at the supported rank cutoffs."""
+    saved_hits = len(positive_saved)
+    positive_total = len(positive_label_items)
+    rank_hits = {
+        rank: _rank_hits(positive_ranks, positive_label_items, rank)
+        for rank in (1, 3, 5)
+    }
     return {
-        "positive_label_items": len(positive_label_items),
+        "positive_label_items": positive_total,
         "recall_at_saved_percent": _percent(
-            len(positive_saved), len(positive_label_items)
+            saved_hits, positive_total
         ),
-        "recall_at_1_percent": _rank_recall(positive_ranks, positive_label_items, 1),
-        "recall_at_3_percent": _rank_recall(positive_ranks, positive_label_items, 3),
-        "recall_at_5_percent": _rank_recall(positive_ranks, positive_label_items, 5),
+        "recall_at_saved_interval_percent": _wilson_interval(
+            saved_hits, positive_total
+        ),
+        **{
+            f"recall_at_{rank}_percent": _percent(hits, positive_total)
+            for rank, hits in rank_hits.items()
+        },
+        **{
+            f"recall_at_{rank}_interval_percent": _wilson_interval(
+                hits, positive_total
+            )
+            for rank, hits in rank_hits.items()
+        },
     }
 
 
@@ -281,10 +316,30 @@ def _empty_precision_sample() -> dict[str, Any]:
         "labeled_candidates": 0,
         "positive_candidates": 0,
         "precision_percent": None,
+        "precision_interval_percent": {
+            "lower_percent": None,
+            "upper_percent": None,
+        },
         "recall_at_saved_percent": None,
+        "recall_at_saved_interval_percent": {
+            "lower_percent": None,
+            "upper_percent": None,
+        },
         "recall_at_1_percent": None,
         "recall_at_3_percent": None,
         "recall_at_5_percent": None,
+        "recall_at_1_interval_percent": {
+            "lower_percent": None,
+            "upper_percent": None,
+        },
+        "recall_at_3_interval_percent": {
+            "lower_percent": None,
+            "upper_percent": None,
+        },
+        "recall_at_5_interval_percent": {
+            "lower_percent": None,
+            "upper_percent": None,
+        },
         "precision_by_candidate_method": {},
     }
 
@@ -339,12 +394,17 @@ def _rank_recall(
     positive_ranks: dict[str, int], positive_items: set[str], rank_limit: int
 ) -> float | None:
     """Return recall for positive labels found at or above a rank limit."""
-    hits = sum(
+    return _percent(_rank_hits(positive_ranks, positive_items, rank_limit), len(positive_items))
+
+
+def _rank_hits(
+    positive_ranks: dict[str, int], positive_items: set[str], rank_limit: int
+) -> int:
+    return sum(
         rank <= rank_limit
         for item_key, rank in positive_ranks.items()
         if item_key in positive_items
     )
-    return _percent(hits, len(positive_items))
 
 
 def report_artifact_dir(

@@ -1,0 +1,24 @@
+item_code,item_name,target_key,source_file,source_row_number,excel_target_row_key,candidate_method,ranking_tier,compatibility_status,label,reviewer,adjudication_notes,reviewed_at,source_run_id
+73451,XITHRONE 200MG SUSP 25ML,البركة شركات,محروس1.xlsx,2344,853cc4369c4959c353a833cfbaa8e668d96068705e452f884a4defe67bf6ca4e,tawreed_dictionary,1,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+73451,XITHRONE 200MG SUSP 25ML,البركة شركات,محروس1.xlsx,2345,affa9ba7e415f471621ba78b5d0bb07fc3f4ae4c569d0ccb33aecfa47ab8afe3,review_identity,2,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+73451,XITHRONE 200MG SUSP 25ML,البركة شركات,محروس1.xlsx,2346,cb402dd66ee046c368cc997513a4b8d1b277cf9e5ca7029e04d0e406e59b74cd,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+73852,XITHRONE 500MG 3TAB,البركة شركات,محروس1.xlsx,2344,853cc4369c4959c353a833cfbaa8e668d96068705e452f884a4defe67bf6ca4e,tawreed_dictionary,1,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+73852,XITHRONE 500MG 3TAB,البركة شركات,محروس1.xlsx,2345,affa9ba7e415f471621ba78b5d0bb07fc3f4ae4c569d0ccb33aecfa47ab8afe3,review_identity,2,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+73852,XITHRONE 500MG 3TAB,البركة شركات,محروس1.xlsx,2346,cb402dd66ee046c368cc997513a4b8d1b277cf9e5ca7029e04d0e406e59b74cd,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3100,ac2e06b47eb69155125034180f62cc45e056296b3bcc0288e3174b6b2ab51015,review_identity,2,compatible,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3101,90310d3d3ec9eda67785292e90b6a1e6b29532cc67d937750a78d91e4e4fcc17,tawreed_dictionary,1,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3103,011ad497ac37b8ae5077b4b3aecce2d0eea50bf2b5be7142f9c72d73f1ad274d,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3102,3a60386b7472119148ab2b977f7542d4dd986310416a7be69fcfb925c75dc2cd,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3098,7ab4af63da7450f8965a939cb20fee4d4e749f4d2eda08449698e426a9e23107,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3104,bbc508db9ad4dd1f00b0cfb39f6cc2972ccb3ef75fce7637da75dbf57aa2671c,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3105,de3ff4c5c2e16f0f61e0a0332e0a20bea8da63ef7d7c37a7a80b737e9ebeccb3,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol3,VOLTAREN 3AMP,البركة شركات,محروس1.xlsx,3099,e79ff1716bb1fdf691bdd09b9d80919d91f338674820707f973d1bf37b91cef4,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3102,3a60386b7472119148ab2b977f7542d4dd986310416a7be69fcfb925c75dc2cd,review_identity_prefix,3,compatible,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3101,90310d3d3ec9eda67785292e90b6a1e6b29532cc67d937750a78d91e4e4fcc17,tawreed_dictionary,1,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3100,ac2e06b47eb69155125034180f62cc45e056296b3bcc0288e3174b6b2ab51015,review_identity,2,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3103,011ad497ac37b8ae5077b4b3aecce2d0eea50bf2b5be7142f9c72d73f1ad274d,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3098,7ab4af63da7450f8965a939cb20fee4d4e749f4d2eda08449698e426a9e23107,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3104,bbc508db9ad4dd1f00b0cfb39f6cc2972ccb3ef75fce7637da75dbf57aa2671c,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3105,de3ff4c5c2e16f0f61e0a0332e0a20bea8da63ef7d7c37a7a80b737e9ebeccb3,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+vol6,VOLTAREN 6AMP,البركة شركات,محروس1.xlsx,3099,e79ff1716bb1fdf691bdd09b9d80919d91f338674820707f973d1bf37b91cef4,review_identity_prefix,3,rejected,U,,Awaiting independent human adjudication,,20260911_1609
+74306,VOLTAREN EMULGEL 25 GM,البركة شركات,محروس1.xlsx,3105,de3ff4c5c2e16f0f61e0a0332e0a20bea8da63ef7d7c37a7a80b737e9ebeccb3,tawreed_dictionary,1,rejected,U,,Awaiting independent human adjudication,,20260911_1609
