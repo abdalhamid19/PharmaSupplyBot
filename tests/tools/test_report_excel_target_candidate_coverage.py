@@ -96,3 +96,25 @@ def test_report_rejects_saved_count_above_generated_count(tmp_path: Path) -> Non
     artifact = _write_artifact(tmp_path / "run", invalid=True)
     with pytest.raises(ValueError, match="invalid candidate counts"):
         build_report([artifact])
+
+
+def test_report_accepts_gold_schema_and_excludes_uncertain_labels(tmp_path: Path) -> None:
+    artifact = _write_artifact(tmp_path / "run")
+    labels = tmp_path / "labels.csv"
+    labels.write_text(
+        "item_code,item_name,expected_row_key,label\n"
+        "1,TEST ITEM,row-1,P\n"
+        "1,TEST ITEM,row-2,N_variant\n"
+        "1,TEST ITEM,row-3,U\n",
+        encoding="utf-8",
+    )
+
+    report = build_report([artifact], labels)
+    precision = report["reports"][0]["precision_sample"]
+
+    assert precision["status"] == "computed"
+    assert precision["positive_candidates"] == 1
+    assert precision["negative_candidates"] == 1
+    assert precision["uncertain_candidates"] == 0
+    assert precision["precision_percent"] == 50.0
+    assert precision["recall_at_saved_percent"] == 100.0

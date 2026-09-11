@@ -22,6 +22,18 @@ from ..streamlit_remove_cart import render_running_remove_cart_controls
 from ..streamlit_shared import ARTIFACTS_DIR, load_csv_rows
 
 
+_REVIEW_ONLY_EVIDENCE_KINDS = {
+    "review_identity",
+    "review_identity_prefix",
+    "review_fuzzy",
+    "english_fuzzy",
+    "arabic_fuzzy",
+    "cross_language_alias",
+    "cohere_translation",
+    "discovery_only",
+}
+
+
 def render_manual_review_tab(app_config=None) -> None:
     """Render the full manual review workflow with candidate options."""
     st.title("Manual Review")
@@ -453,8 +465,8 @@ def _render_candidate_provenance(options: list[ReviewCandidateOption]) -> None:
             details.append(f"File: {option.source_file}")
         if option.identity_evidence_kind:
             details.append(f"Identity evidence: {option.identity_evidence_kind}")
-        if option.identity_evidence_kind == "review_fuzzy":
-            details.append("Review-only fuzzy candidate; human approval required")
+        if _has_review_only_evidence(option):
+            details.append("Review-only candidate; human approval required")
         if option.candidate_method:
             details.append(f"Candidate method: {option.candidate_method}")
         if option.review_status:
@@ -470,6 +482,18 @@ def _render_candidate_provenance(options: list[ReviewCandidateOption]) -> None:
         if option.excel_target_row_key:
             details.append(f"Target row key: {option.excel_target_row_key}")
         st.caption(" · ".join(details))
+
+
+def _has_review_only_evidence(option: ReviewCandidateOption) -> bool:
+    """Return whether an option requires an explicit human approval."""
+    evidence_kinds = {
+        part.strip()
+        for part in str(option.identity_evidence_kind or "").split(";")
+        if part.strip()
+    }
+    if option.candidate_method:
+        evidence_kinds.add(str(option.candidate_method).strip())
+    return bool(evidence_kinds & _REVIEW_ONLY_EVIDENCE_KINDS)
 
 
 # ============ Form Rendering ============

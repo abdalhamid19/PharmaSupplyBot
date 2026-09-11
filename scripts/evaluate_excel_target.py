@@ -168,14 +168,14 @@ def _summary(rows: Iterable[dict[str, str]]) -> dict[str, int]:
         "matched": sum(_is_matched(row) for row in rows),
         "manual_review": sum(_is_reviewable(row) for row in rows),
         "identity_absent": sum(
-            row.get("coverage_category") == "identity_absent" for row in rows
+            _coverage_category(row) == "identity_absent" for row in rows
         ),
         "identity_variant_rejected": sum(
-            row.get("coverage_category") == "identity_variant_rejected"
+            _coverage_category(row) == "identity_variant_rejected"
             for row in rows
         ),
         "excel_target_candidate_available": sum(
-            row.get("coverage_category") == "excel_target_candidate_available"
+            _coverage_category(row) == "excel_target_candidate_available"
             for row in rows
         ),
     }
@@ -183,9 +183,14 @@ def _summary(rows: Iterable[dict[str, str]]) -> dict[str, int]:
 
 def _candidate_categories(rows: Iterable[dict[str, str]]) -> dict[str, int]:
     counts = Counter(
-        row.get("coverage_category", "") for row in rows if _is_reviewable(row)
+        _coverage_category(row) for row in rows if _is_reviewable(row)
     )
     return dict(sorted(counts.items()))
+
+
+def _coverage_category(row: dict[str, str]) -> str:
+    """Read the normalized category from either evaluator or CLI artifacts."""
+    return str(row.get("coverage_category") or row.get("manual_review_category") or "")
 
 
 def _candidate_labels(rows, new_keys: Iterable[tuple[str, str]]) -> list[dict[str, object]]:
@@ -254,7 +259,13 @@ def _validate_gold(
     if gold_path is None:
         return {"path": "", "passed": True, "failures": []}
     failures: list[str] = []
+    target_keys = {
+        str(row.get("target_key") or "") for row in actual_rows.values()
+    }
     for label in _read_rows(Path(gold_path)):
+        if label.get("target_key") and target_keys:
+            if label.get("target_key") not in target_keys:
+                continue
         key = _item_key(label)
         row = actual_rows.get(key)
         if row is None:

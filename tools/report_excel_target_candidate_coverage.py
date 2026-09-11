@@ -12,8 +12,10 @@ Examples:
         --artifact-dir artifacts/excel-target/القيصر شركات/20260910_1243
 
 An optional labels CSV can contain ``item_key``, ``excel_target_row_key`` and
-``label`` columns.  Labels are deliberately optional: without them the tool
-reports coverage and candidate volume but does not invent a precision claim.
+``label`` columns.  It also accepts the gold-set columns ``item_code``,
+``item_name`` and ``expected_row_key``.  Labels are deliberately optional:
+without them the tool reports coverage and candidate volume but does not invent
+a precision claim.
 """
 
 from __future__ import annotations
@@ -123,82 +125,200 @@ def _is_identity_method(method: str) -> bool:
     return method in IDENTITY_METHODS
 
 
-def _load_labels(path: Path | None) -> dict[tuple[str, str], bool]:
+def _label_value(raw_label: str) -> str:
+    """Normalize reviewed labels to P, N, U, or E without guessing positives."""
+    label = raw_label.strip().casefold()
+    if label in {"1", "true", "yes", "correct", "positive", "p"}:
+        return "P"
+    if label in {"0", "false", "no", "negative", "n", "n_variant", "n_prefix"}:
+        return "N"
+    if label in {"e", "e_stale", "stale"}:
+        return "E"
+    return "U"
+
+
+def _label_item_key(row: dict[str, str]) -> str:
+    """Return an item key from either artifact-label or gold-set columns."""
+    explicit = str(row.get("item_key") or "").strip()
+    if explicit:
+        return _canonical_item_key(explicit)
+    code = str(row.get("item_code") or "").strip()
+    name = str(row.get("item_name") or "").strip()
+    return _canonical_item_key(f"{code}::{name}") if code and name else ""
+
+
+def _canonical_item_key(item_key: str) -> str:
+    """Make English case differences harmless while preserving Arabic text."""
+    return str(item_key or "").strip().casefold()
+
+
+def _load_labels(path: Path | None) -> dict[tuple[str, str], str]:
     if path is None:
         return {}
-    labels: dict[tuple[str, str], bool] = {}
+    labels: dict[tuple[str, str], str] = {}
     with path.open("r", newline="", encoding="utf-8-sig") as handle:
         for row in csv.DictReader(handle):
-            item_key = str(row.get("item_key") or "").strip()
+            item_key = _label_item_key(row)
             row_key = str(
                 row.get("excel_target_row_key")
                 or row.get("row_key")
+                or row.get("expected_row_key")
                 or ""
             ).strip()
             if not item_key or not row_key:
                 continue
             label = str(row.get("label") or row.get("correct") or "")
-            labels[(item_key, row_key)] = label.strip().casefold() in {
-                "1", "true", "yes", "correct", "positive",
-            }
+            labels[(item_key, row_key)] = _label_value(label)
     return labels
 
 
 def _precision_sample(
     records: list[dict[str, Any]],
-    labels: dict[tuple[str, str], bool],
+    labels: dict[tuple[str, str], str],
 ) -> dict[str, Any]:
     if not labels:
-        return {
-            "status": "labels_not_provided",
-            "labeled_items": 0,
-            "labeled_candidates": 0,
-            "positive_candidates": 0,
-            "precision_percent": None,
-            "recall_at_saved_percent": None,
-        }
+        return _empty_precision_sample()
+    counts, method_counts, labeled_items, positive_saved, positive_ranks = (
+        _collect_precision_stats(records, labels)
+    )
+    positive_label_items = {
+        item_key for (item_key, _), label in labels.items() if label == "P"
+    }
+    return _precision_metrics(
+        counts,
+        method_counts,
+        labeled_items,
+        positive_saved,
+        positive_ranks,
+        positive_label_items,
+    )
 
-    labeled_candidates = 0
-    positive_candidates = 0
-    labeled_items: set[str] = set()
-    items_with_positive_saved: set[str] = set()
-    positive_label_items: set[str] = set()
-    for record in records:
-        item_key = str(record.get("item_key") or "")
-        options = record.get("options") or []
-        for option in options:
-            if not isinstance(option, dict):
-                continue
-            row_key = str(option.get("excel_target_row_key") or "")
-            key = (item_key, row_key)
-            if key not in labels:
-                continue
-            labeled_items.add(item_key)
-            labeled_candidates += 1
-            if labels[key]:
-                positive_candidates += 1
-                items_with_positive_saved.add(item_key)
-        for (label_item_key, label_row_key), is_positive in labels.items():
-            if label_item_key == item_key and is_positive:
-                positive_label_items.add(label_item_key)
 
+def _precision_metrics(
+    counts,
+    method_counts,
+    labeled_items,
+    positive_saved,
+    positive_ranks,
+    positive_label_items,
+):
+    """Assemble precision and rank-recall metrics from collected labels."""
+    labeled_candidates = counts["P"] + counts["N"]
+    positive_candidates = counts["P"]
+    return {
+        **_precision_counts(counts, labeled_items, labeled_candidates, positive_candidates),
+        **_precision_recall(
+            positive_saved, positive_ranks, positive_label_items
+        ),
+        "precision_by_candidate_method": _method_precision(method_counts),
+    }
+
+
+def _precision_counts(counts, labeled_items, labeled_candidates, positive_candidates):
+    """Return the reviewed candidate counts."""
     return {
         "status": "computed",
         "labeled_items": len(labeled_items),
-        "positive_label_items": len(positive_label_items),
         "labeled_candidates": labeled_candidates,
         "positive_candidates": positive_candidates,
+        "negative_candidates": counts["N"],
+        "uncertain_candidates": counts["U"],
+        "stale_candidates": counts["E"],
         "precision_percent": _percent(positive_candidates, labeled_candidates),
-        "recall_at_saved_percent": _percent(
-            len(items_with_positive_saved), len(positive_label_items)
-        ),
     }
+
+
+def _precision_recall(positive_saved, positive_ranks, positive_label_items):
+    """Return saved-candidate recall at the supported rank cutoffs."""
+    return {
+        "positive_label_items": len(positive_label_items),
+        "recall_at_saved_percent": _percent(
+            len(positive_saved), len(positive_label_items)
+        ),
+        "recall_at_1_percent": _rank_recall(positive_ranks, positive_label_items, 1),
+        "recall_at_3_percent": _rank_recall(positive_ranks, positive_label_items, 3),
+        "recall_at_5_percent": _rank_recall(positive_ranks, positive_label_items, 5),
+    }
+
+
+def _empty_precision_sample() -> dict[str, Any]:
+    """Return the explicit result for a report without reviewed labels."""
+    return {
+        "status": "labels_not_provided",
+        "labeled_items": 0,
+        "labeled_candidates": 0,
+        "positive_candidates": 0,
+        "precision_percent": None,
+        "recall_at_saved_percent": None,
+        "recall_at_1_percent": None,
+        "recall_at_3_percent": None,
+        "recall_at_5_percent": None,
+        "precision_by_candidate_method": {},
+    }
+
+
+def _collect_precision_stats(records, labels):
+    """Collect reviewed counts and saved positive ranks."""
+    counts = Counter()
+    method_counts: dict[str, Counter[str]] = {}
+    labeled_items: set[str] = set()
+    positive_saved: set[str] = set()
+    positive_ranks: dict[str, int] = {}
+    for item_key, option, label, rank in _labeled_options(records, labels):
+        labeled_items.add(item_key)
+        counts[label] += 1
+        method_counts.setdefault(_method(option), Counter())[label] += 1
+        if label == "P":
+            positive_saved.add(item_key)
+            positive_ranks[item_key] = min(positive_ranks.get(item_key, rank), rank)
+    return counts, method_counts, labeled_items, positive_saved, positive_ranks
+
+
+def _method_precision(method_counts):
+    """Calculate labeled precision by candidate method."""
+    return {
+        method: {
+            "positive": values["P"],
+            "negative": values["N"],
+            "uncertain": values["U"],
+            "stale": values["E"],
+            "precision_percent": _percent(
+                values["P"], values["P"] + values["N"]
+            ),
+        }
+        for method, values in sorted(method_counts.items())
+    }
+
+
+def _labeled_options(records, labels):
+    """Yield saved options with their reviewed label and one-based rank."""
+    for record in records:
+        item_key = _canonical_item_key(record.get("item_key") or "")
+        for rank, option in enumerate(record.get("options") or [], start=1):
+            if not isinstance(option, dict):
+                continue
+            row_key = str(option.get("excel_target_row_key") or "")
+            label = labels.get((item_key, row_key))
+            if label:
+                yield item_key, option, label, rank
+
+
+def _rank_recall(
+    positive_ranks: dict[str, int], positive_items: set[str], rank_limit: int
+) -> float | None:
+    """Return recall for positive labels found at or above a rank limit."""
+    hits = sum(
+        rank <= rank_limit
+        for item_key, rank in positive_ranks.items()
+        if item_key in positive_items
+    )
+    return _percent(hits, len(positive_items))
 
 
 def report_artifact_dir(
     artifact_dir: Path,
     *,
-    labels: dict[tuple[str, str], bool] | None = None,
+    labels: dict[tuple[str, str], str] | None = None,
 ) -> dict[str, Any]:
     """Return metrics for one completed target artifact directory."""
     summary_path = _first_file(artifact_dir, "match_only_summary_*.csv")

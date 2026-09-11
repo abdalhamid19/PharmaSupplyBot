@@ -429,6 +429,36 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         assert caption.call_count == 2
 
+    def test_candidate_provenance_warns_for_every_review_only_kind(self) -> None:
+        review_only_kinds = (
+            "review_identity",
+            "review_identity_prefix",
+            "review_fuzzy",
+            "english_fuzzy",
+            "arabic_fuzzy",
+            "cross_language_alias",
+            "cohere_translation",
+            "discovery_only",
+        )
+        for kind in review_only_kinds:
+            option = ReviewCandidateOption(
+                store_product_id=kind,
+                name_en="TEST",
+                name_ar="",
+                supplier="excel-target:baraka",
+                available_quantity=1,
+                price=10.0,
+                score=15.0,
+                rejection_reason="",
+                orderable=True,
+                identity_evidence_kind=kind,
+            )
+            with patch.object(manual_review_page.st, "caption") as caption:
+                manual_review_page._render_candidate_provenance([option])
+
+            rendered = caption.call_args.args[0]
+            assert "Review-only candidate; human approval required" in rendered
+
     def test_tawreed_saved_decision_does_not_hide_baraka_candidates(self) -> None:
         option = ReviewCandidateOption(
             store_product_id="baraka-1",
