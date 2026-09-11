@@ -18,7 +18,7 @@ _FORMS = {
     "SOLUTION": ("SOL", "SOLN", "SOLUTION", "\u0645\u062d\u0644\u0648\u0644"),
     "LOTION": ("LOTION", "\u0644\u0648\u0634\u0646"),
     "VIAL": ("VIAL", "VIALS", "\u0641\u064a\u0627\u0644", "\u0642\u0627\u0631\u0648\u0631\u0629"),
-    "AMPOULE": ("AMP", "AMPS", "AMPOULE", "AMPOULES", "\u0627\u0645\u0628\u0648\u0644", "\u0623\u0645\u0628\u0648\u0644", "\u0627\u0645\u0628\u0648\u0644\u0629", "\u0623\u0645\u0628\u0648\u0644\u0629", "\u0627\u0645\u0628\u0648\u0644\u0627\u062a", "\u0623\u0645\u0628\u0648\u0644\u0627\u062a"),
+    "AMPOULE": ("AMP", "AMPS", "AMPOULE", "AMPOULES", "\u0627\u0645\u0628\u0648\u0644", "\u0645\u0628\u0648\u0644", "\u0623\u0645\u0628\u0648\u0644", "\u0627\u0645\u0628\u0648\u0644\u0629", "\u0623\u0645\u0628\u0648\u0644\u0629", "\u0627\u0645\u0628\u0648\u0644\u0627\u062a", "\u0623\u0645\u0628\u0648\u0644\u0627\u062a"),
     "SUPPOSITORY": ("SUPP", "SUPPOSITORY", "SUPPOSITORIES", "\u0644\u0628\u0648\u0633", "\u062a\u062d\u0627\u0645\u064a\u0644", "\u062a\u062d\u0645\u064a\u0644\u0629"),
     "LOZENGE": ("LOZENGE", "LOZENGES", "\u0627\u0633\u062a\u062d\u0644\u0627\u0628"),
     "POWDER": ("POWDER", "POWDERS", "\u0628\u0648\u062f\u0631\u0629", "\u0628\u0648\u062f\u0631\u0647", "\u0645\u0633\u062d\u0648\u0642"),
@@ -53,7 +53,7 @@ _BARE_DROPS_DOSE_RE = re.compile(
 )
 _PACK_RE = re.compile(
     r"\b(\d+)\s*(?:tab|tabs|tablet|tablets|cap|caps|capsule|capsules|film|films|flim|flims|vial|vials|amp|amps|ampoule|ampoules|supp|suppository|suppositories|lozenge|lozenges)\b|"
-    r"(\d+)\s*(?:\u0642\u0631\u0635|\u0623\u0642\u0631\u0627\u0635|\u0627\u0642\u0631\u0627\u0635|\u0643\u0628\u0633\u0648\u0644|\u0643\u0628\u0633\u0648\u0644\u0629|\u0643\u0628\u0633\u0648\u0644\u0627\u062a|\u0643\u064a\u0633|\u0627\u0643\u064a\u0627\u0633|\u0623\u0643\u064a\u0627\u0633|\u0641\u064a\u0644\u0645|\u0641\u064a\u0644\u0645\u0633|\u0641\u064a\u0627\u0644|\u0627\u0645\u0628\u0648\u0644|\u0623\u0645\u0628\u0648\u0644|\u0644\u0628\u0648\u0633|\u062a\u062d\u0627\u0645\u064a\u0644|\u062a\u062d\u0645\u064a\u0644\u0629)",
+    r"(\d+)\s*(?:\u0642\u0631\u0635|\u0623\u0642\u0631\u0627\u0635|\u0627\u0642\u0631\u0627\u0635|\u0643\u0628\u0633\u0648\u0644|\u0643\u0628\u0633\u0648\u0644\u0629|\u0643\u0628\u0633\u0648\u0644\u0627\u062a|\u0643\u064a\u0633|\u0627\u0643\u064a\u0627\u0633|\u0623\u0643\u064a\u0627\u0633|\u0641\u064a\u0644\u0645|\u0641\u064a\u0644\u0645\u0633|\u0641\u064a\u0627\u0644|\u0627\u0645\u0628\u0648\u0644|\u0645\u0628\u0648\u0644|\u0623\u0645\u0628\u0648\u0644|\u0644\u0628\u0648\u0633|\u062a\u062d\u0627\u0645\u064a\u0644|\u062a\u062d\u0645\u064a\u0644\u0629)",
     re.IGNORECASE,
 )
 _PACK_AFTER_FORM_RE = re.compile(
@@ -157,7 +157,8 @@ def validate_product_compatibility(query: str, candidate: str) -> CompatibilityR
 
 def _has_alias(text: str, alias: str) -> bool:
     if alias.isascii():
-        return bool(re.search(rf"\b{re.escape(alias)}\b", text, re.IGNORECASE))
+        pattern = rf"(?<![a-z0-9])(?:\d+\s*)?{re.escape(alias)}(?![a-z])"
+        return bool(re.search(pattern, text, re.IGNORECASE))
     return alias in text
 
 

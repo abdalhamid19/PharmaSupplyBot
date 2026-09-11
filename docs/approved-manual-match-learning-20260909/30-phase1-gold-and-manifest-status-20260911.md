@@ -50,10 +50,11 @@ manifest قبل التشغيل بنفس الملفات، ثم التحقق من 
 الحالتين، لكن ترتيب `VOLTAREN 3AMP` في البركة يحتاج دراسة منفصلة بعد توسيع
 العينة وتصنيف المرشحين الباقين.
 
-## المتبقي قبل Phase 2
+## المتبقي بعد Phase 2 وقبل Phase 3
 
 1. قياس `C_display` من boundary الحقيقي في Streamlit، لا استنتاجه من saved.
 2. إضافة replay manifest قبل التشغيل إلى runbook والمقارنة.
 3. توسيع labels البشرية المستقلة قبل إعلان precision gate.
-4. تثبيت round-trip وfail-closed end-to-end ثم دراسة parsing للرموز الملتصقة
-   مثل `3AMP` و`3مبول`.
+4. تثبيت round-trip وfail-closed end-to-end.
+5. دراسة ترتيب المرشح الصحيح في البركة بعد اتساع العينة، دون خفض thresholds
+   قبل وجود labels كافية.

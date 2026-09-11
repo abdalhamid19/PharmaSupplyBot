@@ -293,3 +293,48 @@ def test_ampoule_and_vial_are_distinct_counted_presentations() -> None:
     )
     assert not injection_ampoule.accepted
     assert injection_ampoule.rejection_reason == "candidate form conflicts with requested form"
+
+
+@pytest.mark.parametrize(
+    ("query", "candidate"),
+    [
+        ("VOLTAREN 3AMP", "فولتارين 3مبول"),
+        ("VOLTAREN 3 AMP", "فولتارين 3 امبول"),
+        ("XITHRONE 500MG 3TAB", "زيثرون 500 مجم 3قرص"),
+    ],
+)
+def test_compact_form_and_pack_tokens_are_compatible(
+    query: str, candidate: str
+) -> None:
+    result = validate_product_compatibility(query, candidate)
+
+    assert result.accepted
+
+
+@pytest.mark.parametrize(
+    ("query", "candidate", "reason"),
+    [
+        (
+            "VOLTAREN 3AMP",
+            "فولتارين 6امبولة",
+            "candidate pack conflicts with requested pack",
+        ),
+        (
+            "XITHRONE 500MG 3TAB",
+            "زيثرون 500 مجم 5قرص",
+            "candidate pack conflicts with requested pack",
+        ),
+        (
+            "XITHRONE 500MG 3TAB",
+            "زيثرون 500 مجم شراب",
+            "candidate form conflicts with requested form",
+        ),
+    ],
+)
+def test_compact_variant_negatives_remain_rejected(
+    query: str, candidate: str, reason: str
+) -> None:
+    result = validate_product_compatibility(query, candidate)
+
+    assert not result.accepted
+    assert result.rejection_reason == reason

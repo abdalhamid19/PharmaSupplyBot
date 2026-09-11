@@ -137,6 +137,8 @@ def test_review_candidates_include_the_correct_arabic_variant_without_auto_match
     )
     assert correct.product.name == "فولتارين 3مبول س جديد"
     assert correct.candidate_method == "review_identity"
+    assert correct.compatibility_status == "compatible"
+    assert correct.compatibility_rejection == ""
     assert correct.source_kind == "excel-target"
     assert correct.excel_target_source_row == 3100
     assert correct.excel_target_row_key == excel_target_row_key(
@@ -349,3 +351,6 @@ def test_review_candidates_include_the_correct_xithrone_pack_variant() -> None:
 
     assert match.decision.best_match is None
     assert [candidate.product.source_row_number for candidate in match.review_candidates] == [2344, 2345]
+    correct = match.review_candidates[1]
+    assert correct.compatibility_status == "rejected"
+    assert correct.compatibility_rejection == "candidate strength is not proven"
