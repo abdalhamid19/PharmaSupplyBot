@@ -24,7 +24,8 @@ from src.core.utils.excel import Item
 
 
 ALNASR_PATH = Path(__file__).parent / "fixtures" / "alnasr.xlsx"
-BARAKA_1209_PATH = Path(__file__).parent / "fixtures" / "baraka_1209.xlsx"
+BARAKA_OVERRIDE_PATH = Path(__file__).parent / "fixtures" / "baraka_1209.xlsx"
+BARAKA_1309_PATH = Path("data/input/excel target/البركة1309.xlsx")
 TEST_FIXTURE = Path(__file__).parent / "fixtures" / "excel_target_with_target.yaml"
 TEST_EXCEL = Path("data/input/order_items/test_new_feature.xlsx")
 
@@ -52,21 +53,19 @@ excel_targets:
     name_col: "صنف"
     price_col: "سعر"
     discount_col: "الخصم"
-  البركه 1209:
-    display_name: "البركه 1209"
+  البركة شركات:
+    display_name: "البركة شركات"
     name_col: "الصنف"
     price_col: "سعر ج"
     discount_col: "شركات"
-    sheet: "محروس ص"
-    header_row: 0
 """,
                 encoding="utf-8",
             )
         if not ALNASR_PATH.exists():
             raise unittest.SkipTest(f"Alnasr catalog missing at {ALNASR_PATH}")
-        if not BARAKA_1209_PATH.exists():
+        if not BARAKA_OVERRIDE_PATH.exists():
             raise unittest.SkipTest(
-                f"Baraka 1209 catalog missing at {BARAKA_1209_PATH}"
+                f"Baraka override catalog missing at {BARAKA_OVERRIDE_PATH}"
             )
         cls.app_config = load_config(TEST_FIXTURE)
 
@@ -82,74 +81,56 @@ excel_targets:
         self.assertEqual(target_key, "alnasr")
         self.assertEqual(xlsx_paths, [ALNASR_PATH])
 
-    def test_selected_excel_target_configs_resolves_baraka_1209_default_path(
+    def test_selected_excel_target_configs_routes_baraka_1309_through_companies(
         self,
     ) -> None:
-        """The independent 1209 key maps to its own conventional workbook."""
+        """The 1309 workbook is an override of the retained companies key."""
         args = argparse.Namespace(
-            excel_target="البركه 1209",
+            excel_target="البركة شركات",
             all_excel_targets=False,
-            excel_target_path=None,
+            excel_target_path=[f"البركة شركات={BARAKA_1309_PATH}"],
         )
 
         selected = selected_excel_target_configs(self.app_config, args)
 
         self.assertEqual(
             selected,
-            [("البركه 1209", [Path("data/input/excel target/البركه 1209.xlsx")])],
+            [("البركة شركات", [BARAKA_1309_PATH])],
         )
 
-    def test_selected_excel_target_configs_resolves_baraka_1309_default_path(
-        self,
-    ) -> None:
-        args = argparse.Namespace(
-            excel_target="البركة1309",
-            all_excel_targets=False,
-            excel_target_path=None,
-        )
-
-        selected = selected_excel_target_configs(self.app_config, args)
-
-        self.assertEqual(
-            selected,
-            [("البركة1309", [Path("data/input/excel target/البركة1309.xlsx")])],
-        )
-
-    def test_baraka_1209_default_path_loads_fixture_with_provenance(self) -> None:
-        """Default 1209 resolution reads the fixture and records its file name."""
-        args = argparse.Namespace(
-            excel_target="البركه 1209",
-            all_excel_targets=False,
-            excel_target_path=None,
-        )
+    def test_baraka_companies_override_loads_fixture_with_provenance(self) -> None:
+        """An override keeps the companies key and records the source file."""
         temp_root = Path(tempfile.mkdtemp())
-        catalog_path = (
-            temp_root / "data" / "input" / "excel target" / "البركه 1209.xlsx"
-        )
-        catalog_path.parent.mkdir(parents=True)
-        shutil.copyfile(BARAKA_1209_PATH, catalog_path)
+        catalog_path = temp_root / "baraka_1309.xlsx"
+        catalog_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(BARAKA_OVERRIDE_PATH, catalog_path)
         original_cwd = Path.cwd()
         try:
             os.chdir(temp_root)
+            args = argparse.Namespace(
+                excel_target="البركة شركات",
+                all_excel_targets=False,
+                excel_target_path=[f"البركة شركات={catalog_path}"],
+            )
             selected = selected_excel_target_configs(self.app_config, args)
             catalogs = load_target_catalogs(selected, self.app_config)
         finally:
             os.chdir(original_cwd)
             shutil.rmtree(temp_root, ignore_errors=True)
 
-        products = catalogs["البركه 1209"]
+        products = catalogs["البركة شركات"]
         self.assertEqual([product.name for product in products], [
             "BARAKA TEST ITEM 30TAB",
             "BARAKA ZERO PRICE",
         ])
-        self.assertTrue(all(product.source_file == "البركه 1209.xlsx" for product in products))
+        self.assertTrue(all(product.source_file == "baraka_1309.xlsx" for product in products))
 
-    def test_legacy_baraka_key_override_keeps_key_and_records_1209_source(self) -> None:
-        """A temporary legacy override must not relabel the independent target."""
+    def test_baraka_companies_override_keeps_key_and_records_source(self) -> None:
+        """A source override must not create or relabel another target."""
         args = argparse.Namespace(
             excel_target="البركة شركات",
             all_excel_targets=False,
-            excel_target_path=[f"البركة شركات={BARAKA_1209_PATH}"],
+            excel_target_path=[f"البركة شركات={BARAKA_OVERRIDE_PATH}"],
         )
 
         selected = selected_excel_target_configs(self.app_config, args)
@@ -188,7 +169,7 @@ excel_targets:
         selected = selected_excel_target_configs(self.app_config, args)
         self.assertEqual(
             [key for key, _ in selected],
-            ["alnasr", "البركة شركات", "البركه 1209", "البركة1309"],
+            ["alnasr", "البركة شركات"],
         )
 
     def test_selected_excel_target_configs_none(self) -> None:

@@ -1,4 +1,4 @@
-"""Regression coverage for the independent Baraka 1309 target."""
+"""Regression coverage for Baraka 1309 routed through the companies target."""
 
 from __future__ import annotations
 
@@ -37,9 +37,9 @@ def _catalog() -> list[TargetProduct]:
     ]
 
 
-def test_baraka_1309_target_is_configured_with_its_own_sheet_and_alias_scope() -> None:
+def test_baraka_1309_is_configured_under_the_companies_target() -> None:
     config = load_config(Path("state/config.yaml"))
-    target = config.excel_targets["البركة1309"]
+    target = config.excel_targets["البركة شركات"]
 
     assert target.sheet == "محروس"
     assert target.name_col == "الصنف"
@@ -47,13 +47,15 @@ def test_baraka_1309_target_is_configured_with_its_own_sheet_and_alias_scope() -
     assert len(target.aliases) == 9
     assert len(target.review_aliases) == 1
     assert all("البركة1309.xlsx row " in alias["source"] for alias in target.aliases)
+    assert "البركه 1209" not in config.excel_targets
+    assert "البركة1309" not in config.excel_targets
 
 
 def test_baraka_1309_items_are_matched_or_reviewed_without_unsafe_substitutions() -> None:
     config = load_config(Path("state/config.yaml"))
-    target = config.excel_targets["البركة1309"]
+    target = config.excel_targets["البركة شركات"]
     matcher = ExcelTargetMatcher(
-        "البركة1309",
+        "البركة شركات",
         _catalog(),
         allow_live_translation=False,
         use_saved_approvals=False,
