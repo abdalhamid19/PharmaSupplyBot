@@ -75,6 +75,12 @@ def _brands_similar_fuzzy(req_brand, off_brand):
 
 
 def _can_aggressively_flag(diagnostic: CandidateMatchDiagnostic, cfg: Any = None) -> bool:
+    from .product_matching_acceptance import identity_conflict_rejection_reason
+
+    if identity_conflict_rejection_reason(diagnostic.query, diagnostic.candidate) or str(
+        diagnostic.rejection_reason or ""
+    ).startswith("Product identity conflict:"):
+        return False
     if not candidate_has_store_product_id(diagnostic.candidate):
         return False
     if diagnostic.score < AGGRESSIVE_MIN_SCORE:

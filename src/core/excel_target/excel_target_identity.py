@@ -117,6 +117,7 @@ class ExcelTargetBilingualIndex:
         catalog: Sequence[TargetProduct],
         *,
         allow_live_translation: bool = False,
+        alias_entries: Sequence[AliasEntry | Mapping[str, object]] = (),
     ) -> "ExcelTargetBilingualIndex":
         native: dict[str, list[TargetProduct]] = {}
         arabic: dict[str, list[TargetProduct]] = {}
@@ -142,7 +143,7 @@ class ExcelTargetBilingualIndex:
                     (review_brand, product)
                 )
         tawreed_rows = tuple(load_tawreed_catalog().get("rows", ()))
-        alias_entries: list[AliasEntry] = []
+        discovered_alias_entries: list[AliasEntry] = []
         review_aliases: list[tuple[str, str]] = []
         review_alias_entries: list[AliasEntry] = []
         for row in tawreed_rows:
@@ -158,7 +159,7 @@ class ExcelTargetBilingualIndex:
                 tawreed.setdefault(english_brand, []).extend(targets)
                 if targets or review_targets:
                     if targets:
-                        alias_entries.append(
+                        discovered_alias_entries.append(
                             AliasEntry(row.get("en", ""), row.get("ar", ""), "tawreed")
                         )
                     if review_targets:
@@ -185,7 +186,7 @@ class ExcelTargetBilingualIndex:
                 if targets:
                     dictionary.setdefault(english_brand, []).extend(targets)
                     dictionary_arabic_names.add(arabic_brand)
-                    alias_entries.append(
+                    discovered_alias_entries.append(
                         AliasEntry(english_name, row.get("ar", ""), "egyptian")
                     )
                 if review_targets:
@@ -247,7 +248,9 @@ class ExcelTargetBilingualIndex:
             _freeze(live),
             _freeze(tawreed),
             _freeze_review(review),
-            ExcelTargetAliasResolver(alias_entries, catalog),
+            ExcelTargetAliasResolver(
+                (*alias_entries, *discovered_alias_entries), catalog
+            ),
             _freeze(alias_products),
             tuple(review_alias_entries),
         )

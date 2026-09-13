@@ -13,3 +13,15 @@ excel_targets:
     name_col: "صنف"
     price_col: "سعر"
     discount_col: "الخصم"
+  البركة شركات:
+    display_name: "البركة شركات"
+    name_col: "الصنف"
+    price_col: "سعر ج"
+    discount_col: "شركات"
+  البركه 1209:
+    display_name: "البركه 1209"
+    name_col: "الصنف"
+    price_col: "سعر ج"
+    discount_col: "شركات"
+    sheet: "محروس ص"
+    header_row: 0

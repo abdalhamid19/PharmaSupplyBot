@@ -10,7 +10,7 @@ import time
 import logging
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from src.core.config.config_models import AppConfig, ExcelTargetConfig, MatchingConfig
 from src.core.matching.product_matching import explain_best_product_match
@@ -80,6 +80,7 @@ class ExcelTargetMatcher:
         allow_live_translation: bool = False,
         use_saved_approvals: bool = True,
         review_aliases: Sequence[AliasEntry] = (),
+        approved_aliases: Sequence[AliasEntry | Mapping[str, object]] = (),
     ) -> None:
         self.target_key = target_key
         self.catalog = tuple(catalog)
@@ -91,6 +92,7 @@ class ExcelTargetMatcher:
         self.identity_index = ExcelTargetBilingualIndex.build(
             self.catalog,
             allow_live_translation=allow_live_translation,
+            alias_entries=approved_aliases,
         )
         self.review_discovery = ExcelTargetReviewDiscoveryIndex.build(
             self.catalog,
@@ -164,6 +166,7 @@ def find_best_match_in_target(
     allow_live_translation: bool = False,
     use_saved_approvals: bool = True,
     review_aliases: Sequence[AliasEntry] = (),
+    approved_aliases: Sequence[AliasEntry | Mapping[str, object]] = (),
 ) -> ExcelTargetMatch:
     """Compatibility wrapper; batch callers must reuse :class:`ExcelTargetMatcher`."""
     return ExcelTargetMatcher(
@@ -172,6 +175,7 @@ def find_best_match_in_target(
         allow_live_translation=allow_live_translation,
         use_saved_approvals=use_saved_approvals,
         review_aliases=review_aliases,
+        approved_aliases=approved_aliases,
     ).match(item, matching_config)
 
 
@@ -182,6 +186,7 @@ def match_item_against_all_targets(
     *,
     allow_live_translation: bool = False,
     use_saved_approvals: bool = True,
+    approved_aliases_by_target: Mapping[str, Sequence[AliasEntry | Mapping[str, object]]] | None = None,
 ) -> dict[str, ExcelTargetMatch]:
     matchers = {
         target_key: ExcelTargetMatcher(
@@ -189,6 +194,12 @@ def match_item_against_all_targets(
             catalog,
             allow_live_translation=allow_live_translation,
             use_saved_approvals=use_saved_approvals,
+            approved_aliases=(approved_aliases_by_target or {}).get(
+                target_key,
+                getattr(app_config.excel_targets.get(target_key), "aliases", ())
+                if hasattr(app_config, "excel_targets")
+                else (),
+            ),
         )
         for target_key, catalog in catalogs.items()
     }
@@ -279,7 +290,10 @@ def _scoped_manual_review(
             else (rejected[0] if rejected else "Saved product is absent from current Excel file")
         )
         _record_manual_rebind_failure(decision, target_key, catalog, reason)
-        return MatchDecision(None, [], reason)
+        # A stale item-level approval is diagnostic state only.  It must not
+        # hide a candidate that can be found by matching the current catalog.
+        # Explicit negative decisions above remain blocking by design.
+        return None
 
     product = compatible[0]
     identified = IdentifiedTarget(

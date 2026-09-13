@@ -429,6 +429,29 @@ class StreamlitManualReviewTests(unittest.TestCase):
 
         assert caption.call_count == 2
 
+    def test_candidate_provenance_displays_rejection_reason(self) -> None:
+        option = ReviewCandidateOption(
+            store_product_id="man",
+            name_en="LIMITLESS MAN MAX 30 TABS",
+            name_ar="",
+            supplier="wardany",
+            available_quantity=1,
+            price=10.0,
+            score=16.1,
+            rejection_reason=(
+                "Product identity conflict: requested LIMITLESS MILGA MAX "
+                "but candidate is LIMITLESS MAN MAX"
+            ),
+            orderable=True,
+        )
+        with patch.object(manual_review_page.st, "caption") as caption:
+            manual_review_page._render_candidate_provenance([option])
+
+        rendered = caption.call_args.args[0]
+        assert "Rejection reason:" in rendered
+        assert "MILGA" in rendered
+        assert "MAN" in rendered
+
     def test_candidate_provenance_warns_for_every_review_only_kind(self) -> None:
         review_only_kinds = (
             "review_identity",

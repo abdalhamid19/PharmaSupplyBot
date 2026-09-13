@@ -73,6 +73,9 @@ _ATTRIBUTE_TOKENS = frozenset(
         "CAPS",
         "CAPSULE",
         "CAPSULES",
+        # Abbreviated film-coated tablet notation (F.C.TABS.) is tokenized
+        # as standalone F and C after punctuation is removed.
+        "C",
         "CREAM",
         "DROPS",
         "FILM",
@@ -423,6 +426,8 @@ def _brand_signature(value: str) -> _BrandSignature:
 
 def _english_tokens(value: str) -> list[str]:
     text = (value or "").upper().replace("µ", "U")
+    # Keep dotted IU notation together before punctuation tokenization.
+    text = re.sub(r"\bI\s*[.]\s*U\b", "IU", text)
     text = re.sub(r"(?<![A-Z0-9])MGC(?![A-Z0-9])", "MCG", text)
     raw_tokens = _TOKEN_RE.findall(text)
     tokens: list[str] = []

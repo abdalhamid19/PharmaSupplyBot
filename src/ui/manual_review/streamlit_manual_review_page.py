@@ -472,6 +472,8 @@ def _render_candidate_provenance(options: list[ReviewCandidateOption]) -> None:
             details.append(f"Candidate method: {option.candidate_method}")
         if option.review_status:
             details.append(f"Review status: {option.review_status}")
+        if option.rejection_reason:
+            details.append(f"Rejection reason: {option.rejection_reason}")
         if option.score_margin:
             details.append(f"Score margin: {option.score_margin:.2f}")
         if option.shared_brand_tokens:

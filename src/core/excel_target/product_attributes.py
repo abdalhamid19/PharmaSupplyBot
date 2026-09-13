@@ -138,6 +138,10 @@ def _normalize_attribute_text(text: str) -> str:
         )
     )
     normalized = normalized.replace("ـ", "").replace("\\", "/")
+    # Supplier workbooks commonly write international units as ``i.u`` or
+    # ``i.u.``. Treat the dotted abbreviation as the same explicit IU unit so
+    # a missing strength cannot be mistaken for a compatible vial.
+    normalized = re.sub(r"\bi\s*[.]\s*u[.]?\b", "iu", normalized)
     normalized = re.sub(r"[\u064B-\u065F\u0670]", "", normalized)
     return re.sub(r"(?<![a-z])mgc(?![a-z])", "mcg", normalized)
 

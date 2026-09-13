@@ -46,6 +46,9 @@ class ExcelTargetConfig:
     header_row: int = 0
     enabled: bool = True
     price_meaning: str = "public_with_discount"
+    # Target-scoped bilingual aliases. Each mapping carries ``en``, ``ar``
+    # and a source/reference string; aliases are never shared across targets.
+    aliases: tuple[dict[str, str], ...] = ()
 
     @property
     def requires_code(self) -> bool:

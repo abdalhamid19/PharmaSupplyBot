@@ -222,6 +222,10 @@ class TestConfigExcelTargets(TestCase):
         self.assertEqual(alnasr.name_col, "صنف")
         self.assertEqual(alnasr.price_col, "سعر")
         self.assertEqual(alnasr.discount_col, "الخصم")
+        self.assertEqual(
+            alnasr.aliases,
+            ({"en": "LEVOFLOXACIN-EVA", "ar": "ليفوفلوكساسين ايفا 500مجم 10اقراص", "source": "fixture"},),
+        )
         self.assertTrue(alnasr.enabled)
         self.assertEqual(list(config.enabled_excel_targets().keys()), ["alnasr"])
 

@@ -74,6 +74,22 @@ def build_enriched_coverage_rows(
     return [_enriched_coverage_row(matcher, item, config) for item in items]
 
 
+def build_coverage_matcher(target_key: str, catalog, approved_aliases=()) -> ExcelTargetMatcher:
+    """Build a replay matcher without reading or writing saved approvals.
+
+    Coverage is a counterfactual diagnostic.  It must describe what the
+    current catalog would do on its own, rather than inheriting a historical
+    user decision or calling the live translation provider.
+    """
+    return ExcelTargetMatcher(
+        target_key,
+        catalog,
+        allow_live_translation=False,
+        use_saved_approvals=False,
+        approved_aliases=approved_aliases,
+    )
+
+
 def _enriched_coverage_row(matcher, item, config) -> dict[str, object]:
     match = matcher.match(item, config)
     identified = tuple(matcher.identity_index.identify(item.name))
@@ -288,7 +304,9 @@ def main() -> None:
         target_config,
         source_file=args.target_path.name,
     )
-    matcher = ExcelTargetMatcher(args.target_key, catalog)
+    matcher = build_coverage_matcher(
+        args.target_key, catalog, approved_aliases=target_config.aliases
+    )
     records = build_enriched_coverage_rows(
         matcher, _load_items(args, app_config), app_config.matching
     )

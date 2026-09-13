@@ -13,7 +13,10 @@ from src.core.excel_target.excel_target_review_candidates import (
 )
 from src.core.excel_target.product_attributes import validate_product_compatibility
 from src.core.utils.excel import Item
-from scripts.baraka_coverage_report import build_enriched_coverage_rows
+from scripts.baraka_coverage_report import (
+    build_coverage_matcher,
+    build_enriched_coverage_rows,
+)
 
 
 def test_coverage_report_distinguishes_identity_and_variant_rejection() -> None:
@@ -147,3 +150,21 @@ def test_coverage_candidate_reporting_does_not_call_translation_provider(
     )
 
     assert rows[0]["review_candidate_count_total"] == 0
+
+
+def test_coverage_matcher_disables_saved_approvals_and_live_translation() -> None:
+    product = TargetProduct("1", "اينوديب 30 كبسول", 10.0, 0.0)
+    with patch(
+        "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+        side_effect=AssertionError("coverage must not read saved approvals"),
+    ), patch(
+        "src.core.excel_target.excel_target_identity.ar_to_en_many",
+        side_effect=AssertionError("coverage must not call live translation"),
+    ), patch(
+        "src.core.excel_target.excel_target_identity.lookup_en",
+        return_value=[],
+    ):
+        matcher = build_coverage_matcher("baraka", [product])
+        result = matcher.match(Item("1", "UNKNOWN BRAND", 1), MatchingConfig())
+
+    assert result.decision.best_match is None

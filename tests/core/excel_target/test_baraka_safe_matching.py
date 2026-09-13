@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import csv
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -16,6 +19,7 @@ from src.core.normalization.translation import CachedTranslations
 
 
 ITEM = Item(code="90951", name="INODEP CAPSULES 30", qty=1)
+BARAKA_1209_LABELS = Path(__file__).parent / "fixtures" / "baraka_1209_gold_labels.csv"
 
 
 class TestBarakaSafeMatching(TestCase):
@@ -302,6 +306,44 @@ class TestBarakaSafeMatching(TestCase):
         self.assertEqual(decision.source, DecisionSource.MANUAL_REVIEW_SAVED)
         record.assert_called_once()
 
+    def test_stale_item_approval_without_row_key_does_not_hide_current_match(self) -> None:
+        """An old catalog approval must not short-circuit current matching."""
+        product = TargetProduct(
+            "current-code",
+            "INODEP CAPSULES 30",
+            10,
+            0,
+            "baraka-1209.xlsx",
+            source_row_number=9,
+        )
+        matcher = ExcelTargetMatcher("baraka", [product])
+        stale = ManualReviewDecision(
+            ITEM.code,
+            ITEM.name,
+            True,
+            "old-code",
+            correct_product_name="REMOVED PRODUCT 30 CAPS",
+            manual_decision="approved_match",
+            excel_target_key="baraka",
+            excel_target_source_file="baraka-old.xlsx",
+            matching_source="excel-target",
+        )
+        with TemporaryDirectory() as temp_dir, patch(
+            "src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB",
+            Path(temp_dir) / "manual-review.db",
+        ), patch(
+            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+            return_value=stale,
+        ), patch(
+            "src.core.excel_target.excel_target_matching._record_manual_rebind_failure"
+        ) as record_failure:
+            decision = matcher.match(ITEM, MatchingConfig()).decision
+
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["storeProductId"], "current-code")
+        self.assertNotEqual(decision.source, DecisionSource.MANUAL_REVIEW_SAVED)
+        record_failure.assert_called_once()
+
     def test_scoped_approved_match_can_override_saved_variant_conflict(self) -> None:
         """A human approval may intentionally select a different product variant."""
         product = TargetProduct(
@@ -347,6 +389,111 @@ class TestBarakaSafeMatching(TestCase):
         self.assertTrue(decision.best_match.data["manual_override"])
         self.assertIn("approved_manual_override", decision.final_reason)
         record.assert_called_once()
+
+    def test_changed_row_code_invalidates_saved_row_approval(self) -> None:
+        """Changing only the row code must prevent inheriting its approval."""
+        old_product = TargetProduct(
+            "old-code",
+            "INODEP CAPSULES 30",
+            10,
+            0,
+            "baraka.xlsx",
+            source_row_number=7,
+        )
+        current_product = TargetProduct(
+            "new-code",
+            "INODEP CAPSULES 30",
+            10,
+            0,
+            "baraka.xlsx",
+            source_row_number=7,
+        )
+        matcher = ExcelTargetMatcher("baraka", [current_product])
+        saved_row_key = excel_target_row_key("baraka", old_product)
+        current_row_key = excel_target_row_key("baraka", current_product)
+        scoped = ManualReviewDecision(
+            ITEM.code,
+            ITEM.name,
+            True,
+            "old-code",
+            correct_product_name=old_product.name,
+            manual_decision="approved_match",
+            excel_target_key="baraka",
+            excel_target_source_file="baraka.xlsx",
+            excel_target_row_key=saved_row_key,
+            excel_target_source_row=7,
+            matching_source="excel-target",
+        )
+        with TemporaryDirectory() as temp_dir, patch(
+            "src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB",
+            Path(temp_dir) / "manual-review.db",
+        ), patch(
+            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+            return_value=scoped,
+        ), patch(
+            "src.core.excel_target.excel_target_matching._record_manual_rebind_failure"
+        ) as record_failure:
+            decision = matcher.match(ITEM, MatchingConfig()).decision
+
+        self.assertNotEqual(saved_row_key, current_row_key)
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(decision.best_match.data["storeProductId"], "new-code")
+        self.assertNotEqual(decision.source, DecisionSource.MANUAL_REVIEW_SAVED)
+        record_failure.assert_called_once()
+
+    def test_changed_row_name_invalidates_saved_row_approval(self) -> None:
+        """Changing only the row name must prevent inheriting its approval."""
+        old_product = TargetProduct(
+            "same-code",
+            "INODEP CAPSULES 30",
+            10,
+            0,
+            "baraka.xlsx",
+            source_row_number=7,
+        )
+        current_product = TargetProduct(
+            "same-code",
+            "INODEP CAPSULES 30 NEW",
+            10,
+            0,
+            "baraka.xlsx",
+            source_row_number=7,
+        )
+        current_item = Item(code=ITEM.code, name="INODEP CAPSULES 30 NEW", qty=1)
+        matcher = ExcelTargetMatcher("baraka", [current_product])
+        saved_row_key = excel_target_row_key("baraka", old_product)
+        current_row_key = excel_target_row_key("baraka", current_product)
+        scoped = ManualReviewDecision(
+            current_item.code,
+            current_item.name,
+            True,
+            "same-code",
+            correct_product_name=old_product.name,
+            manual_decision="approved_match",
+            excel_target_key="baraka",
+            excel_target_source_file="baraka.xlsx",
+            excel_target_row_key=saved_row_key,
+            excel_target_source_row=7,
+            matching_source="excel-target",
+        )
+        with TemporaryDirectory() as temp_dir, patch(
+            "src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB",
+            Path(temp_dir) / "manual-review.db",
+        ), patch(
+            "src.core.excel_target.excel_target_matching.saved_manual_review_decision",
+            return_value=scoped,
+        ), patch(
+            "src.core.excel_target.excel_target_matching._record_manual_rebind_failure"
+        ) as record_failure:
+            decision = matcher.match(current_item, MatchingConfig()).decision
+
+        self.assertNotEqual(saved_row_key, current_row_key)
+        self.assertIsNotNone(decision.best_match)
+        self.assertEqual(
+            decision.best_match.data["productName"], current_product.name
+        )
+        self.assertNotEqual(decision.source, DecisionSource.MANUAL_REVIEW_SAVED)
+        record_failure.assert_called_once()
 
     def test_stale_scoped_approval_does_not_block_current_discovery(self) -> None:
         product = TargetProduct(
@@ -522,3 +669,81 @@ class TestBarakaSafeMatching(TestCase):
         self.assertIsNotNone(best)
         self.assertEqual(best.data["storeProductId"], "2")
         self.assertEqual(best.data["identity_evidence_kind"], "tawreed_catalog")
+
+
+class TestBaraka1209GoldLabels(TestCase):
+    """Replay the twelve requested rows against a small Arabic fixture."""
+
+    def test_each_gold_row_has_the_expected_safe_outcome(self) -> None:
+        labels = list(csv.DictReader(BARAKA_1209_LABELS.open(encoding="utf-8")))
+        aliases = {
+            "ELBAVIT SYP": [
+                "البافيت بالحديد 60مل شراب",
+                "البافيت كالسيوم 60مل شراب",
+            ],
+            "DURJOY": ["ديورجوى 60 مجم اقراص"],
+            "PENCITARD": ["بنسيتارد فيال"],
+            "PROTOFIX": ["بروتوفكس40مجم اقراص س ج"],
+            "LOGUSGYN": ["لوجس جين لبوس مهبلي"],
+            "SYNOBAR S SOAP": ["سينوبار اس صابونة"],
+            "CONVENTIN": ["كونفينتين 300 اكس ار ممتد المفعول ق"],
+            "LEVOFLOXACIN EVA": ["ليفوفلوكساسين ايفا 500مجم 10اقراص"],
+            "QUADRIDERM": ["كوادريدرم كريم س ج"],
+            "OMEGAL ULTRA": ["اوميجال الترا 30كبسولة"],
+        }
+
+        def dictionary_lookup(brand: str):
+            for english, arabic_names in aliases.items():
+                if brand.startswith(english):
+                    return [
+                        {"ar": arabic, "en": english}
+                        for arabic in arabic_names
+                    ]
+            return []
+
+        for index, label in enumerate(labels, start=1):
+            with self.subTest(item_code=label["item_code"]):
+                product_names = (
+                    aliases["ELBAVIT SYP"]
+                    if label["item_code"] == "23031"
+                    else [label["arabic_name"]]
+                    if label["arabic_name"]
+                    else []
+                )
+                products = [
+                    TargetProduct(
+                        f"{index}-{variant_index}",
+                        arabic_name,
+                        10.0,
+                        0.0,
+                        source_file="البركه 1209.xlsx",
+                        source_row_number=index + variant_index,
+                    )
+                    for variant_index, arabic_name in enumerate(product_names)
+                ]
+                with patch(
+                    "src.core.excel_target.excel_target_identity.lookup_en",
+                    side_effect=dictionary_lookup,
+                ), patch(
+                    "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+                    return_value={},
+                ), patch(
+                    "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+                    return_value={"rows": []},
+                ):
+                    matcher = ExcelTargetMatcher(
+                        "البركه 1209", products, use_saved_approvals=False
+                    )
+                    result = matcher.match(
+                        Item(label["item_code"], label["item_name"], 1),
+                        MatchingConfig(),
+                    )
+
+                category = (
+                    "auto_match"
+                    if result.decision.best_match is not None
+                    else "review"
+                    if result.review_candidates
+                    else "no_match"
+                )
+                self.assertEqual(category, label["expected_category"])

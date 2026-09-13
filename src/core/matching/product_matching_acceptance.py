@@ -73,6 +73,31 @@ def _candidate_component_rejection(query: str, candidate: dict[str, Any]) -> str
     return f"Semantic token conflict: {reason}"
 
 
+def identity_conflict_rejection_reason(
+    query: str, candidate: dict[str, Any]
+) -> str:
+    """Return a hard identity conflict for known non-substitutable variants.
+
+    ``LIMITLESS MILGA MAX`` and ``LIMITLESS MAN MAX`` share enough lexical
+    material to score highly, but they are distinct products.  Keep this
+    check in the shared acceptance module so all Tawreed consumers (API and
+    browser) receive the same decision before any saved or aggressive match
+    can promote the candidate.
+    """
+    query_tokens = set(_normalized_tokens(query))
+    candidate_tokens = set(
+        _normalized_tokens(_candidate_english_name(candidate))
+    )
+    if {"LIMITLESS", "MILGA", "MAX"} <= query_tokens and {
+        "LIMITLESS", "MAN", "MAX"
+    } <= candidate_tokens:
+        return (
+            "Product identity conflict: requested LIMITLESS MILGA MAX "
+            "but candidate is LIMITLESS MAN MAX"
+        )
+    return ""
+
+
 # ── Identity validation (from product_matching_identity.py) ──
 
 
@@ -393,6 +418,7 @@ def _check_rejections(
     """Check all rejection criteria and return (is_rejected, reason)."""
     config = config or {}
     checks = [
+        identity_conflict_rejection_reason(score_query, candidate),
         _candidate_variant_rejection(score_query, candidate),
         compatibility_rejection_reason(score_query, _candidate_english_name(candidate), config),
     ]
@@ -538,6 +564,7 @@ __all__ = [
     "_normalize_text",
     "_normalized_tokens",
     "_candidate_component_rejection",
+    "identity_conflict_rejection_reason",
     "_candidate_variant_rejection",
     "_normalized_arabic_name",
     "_synthetic_name_rejection_reasons",

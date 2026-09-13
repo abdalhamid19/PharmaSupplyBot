@@ -23,6 +23,42 @@ from src.core.utils.excel import Item
 class ManualReviewRuntimeTests(unittest.TestCase):
     """Validate runtime consumption of saved manual-review decisions."""
 
+    def test_stale_auto_matched_limitless_variant_cannot_force_match(self) -> None:
+        item = Item("92558", "LIMITLESS MILGA MAX 30 TABS", 1)
+        candidate = {
+            "storeProductId": "man",
+            "productNameEn": "LIMITLESS MAN MAX 30 TABS",
+        }
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "manual.sqlite3"
+            store = ManualReviewStore(db_path)
+            store.upsert(
+                ManualReviewDecision(
+                    item.code,
+                    item.name,
+                    True,
+                    "man",
+                    correct_product_name=candidate["productNameEn"],
+                    manual_decision="auto_matched",
+                    matching_source="tawreed",
+                )
+            )
+            with patch(
+                "src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB",
+                db_path,
+            ):
+                cache = preload_manual_review_decisions([item])
+                with manual_review_cache_context(cache):
+                    forced = manual_review_match(item, [(item.name, [candidate])])
+                    decision = explain_best_product_match(
+                        item, [(item.name, [candidate])]
+                    )
+
+        self.assertIsNone(forced)
+        self.assertIsNone(decision.best_match)
+        self.assertIn("MILGA", decision.final_reason)
+        self.assertIn("MAN", decision.final_reason)
+
     def test_lookup_many_loads_multiple_items_with_one_query(self) -> None:
         db = _FakeManualReviewDb()
         store = ManualReviewStore(database_manager=db)

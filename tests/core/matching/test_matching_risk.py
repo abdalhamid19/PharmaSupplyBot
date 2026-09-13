@@ -3,8 +3,27 @@ from typing import Any
 from src.core.matching_types import CandidateMatchDiagnostic, MatchScoreBreakdown, MatchDecision
 from src.core.matching.matching_risk import aggressive_review_decision
 from src.core.config.config_models import MatchingConfig
+from src.core.matching.product_matching import explain_best_product_match
+from src.core.utils.excel import Item
 
 class MatchingRiskTests(unittest.TestCase):
+    def test_limitless_man_is_never_repromoted_by_aggressive_policy(self) -> None:
+        item = Item("92558", "LIMITLESS MILGA MAX 30 TABS", 1)
+        candidate = {
+            "storeProductId": "man",
+            "productNameEn": "LIMITLESS MAN MAX 30 TABS",
+        }
+        decision = explain_best_product_match(item, [(item.name, [candidate])])
+
+        self.assertIsNone(
+            aggressive_review_decision(
+                decision,
+                MatchingConfig(
+                    require_identity_token_for_flag=False,
+                ),
+            )
+        )
+
     def test_aggressive_review_decision_requires_brand_token(self) -> None:
         # Create a breakdown
         breakdown = MatchScoreBreakdown(

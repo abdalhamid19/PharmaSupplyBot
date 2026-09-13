@@ -12,3 +12,7 @@ excel_targets:
     name_col: "صنف"
     price_col: "سعر"
     discount_col: "الخصم"
+    aliases:
+      - en: "LEVOFLOXACIN-EVA"
+        ar: "ليفوفلوكساسين ايفا 500مجم 10اقراص"
+        source: "fixture"

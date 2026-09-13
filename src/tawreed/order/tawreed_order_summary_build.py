@@ -71,7 +71,7 @@ def _handle_manual_review_or_auto_save(
     profile_key, item, summary, decision, label_suffix, matching_config
 ) -> None:
     """Handle manual review or auto-save based on config."""
-    requires_review = manual_review_required(item, summary.status, matching_config)
+    requires_review = manual_review_required(item, summary.status, matching_config, decision)
     if requires_review:
         append_manual_review_artifacts(
             profile_key, item, summary, decision, label_suffix, matching_config

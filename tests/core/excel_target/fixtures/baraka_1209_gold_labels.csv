@@ -1,0 +1,13 @@
+item_code,item_name,arabic_name,expected_category,expected_reason
+23031,ELBAVIT SYP 60 ML,البافيت بالحديد 60مل شراب,review,iron/calcium variant is ambiguous
+64430,DURJOY 60 MG 3 TAB,ديورجوى 60 مجم اقراص,review,pack of 3 is not proven
+73151,PENCITARD 1200000 i.u vial,بنسيتارد فيال,review,1200000 IU is not proven
+74209,PROTOFIX 40MG 14 TAB,بروتوفكس40مجم اقراص س ج,review,pack of 14 is not proven
+74659,ZOLADEX DEPOT 3.6 MG AM,,no_match,AM form is not documented
+80532,LOGUSGYN 10 SUPPOSITORIES,لوجس جين لبوس مهبلي,review,pack of 10 is not proven
+81148,SYNOBAR-S SOAP 100GM,سينوبار اس صابونة,review,100 GM is not proven
+87486,CONVENTIN XR 300 MG 30 TABS,كونفينتين 300 اكس ار ممتد المفعول ق,review,pack of 30 is not proven
+88189,LEVOFLOXACIN-EVA 500 MG 10 F.C.TABS.,ليفوفلوكساسين ايفا 500مجم 10اقراص,auto_match,brand strength form and pack agree
+90893,quadriderm cream 15g,كوادريدرم كريم س ج,review,15 GM is not proven
+90993,OMEGAL ULTRA 30CAP,اوميجال الترا 30كبسولة,auto_match,brand form and pack agree
+92558,LIMITLESS MILGA MAX 30 TABS,,no_match,no verified MILGA MAX row exists

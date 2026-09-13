@@ -23,6 +23,19 @@ def test_missing_explicit_strength_requires_review() -> None:
     assert result.rejection_reason == "candidate strength is not proven"
 
 
+def test_dotted_iu_abbreviation_is_an_explicit_strength() -> None:
+    result = validate_product_compatibility(
+        "PENCITARD 1200000 i.u vial", "بنسيتارد فيال"
+    )
+    assert not result.accepted
+    assert result.rejection_reason == "candidate strength is not proven"
+
+    matching = validate_product_compatibility(
+        "PENCITARD 1200000 i.u vial", "بنسيتارد 1200000 وحدة فيال"
+    )
+    assert matching.accepted
+
+
 def test_conflicting_pack_is_rejected() -> None:
     result = validate_product_compatibility("PRODUCT CAPSULES 30", "منتج 20 كبسول")
     assert not result.accepted

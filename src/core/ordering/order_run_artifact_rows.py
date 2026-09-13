@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..manual_review.manual_review_reason import manual_review_reason_fields
 from ..manual_review.manual_review_runtime import saved_manual_review_decision
+from ..matching.product_matching_acceptance import identity_conflict_rejection_reason
 from .order_winner_fields import candidate_summary_fields
 
 REVIEWABLE_STATUSES = {
@@ -25,11 +26,13 @@ def text_block(title: str, row: dict[str, object]) -> str:
     ) + "\n"
 
 
-def manual_review_required(item, summary_status: str, config=None) -> bool:
+def manual_review_required(item, summary_status: str, config=None, decision=None) -> bool:
     """Return whether the local result should be sent to manual review."""
     saved = saved_manual_review_decision(item)
     if saved and saved.manual_decision == "not_matching":
         return False
+    if saved and saved.manual_decision == "auto_matched" and _decision_has_identity_conflict(item, decision):
+        return True
     if saved and saved.manual_decision in {"auto_matched", "approved_match"}:
         key = (
             "enable_auto_match_re_review_on_fail"
@@ -38,6 +41,14 @@ def manual_review_required(item, summary_status: str, config=None) -> bool:
         )
         return bool(summary_status in REVIEWABLE_STATUSES and config and getattr(config, key, False))
     return summary_status in REVIEWABLE_STATUSES
+
+
+def _decision_has_identity_conflict(item, decision) -> bool:
+    """Return whether a rejected diagnostic names a known identity conflict."""
+    for diagnostic in getattr(decision, "diagnostics", ()) or ():
+        if identity_conflict_rejection_reason(item.name, diagnostic.candidate):
+            return True
+    return False
 
 
 def _candidate_for_summary(decision) -> tuple[object | None, dict]:
@@ -62,7 +73,7 @@ def order_item_summary_row(item, summary, decision, config=None) -> dict[str, ob
     """Return a compact row describing one deterministic order result."""
     match, candidate = _candidate_for_summary(decision)
     status = summary.status
-    review = manual_review_required(item, status, config)
+    review = manual_review_required(item, status, config, decision)
     query = match.query if match else ""
     score = round(float(match.score), 6) if match else ""
     row = {

@@ -6,6 +6,62 @@ from src.core.excel_target.excel_target_aliases import (
     ExcelTargetAliasResolver,
 )
 from src.core.excel_target.excel_target_loader import TargetProduct
+from src.core.excel_target.excel_target_identity import ExcelTargetBilingualIndex
+
+
+def test_configured_alias_is_scoped_to_the_target_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "src.core.excel_target.excel_target_identity.load_tawreed_catalog",
+        lambda: {"rows": ()},
+    )
+    monkeypatch.setattr(
+        "src.core.excel_target.excel_target_identity.load_dictionary",
+        lambda: {"by_en": {}},
+    )
+    monkeypatch.setattr(
+        "src.core.excel_target.excel_target_identity.ar_to_en_many_cached_only",
+        lambda names: {},
+    )
+    alias = {
+        "en": "LEVOFLOXACIN-EVA",
+        "ar": "ليفوفلوكساسين ايفا 500مجم 10اقراص",
+        "source": "baraka-1209",
+    }
+    product = TargetProduct("levo", "ليفوفلوكساسين ايفا 500مجم 10اقراص", 10.0, 0.0)
+
+    scoped = ExcelTargetBilingualIndex.build(
+        [product], allow_live_translation=False, alias_entries=[alias]
+    )
+    identified = scoped.identify("LEVOFLOXACIN-EVA 500 MG 10 F.C.TABS.")
+    assert [entry.product.code for entry in identified] == ["levo"]
+    assert identified[0].evidence.kind == "safe_alias"
+
+    other = ExcelTargetBilingualIndex.build(
+        [TargetProduct("other", "سالبوتامول شراب", 10.0, 0.0)],
+        allow_live_translation=False,
+        alias_entries=[alias],
+    )
+    assert other.identify("LEVOFLOXACIN-EVA 500 MG 10 F.C.TABS.") == ()
+
+
+def test_dotted_iu_and_film_coated_tablet_tokens_are_ignored_for_alias_brand() -> None:
+    resolver = ExcelTargetAliasResolver(
+        alias_entries=[
+            {"en": "PENCITARD", "ar": "بنسيتارد فيال", "source": "baraka-1209"},
+            {
+                "en": "LEVOFLOXACIN-EVA",
+                "ar": "ليفوفلوكساسين ايفا 500مجم 10اقراص",
+                "source": "baraka-1209",
+            },
+        ],
+        target_products=[
+            TargetProduct("pen", "بنسيتارد فيال", 10.0, 0.0),
+            TargetProduct("levo", "ليفوفلوكساسين ايفا 500مجم 10اقراص", 10.0, 0.0),
+        ],
+    )
+
+    assert resolver.resolve("PENCITARD 1200000 i.u vial")[0].product_id == "pen"
+    assert resolver.resolve("LEVOFLOXACIN-EVA 500 MG 10 F.C.TABS.")[0].product_id == "levo"
 
 
 def test_resolves_a_high_confidence_typo_to_a_real_target_product() -> None:

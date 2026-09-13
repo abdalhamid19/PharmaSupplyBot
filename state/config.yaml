@@ -106,6 +106,50 @@ excel_targets:
     header_row: 0
     enabled: true
     display_name: البركة شركات
+  البركه 1209:
+    name_col: الصنف
+    price_col: سعر ج
+    discount_col: شركات
+    code_col: ''
+    sheet: محروس ص
+    header_row: 0
+    enabled: true
+    display_name: البركه 1209
+    aliases:
+    - en: ELBAVIT SYP
+      ar: البافيت بالحديد 60مل شراب
+      source: "البركه 1209.xlsx row 353"
+    - en: ELBAVIT SYP
+      ar: البافيت كالسيوم 60مل شراب
+      source: "البركه 1209.xlsx row 354"
+    - en: DURJOY
+      ar: ديورجوى 60 مجم اقراص
+      source: "البركه 1209.xlsx row 2115"
+    - en: PENCITARD
+      ar: بنسيتارد فيال
+      source: "البركه 1209.xlsx row 1229"
+    - en: PROTOFIX
+      ar: بروتوفكس40مجم اقراص س ج
+      source: "البركه 1209.xlsx row 1073"
+    - en: LOGUSGYN
+      ar: لوجس جين لبوس مهبلي
+      source: "البركه 1209.xlsx row 3725"
+    - en: SYNOBAR-S SOAP
+      ar: سينوبار اس صابونة
+      source: "البركه 1209.xlsx row 2796"
+    - en: CONVENTIN XR
+      ar: كونفينتين 300 اكس ار ممتد المفعول ق
+      source: "البركه 1209.xlsx row 3546"
+    - en: QUADRIDERM
+      ar: كوادريدرم كريم س ج
+      source: "البركه 1209.xlsx row 3431"
+    - en: LEVOFLOXACIN-EVA
+      ar: ليفوفلوكساسين ايفا 500مجم 10اقراص
+      source: "البركه 1209.xlsx row 3808"
+    - en: OMEGAL ULTRA
+      ar: اوميجال الترا 30كبسولة
+      source: "البركه 1209.xlsx row 791"
 user_added_targets:
 - الجزيره
 - البركة شركات
+- البركه 1209

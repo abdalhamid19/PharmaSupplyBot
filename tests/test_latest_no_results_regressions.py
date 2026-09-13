@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from src.core.matching.product_matching import explain_best_product_match
+from src.core.manual_review.manual_review_candidates import review_candidate_options
 from src.core.config.config_models import MatchingConfig
 from src.core.utils.excel import Item
 
@@ -256,6 +257,22 @@ class LatestNoResultsRegressionTests(unittest.TestCase):
                     [(item_name, [_candidate(candidate_name, store_id=f"s-{code}")])],
                 )
                 self.assertIsNone(decision.best_match)
+                if item_name == "LIMITLESS MILGA MAX 30 TABS":
+                    self.assertIn("MILGA", decision.final_reason)
+                    self.assertIn("MAN", decision.final_reason)
+                    options = review_candidate_options(decision)
+                    self.assertEqual(len(options), 1)
+                    self.assertIn("MILGA", options[0].rejection_reason)
+                    self.assertIn("MAN", options[0].rejection_reason)
+
+    def test_real_limitless_milga_candidate_is_not_blocked(self) -> None:
+        item_name = "LIMITLESS MILGA MAX 30 TABS"
+        candidate_name = "LIMITLESS MILGA MAX 30 TABS"
+        decision = explain_best_product_match(
+            Item(code="92558", name=item_name, qty=1),
+            [(item_name, [_candidate(candidate_name, store_id="milga")])],
+        )
+        self.assertIsNotNone(decision.best_match)
 
     def test_reported_correct_matches_are_accepted(self) -> None:
         """Ensure the corrected alternatives do not regress to no-results."""
