@@ -295,6 +295,89 @@ class ManualReviewStore:
             tuple(params),
         )
 
+    def delete_exact(
+        self,
+        *,
+        item_code: str,
+        item_name: str,
+        matching_source: str,
+        supplier_scope_key: str,
+        expected_store_product_id: str,
+        expected_product_name: str,
+        expected_run_id: str,
+        expected_manual_decision: str,
+    ) -> int:
+        """Delete exactly one expected decision inside an immediate transaction.
+
+        This is intentionally separate from the UI's broader ``delete`` API.
+        It is used for operator-led revocations where deleting a different
+        source/scope, or deleting after the row changed, would be unsafe.
+        """
+        if not hasattr(self.db, "get_connection"):
+            raise RuntimeError("Exact decision deletion requires a SQLite connection")
+
+        code_key, name_key = hint_key(item_code, item_name)
+        source_key = _normalize_source(matching_source)
+        scope_key = " ".join(str(supplier_scope_key or "").split()).casefold()
+        if not source_key or not scope_key:
+            raise ValueError("matching_source and supplier_scope_key are required")
+
+        select_sql = (
+            "select approved,manual_decision,correct_store_product_id,"
+            "correct_product_name,run_id from manual_review_decisions "
+            "where item_code_key=? and item_name_key=? "
+            "and replace(lower(matching_source),'_','-')=? "
+            "and supplier_scope_key=?"
+        )
+        delete_sql = (
+            "delete from manual_review_decisions "
+            "where item_code_key=? and item_name_key=? "
+            "and replace(lower(matching_source),'_','-')=? "
+            "and supplier_scope_key=?"
+        )
+        expected = (
+            1,
+            str(expected_manual_decision),
+            str(expected_store_product_id),
+            str(expected_product_name),
+            str(expected_run_id),
+        )
+
+        with self.db.get_connection() as conn:
+            conn.execute("begin immediate")
+            try:
+                rows = conn.execute(
+                    select_sql,
+                    (code_key, name_key, source_key, scope_key),
+                ).fetchall()
+                if len(rows) != 1:
+                    raise RuntimeError(
+                        "Exact manual-review revocation expected one row, "
+                        f"found {len(rows)} for {item_code}/{item_name}/"
+                        f"{source_key}/{scope_key}"
+                    )
+                actual = tuple(rows[0])
+                if actual != expected:
+                    raise RuntimeError(
+                        "Exact manual-review revocation precondition changed: "
+                        f"expected {expected!r}, found {actual!r}"
+                    )
+
+                cursor = conn.execute(
+                    delete_sql,
+                    (code_key, name_key, source_key, scope_key),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError(
+                        "Exact manual-review revocation deleted "
+                        f"{cursor.rowcount} rows instead of one"
+                    )
+                conn.commit()
+                return cursor.rowcount
+            except Exception:
+                conn.rollback()
+                raise
+
     def list_decisions(self) -> list[ManualReviewDecision]:
         """Return all saved manual-review decisions in newest-updated order."""
         rows = self.db.execute_query(SELECT_DECISIONS + " order by updated_at desc")
