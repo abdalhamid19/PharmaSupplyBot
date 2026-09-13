@@ -13,7 +13,7 @@
 ## الأدلة الحالية
 
 - تقرير 17:30 شغّل هدف `البركة شركات`، وتُظهر قيم `source_file` للصفوف ذات المصدر `البركة شركات.xlsx`. اسم الهدف وحده لا يثبت اسم الملف الذي قُرئ.
-- عند تمرير `--excel-target "البركة شركات"` مع `--excel-target-path "البركة شركات=data/input/excel target/البركه 1209.xlsx"`، اختار المحمّل الملف `البركه 1209.xlsx` وقرأ 4,449 صفاً؛ ظل `target_key` في النتائج `البركة شركات`، وسجّل `source_file` اسم ملف 1209. إذن تجاوز المسار يعمل، لكن المفتاح المستقل غير مسجل حالياً في `state/config.yaml`.
+- عند تمرير `--excel-target "البركة شركات"` مع `--excel-target-path "البركة شركات=<مسار 1209>"`، اختار المحمّل الملف `البركه 1209.xlsx` وقرأ 4,449 صفاً؛ ظل `target_key` في النتائج `البركة شركات`، وسجّل `source_file` اسم ملف 1209. إذن تجاوز المسار يعمل، لكن المفتاح المستقل غير مسجل حالياً في `state/config.yaml`.
 - في ذلك التقرير، طابق `SYNOBAR-S` بالفعل، وظهر لـ`DURJOY` مرشح مراجعة رُفض لنقص دليل العبوة، بينما غابت الهوية عن ثمانية أصناف، ومنعت موافقتان قديمتان بلا row key `LEVOFLOXACIN-EVA` و`OMEGAL ULTRA` من متابعة البحث الاعتيادي. هذه نتيجة هدف `البركة شركات`، وليست نتيجة ملف 1209.
 - ملف 1209 عربيّ الأسماء، فلا تظهر فيه أي من الأسماء الإنجليزية الاثني عشر حرفياً. إعادة تشغيل المطابق على هذا الملف مع تعطيل القرارات المحفوظة تعرّفت تلقائياً على `LEVOFLOXACIN-EVA` و`OMEGAL ULTRA`، ووجدت لـ`DURJOY` مرشحاً رفضه لأن عدد الأقراص غير مثبت؛ الأصناف التسعة الأخرى لم تملك دليلاً آلياً للهوية.
 - توجد أسماء عربية محتملة في الصفوف المذكورة أدناه، لكن وجود الاسم القريب لا يثبت دائماً القوة أو الشكل أو حجم العبوة. `LIMITLESS MILGA MAX` تحديداً لا يملك صفاً مثبتاً له في الكتالوج؛ توجد منتجات LIMITLESS أخرى منفصلة.
@@ -32,179 +32,6 @@
 
 ---
 
-## Task 0: إلغاء التفويض القديم الخاطئ للصنف 92558 قبل أي إعادة تشغيل
-
-**سبب الإلغاء الإلزامي:**
-
-الصف النشط في `state/manual_review_decisions.db` لا يمثل تصحيحاً للصنف المطلوب؛ فهو يحفظ الطلب `92558 / LIMITLESS MILGA MAX 30 TABS`، لكنه يمنح `approved_match` للمنتج المختلف `LIMITLESS MAN MAX 30 TABS` بالمعرف `2145610`. القرار مؤرخ `2026-08-25`، ومصدره `legacy-unknown`، ولذلك يدخل في `preload_manual_review_decisions(..., matching_source="tawreed", include_legacy=True)` رغم عدم وجود مورد أو نطاق واضح.
-
-إبقاء هذا الصف يعني أن إصلاح الـscorer وحده غير كافٍ: مسار `manual_review_match` يسبق `explain_best_product_match`، ويستطيع فرض مرشح مطابق للاسم المحفوظ بدرجة `999` ثم تمريره إلى السلة. في التشغيل الفعلي ظهر هذا بالفعل كـ`Approved by saved manual review (Name match)`، مع مرشح حالي مختلف بالمعرف `2940276`. لذلك يجب إلغاء التفويض النشط؛ أما سجل `manual_review_source_history` فيبقى محفوظاً لأنه دليل تدقيقي يثبت كيف نشأ الخطأ، ولا يُستخدم كمصدر تفويض وقت التشغيل.
-
-الدليل التشغيلي المحدد هو run `wardany/20260913_1058`: للطلب بكمية `17` ظهر المرشح `LIMITLESS MAN MAX 30 TABS` بكمية متاحة `39`، وسعر عام `265`، وسعر شراء `182.85`، وخصم `31`، وانتهى بالـstatus `added-to-cart` بسبب القرار المحفوظ؛ بينما صفوف Excel-target للصنف نفسه انتهت `no-results` لغياب هوية `MILGA` الموثقة. هذه ليست حالة تشابه نظرية، بل تفويض محفوظ أعاد تسمية المنتج الخطأ إلى فائز قابل للتنفيذ.
-
-**Files:**
-- Modify: `src/core/manual_review/manual_review_store.py:271-296` بإضافة عملية حذف دقيقة للصف الواحد، دون توسيع سلوك زر الحذف العام في الواجهة.
-- Test: `tests/core/manual_review/test_manual_review_store_metadata.py` لاختبار عزل `supplier_scope_key` ورفض الحذف إذا لم يكن الصف المتوقع وحيداً.
-- Modify (runtime state only, after backup): `state/manual_review_decisions.db`, exactly one active row scoped by item و`matching_source=legacy-unknown` و`supplier_scope_key=legacy-unknown`.
-- Preserve: `manual_review_source_history` row for `92558`; do not delete or rewrite historical evidence.
-- Record: `artifacts/manual-review/revocations/20260913-92558-man-max.json` containing the preflight row, backup hash, deletion result, and post-verification counts.
-- Test: `tests/core/manual_review/test_manual_review_store_metadata.py` and the temporary-database integration in `tests/tawreed/order/test_limitless_manual_review.py`.
-
-**Interfaces:**
-- Consumes: the new exact operation `ManualReviewStore.delete_exact(item_code, item_name, matching_source, supplier_scope_key, expected_store_product_id, expected_product_name, expected_run_id, expected_manual_decision)`; it must check the expected row and delete it in one write transaction, then require `rowcount == 1`.
-- Produces: no active approved legacy decision for the MILGA item; the immutable source-history observation remains available for audit.
-
-- [x] **Step 0: Harden the one-row revocation primitive before touching the live database.** Add `delete_exact` to `ManualReviewStore` with all four key predicates: normalized item code, normalized item name, normalized `matching_source`, and exact `supplier_scope_key`. Inside one transaction, re-check `approved=1`, `manual_decision=approved_match`, product ID `2145610`, product name `LIMITLESS MAN MAX 30 TABS`, and `run_id=20260825_1005`; abort without deletion if the snapshot differs, and require exactly one deleted row. Keep the existing broad `delete` semantics for the UI only after auditing its callers; the cleanup path must not call it without a supplier scope. Add a temporary-database test with two rows under different supplier scopes and a preserved history row; prove that only the exact legacy row is deleted and a zero/multiple-row precondition aborts. Run `tests/core/manual_review/test_manual_review_store_metadata.py` before proceeding to the live-state steps.
-
-- [x] **Step 1: Run a read-only preflight and stop on any unexpected row.**
-
-```powershell
-@'
-import json
-import sqlite3
-
-path = r"state/manual_review_decisions.db"
-con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-con.row_factory = sqlite3.Row
-decision = con.execute(
-    """select item_code,item_name,approved,manual_decision,
-              correct_store_product_id,correct_product_name,run_id,
-              matching_source,supplier_scope_key,updated_at
-       from manual_review_decisions
-       where item_code_key=? and item_name_key=? and matching_source=?
-         and supplier_scope_key=?""",
-    ("92558", "LIMITLESS MILGA MAX 30 TABS", "legacy-unknown", "legacy-unknown"),
-).fetchall()
-history = con.execute(
-    """select matching_source,supplier_scope_key,source_file,source_label,
-              run_id,store_product_id,product_name,manual_decision,
-              rebind_status,first_seen_at,last_seen_at
-       from manual_review_source_history
-       where item_code_key=? and item_name_key=?""",
-    ("92558", "LIMITLESS MILGA MAX 30 TABS"),
-).fetchall()
-assert len(decision) == 1, f"expected exactly one legacy decision, found {len(decision)}"
-row = dict(decision[0])
-assert row["approved"] == 1
-assert row["manual_decision"] == "approved_match"
-assert row["correct_store_product_id"] == "2145610"
-assert row["correct_product_name"] == "LIMITLESS MAN MAX 30 TABS"
-expected_history = {
-    "matching_source": "legacy-unknown",
-    "supplier_scope_key": "legacy-unknown",
-    "source_file": "",
-    "source_label": "",
-    "run_id": "20260825_1005",
-    "store_product_id": "2145610",
-    "product_name": "LIMITLESS MAN MAX 30 TABS",
-    "manual_decision": "approved_match",
-    "rebind_status": "",
-    "first_seen_at": "2026-08-25 08:34:40",
-    "last_seen_at": "2026-08-25 08:34:40",
-}
-assert [dict(item) for item in history] == [expected_history], "historical evidence differs; do not delete the active row"
-print(json.dumps({"active": row, "history": [dict(item) for item in history]}, ensure_ascii=True, indent=2))
-con.close()
-'@ | .\.venv\Scripts\python.exe -
-```
-
-Expected: exactly the known bad active row and the complete historical observation are printed. If the count, source, scope, product ID, product name, run ID, decision, or any history field differs, stop and inspect the database instead of broadening the delete predicate.
-
-- [x] **Step 2: Create a recoverable backup before changing the database.**
-
-```powershell
-$dbPath = (Resolve-Path -LiteralPath 'state\manual_review_decisions.db').Path
-$backupDir = 'artifacts\manual-review\revocations'
-New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
-$backupPath = Join-Path $backupDir 'manual_review_decisions.pre-revoke-92558.db'
-if (Test-Path -LiteralPath $backupPath) { throw "Refusing to overwrite existing backup: $backupPath" }
-@'
-import pathlib
-import sqlite3
-
-source = pathlib.Path(r"state/manual_review_decisions.db").resolve()
-backup = pathlib.Path(r"artifacts/manual-review/revocations/manual_review_decisions.pre-revoke-92558.db").resolve()
-source_db = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)
-backup_db = sqlite3.connect(str(backup))
-try:
-    source_db.backup(backup_db)
-    assert backup_db.execute("pragma integrity_check").fetchone()[0] == "ok"
-    print({"journal_mode": source_db.execute("pragma journal_mode").fetchone()[0], "backup_integrity": "ok"})
-finally:
-    backup_db.close()
-    source_db.close()
-'@ | .\.venv\Scripts\python.exe -
-Get-FileHash -LiteralPath $dbPath -Algorithm SHA256
-Get-FileHash -LiteralPath $backupPath -Algorithm SHA256
-foreach ($sidecar in @($dbPath + '-wal', $dbPath + '-shm')) {
-    if (Test-Path -LiteralPath $sidecar) { Get-FileHash -LiteralPath $sidecar -Algorithm SHA256 }
-}
-```
-
-Before this step, stop the order/matcher writers and confirm no process is writing the database. The online backup is required because the live database is in WAL mode; it captures the main database and pending WAL state consistently. Expected: the backup passes `integrity_check`, and hashes for the live file, any existing `-wal`/`-shm` sidecars, and the standalone backup are recorded. The byte hashes need not be identical because the backup is a reconstructed SQLite file. Do not stage or commit either database copy; the source database is runtime state, while the plan and verification artifact are the reviewable changes.
-
-- [x] **Step 3: Delete only the active legacy authorization through the store API.**
-
-```powershell
-.\.venv\Scripts\python.exe -c "from src.core.manual_review.manual_review_store import ManualReviewStore; deleted=ManualReviewStore(r'state\\manual_review_decisions.db').delete_exact(item_code='92558', item_name='LIMITLESS MILGA MAX 30 TABS', matching_source='legacy-unknown', supplier_scope_key='legacy-unknown', expected_store_product_id='2145610', expected_product_name='LIMITLESS MAN MAX 30 TABS', expected_run_id='20260825_1005', expected_manual_decision='approved_match'); assert deleted == 1, deleted"
-```
-
-Do not use the broad `delete` method, do not delete by product name alone, and do not remove the `manual_review_source_history` row. Do not replace the bad approval with a `not_matching` row as the primary cleanup: that would retain an ambiguous legacy decision and only block one historical product ID rather than expressing the `MILGA`/`MAN` identity rule.
-
-- [x] **Step 4: Verify revocation, audit preservation, and SQLite integrity.**
-
-```powershell
-@'
-import json
-import sqlite3
-
-con = sqlite3.connect(r"state/manual_review_decisions.db")
-con.row_factory = sqlite3.Row
-active = con.execute(
-    """select * from manual_review_decisions
-       where item_code_key=? and item_name_key=? and matching_source=?
-         and supplier_scope_key=?""",
-    ("92558", "LIMITLESS MILGA MAX 30 TABS", "legacy-unknown", "legacy-unknown"),
-).fetchall()
-history = con.execute(
-    """select matching_source,supplier_scope_key,source_file,source_label,
-              run_id,store_product_id,product_name,manual_decision,
-              rebind_status,first_seen_at,last_seen_at
-       from manual_review_source_history
-       where item_code_key=? and item_name_key=?""",
-    ("92558", "LIMITLESS MILGA MAX 30 TABS"),
-).fetchall()
-expected_history = {
-    "matching_source": "legacy-unknown",
-    "supplier_scope_key": "legacy-unknown",
-    "source_file": "",
-    "source_label": "",
-    "run_id": "20260825_1005",
-    "store_product_id": "2145610",
-    "product_name": "LIMITLESS MAN MAX 30 TABS",
-    "manual_decision": "approved_match",
-    "rebind_status": "",
-    "first_seen_at": "2026-08-25 08:34:40",
-    "last_seen_at": "2026-08-25 08:34:40",
-}
-history_rows = [dict(item) for item in history]
-integrity = con.execute("pragma integrity_check").fetchone()[0]
-assert active == [], f"active bad decision still exists: {active}"
-assert history_rows == [expected_history], f"historical source evidence changed: {history_rows}"
-assert integrity == "ok", integrity
-print(json.dumps({"active_count": 0, "history": history_rows, "integrity": integrity}, ensure_ascii=True))
-con.close()
-'@ | .\.venv\Scripts\python.exe -
-```
-
-Expected: `active_count=0`, the exact preflight history row is unchanged, and `integrity=ok`. Also verify that `ManualReviewStore.lookup_many(matching_source='tawreed', include_legacy=True)` no longer returns the `92558 / LIMITLESS MILGA MAX 30 TABS` key. Save these values, the preflight row, the complete history row, the journal/sidecar evidence, the backup hash, and the timestamp in `artifacts/manual-review/revocations/20260913-92558-man-max.json`.
-
-- [x] **Step 5: Roll back only if verification fails.** No rollback was needed. The backup and post-verification checks passed; if a future verification fails, stop all writers, preserve the post-change database with the SQLite online-backup API as `manual_review_decisions.failed-revoke-92558.db`, restore the verified pre-revoke backup with the same API under a writer-free lock, rerun `pragma integrity_check` and the full-history comparison, and report the failure. Do not copy only the main file over a live WAL database, and never restore over an active process that may be writing the database.
-
-- [x] **Step 6: Re-run the matcher only in safe mode after the code guard is present.** Used a temporary manual-review database for tests and ran the real Tawreed CLI with `--match-only`, one item, API mode, and `--flagged-match-action manual-review-only`; no order or cart mutation was attempted.
-
-**Task acceptance:** the bad `approved_match` is no longer loadable by Tawreed, the historical row remains auditable, no replacement approval is created without a verified exact `MILGA MAX` candidate and supplier scope, and the cleanup is reproducible from the recorded preflight/backup evidence.
-
 ## خريطة الملفات
 
 - `state/config.yaml`: تعريف مفتاح 1209 المستقل وظهوره في قائمة الأهداف، مع إبقاء `البركة شركات` كما هو.
@@ -212,11 +39,9 @@ Expected: `active_count=0`, the exact preflight history row is unchanged, and `i
 - `src/cli/commands/cli_order_excel_target.py`: تشغيل Excel-target عبر CLI يجب أن يستخدم الفهارس المحلية/المخزنة فقط.
 - `src/core/excel_target/excel_target_identity.py` و`src/core/excel_target/excel_target_aliases.py`: مصادر الهوية والـaliases المحددة بهدف البركة.
 - `src/core/matching/product_matching_acceptance.py`: حاجز الهوية المشترك الذي يمنع قبول بديل Tawreed ذي اسم منتج متعارض.
-- `src/core/manual_review/manual_review_store.py` و`src/core/manual_review/manual_review_store_sql.py`: حذف قرار واحد فقط مع نطاق المورد، وفصل تفويض التشغيل عن سجل التاريخ.
 - `src/core/manual_review/manual_review_runtime.py`: تطبيق قرارات المراجعة المحفوظة قبل المطابقة، ومنها منع سجل `auto_matched` القديم من تجاوز تعارض الهوية.
 - `src/core/ordering/order_run_artifact_rows.py`: تحديد وجوب إحالة نتيجة مرفوضة للمراجعة حتى مع وجود قرار آلي قديم.
 - `src/tawreed/order/tawreed_order_match.py`: تحميل قرارات التشغيل وتفعيل `manual_review_cache_context` أثناء المطابقة الفعلية.
-- `src/tawreed/api/tawreed_api_flow_matching.py`: مسار API المنفصل الذي يستدعي `manual_review_match` قبل الـscorer؛ يجب أن يطبق نفس حاجز الهوية.
 - `src/tawreed/order/tawreed_order_summary_build.py`: تحويل نتيجة الرفض ومرشحيها إلى سجل المراجعة اليدوية.
 - `src/ui/manual_review/streamlit_manual_review_page.py`: عرض سبب رفض المرشح للمراجع قبل اتخاذ القرار.
 - `scripts/baraka_coverage_report.py`: إعادة تشغيل محلية للقياس دون قراءة/إعادة ربط قرارات المستخدم المحفوظة.
@@ -225,7 +50,6 @@ Expected: `active_count=0`, the exact preflight history row is unchanged, and `i
 - `tests/core/excel_target/test_baraka_safe_matching.py` و`tests/core/excel_target/test_excel_target_aliases.py` و`tests/core/excel_target/test_product_attributes.py`: اختبارات الأمان والهوية والخصائص.
 - `tests/core/excel_target/test_coverage.py`: سلوك تقرير التغطية المحلي دون قرارات محفوظة.
 - `tests/core/excel_target/fixtures/`: سجل ذهبي صغير يربط أسماء الطلب بصفوف الكتالوج وتوقع المطابقة أو المراجعة.
-- `tests/core/manual_review/test_manual_review_store_metadata.py` و`tests/tawreed/api/test_tawreed_api.py`: اختبار الحذف الدقيق ومسار API مع قرار legacy القديم.
 
 ## Task 1: سجّل مفتاح 1209 المستقل واختبر الفرق بين المفتاح ومسار الملف
 
@@ -310,7 +134,6 @@ Expected: `active_count=0`, the exact preflight history row is unchanged, and `i
 - Modify: `src/core/matching/matching_risk.py`
 - Modify: `src/core/manual_review/manual_review_runtime.py`
 - Modify: `src/core/ordering/order_run_artifact_rows.py`
-- Modify: `src/tawreed/api/tawreed_api_flow_matching.py`
 - Modify: `src/tawreed/order/tawreed_order_summary_build.py`
 - Modify: `src/ui/manual_review/streamlit_manual_review_page.py`
 - Test: `tests/test_product_matching.py`
@@ -319,7 +142,6 @@ Expected: `active_count=0`, the exact preflight history row is unchanged, and `i
 - Test: `tests/core/matching/test_matching_risk.py`
 - Test: `tests/tawreed/matching/test_tawreed_search_logic.py`
 - Test: `tests/tawreed/api/test_tawreed_api_execution_mode.py`
-- Test: `tests/tawreed/api/test_tawreed_api.py`
 - Create: `tests/tawreed/order/test_limitless_manual_review.py`
 - Test: `tests/ui/manual_review/test_streamlit_manual_review.py`
 
@@ -328,11 +150,9 @@ Expected: `active_count=0`, the exact preflight history row is unchanged, and `i
 - [ ] افحص مسار القرار المحفوظ قبل المطابقة العادية: قد يجبر `manual_review_match` نتيجة `auto_matched` قديمة على المنتج الخاطئ قبل وصولها إلى حاجز الهوية. اجعل التعارض المثبت بين اسم الطلب والمنتج المحفوظ يمنع هذا الإجبار الآلي، مع إبقاء السجل التاريخي دون حذف أو تعديل، ثم دع المرشح المرفوض يمر لمسار المراجعة.
 - [ ] امنع سياسة aggressive من إعادة ترقية تشخيص الهوية المرفوض إلى مرشح قابل للإضافة للسلة حتى إذا كان `flagged_match_action=add-to-cart`؛ اختبر أن زوج `MILGA`/`MAN` يظل مرفوضاً وأن مرشحاً آخر لا يحمل هذا التعارض يستمر وفق السياسة الحالية.
 - [ ] مرّر قرار المطابقة إلى `manual_review_required` من موضعي الاستدعاء `order_item_summary_row` و`_handle_manual_review_or_auto_save`؛ عند وجود رفض صريح بسبب تعارض الهوية، لا تسمح لسجل `auto_matched` القديم بإخفاء المراجعة حتى عندما يكون `enable_auto_match_re_review_on_fail=false`.
-- [ ] أنشئ حالة تكامل مطابقة للسجل الحقيقي، لا حالة `auto_matched` فقط: ازرع في قاعدة مؤقتة قراراً من نوع `approved_match`، و`matching_source=legacy-unknown`، و`supplier_scope_key=legacy-unknown`، و`run_id=20260825_1005`، وID `2145610`، واسم `LIMITLESS MAN MAX 30 TABS`. شغّل `preload_manual_review_decisions(matching_source="tawreed", include_legacy=True)` ثم مرّر طلب `LIMITLESS MILGA MAX 30 TABS` ونتيجة بحث `LIMITLESS MAN MAX 30 TABS`؛ أثبت أن القرار legacy لا يفرض الفوز أو الإضافة للسلة حتى لو كان الصف موجوداً، وأنه بعد revocation لا يعود `lookup_many` يحمّله أصلاً. تحقق من `manual_review_required` وسبب تعارض `MILGA`/`MAN` ومن عدم إنشاء `auto_matched` جديد، مع بقاء القرار المزروع وسجل التاريخ دون تعديل داخل قاعدة الاختبار.
 - [ ] أنشئ اختبار تكامل في `tests/tawreed/order/test_limitless_manual_review.py`: ازرع قاعدة قرارات مؤقتة بسجل Tawreed قديم من نوع `auto_matched` يشير إلى `LIMITLESS MAN MAX`، مع تعطيل `enable_auto_match_re_review_on_fail`. شغّل مسار تنفيذ الطلب الفعلي (API أو المتصفح) ببوابة Tawreed اختبارية، وتأكد أن التنفيذ يستخدم `preload_manual_review_decisions` و`manual_review_cache_context`، ثم مرّر طلب `LIMITLESS MILGA MAX 30 TABS` ونتيجة بحث `LIMITLESS MAN MAX 30 TABS` خلال `manual_review_match` والمطابقة العادية قبل أي محاولة إضافة للسلة؛ لا تستدعِ helper منفرداً ولا تستخدم قراراً مسبق التجهيز من نوع `no-results` لتجاوز هذا المسار. تحقق أن السجل القديم لا يجبر `MAN MAX` على أن يصبح فائزاً أو يضيفه للسلة، وأن قرار المطابقة النهائي مرفوض بسبب تعارض الهوية. مرّر هذا القرار المرفوض مع ملخص `no-results` إلى مسار artifact handling، واحفظ مرشح `MAN MAX` وسبب التعارض في ملف المراجعة ضمن مجلد تشغيل مؤقت؛ حمّله عبر `load_review_candidates` وتأكد من ظهور السبب للمراجع ومن أن الصف أُحيل فعلاً للمراجعة. أثبت أن سجل `auto_matched` المزروع لم يُحذف أو يُعدّل، وأن الصنف لم يُسجّل كـ`auto_matched` جديد. وجّه `src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB` و`src.tawreed.order.tawreed_order_summary_build.DEFAULT_MANUAL_REVIEW_DB` إلى قاعدة مؤقتة كي لا يقرأ الاختبار قرارات المستخدم ولا يكتب إليها.
-- [x] أضف اختباراً منفصلاً لمسار API في `src/tawreed/api/tawreed_api_flow_matching.py`، لأن `_api_match_decision` يستدعي `manual_review_match` قبل `explain_best_product_match` بصورة مستقلة عن مسار المتصفح. أثبت بنفس fixture أن حاجز الهوية يرفض الإكراه المحفوظ، وأن API يعيد `manual_review_required`/`no_match` ولا يستدعي إضافة السلة؛ أبقِ اختبار المتصفح السابق منفصلاً حتى لا يخفي نجاح أحد المستهلكين فشل الآخر. الاختبار المضاف في `tests/tawreed/api/test_tawreed_api.py` مرّ.
 - [ ] اعرض `rejection_reason` في صفحة المراجعة اليدوية قرب اسم `LIMITLESS MAN MAX`، وأضف اختبار UI يثبت أن عبارة تعارض `MAN`/`MILGA` ظاهرة للمراجع وليست محفوظة في JSONL فقط.
-- [ ] أضف حالة مقابلة تثبت أن صفاً موثقاً باسم `LIMITLESS MILGA MAX` لا يتأثر بالحاجز، ثم شغّل: `.\.venv\Scripts\python.exe -m pytest -q tests\test_product_matching.py tests\test_latest_no_results_regressions.py tests\core\manual_review\test_manual_review_runtime.py tests\core\manual_review\test_manual_review_store_metadata.py tests\core\matching\test_matching_risk.py tests\tawreed\matching\test_tawreed_search_logic.py tests\tawreed\api\test_tawreed_api_execution_mode.py tests\tawreed\api\test_tawreed_api.py tests\tawreed\order\test_limitless_manual_review.py tests\ui\manual_review\test_streamlit_manual_review.py`.
+- [ ] أضف حالة مقابلة تثبت أن صفاً موثقاً باسم `LIMITLESS MILGA MAX` لا يتأثر بالحاجز، ثم شغّل: `.\.venv\Scripts\python.exe -m pytest -q tests\test_product_matching.py tests\test_latest_no_results_regressions.py tests\core\manual_review\test_manual_review_runtime.py tests\core\matching\test_matching_risk.py tests\tawreed\matching\test_tawreed_search_logic.py tests\tawreed\api\test_tawreed_api_execution_mode.py tests\tawreed\order\test_limitless_manual_review.py tests\ui\manual_review\test_streamlit_manual_review.py`.
 
 **Expected:** لا يتحول `LIMITLESS MAN MAX` إلى مطابقة آلية أو إضافة للسلة لطلب `MILGA MAX`، ولا يخفيه سجل `auto_matched` قديم عن المراجعة؛ يظهر للمراجع اليدوي كمرشح مع سبب اختلاف الهوية قبل أن يتخذ قراره، مع بقاء السجل التاريخي محفوظاً. وتظل مطابقة `MILGA MAX` الحقيقي ممكنة عند ثبوتها.
 
@@ -346,7 +166,7 @@ Expected: `active_count=0`, the exact preflight history row is unchanged, and `i
 - Output: ملف CSV/JSONL مؤقت للمقارنة، بلا تعديل لكتالوج المستخدم
 
 - [ ] اجعل `scripts/baraka_coverage_report.py` ينشئ المطابق باستخدام `use_saved_approvals=False` حتى لا يقرأ قرارات الهدف القديم أو يعيد ربطها/يكتبها. أضف اختباراً يثبت أن matcher تقرير التغطية معطّل القرارات المحفوظة ولا يستدعي قراءة أو كتابة `ManualReviewStore`.
-- [ ] في اختبار CLI داخل العملية نفسها بكتالوج fixture محفوظ في ملف مؤقت اسمه `البركه 1209.xlsx`، أنشئ `AppConfig` اختباريّاً بقيمة `database.order_runs_path` مؤقتة باستخدام `dataclasses.replace` مع إنشاء `DatabaseConfig` بديل؛ الكائنان مجمّدان ولا تعدّل الخاصية مباشرة. ووجّه الثابتين `src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB` و`src.cli.commands.cli_order_excel_target.DEFAULT_MANUAL_REVIEW_DB` إلى قاعدة مؤقتة. استدعِ مسار المطابقة فقط، ثم تحقق من الحقول: `matching_source=excel-target`؛ و`matching_source_label=البركه 1209@البركه 1209.xlsx`؛ و`storeName=excel-target:البركه 1209@البركه 1209.xlsx`. لا تشغّل أمراً فرعياً يكتب إلى قاعدة قرارات المستخدم.
+- [ ] في اختبار CLI داخل العملية نفسها بكتالوج fixture محفوظ في ملف مؤقت اسمه `البركه 1209.xlsx`، أنشئ `AppConfig` اختباريّاً بقيمة `database.order_runs_path` مؤقتة باستخدام `dataclasses.replace` مع إنشاء `DatabaseConfig` بديل؛ الكائنان مجمّدان ولا تعدّل الخاصية مباشرة. ووجّه الثابتين `src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB` و`src.cli.commands.cli_order_excel_target.DEFAULT_MANUAL_REVIEW_DB` إلى قاعدة مؤقتة. استدعِ مسار المطابقة فقط، ثم تحقق من الحقول: `matching_source=excel-target`؛ و`matching_source_label=<target_key>@<source_file>`، وقيمته هنا `البركه 1209@البركه 1209.xlsx`؛ و`storeName=excel-target:<target_key>@<source_file>`، وقيمته هنا `excel-target:البركه 1209@البركه 1209.xlsx`. لا تشغّل أمراً فرعياً يكتب إلى قاعدة قرارات المستخدم.
 - [ ] شغّل تقرير التغطية على الطلب الفعلي والهدف الجديد:
 
 ```powershell

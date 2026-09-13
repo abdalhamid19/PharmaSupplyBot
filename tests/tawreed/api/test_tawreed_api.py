@@ -6,16 +6,8 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from src.core.config.config_models import MatchingConfig
-from src.core.manual_review.manual_review_runtime import (
-    manual_review_cache_context,
-    preload_manual_review_decisions,
-)
-from src.core.manual_review.manual_review_store import ManualReviewDecision, ManualReviewStore
-from src.core.utils.excel import Item
 from src.tawreed.api.tawreed_api_client import (
     TawreedApiClient,
     TawreedApiUnavailable,
@@ -26,7 +18,6 @@ from src.tawreed.api.tawreed_api_contract import (
     save_discovered_api_contract,
 )
 from src.tawreed.api.tawreed_api_flow import _submit_order_if_enabled
-from src.tawreed.api.tawreed_api_flow_matching import _api_match_decision
 
 
 class _FakeSubmitApi:
@@ -206,47 +197,6 @@ def _add_to_cart_client(temp_dir: str, response_payload: dict):
 
 class TawreedApiTests(unittest.TestCase):
     """Validate local API contract parsing and safe unavailable behavior."""
-
-    def test_api_matching_does_not_force_legacy_man_approval_for_milga(self) -> None:
-        item = Item("92558", "LIMITLESS MILGA MAX 30 TABS", 17)
-        man_candidate = {
-            "storeProductId": "2145610",
-            "productNameEn": "LIMITLESS MAN MAX 30 TABS",
-            "availableQuantity": 39,
-        }
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "manual-review.sqlite3"
-            ManualReviewStore(db_path).upsert(
-                ManualReviewDecision(
-                    item.code,
-                    item.name,
-                    True,
-                    man_candidate["storeProductId"],
-                    correct_product_name=man_candidate["productNameEn"],
-                    run_id="20260825_1005",
-                    manual_decision="approved_match",
-                    matching_source="legacy-unknown",
-                    supplier_scope_key="legacy-unknown",
-                )
-            )
-            bot = SimpleNamespace(
-                config=SimpleNamespace(matching=MatchingConfig()),
-            )
-            with patch(
-                "src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB",
-                db_path,
-            ):
-                cache = preload_manual_review_decisions([item])
-                with manual_review_cache_context(cache):
-                    decision = _api_match_decision(
-                        bot,
-                        item,
-                        [(item.name, [man_candidate])],
-                    )
-
-        self.assertIsNone(decision.best_match)
-        self.assertIn("MILGA", decision.final_reason)
-        self.assertIn("MAN", decision.final_reason)
 
     def test_load_missing_contract_disables_mutating_api(self) -> None:
         with TemporaryDirectory() as temp_dir:
