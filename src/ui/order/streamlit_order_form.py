@@ -229,7 +229,7 @@ def _collect_form_values() -> dict[str, object]:
         "resume": bool(advanced.get("resume", False)),
         "match_only": bool(advanced.get("match_only", False)),
         "execution_mode": str(advanced.get("execution_mode", "auto")),
-        "highest_discount": bool(advanced.get("highest_discount", False)),
+        "warehouse_mode": "lowest_purchase_price",
         "min_discount_percent": float(advanced.get("min_discount_percent", 0.0)),
         "start_item": int(advanced.get("start_item", 1)),
         "end_item": int(advanced.get("end_item", 0)),

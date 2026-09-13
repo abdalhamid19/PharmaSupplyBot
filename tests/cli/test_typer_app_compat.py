@@ -82,8 +82,7 @@ def test_order_accepts_debug_browser_flag() -> None:
     assert captured["cmd"] == "order"
 
 
-def test_order_accepts_warehouse_mode_override() -> None:
-    captured: dict = {"warehouse_mode": None}
+def test_order_does_not_expose_warehouse_mode_override() -> None:
     result = _invoke(
         [
             "order",
@@ -91,10 +90,9 @@ def test_order_accepts_warehouse_mode_override() -> None:
             "--profile", "wardany",
             "--warehouse-mode", "max_discount",
         ],
-        captured,
+        {},
     )
-    assert result.exit_code == 0
-    assert captured["warehouse_mode"] == "max_discount"
+    assert result.exit_code != 0
 
 
 def test_order_accepts_min_discount_override() -> None:

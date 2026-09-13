@@ -42,3 +42,7 @@ Read [01-evidence-and-root-causes.md](01-evidence-and-root-causes.md) before
 
 The current human-gated proposal queue is in
 [05-deterministic-alias-proposals.md](05-deterministic-alias-proposals.md).
+
+The forward-looking, whole-picture plan that ties the remaining gates, gold
+labelling, attribute parsing, and channel rollout into one sequence is in
+[28-comprehensive-matching-improvement-plan.md](28-comprehensive-matching-improvement-plan.md).

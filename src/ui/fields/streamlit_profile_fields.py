@@ -26,7 +26,7 @@ from typing import NamedTuple
 
 import streamlit as st
 
-from src.core.config.config_models import AppConfig
+from src.core.config.config_models import AppConfig, LOWEST_PURCHASE_PRICE_MODE
 from ..streamlit_uploads import available_excel_target_options
 from .streamlit_excel_target_manager_widgets import (
     maybe_open_add_dialog,
@@ -47,7 +47,7 @@ class OrderRunFields(NamedTuple):
     resume: bool
     match_only: bool
     execution_mode: str
-    highest_discount: bool
+    warehouse_mode: str
     min_discount_percent: float
     start_item: int
     end_item: int
@@ -112,17 +112,17 @@ def profile_run_fields_with_workers(
         f"{kind}:{key}" for kind, key in selected_pairs
     )
     st.session_state["order_form_advanced"] = {
-        "limit": int(advanced_options[0]) if False else int(limit),
+        "limit": int(limit),
         "debug_browser": bool(advanced_options[0]),
         "resume": bool(advanced_options[1]),
         "match_only": bool(advanced_options[2]),
         "execution_mode": str(advanced_options[3]),
-        "highest_discount": bool(advanced_options[4]),
-        "min_discount_percent": float(advanced_options[5]),
-        "start_item": int(advanced_options[6]),
-        "end_item": int(advanced_options[7]),
+        "warehouse_mode": LOWEST_PURCHASE_PRICE_MODE,
+        "min_discount_percent": float(advanced_options[4]),
+        "start_item": int(advanced_options[5]),
+        "end_item": int(advanced_options[6]),
     }
-    st.session_state["order_form_item_workers"] = int(advanced_options[8])
+    st.session_state["order_form_item_workers"] = int(advanced_options[7])
 
     fields = OrderRunFields(
         profile_mode=str(profile_mode),
@@ -133,10 +133,10 @@ def profile_run_fields_with_workers(
         resume=bool(advanced_options[1]),
         match_only=bool(advanced_options[2]),
         execution_mode=str(advanced_options[3]),
-        highest_discount=bool(advanced_options[4]),
-        min_discount_percent=float(advanced_options[5]),
-        start_item=int(advanced_options[6]),
-        end_item=int(advanced_options[7]),
+        warehouse_mode=LOWEST_PURCHASE_PRICE_MODE,
+        min_discount_percent=float(advanced_options[4]),
+        start_item=int(advanced_options[5]),
+        end_item=int(advanced_options[6]),
     )
     return fields, int(advanced_options[-1])
 
@@ -361,9 +361,6 @@ def _render_advanced_options(app_config):
             help="auto uses API when a safe contract exists, then falls back to browser.",
         )
         item_workers = item_workers_field(app_config)
-        highest_discount = st.checkbox(
-            "Highest discount only", value=False, key="order_form_highest_discount"
-        )
         min_discount = st.number_input(
             "Minimum discount percent",
             min_value=0.0,
@@ -371,6 +368,7 @@ def _render_advanced_options(app_config):
             value=0.0,
             step=1.0,
             key="order_form_min_discount",
+            help="Applies to Tawreed and Excel Target offers.",
         )
 
     return (
@@ -378,7 +376,6 @@ def _render_advanced_options(app_config):
         bool(resume),
         bool(match_only),
         str(execution_mode),
-        bool(highest_discount),
         float(min_discount),
         int(start_item),
         int(end_item),

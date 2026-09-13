@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "v0": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "v0/v0-gpt-5 (local bridge)",
+      "options": {
+        "baseURL": "http://127.0.0.1:8765/v1"
+      },
+      "models": {
+        "v0-gpt-5": {
+          "name": "v0/v0-gpt-5",
+          "limit": {
+            "context": 128000,
+            "output": 32000
+          }
+        }
+      }
+    }
+  },
+  "permission": {
+    "websearch": "allow",
+    "webfetch": "allow"
+  }
+}

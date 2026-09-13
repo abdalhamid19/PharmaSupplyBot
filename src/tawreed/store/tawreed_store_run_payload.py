@@ -52,7 +52,15 @@ def store_snapshot_payload(bot) -> dict[str, Any]:
 def persistence_options(bot) -> dict[str, Any] | None:
     """Return the configured database options, or ``None`` when unavailable."""
     database = getattr(getattr(bot, "config", None), "database", None)
-    return database.persistence_options() if database is not None else None
+    if database is None:
+        return None
+    factory = getattr(database, "persistence_options", None)
+    if callable(factory):
+        return factory()
+    return {
+        "enabled": bool(getattr(database, "order_runs_enabled", True)),
+        "path": getattr(database, "order_runs_path", "") or None,
+    }
 
 
 __all__ = [

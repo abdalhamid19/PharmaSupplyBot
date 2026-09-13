@@ -51,7 +51,7 @@ class TawreedProductsFlowTests(unittest.TestCase):
         # Skip this test as it requires complex Playwright page mocking
         self.skipTest("Requires complex Playwright page mocking - skipping for now")
 
-    def test_max_discount_add_records_best_store_metadata(self) -> None:
+    def test_lowest_price_add_records_best_store_metadata(self) -> None:
         # Skip this test as it requires complex Playwright page mocking
         self.skipTest("Requires complex Playwright page mocking - skipping for now")
 
@@ -75,7 +75,7 @@ def _bot(warehouse_mode: str) -> SimpleNamespace:
 
 
 def _split_store_rows() -> list[dict[str, object]]:
-    """Return store rows used by split and max-discount tests."""
+    """Return store rows used by split and lowest-price tests."""
     return [
         {
             "availableQuantity": 2,

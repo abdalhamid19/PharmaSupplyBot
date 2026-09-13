@@ -22,17 +22,40 @@ def test_price_precedes_source_and_preference():
     assert select_warehouse_winner([offer(), offer("Excel", 8, "excel_target")])[1] == "excel_preferred"
 
 
-def test_tawreed_nearby_prices_use_preferred_warehouse_order():
+def test_tawreed_nearby_prices_choose_the_cheapest_offer():
     rows = [
         offer(PREFERRED_WAREHOUSES[1], 100.0),
-        offer(PREFERRED_WAREHOUSES[0], 100.9),
+        offer(PREFERRED_WAREHOUSES[0], 100.2),
     ]
-    assert select_warehouse_winner(rows)[0]["store_name"] == PREFERRED_WAREHOUSES[0]
+    assert select_warehouse_winner(rows)[0]["store_name"] == PREFERRED_WAREHOUSES[1]
 
 
-def test_tawreed_price_difference_of_one_pound_is_not_a_tie():
+def test_minimum_discount_filters_tawreed_and_excel_target():
     rows = [
-        offer(PREFERRED_WAREHOUSES[0], 101.0),
+        offer("Tawreed below threshold", 7, discount_percent=9),
+        offer("Excel below threshold", 5, "excel_target", discount_percent=9),
+        offer("Excel eligible", 8, "excel_target", discount_percent=10),
+    ]
+    winner, _reason = select_warehouse_winner(rows, min_discount_percent=10)
+    assert winner["store_name"] == "Excel eligible"
+    winner, _reason = select_warehouse_winner(
+        [
+            offer("Tawreed eligible", 7, discount_percent=10),
+            offer("Excel below threshold", 5, "excel_target", discount_percent=9),
+            offer("Excel eligible", 8, "excel_target", discount_percent=10),
+        ],
+        min_discount_percent=10,
+    )
+    assert winner["store_name"] == "Tawreed eligible"
+    assert select_warehouse_winner(
+        [offer("Tawreed below", 7, discount_percent=9)],
+        min_discount_percent=10,
+    )[0] is None
+
+
+def test_tawreed_exact_lowest_price_wins_at_quarter_gap():
+    rows = [
+        offer(PREFERRED_WAREHOUSES[0], 100.25),
         offer(PREFERRED_WAREHOUSES[1], 100.0),
     ]
     assert select_warehouse_winner(rows)[0]["store_name"] == PREFERRED_WAREHOUSES[1]
@@ -52,14 +75,15 @@ def test_preferred_warehouse_order(index):
     assert select_warehouse_winner(rows[::-1])[0]["store_name"] == PREFERRED_WAREHOUSES[index]
 
 
-def test_stable_ties_and_currency_aliases():
+def test_stable_ties_and_currency_metadata_does_not_exclude_offers():
     rows = [offer("B", source="excel_target"), offer("A", source="excel-target")]
     for order in permutations(rows):
         assert select_warehouse_winner(list(order))[0]["store_name"] == "A"
-    rows = [dict(offer(), currency="ج.م"), dict(offer("B"), currency="EGP")]
-    assert select_warehouse_winner(rows)[0] is not None
-    rows.append(dict(offer("US"), currency="USD"))
-    assert select_warehouse_winner(rows) == (None, "mixed_currencies")
+    rows = [
+        dict(offer("Egyptian currency", 8), currency="?.?"),
+        dict(offer("Legacy currency text", 7), currency="USD"),
+    ]
+    assert select_warehouse_winner(rows)[0]["store_name"] == "Legacy currency text"
 
 
 def test_excel_ties_do_not_use_tawreed_preference_names():
@@ -88,10 +112,11 @@ def store(tmp_path):
     result.db.close()
 
 
-def persist(store, name, price, source="store_details", qty=2):
+def persist(store, name, price, source="store_details", qty=2, discount=0):
     candidate = dict(storeProductId="same-code", storeName=name,
                      productName="Supplier product", availableQuantity=qty,
-                     retailPrice=10, salePrice=price, priceMeaning="purchase_only")
+                     retailPrice=price, salePrice=price, discountPercent=discount,
+                     priceMeaning="purchase_only")
     store.upsert_run_item(
         "test/one", dict(item_code="001", item_name="Drug", item_qty=10, status="matched-only"),
         stores=[candidate], store_source=source,
@@ -153,17 +178,64 @@ def test_comparison_failure_rolls_back_item_and_offer(store, monkeypatch):
     assert store.db.execute_query("select purchase_price from run_item_stores")[0][0] == 8
 
 
-def test_mixed_currency_exclusion_is_persisted(store):
-    from src.core.database.order_runs_warehouse_winners import refresh_warehouse_winner
-
-    persist(store, "Tawreed", 8)
-    persist(store, "excel-target:other@Other.xlsx", 8, "excel_target")
+def test_saved_minimum_discount_filters_excel_target_in_materialized_report(store):
     with store.db.get_connection() as conn:
-        conn.execute("update run_item_stores set currency='USD' where source='excel_target'")
-        refresh_warehouse_winner(conn, "test/one", "001::DRUG")
+        conn.execute("update runs set min_discount_pct=10 where run_key='test/one'")
         conn.commit()
-    assert fetch_run_warehouse_winners("test/one", store.path) == []
-    assert fetch_run_warehouse_exclusions("test/one", store.path)[0]["selection_reason"] == "mixed_currencies"
+    persist(store, "Tawreed below threshold", 8, discount=9)
+    persist(store, "excel-target:target@Cheap.xlsx", 5, "excel_target", discount=9)
+    persist(store, "excel-target:target@Eligible.xlsx", 8, "excel_target", discount=10)
+    winners = fetch_run_warehouse_winners("test/one", store.path)
+    assert winners[0]["store_name"] == "Eligible.xlsx"
+    assert winners[0]["purchase_price"] == 7.2
+
+
+def test_v8_upgrade_rebuilds_materialized_winner_using_saved_discount_floor(store):
+    persist(store, "Tawreed", 8, discount=0)
+    persist(store, "excel-target:target@Cheap.xlsx", 5, "excel_target", discount=9)
+    persist(store, "excel-target:target@Eligible.xlsx", 8, "excel_target", discount=10)
+    with store.db.get_connection() as conn:
+        conn.execute("update runs set min_discount_pct=10 where run_key='test/one'")
+        conn.execute(
+            "update run_warehouse_winners set store_name='stale', purchase_price=5 "
+            "where run_key='test/one'"
+        )
+        conn.execute("update schema_meta set value='8' where key='schema_version'")
+        conn.commit()
+    store.db.close()
+    OrderRunsStore._bootstrapped_paths.discard(str(store.path.resolve()))
+
+    reopened = OrderRunsStore(store.path)
+    winners = fetch_run_warehouse_winners("test/one", store.path)
+    assert winners[0]["store_name"] == "Eligible.xlsx"
+    assert winners[0]["purchase_price"] == 7.2
+    reopened.db.close()
+
+
+def test_v9_upgrade_rebuilds_materialized_winner_with_tawreed_discount_floor(store):
+    persist(store, "Tawreed below threshold", 8, discount=9)
+    persist(store, "excel-target:target@Eligible.xlsx", 8, "excel_target", discount=10)
+    with store.db.get_connection() as conn:
+        conn.execute("update runs set min_discount_pct=10 where run_key='test/one'")
+        conn.execute(
+            "update run_warehouse_winners set store_name='stale', purchase_price=5 "
+            "where run_key='test/one'"
+        )
+        conn.execute("update schema_meta set value='9' where key='schema_version'")
+        conn.commit()
+    store.db.close()
+    OrderRunsStore._bootstrapped_paths.discard(str(store.path.resolve()))
+
+    reopened = OrderRunsStore(store.path)
+    winners = fetch_run_warehouse_winners("test/one", store.path)
+    assert winners[0]["store_name"] == "Eligible.xlsx"
+    assert winners[0]["purchase_price"] == 7.2
+    flags = reopened.db.execute_query(
+        "select source, is_winner from run_item_stores "
+        "where run_key='test/one' order by source"
+    )
+    assert flags == [("excel_target", 1), ("store_details", 0)]
+    reopened.db.close()
 
 
 def test_excel_owner_retry_removes_old_catalog_offer_but_keeps_other_target(store):

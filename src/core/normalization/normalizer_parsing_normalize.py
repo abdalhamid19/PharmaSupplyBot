@@ -10,7 +10,7 @@ def normalize_arabic(name: str) -> str:
     """Normalize Arabic product text for auxiliary matching signals."""
     if not name or not isinstance(name, str):
         return ""
-    text = _AR_DIACRITICS_RE.sub("", name.strip())
+    text = _AR_DIACRITICS_RE.sub("", name.strip()).replace("\u0640", "")
     text = re.sub("[إأآٱ]", "ا", text)
     text = text.replace("ى", "ي").replace("ؤ", "و").replace("ئ", "ي").replace("ة", "ه")
     text = re.sub(r"[^\w\s\u0600-\u06FF]", " ", text)

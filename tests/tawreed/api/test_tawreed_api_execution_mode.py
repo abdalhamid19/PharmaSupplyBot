@@ -89,24 +89,27 @@ class TawreedApiExecutionModeTests(unittest.TestCase):
         # Skip this test as it requires complex mocking of bot methods
         self.skipTest("Requires complex mocking of bot methods - skipping for now")
 
-    def test_api_match_only_records_selected_max_discount_store_metadata(self) -> None:
-        """API match-only summaries use the chosen multi-store discount."""
-        bot = _FlowBot()
-        bot.config.warehouse_strategy = {"mode": "max_discount"}
-        api = _FakeStoreDetailsClient()
+    def test_api_match_only_prefers_configured_warehouse_on_price_tie(self) -> None:
         match = SimpleNamespace(
             data={
                 "productId": "p1",
                 "productsCount": 2,
-                "storeName": "شركه روما فارما (الجيزه)",
-                "discountPercent": "20%",
+                "storeName": "شركه عنايه للادويه (الجيزه)",
+                "discountPercent": "35%",
             }
         )
 
-        record_api_match_only_store_metadata(bot, api, match)
+        bot = _FlowBot()
+        bot.config.warehouse_strategy = {
+            "mode": "lowest_purchase_price",
+            "preferred_warehouses": ["شركه الفا فارما (الجيزه)"],
+        }
+        record_api_match_only_store_metadata(bot, _FakeStoreDetailsClient(), match)
 
-        self.assertEqual(bot.last_selected_store_name, "شركه الهادي فارم (الجيزه)")
-        self.assertEqual(bot.last_selected_discount_percent, "32%")
+        self.assertEqual(
+            bot.last_selected_store_name, "شركة الفا فارما (الجيزه)"
+        )
+        self.assertEqual(bot.last_selected_discount_percent, "35%")
 
 
 class _FakeFlowClient:
@@ -137,14 +140,16 @@ class _FakeStoreDetailsClient:
     def get_store_details(self, product_id):
         return [
             {
-                "availableQuantity": 10,
-                "storeName": "شركه روما فارما (الجيزه)",
-                "discountPercent": "24%",
+                "availableQuantity": 54,
+                "storeName": "شركه عنايه للادويه (الجيزه)",
+                "discountPercent": "35%",
+                "salePrice": 18.2,
             },
             {
-                "availableQuantity": 32,
-                "storeName": "شركه الهادي فارم (الجيزه)",
-                "discountPercent": "32%",
+                "availableQuantity": 53,
+                "storeName": "شركة الفا فارما (الجيزه)",
+                "discountPercent": "35%",
+                "salePrice": 18.2,
             },
         ]
 

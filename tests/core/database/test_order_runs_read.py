@@ -12,6 +12,7 @@ from src.core.database.order_runs_read import (
     fetch_item_stores,
     fetch_missed_discounts,
     fetch_run_items,
+    fetch_run_match_only_simulation,
     fetch_runs,
     run_store_row_count,
 )
@@ -89,6 +90,15 @@ class OrderRunsReadTests(unittest.TestCase):
         self.assertEqual(len(stores), 2)
         self.assertEqual(stores[0]["is_winner"], 1)
         self.assertEqual(stores[0]["store_name"], "Alpha")
+
+    def test_fetch_match_only_simulation_returns_run_policy_and_offers(self) -> None:
+        rows = fetch_run_match_only_simulation(RUN_KEY, db=self.store.db.path)
+
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(all(row["run_mode"] == "match-only" for row in rows))
+        self.assertEqual(
+            {row["store_name"] for row in rows}, {"Alpha", "Beta"}
+        )
 
     def test_missed_discounts_flags_beaten_winner(self) -> None:
         rows = fetch_missed_discounts(RUN_KEY, db=self.store.db.path)

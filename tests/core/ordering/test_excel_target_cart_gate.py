@@ -39,10 +39,14 @@ def _write_excel_offers(
     *,
     item: Item = ITEM,
     run_key: str = RUN_KEY,
+    min_discount_pct: float | None = None,
 ) -> None:
     """Persist accepted Excel Target offers into an isolated order-run DB."""
     store = OrderRunsStore(db_path)
-    store.open_run(run_meta_row("wardany", "run-1", started_at="2026-09-09T12:00:00"))
+    store.open_run(run_meta_row(
+        "wardany", "run-1", started_at="2026-09-09T12:00:00",
+        min_discount_pct=min_discount_pct,
+    ))
     store.upsert_run_item(
         run_key,
         {
@@ -64,6 +68,66 @@ def _tawreed_store(purchase_price: float | None) -> dict:
         "retailPrice": purchase_price,
         "salePrice": purchase_price,
     }
+
+
+def test_candidates_gate_applies_discount_floor_to_both_sources(
+    tmp_path: Path,
+) -> None:
+    """The configured floor removes below-threshold candidates on both sides."""
+    from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
+
+    db_path = tmp_path / "runs.db"
+    _write_excel_offers(
+        db_path,
+        [
+            _offer(1, public_price=80.0, discount_percent=9.0),
+            _offer(2, public_price=125.0, discount_percent=20.0),
+        ],
+    )
+    stores = [
+        {
+            "storeProductId": "low-discount-tawreed",
+            "availableQuantity": 10,
+            "retailPrice": 80.0,
+            "salePrice": 80.0,
+            "discountPercent": 0.0,
+        },
+        {
+            "storeProductId": "eligible",
+            "availableQuantity": 10,
+            "retailPrice": 105.0,
+            "salePrice": 105.0,
+            "discountPercent": 20.0,
+        },
+    ]
+
+    decision = ExcelTargetCartGate(db_path).evaluate_candidates(
+        RUN_KEY, ITEM, stores, min_discount_percent=10.0
+    )
+
+    assert decision.blocked is True
+    assert decision.excel_purchase_price == 100.0
+
+
+def test_single_candidate_gate_uses_saved_excel_discount_floor(tmp_path: Path) -> None:
+    from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
+
+    db_path = tmp_path / "runs.db"
+    _write_excel_offers(
+        db_path,
+        [
+            _offer(1, public_price=80.0, discount_percent=9.0),
+            _offer(2, public_price=140.0, discount_percent=20.0),
+        ],
+        min_discount_pct=10.0,
+    )
+
+    decision = ExcelTargetCartGate(db_path).evaluate(
+        RUN_KEY, ITEM, _tawreed_store(100.0)
+    )
+
+    assert decision.blocked is False
+    assert decision.excel_purchase_price == 112.0
 
 
 def test_blocks_when_excel_purchase_price_is_lower_or_equal(tmp_path: Path) -> None:
@@ -97,6 +161,39 @@ def test_allows_when_excel_purchase_price_is_higher(tmp_path: Path) -> None:
     assert decision.blocked is False
     assert decision.excel_purchase_price == 101.0
     assert decision.reason == ""
+
+
+def test_blocks_when_excel_is_less_than_quarter_egp_more_expensive(
+    tmp_path: Path,
+) -> None:
+    """A sub-quarter-EGP Excel premium still diverts the item from Tawreed."""
+    from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
+
+    db_path = tmp_path / "runs.db"
+    _write_excel_offers(db_path, [_offer(1, public_price=100.24)])
+
+    decision = ExcelTargetCartGate(db_path).evaluate(
+        RUN_KEY, ITEM, _tawreed_store(100.0)
+    )
+
+    assert decision.blocked is True
+    assert "within 0.25 EGP" in decision.reason
+
+
+def test_does_not_block_when_excel_is_exactly_quarter_egp_more_expensive(
+    tmp_path: Path,
+) -> None:
+    """The configured threshold is strictly below 0.25 EGP."""
+    from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
+
+    db_path = tmp_path / "runs.db"
+    _write_excel_offers(db_path, [_offer(1, public_price=100.25)])
+
+    decision = ExcelTargetCartGate(db_path).evaluate(
+        RUN_KEY, ITEM, _tawreed_store(100.0)
+    )
+
+    assert decision.blocked is False
 
 
 def test_uses_lowest_resolved_excel_purchase_price_and_ignores_raw_public_price(

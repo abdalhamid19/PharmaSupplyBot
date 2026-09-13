@@ -61,8 +61,8 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
         self.assertEqual(choice.discount_percent, 25.0)
         self.assertEqual(choice.store["storeName"], "Store A")
 
-    def test_max_discount_rejects_when_highest_below_minimum(self):
-        """When highest discount < min_discount_percent, reject item."""
+    def test_max_discount_mode_filters_tawreed_below_configured_floor(self):
+        """Tawreed stores below the configured floor are not eligible."""
         stores_low_discount = [
             {
                 "storeProductId": 1,
@@ -78,15 +78,13 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
             },
         ]
         
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaisesRegex(RuntimeError, "discount tier 30%"):
             choose_next_store_for_remaining_quantity(
                 stores_low_discount,
                 mode="max_discount",
                 skip_exception_cls=RuntimeError,
-                min_discount_percent=12.0,
+                min_discount_percent=30.0,
             )
-        
-        self.assertIn("minimum discount", str(ctx.exception))
 
     def test_max_discount_accepts_when_highest_meets_minimum(self):
         """When highest discount >= min_discount_percent, accept."""
@@ -106,8 +104,8 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
         self.assertEqual(choices[0].discount_percent, 25.0)
         self.assertEqual(choices[1].discount_percent, 15.0)
 
-    def test_effective_min_discount_escalates_in_max_discount_mode(self):
-        """In max_discount mode with selections, min escalates."""
+    def test_configured_floor_applies_before_max_discount_continuation(self):
+        """The run floor applies initially, then max mode preserves its tier."""
         bot = SimpleNamespace(
             config=SimpleNamespace(
                 warehouse_strategy={
@@ -117,15 +115,15 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
             )
         )
         
-        # No selections yet
+        # The configured floor applies before selecting any Tawreed offer.
         self.assertEqual(_effective_min_discount(bot, []), 10.0)
         
         # With selection of 25%
         sels = [({"discountPercent": 25.0}, 5)]
         self.assertEqual(_effective_min_discount(bot, sels), 25.0)
 
-    def test_effective_min_discount_no_escalation_in_other_modes(self):
-        """In first_available mode, no escalation."""
+    def test_configured_floor_applies_in_first_available_mode(self):
+        """All selection modes receive the configured Tawreed floor."""
         bot = SimpleNamespace(
             config=SimpleNamespace(
                 warehouse_strategy={
@@ -138,9 +136,10 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
         sels = [({"discountPercent": 25.0}, 5)]
         self.assertEqual(_effective_min_discount(bot, sels), 10.0)
 
-    def test_single_store_rejects_below_min_discount(self):
-        """Single-store products should reject if discount < min_discount_percent."""
+    def test_single_tawreed_store_below_floor_is_rejected_before_cart_or_recording(self):
+        """A single-store Tawreed offer must pass the floor before any side effect."""
         from src.tawreed.products.tawreed_products_flow import _click_cart
+        from unittest.mock import patch
         
         bot = SimpleNamespace(
             config=SimpleNamespace(
@@ -156,15 +155,22 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
             data={"discountPercent": 27.0, "storeName": "Test Store"}
         )
         
-        # Should raise skip_item_exception
-        with self.assertRaises(RuntimeError) as ctx:
-            _click_cart(bot, None, None, match)
-        
-        self.assertIn("27", str(ctx.exception))
-        self.assertIn("30", str(ctx.exception))
+        with patch("src.tawreed.products.tawreed_products_flow.record_single_store") as record, \
+                patch("src.tawreed.products.tawreed_products_flow._record_search_row_as_store") as snapshot, \
+                patch("src.tawreed.products.tawreed_products_flow.wait_for_row_to_settle") as wait, \
+                patch("src.tawreed.products.tawreed_products_flow.cart_button") as button:
+            with self.assertRaisesRegex(RuntimeError, "below the configured minimum"):
+                _click_cart(bot, object(), None, match)
+        record.assert_not_called()
+        snapshot.assert_not_called()
+        wait.assert_not_called()
+        button.assert_not_called()
 
-    def test_max_discount_rejects_item_before_selection(self):
-        """Test that items are rejected when max discount is below minimum before any selection."""
+    def test_max_discount_with_no_eligible_tawreed_offer_is_skipped(self):
+        """Max-discount mode skips when every Tawreed offer misses the floor."""
+        from src.tawreed.api.tawreed_api_flow_multistore import (
+            _validate_max_discount_if_needed,
+        )
         stores_below_minimum = [
             {
                 "storeProductId": 1,
@@ -180,13 +186,23 @@ class TestMaxDiscountWithMinimum(unittest.TestCase):
             },
         ]
         
-        # This simulates the scenario where highest discount (27%) < min_discount_percent (30%)
-        max_discount = _find_max_discount(stores_below_minimum)
-        self.assertEqual(max_discount, 27.0)
-        
-        # The logic should reject this item because 27% < 30%
-        min_discount = 30.0
-        self.assertLess(max_discount, min_discount - 0.001)
+        bot = SimpleNamespace(
+            config=SimpleNamespace(
+                warehouse_strategy={"min_discount_percent": 30.0}
+            ),
+            skip_item_exception=RuntimeError,
+        )
+        self.assertEqual(
+            _validate_max_discount_if_needed(bot, "max_discount", stores_below_minimum),
+            27.0,
+        )
+        with self.assertRaisesRegex(RuntimeError, "discount tier 30%"):
+            choose_next_store_for_remaining_quantity(
+                stores_below_minimum,
+                mode="max_discount",
+                skip_exception_cls=RuntimeError,
+                min_discount_percent=_effective_min_discount(bot, []),
+            )
 
 
 if __name__ == "__main__":

@@ -12,16 +12,19 @@ def record_match_only_store_metadata(
     bot, page, match: SearchMatch, active_query: str | None
 ) -> None:
     """Record the store that match-only would choose without touching the cart."""
+    from .tawreed_products_flow import _require_min_discount
     from ..store.tawreed_store_summary import record_single_store
     from ..store.tawreed_store_match_only import (
         record_match_only_choice,
         record_single_store_match_only_choice,
     )
 
-    record_single_store(bot, match.data)
     if int(match.data.get("productsCount") or 0) <= 0:
+        _require_min_discount(bot, match.data)
+        record_single_store(bot, match.data)
         record_single_store_match_only_choice(bot, match.data)
         return
+    record_single_store(bot, match.data)
     _record_multi_store_metadata(bot, page, match, active_query)
 
 
@@ -32,6 +35,13 @@ def _record_multi_store_metadata(bot, page, match, active_query) -> None:
 
     try:
         choice = match_only_store_choice(bot, page, match, active_query)
+    except bot.skip_item_exception as error:
+        # Keep the legacy non-fatal behavior for an empty/out-of-stock dialog,
+        # while propagating a configured discount-floor violation.
+        if "minimum discount" in str(error):
+            raise
+        logger.debug("products.match_only_metadata: no selectable store", exc_info=True)
+        return
     except Exception:
         logger.debug("products.match_only_metadata: write failed (non-fatal)")
         return

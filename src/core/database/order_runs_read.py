@@ -20,7 +20,10 @@ from .order_runs_read_sql import (
     LIST_RUNS,
     MISSED_DISCOUNT,
     QUERY_COLUMNS,
+    RUN_ACTUAL_BASKET,
+    RUN_DEFERRED_EXCEL,
     RUN_FACTS,
+    RUN_MATCH_ONLY_SIMULATION,
     RUN_STORE_ROW_COUNT,
 )
 
@@ -59,6 +62,28 @@ def fetch_run_items(run_key: str, db=None) -> list[dict[str, Any]]:
     """Return per-item facts for one run, joined to the item dimension."""
     rows = order_runs_connection(db).execute_query(RUN_FACTS, (run_key,))
     return _rows_as_dicts(rows, QUERY_COLUMNS["items"])
+
+
+def fetch_run_actual_basket(run_key: str, db=None) -> list[dict[str, Any]]:
+    """Return only Tawreed store rows with quantity actually ordered."""
+    rows = order_runs_connection(db).execute_query(RUN_ACTUAL_BASKET, (run_key,))
+    return _rows_as_dicts(rows, QUERY_COLUMNS["actual_basket"])
+
+
+def fetch_run_deferred_excel(run_key: str, db=None) -> list[dict[str, Any]]:
+    """Return items deliberately deferred to Excel Target."""
+    rows = order_runs_connection(db).execute_query(RUN_DEFERRED_EXCEL, (run_key,))
+    return _rows_as_dicts(rows, QUERY_COLUMNS["deferred_excel"])
+
+
+def fetch_run_match_only_simulation(
+    run_key: str, db=None
+) -> list[dict[str, Any]]:
+    """Return saved offers and run facts needed to simulate a match-only order."""
+    rows = order_runs_connection(db).execute_query(
+        RUN_MATCH_ONLY_SIMULATION, (run_key,)
+    )
+    return _rows_as_dicts(rows, QUERY_COLUMNS["match_only_simulation"])
 
 
 def fetch_item_stores(

@@ -10,7 +10,7 @@ Such handlers silently hide failures from the operator.
 
 | Metric | Count |
 |--------|------:|
-| Swallowed `except Exception` handlers in `src/` | 10 |
+| Swallowed `except Exception` handlers in `src/` | 11 |
 | Files in allowlist (intentional) | 5 |
 
 ## Per-file breakdown
@@ -20,19 +20,21 @@ Such handlers silently hide failures from the operator.
 | `src\core\normalization\translation.py` | 7 |
 | `src\ui\order\streamlit_order_command.py` | 2 |
 | `src\core\database\order_runs_store.py` | 1 |
+| `src\core\excel_target\approved_correction_analysis.py` | 1 |
 
 ## All occurrences
 
 | File:Line | Function | Snippet |
 |-----------|----------|---------|
 | `src\core\database\order_runs_store.py:86` | `_read_schema_version` | `except Exception:` |
-| `src\core\normalization\translation.py:484` | `normalize_key_for_lru` | `except Exception:` |
-| `src\core\normalization\translation.py:520` | `ar_to_en_cached_only` | `except Exception:` |
-| `src\core\normalization\translation.py:553` | `ar_to_en_many_cached_only` | `except Exception:` |
-| `src\core\normalization\translation.py:462` | `_lru_translate` | `except Exception:` |
-| `src\core\normalization\translation.py:470` | `_lru_translate` | `except Exception:` |
-| `src\core\normalization\translation.py:593` | `ar_to_en_many` | `except Exception:` |
-| `src\core\normalization\translation.py:627` | `ar_to_en_many` | `except Exception:` |
+| `src\core\excel_target\approved_correction_analysis.py:332` | `_build_approval_disabled_matcher` | `except Exception:` |
+| `src\core\normalization\translation.py:503` | `normalize_key_for_lru` | `except Exception:` |
+| `src\core\normalization\translation.py:539` | `ar_to_en_cached_only` | `except Exception:` |
+| `src\core\normalization\translation.py:572` | `ar_to_en_many_cached_only` | `except Exception:` |
+| `src\core\normalization\translation.py:481` | `_lru_translate` | `except Exception:` |
+| `src\core\normalization\translation.py:489` | `_lru_translate` | `except Exception:` |
+| `src\core\normalization\translation.py:612` | `ar_to_en_many` | `except Exception:` |
+| `src\core\normalization\translation.py:646` | `ar_to_en_many` | `except Exception:` |
 | `src\ui\order\streamlit_order_command.py:157` | `_configured_profiles` | `except Exception:` |
 | `src\ui\order\streamlit_order_command.py:161` | `_configured_profiles` | `except Exception:` |
 

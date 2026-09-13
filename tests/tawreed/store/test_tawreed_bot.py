@@ -200,9 +200,9 @@ class TawreedBotTests(unittest.TestCase):
         self.assertEqual(summary.status, "matched-only")
         self.assertEqual(summary.ordered_total_qty, 0)
 
-    def test_match_only_records_selected_max_discount_store_metadata(self) -> None:
+    def test_match_only_records_selected_lowest_price_store_metadata(self) -> None:
         bot = self._bot()
-        bot.config.warehouse_strategy["mode"] = "max_discount"
+        bot.config.warehouse_strategy["mode"] = "lowest_purchase_price"
         item = Item(code="46883", name="ZINC OLIVE CREAM 75 GM", qty=1)
         page: Any = _FakePage("https://seller.tawreed.io/#/catalog/store-products/dv/")
         match = SearchMatch(
@@ -492,6 +492,16 @@ class TawreedBotTests(unittest.TestCase):
         self.assertEqual(
             bot._skip_status("Local matching requires manual review"),
             "manual-review-required",
+        )
+
+    def test_excel_target_deferral_has_explicit_status(self) -> None:
+        bot = self._bot()
+
+        self.assertEqual(
+            bot._skip_status(
+                "Excel Target deferred_to_excel_target: purchase price wins"
+            ),
+            "deferred-to-excel-target",
         )
 
     def test_auth_does_not_replace_existing_state_when_validation_fails(self) -> None:

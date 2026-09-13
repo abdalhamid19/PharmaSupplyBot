@@ -14,10 +14,21 @@ from .tawreed_api_client import TawreedApiClient
 logger = logging.getLogger(__name__)
 
 
-def _raise_if_excel_target_cart_blocked(bot, item: Item, tawreed_store: dict) -> None:
-    """Stop a real API cart mutation when Excel Target is cheaper or equal."""
+def _raise_if_excel_target_cart_blocked(
+    bot,
+    item: Item,
+    tawreed_store: dict | None = None,
+    *,
+    tawreed_stores: list[dict] | None = None,
+) -> None:
+    """Stop a real API cart mutation when Excel Target wins the policy."""
     if getattr(bot, "match_only", False):
         return
+
+    if tawreed_store is not None:
+        from ..products.tawreed_products_flow import _require_min_discount
+
+        _require_min_discount(bot, tawreed_store)
 
     from ..store.tawreed_store_run_payload import excel_target_cart_gate_run_key
 
@@ -35,9 +46,22 @@ def _raise_if_excel_target_cart_blocked(bot, item: Item, tawreed_store: dict) ->
         if database is not None and not getattr(database, "order_runs_enabled", True):
             return
         db_path = getattr(database, "order_runs_path", "") or None
-    decision = ExcelTargetCartGate(db_path).evaluate(run_key, item, tawreed_store)
+    gate = ExcelTargetCartGate(db_path)
+    if tawreed_stores is not None:
+        from ..products.tawreed_products_flow import _min_disc
+
+        decision = gate.evaluate_candidates(
+            run_key,
+            item,
+            tawreed_stores,
+            min_discount_percent=_min_disc(bot),
+        )
+    else:
+        decision = gate.evaluate(run_key, item, tawreed_store or {})
     if decision.blocked:
-        raise bot.skip_item_exception(decision.reason)
+        raise bot.skip_item_exception(
+            f"Excel Target deferred_to_excel_target: {decision.reason}"
+        )
 
 
 def _add_api_order_items(bot, api: TawreedApiClient, items: Iterable[Item]) -> bool:
@@ -95,22 +119,12 @@ def _record_single_store_item(bot, match, item) -> None:
 def _add_single_item_to_cart(bot, api, match, item, record_timing):
     """Execute add-to-cart API call and record timing."""
     from src.core.matching.candidate_identity import candidate_has_store_product_id
-    from ..products.tawreed_products_flow import _min_disc
-    from ..store.tawreed_pricing import discount_value_as_percent, first_discount_value
 
     if not candidate_has_store_product_id(match.data):
         raise bot.skip_item_exception(
             f"Matched product is not orderable (missing storeProductId) "
             f"for '{item.name}'."
         )
-
-    min_discount = _min_disc(bot)
-    if min_discount > 0:
-        store_discount = discount_value_as_percent(first_discount_value(match.data))
-        if store_discount < min_discount - 0.001:
-            raise bot.skip_item_exception(
-                f"Store discount ({store_discount:g}%) is below minimum ({min_discount:g}%)."
-            )
 
     _raise_if_excel_target_cart_blocked(bot, item, match.data)
     cart_start = time.perf_counter()

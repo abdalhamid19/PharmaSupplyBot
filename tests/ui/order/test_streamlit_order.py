@@ -28,7 +28,7 @@ class _FakeUpload:
 
 
 class StreamlitOrderTests(unittest.TestCase):
-    def test_order_command_adds_highest_discount_override(self) -> None:
+    def test_order_command_ignores_removed_highest_discount_override(self) -> None:
         command = order_command(
             Path("config.yaml"),
             {
@@ -41,8 +41,27 @@ class StreamlitOrderTests(unittest.TestCase):
             Path("data/input/order_items/ddd.xlsx"),
         )
 
-        self.assertIn("--warehouse-mode", command)
-        self.assertEqual(command[command.index("--warehouse-mode") + 1], "max_discount")
+        self.assertNotIn("--warehouse-mode", command)
+
+    def test_order_command_does_not_emit_removed_warehouse_mode(self) -> None:
+        command = order_command(
+            Path("config.yaml"),
+            {
+                "limit": 5,
+                "profile_mode": "Single profile",
+                "profile_key": "wardany",
+                "debug_browser": False,
+                "resume": False,
+                "match_only": False,
+                "execution_mode": "auto",
+                "warehouse_mode": "first_available",
+                "highest_discount": False,
+                "min_discount_percent": 0,
+            },
+            Path("data/input/order_items/ddd.xlsx"),
+        )
+
+        assert "--warehouse-mode" not in command
 
     def test_order_command_adds_min_discount_override(self) -> None:
         command = order_command(

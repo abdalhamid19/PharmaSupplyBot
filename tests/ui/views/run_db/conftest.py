@@ -43,6 +43,7 @@ def run_row(**overrides: Any) -> dict[str, Any]:
         "total_items": 3, "items": 3, "matched": 0, "flagged": 0,
         "added_to_cart": 0, "total_ordered": 0, "store_count": 0,
         "not_orderable": 0,
+        "deferred_to_excel": 0,
     }
     row.update(overrides)
     return row
@@ -79,6 +80,8 @@ with patch('src.ui.views.run_db.streamlit_run_db_page.fetch_runs', return_value=
      patch('src.ui.views.run_db.streamlit_run_db_page.database_is_ready', return_value=True), \\
      patch('src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_winners', return_value=[]), \\
      patch('src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_exclusions', return_value=[]), \\
+     patch('src.ui.views.run_db.streamlit_actual_basket.fetch_run_actual_basket', return_value=[]), \\
+     patch('src.ui.views.run_db.streamlit_actual_basket.fetch_run_deferred_excel', return_value=[]), \\
      patch('src.core.database.order_runs_read.run_store_row_count', return_value=STORE_ROW_COUNT), \\
      patch('src.ui.views.run_db.streamlit_run_tables.fetch_item_stores', return_value=ITEM_STORES), \\
      patch('src.ui.views.run_db.streamlit_missed_discount.fetch_missed_discounts', return_value=MISSED_DISCOUNTS), \\
@@ -135,6 +138,10 @@ def build_app_test(
         patch("src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_winners",
               return_value=[]),
         patch("src.ui.views.run_db.streamlit_warehouse_winners.fetch_run_warehouse_exclusions",
+              return_value=[]),
+        patch("src.ui.views.run_db.streamlit_actual_basket.fetch_run_actual_basket",
+              return_value=[]),
+        patch("src.ui.views.run_db.streamlit_actual_basket.fetch_run_deferred_excel",
               return_value=[]),
         patch("src.core.database.order_runs_read.run_store_row_count",
               return_value=store_row_count),

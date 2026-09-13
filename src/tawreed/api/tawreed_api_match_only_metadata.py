@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 def record_api_match_only_store_metadata(bot, api, match) -> None:
     """Record the API store that match-only would choose without adding to cart."""
+    from ..products.tawreed_products_flow import _require_min_discount
     from ..store.tawreed_store_summary import record_single_store
     from ..store.tawreed_store_match_only import (
         record_match_only_choice,
@@ -15,12 +16,14 @@ def record_api_match_only_store_metadata(bot, api, match) -> None:
     )
 
     data = getattr(match, "data", {})
-    record_single_store(bot, data)
     if not _can_fetch_store_details(data):
+        _require_min_discount(bot, data)
+        record_single_store(bot, data)
         # Search rows with productsCount > 0 but no productId have their only
         # store embedded in the row itself (same rule the order flow uses).
         record_single_store_match_only_choice(bot, data)
         return
+    record_single_store(bot, data)
     _record_api_multi_store_metadata(bot, api, data)
 
 
@@ -43,6 +46,14 @@ def _record_api_multi_store_metadata(bot, api, data) -> None:
 
     try:
         choice = api_match_only_store_choice(bot, api, data)
+    except bot.skip_item_exception as error:
+        # A missing/empty store-details payload is a non-fatal metadata gap,
+        # as it was before the discount-floor check. A real discount-floor
+        # failure must still propagate so an ineligible match is not recorded.
+        if "minimum discount" in str(error):
+            raise
+        logger.debug("api.match_only_metadata: no selectable store", exc_info=True)
+        return
     except Exception:
         logger.debug("api.match_only_metadata: write failed (non-fatal)")
         return

@@ -57,8 +57,9 @@ CREATE INDEX IF NOT EXISTS idx_runs_profile ON runs(profile_key, run_id);
 `command/profile` فقط.
 
 **لماذا تُخزَّن إعدادات الـ run؟** لأن أي مقارنة بين runين بلا معرفة
-`warehouse_mode` و`min_discount_pct` مقارنة بلا معنى: انخفاض الأسعار قد
-يكون تغيّراً في السوق أو تغيّراً في `--warehouse-mode`.
+`warehouse_mode` و`min_discount_pct` ضروريان لفهم نتيجة التشغيل. كل تشغيل
+جديد يسجل سياسة `lowest_purchase_price`، بينما قد تحمل السجلات القديمة قيمة
+تاريخية من سياسة سابقة.
 
 ### 2. `items` — بُعد الأصناف المطلوبة
 

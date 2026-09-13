@@ -110,7 +110,7 @@ py run.py remove-cart --profile wardany --excel data/input/items.xlsx --limit 30
 
 ### Excel target cart gate
 
-During a real order run, a Tawreed item is not added to the cart when any accepted Excel target has a purchase price less than or equal to Tawreed's selected purchase price. The comparison is inclusive (`excel_price <= tawreed_price`) and is applied before any cart mutation, including multi-store runs. `--match-only` keeps its existing behavior and never performs the cart gate.
+During a real order run, a Tawreed item is not added to the cart when any accepted Excel target has a purchase price lower than Tawreed's selected purchase price or less than 0.25 EGP above it. The comparison (`excel_price < tawreed_price + 0.25`) is applied before any cart mutation, including multi-store runs. A difference of exactly 0.25 EGP does not block. `--match-only` keeps its existing behavior and never performs the cart gate.
 
 Blank or invalid Excel target prices are treated as unavailable; a valid numeric zero remains a real price.
 

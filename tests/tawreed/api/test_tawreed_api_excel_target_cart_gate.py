@@ -111,16 +111,65 @@ def test_api_single_store_does_not_add_when_excel_price_is_equal(
         flow.ExcelTargetCartGate,
         "evaluate",
         lambda self, run_key, item, store: CartGateDecision(
-            True, 100.0, "Excel Target purchase price 100.00 <= Tawreed purchase price 100.00"
+            True,
+            100.0,
+            "Excel Target purchase price 100.00 is lower than or within 0.25 EGP of Tawreed purchase price 100.00",
         ),
     )
     bot = _bot(tmp_path)
     api = MagicMock()
     match = SimpleNamespace(data=_store(100.0))
 
-    with pytest.raises(_SkipItem, match="Excel Target"):
+    with pytest.raises(_SkipItem, match="deferred_to_excel_target"):
         _add_single_item_to_cart(
             bot, api, match, Item(code="1", name="PANADOL", qty=1), lambda *_a: None
+        )
+
+    api.add_to_cart.assert_not_called()
+
+
+def test_api_single_store_below_configured_discount_floor_is_not_added(
+    tmp_path: Path,
+) -> None:
+    """Reject an ineligible Tawreed offer even when the price gate is inactive."""
+    bot = _bot(tmp_path)
+    bot.config.warehouse_strategy["min_discount_percent"] = 10.0
+    api = MagicMock()
+
+    with pytest.raises(_SkipItem, match="below the configured minimum"):
+        _add_single_item_to_cart(
+            bot,
+            api,
+            SimpleNamespace(data=_store(100.0)),
+            Item(code="1", name="PANADOL", qty=1),
+            lambda *_a: None,
+        )
+
+    api.add_to_cart.assert_not_called()
+
+
+def test_api_lowest_price_skips_when_all_tawreed_offers_miss_floor(
+    tmp_path: Path,
+) -> None:
+    """Lowest-price mode must not add a below-floor store."""
+    bot = _bot(tmp_path)
+    bot.config.warehouse_strategy.update(
+        mode="lowest_purchase_price", min_discount_percent=10.0
+    )
+    api = MagicMock()
+    store_rows = [
+        {**_store(100.0, "store-1"), "discountPercent": 8.0},
+        {**_store(101.0, "store-2"), "discountPercent": 9.0},
+    ]
+
+    with pytest.raises(_SkipItem, match="out of stock or unpriced"):
+        _select_stores_and_add_to_cart(
+            bot,
+            api,
+            Item(code="1", name="PANADOL", qty=1),
+            store_rows,
+            [],
+            lambda *_a: None,
         )
 
     api.add_to_cart.assert_not_called()
@@ -129,22 +178,22 @@ def test_api_single_store_does_not_add_when_excel_price_is_equal(
 def test_api_multistore_preflights_all_choices_before_any_add(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A blocked later store prevents an earlier store from being added."""
+    """A blocked item is rejected before any store allocation is added."""
     from src.tawreed.api import tawreed_api_flow_cart as cart_flow
 
     monkeypatch.setattr(
         "src.tawreed.store.tawreed_store_run_payload.active_order_run_key",
         lambda: "wardany/run-1",
     )
-    calls: list[str] = []
+    calls: list[int] = []
 
-    def evaluate(_self, _run_key, _item, store):
-        calls.append(store["storeProductId"])
-        if store["storeProductId"] == "store-2":
-            return CartGateDecision(True, 90.0, "Excel Target price wins")
-        return CartGateDecision(False, 110.0, "")
+    def evaluate_candidates(_self, _run_key, _item, stores, **_kwargs):
+        calls.append(len(stores))
+        return CartGateDecision(True, 90.0, "Excel Target price wins")
 
-    monkeypatch.setattr(cart_flow.ExcelTargetCartGate, "evaluate", evaluate)
+    monkeypatch.setattr(
+        cart_flow.ExcelTargetCartGate, "evaluate_candidates", evaluate_candidates
+    )
     bot = _bot(tmp_path)
     api = MagicMock()
     item = Item(code="1", name="PANADOL", qty=15)
@@ -156,11 +205,9 @@ def test_api_multistore_preflights_all_choices_before_any_add(
             api,
             item,
             store_rows,
-            "first_available",
-            None,
             [],
             lambda *_a: None,
         )
 
-    assert calls == ["store-1", "store-2"]
+    assert calls == [2]
     api.add_to_cart.assert_not_called()

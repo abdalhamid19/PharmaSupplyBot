@@ -19,10 +19,14 @@ def _download(rows: list[dict]) -> bytes:
 
 def render_warehouse_winners(run_key: str) -> None:
     """Show all winners before the existing, independently filtered details."""
+    st.caption(
+        "Price comparison only: this section is not the actual Tawreed basket. "
+        "Use the actual basket section above for successful additions."
+    )
     st.subheader("الأصناف الفائزة بأقل سعر شراء حسب المخزن")
     st.caption(
         "مقارنة العروض المتاحة المحفوظة في هذا التشغيل؛ كل صنف يظهر لدى مخزن واحد. "
-        "العملة غير المحددة تُعامل كجنيه مصري."
+        "العملة المعتمدة لجميع العروض هي الجنيه المصري."
     )
     st.caption("كمية Excel قد تكون علامة توافر بقيمة 1 وليست رصيد مخزون فعليًا.")
     rows = fetch_run_warehouse_winners(run_key)
@@ -36,14 +40,11 @@ def render_warehouse_winners(run_key: str) -> None:
 
 def _render_exclusions(run_key: str) -> None:
     excluded = fetch_run_warehouse_exclusions(run_key)
-    mixed = [row["item_name"] or row["item_code"] for row in excluded
-             if row["selection_reason"] == "mixed_currencies"]
-    if mixed:
-        st.warning("استُبعدت أصناف لاختلاف عملات عروضها: " + "، ".join(mixed))
-    unavailable = len(excluded) - len(mixed)
-    if unavailable:
-        st.caption(f"عدد الأصناف دون عرض متاح بسعر شراء صالح محفوظ: {unavailable}")
-
+    if excluded:
+        st.caption(
+            f"عدد الأصناف التي لا يوجد لها عرض متاح يحقق شروط السعر والخصم "
+            f"المحفوظة: {len(excluded)}"
+        )
 
 def _render_download(run_key: str, rows: list[dict]) -> None:
     st.download_button(

@@ -6,11 +6,13 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 from src.cli.commands.cli_order_run_record import (
     active_run_key,
     order_run_options,
 )
+from src.cli.commands.cli_order_excel_target import _ensure_run_record
 from src.core.artifact_run import artifact_run
 from src.core.config.config_models import (
     AppConfig,
@@ -20,6 +22,7 @@ from src.core.config.config_models import (
     ProfileConfig,
     RuntimeConfig,
 )
+from src.core.database.order_runs_store import OrderRunsStore
 
 
 def _app_config(**overrides) -> AppConfig:
@@ -68,13 +71,13 @@ class OrderRunOptionsTests(unittest.TestCase):
     def test_records_warehouse_strategy_from_config(self) -> None:
         """Price comparisons are meaningless without the selection strategy."""
         options = self._options()
-        self.assertEqual(options["warehouse_mode"], "max_discount")
+        self.assertEqual(options["warehouse_mode"], "lowest_purchase_price")
         self.assertAlmostEqual(float(options["min_discount_pct"]), 15.0)
 
     def test_cli_override_wins_over_config(self) -> None:
         """--warehouse-mode must be reflected, not the stale config value."""
         options = self._options(warehouse_mode="first_available", min_discount_percent=0)
-        self.assertEqual(options["warehouse_mode"], "first_available")
+        self.assertEqual(options["warehouse_mode"], "lowest_purchase_price")
         self.assertAlmostEqual(float(options["min_discount_pct"]), 0.0)
 
     def test_mode_reflects_match_only(self) -> None:
@@ -97,6 +100,26 @@ class OrderRunOptionsTests(unittest.TestCase):
     def test_cli_item_workers_override_wins(self) -> None:
         """--item-workers is resolved the same way the runner resolves it."""
         self.assertEqual(self._options(item_workers=2)["item_workers"], 2)
+
+    def test_excel_target_only_run_persists_configured_discount_floor(self) -> None:
+        with TemporaryDirectory() as temp:
+            db_path = Path(temp) / "order-runs.db"
+            config = _app_config(
+                database=DatabaseConfig(order_runs_path=str(db_path))
+            )
+            run = SimpleNamespace(
+                run_id="target-only", directory=Path(temp) / "artifacts"
+            )
+
+            _ensure_run_record(config, "wardany/target-only", run, "baraka")
+            store = OrderRunsStore(db_path)
+            rows = store.db.execute_query(
+                "select min_discount_pct from runs where run_key=?",
+                ("wardany/target-only",),
+            )
+            store.db.close()
+
+        self.assertAlmostEqual(float(rows[0][0]), 15.0)
 
 
 if __name__ == "__main__":

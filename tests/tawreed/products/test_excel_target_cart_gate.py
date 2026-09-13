@@ -24,7 +24,9 @@ def _bot() -> SimpleNamespace:
     return SimpleNamespace(
         config=SimpleNamespace(
             runtime=SimpleNamespace(timeout_ms=5000),
-            warehouse_strategy={"mode": "first_available"},
+            warehouse_strategy={"mode": "lowest_purchase_price"},
+            excel_target_cart_gate_run_key="wardany/run-1",
+            database=SimpleNamespace(order_runs_enabled=True, order_runs_path=""),
         ),
         skip_item_exception=RuntimeError,
         last_ordered_total_qty=0,
@@ -48,7 +50,11 @@ def _match() -> SearchMatch:
 
 def test_single_store_does_not_open_cart_when_excel_target_is_cheaper() -> None:
     bot = _bot()
-    decision = CartGateDecision(True, 90.0, "Excel Target purchase price 90.00 <= Tawreed purchase price 100.00")
+    decision = CartGateDecision(
+        True,
+        90.0,
+        "Excel Target purchase price 90.00 is lower than or within 0.25 EGP of Tawreed purchase price 100.00",
+    )
 
     with (
         patch(
@@ -64,7 +70,7 @@ def test_single_store_does_not_open_cart_when_excel_target_is_cheaper() -> None:
             "src.tawreed.products.tawreed_products_flow._record_single_store_selection"
         ),
     ):
-        with pytest.raises(RuntimeError, match="Excel Target"):
+        with pytest.raises(RuntimeError, match="deferred_to_excel_target"):
             open_add_to_cart_for_match(bot, Mock(), Mock(), ITEM, _match())
 
     click_cart.assert_not_called()
@@ -88,7 +94,9 @@ def test_multi_store_preflights_all_selected_stores_before_first_quantity_dialog
         },
     ]
     decision = CartGateDecision(
-        True, 90.0, "Excel Target purchase price 90.00 <= Tawreed purchase price 100.00"
+        True,
+        90.0,
+        "Excel Target purchase price 90.00 is lower than or within 0.25 EGP of Tawreed purchase price 100.00",
     )
     cart_buttons = Mock()
     cart_buttons.nth.return_value = Mock()
@@ -99,8 +107,8 @@ def test_multi_store_preflights_all_selected_stores_before_first_quantity_dialog
             return_value=rows,
         ),
         patch(
-            "src.tawreed.products.tawreed_products_flow.ExcelTargetCartGate.evaluate",
-            side_effect=[CartGateDecision(False, 90.0, ""), decision],
+            "src.tawreed.products.tawreed_products_flow.ExcelTargetCartGate.evaluate_candidates",
+            return_value=decision,
         ),
         patch(
             "src.tawreed.products.tawreed_products_flow.store_dialog_cart_buttons",
@@ -136,7 +144,7 @@ def test_legacy_selector_flow_skips_when_excel_target_has_a_priced_offer() -> No
         "src.tawreed.order.tawreed_order_processing.ExcelTargetCartGate.evaluate",
         return_value=decision,
     ):
-        with pytest.raises(RuntimeError, match="Cannot compare legacy Tawreed price"):
+        with pytest.raises(RuntimeError, match="deferred_to_excel_target"):
             processor.add_item_with_configured_flow(page, ITEM)
 
     page.locator.assert_any_call(bot.selectors.item_search_input)

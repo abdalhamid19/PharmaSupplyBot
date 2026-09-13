@@ -79,15 +79,14 @@ login_email=_get(sel, "login", "email_input", default="input[type='email']")
 
 ## Warehouse Strategy
 
-### Modes
-- `first_available`: Select first warehouse with stock
-- `max_available`: Select warehouse with maximum quantity
+### Mode
+- `lowest_purchase_price`: Select the lowest eligible purchase price
 
 ### Store Selection
 When product has multiple stores:
 1. Open stores dialog
-2. Apply warehouse strategy mode
-3. Select appropriate store
+2. Order eligible stores by lowest purchase price
+3. Use preferred warehouses only for exact-price ties
 
 ## Error Handling
 

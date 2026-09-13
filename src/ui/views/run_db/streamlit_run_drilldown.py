@@ -92,4 +92,6 @@ def _kpi_specs(run: dict[str, Any]) -> list[tuple[str, str, int, str]]:
          int(run.get("not_orderable", 0) or 0), ":material/block:"),
         ("ordered", "Ordered qty", int(run.get("total_ordered", 0) or 0),
          ":material/shopping_cart:"),
+        ("deferred_excel", "Deferred to Excel",
+         int(run.get("deferred_to_excel", 0) or 0), ":material/assignment_return:"),
     ]

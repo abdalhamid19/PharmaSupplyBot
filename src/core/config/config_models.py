@@ -7,6 +7,9 @@ from typing import Any
 
 from src.core.errors import ValidationError
 
+
+LOWEST_PURCHASE_PRICE_MODE = "lowest_purchase_price"
+
 @dataclass(frozen=True)
 class ExcelConfig:
     """Excel column names and quantity bounds used to load shortage items."""
@@ -46,7 +49,7 @@ class ExcelTargetConfig:
     header_row: int = 0
     enabled: bool = True
     price_meaning: str = "public_with_discount"
-    # Target-scoped bilingual aliases. Each mapping carries ``en``, ``ar``
+    # Target-scoped bilingual aliases.  Each mapping carries ``en``, ``ar``
     # and a source/reference string; aliases are never shared across targets.
     aliases: tuple[dict[str, str], ...] = ()
     # Identity hints that may surface a row for a human reviewer but must

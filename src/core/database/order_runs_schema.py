@@ -33,6 +33,7 @@ STALE_VIEWS_BY_VERSION = {
     1: ("v_run_summary",),
     2: ("v_run_winners", "v_run_summary"),
     3: ("v_run_summary",),
+    6: ("v_run_summary",),
 }
 
 # Order matters: dimensions before facts so foreign keys resolve, indexes and

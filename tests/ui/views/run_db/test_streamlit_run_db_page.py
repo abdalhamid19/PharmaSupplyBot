@@ -47,14 +47,16 @@ class RunDbTabSmokeTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def _seed(self, store: OrderRunsStore) -> None:
-        """Seed one finished run so the tab has data to render."""
+        """Seed one finished run with a real basket addition."""
         store.open_run(
             run_meta_row("tester", "20260101_1200", "2026-01-01T12:00:00Z")
         )
-        winner = _store_row()
+        selected = _store_row()
         store.upsert_run_item(
-            "tester/20260101_1200", _summary(), stores=[_store_row(), winner],
-            store_selections=[(winner, 0)],
+            "tester/20260101_1200", _summary(),
+            source_kind="tawreed", source_label="tester",
+            store_source="store_details",
+            stores=[selected], store_selections=[(selected, 1)],
         )
         store.finish_run("tester/20260101_1200")
 
@@ -71,36 +73,105 @@ class RunDbTabSmokeTests(unittest.TestCase):
         self._app_test.run()
         self.assertEqual(self._app_test.exception, [])
         warnings = [element.value for element in self._app_test.warning]
-        self.assertTrue(
-            any("order-runs database" in text for text in warnings)
-        )
+        self.assertTrue(any("order-runs database" in text for text in warnings))
 
-    def test_warehouse_table_precedes_existing_items(self) -> None:
+    def test_actual_basket_groups_items_before_existing_diagnostics(self) -> None:
         self._app_test.run()
         self.assertEqual(self._app_test.exception, [])
-        frames = self._app_test.dataframe
-        self.assertEqual(frames[0].value.iloc[0]["سعر الشراء"], 8)
-        self.assertIn("status", frames[1].value.columns)
-        labels = [element.label for element in self._app_test.get("download_button")]
-        self.assertIn("تحميل جميع المخازن", labels)
+        headings = [element.value for element in self._app_test.subheader]
+        self.assertIn("نتيجة الشراء الفعلية", headings)
+        download_labels = [element.label for element in self._app_test.download_button]
+        self.assertIn("تحميل ملفات Excel مستقلة لكل فرع (ZIP)", download_labels)
+
+    def test_match_only_run_shows_hypothetical_warehouse_groups(self) -> None:
+        db_path = Path(os.environ[SEED_DIR_ENV])
+        store = OrderRunsStore(db_path)
+        run_id = "20260101_1201"
+        run_key = f"tester/{run_id}"
+        store.open_run(
+            run_meta_row(
+                "tester", run_id, "2026-01-01T12:02:00Z",
+                mode="match-only", warehouse_mode="first_available",
+            )
+        )
+        tawreed_offer = _store_row()
+        store.upsert_run_item(
+            run_key,
+            {
+                "item_code": "m1", "item_name": "SIMULATED ITEM",
+                "item_qty": 3, "ordered_total_qty": 0,
+                "status": "matched-only", "matched": 1,
+                "manual_review_required": 0,
+            },
+            source_kind="tawreed", source_label="tester",
+            stores=[tawreed_offer], store_source="store_details",
+            store_selections=[(tawreed_offer, 0)],
+        )
+        excel_gate_tawreed = {
+            **_store_row(),
+            "storeProductId": "sp-m2",
+        }
+        store.upsert_run_item(
+            run_key,
+            {
+                "item_code": "m2", "item_name": "EXCEL GATE ITEM",
+                "item_qty": 1, "ordered_total_qty": 0,
+                "status": "matched-only", "matched": 1,
+                "manual_review_required": 0,
+            },
+            source_kind="tawreed", source_label="tester",
+            stores=[excel_gate_tawreed], store_source="store_details",
+            store_selections=[(excel_gate_tawreed, 0)],
+        )
+        excel_gate_offer = {
+            **_store_row(),
+            "storeName": "excel-target:البركة شركات@البركة1209.xlsx",
+            "storeId": "excel:البركة شركات",
+            "storeProductId": "excel-m2",
+            "salePrice": 8.5,
+        }
+        store.upsert_run_item(
+            run_key,
+            {
+                "item_code": "m2", "item_name": "EXCEL GATE ITEM",
+                "item_qty": 1, "ordered_total_qty": 0,
+                "status": "matched-only", "matched": 1,
+                "manual_review_required": 0,
+            },
+            source_kind="excel-target",
+            source_label="البركة شركات@البركة1209.xlsx",
+            stores=[excel_gate_offer], store_source="excel_target",
+            store_selections=[],
+        )
+        store.finish_run(run_key)
+        store.db.close()
+
+        self._app_test.run()
+
+        self.assertEqual(self._app_test.exception, [])
+        headings = [element.value for element in self._app_test.subheader]
+        self.assertIn("محاكاة السلة المحتملة حسب المخزن", headings)
+        self.assertIn("Alpha", headings)
+        excel_heading = "أصناف كانت ستُوجّه إلى Excel Target خارج سلة توريد"
+        self.assertIn(excel_heading, headings)
+        self.assertLess(
+            headings.index(excel_heading), headings.index("نتيجة الشراء الفعلية")
+        )
 
 
 def _project_root() -> str:
-    """Return the repository root the tests run against."""
     return str(Path(__file__).resolve().parents[4])
 
 
 def _summary() -> dict:
-    """Return one order summary row shaped like the live flow provides."""
     return {
         "item_code": "c1", "item_name": "ALFA", "item_qty": 1,
-        "ordered_total_qty": 0, "status": "matched-only",
+        "ordered_total_qty": 1, "status": "added-to-cart",
         "matched": 1, "manual_review_required": 0,
     }
 
 
 def _store_row() -> dict:
-    """Return one Tawreed-shaped offering-store row."""
     return {
         "storeProductId": "sp-a", "storeId": "s:A", "storeName": "Alpha",
         "availableQuantity": 5, "retailPrice": 10.0, "salePrice": 8.0,
@@ -110,4 +181,3 @@ def _store_row() -> dict:
 
 if __name__ == "__main__":
     unittest.main()
-

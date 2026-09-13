@@ -18,6 +18,7 @@ from .order_runs_read_filters_sql import (
     RUN_ITEMS_FLAGGED,
     RUN_ITEMS_MATCHED,
     RUN_ITEMS_NOT_ORDERABLE,
+    RUN_ITEMS_DEFERRED_EXCEL,
     RUN_ITEMS_ORDERED,
 )
 from .order_runs_read_sql import QUERY_COLUMNS
@@ -51,12 +52,22 @@ def fetch_run_items_ordered(run_key: str, db=None) -> list[dict[str, Any]]:
     return _rows_as_dicts(rows, QUERY_COLUMNS["items"])
 
 
+@st.cache_data(ttl="5m", max_entries=32)
+def fetch_run_items_deferred_excel(run_key: str, db=None) -> list[dict[str, Any]]:
+    """Items intentionally deferred to Excel Target."""
+    rows = order_runs_connection(db).execute_query(
+        RUN_ITEMS_DEFERRED_EXCEL, (run_key,)
+    )
+    return _rows_as_dicts(rows, QUERY_COLUMNS["items"])
+
+
 def clear_filter_cache() -> None:
     """Drop every cached filter result (call after a new run is persisted)."""
     fetch_run_items_matched.clear()
     fetch_run_items_flagged.clear()
     fetch_run_items_not_orderable.clear()
     fetch_run_items_ordered.clear()
+    fetch_run_items_deferred_excel.clear()
 
 
 __all__ = [
@@ -65,4 +76,5 @@ __all__ = [
     "fetch_run_items_matched",
     "fetch_run_items_not_orderable",
     "fetch_run_items_ordered",
+    "fetch_run_items_deferred_excel",
 ]

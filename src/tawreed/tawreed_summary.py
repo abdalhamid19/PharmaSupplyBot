@@ -123,6 +123,8 @@ class SummaryStatus:
     def skip_status(self, reason: str) -> str:
         """Return the structured summary status for one skipped item."""
         lowered = reason.lower()
+        if "deferred_to_excel_target" in lowered:
+            return "deferred-to-excel-target"
         if (
             "no matching product found" in lowered
             or "no decisive match found" in lowered

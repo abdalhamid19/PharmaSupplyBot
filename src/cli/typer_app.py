@@ -389,13 +389,9 @@ def order_cmd(
         help="Action for flagged matches: manual-review-only or add-to-cart.",
     ),
     # Filter
-    warehouse_mode: str | None = typer.Option(
-        None, "--warehouse-mode",
-        help="Warehouse selection override: first_available, max_available, max_discount.",
-    ),
     min_discount_percent: float | None = typer.Option(
         None, "--min-discount-percent",
-        help="Only stores with discount ≥ this percent.",
+        help="Apply the minimum discount to Tawreed and Excel Target offers.",
     ),
     sort_by_net: bool = typer.Option(
         False, "--sort-by-net",

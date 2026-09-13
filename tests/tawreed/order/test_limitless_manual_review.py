@@ -1,4 +1,4 @@
-"""Integration coverage for the LIMITLESS variant identity guard."""
+﻿"""Integration coverage for the LIMITLESS variant identity guard."""
 
 from __future__ import annotations
 
@@ -24,6 +24,69 @@ from src.tawreed.order.tawreed_order_summary_build import append_order_item_arti
 
 class LimitlessManualReviewIntegrationTests(TestCase):
     """Exercise the seeded decision through preload/cache and artifact handling."""
+
+    def test_real_legacy_approved_match_cannot_force_baraka_man_candidate(self) -> None:
+        item = Item("92558", "LIMITLESS MILGA MAX 30 TABS", 17)
+        man_candidate = {
+            "storeProductId": "2145610",
+            "productNameEn": "LIMITLESS MAN MAX 30 TABS",
+            "availableQuantity": 39,
+        }
+        with TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "manual-review.sqlite3"
+            store = ManualReviewStore(db_path)
+            store.upsert(
+                ManualReviewDecision(
+                    item.code,
+                    item.name,
+                    True,
+                    man_candidate["storeProductId"],
+                    correct_product_name=man_candidate["productNameEn"],
+                    run_id="20260825_1005",
+                    manual_decision="approved_match",
+                    matching_source="legacy-unknown",
+                    supplier_scope_key="legacy-unknown",
+                )
+            )
+
+            bot = SimpleNamespace(
+                config=SimpleNamespace(matching=MatchingConfig()),
+            )
+            with patch(
+                "src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB",
+                db_path,
+            ):
+                cache = preload_manual_review_decisions([item])
+                cached = cache.lookup(item)
+                self.assertIsNotNone(cached)
+                self.assertEqual(cached.correct_store_product_id, "2145610")
+                with manual_review_cache_context(cache):
+                    decision = _match_decision(
+                        bot,
+                        item,
+                        [(item.name, [man_candidate])],
+                    )
+                self.assertIsNone(decision.best_match)
+                self.assertIn("MILGA", decision.final_reason)
+                self.assertIn("MAN", decision.final_reason)
+
+                deleted = store.delete_exact(
+                    item_code=item.code,
+                    item_name=item.name,
+                    matching_source="legacy-unknown",
+                    supplier_scope_key="legacy-unknown",
+                    expected_store_product_id="2145610",
+                    expected_product_name="LIMITLESS MAN MAX 30 TABS",
+                    expected_run_id="20260825_1005",
+                    expected_manual_decision="approved_match",
+                )
+                self.assertEqual(deleted, 1)
+                self.assertIsNone(preload_manual_review_decisions([item]).lookup(item))
+
+            history = store.list_source_history(item.code, item.name)
+            self.assertEqual(len(history), 1)
+            self.assertEqual(history[0].store_product_id, "2145610")
+            self.assertEqual(history[0].run_id, "20260825_1005")
 
     def test_stale_auto_match_is_rejected_and_saved_for_manual_review(self) -> None:
         item = Item("92558", "LIMITLESS MILGA MAX 30 TABS", 1)

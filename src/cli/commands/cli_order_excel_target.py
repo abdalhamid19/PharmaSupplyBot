@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Iterable
 
 from src.core.artifact_run import artifact_run
-from src.core.config.config_models import AppConfig
+from src.core.config.config_models import AppConfig, LOWEST_PURCHASE_PRICE_MODE
 from src.core.excel_target import (
     TargetProduct,
     ExcelTargetMatcher,
@@ -789,8 +789,10 @@ def _ensure_run_record(
     run_options = {
         "mode": "match-only",
         "execution_mode": "excel-target",
-        "warehouse_mode": "",
-        "min_discount_pct": None,
+        "warehouse_mode": LOWEST_PURCHASE_PRICE_MODE,
+        "min_discount_pct": (
+            getattr(app_config, "warehouse_strategy", {}) or {}
+        ).get("min_discount_percent"),
         "matching_risk": "",
         "excel_source": target_key,
         "item_workers": 1,

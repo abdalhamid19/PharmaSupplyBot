@@ -16,7 +16,7 @@ from .config_factory import (
     build_profiles,
     build_runtime_config,
 )
-from .config_models import AppConfig
+from .config_models import AppConfig, LOWEST_PURCHASE_PRICE_MODE
 
 
 def load_config(path: Path) -> AppConfig:
@@ -31,7 +31,7 @@ def load_config(path: Path) -> AppConfig:
         excel=build_excel_config(excel_values),
         profiles=build_profiles(profiles_values),
         selectors=dict(raw_values.get("selectors", {})),
-        warehouse_strategy=dict(raw_values.get("warehouse_strategy", {})),
+        warehouse_strategy=_build_warehouse_strategy(raw_values),
         matching=build_matching_config(raw_values),
         runtime=build_runtime_config(raw_values),
         database=build_database_config(raw_values),
@@ -58,3 +58,11 @@ def _require(values: dict[str, Any], key: str) -> Any:
     if key not in values:
         raise KeyError(f"Missing required config key: {key}")
     return values[key]
+
+
+def _build_warehouse_strategy(raw_values: dict[str, Any]) -> dict[str, Any]:
+    """Return the single supported warehouse strategy with legacy values normalized."""
+    strategy = dict(raw_values.get("warehouse_strategy", {}) or {})
+    strategy["mode"] = LOWEST_PURCHASE_PRICE_MODE
+    strategy.pop("highest_discount", None)
+    return strategy

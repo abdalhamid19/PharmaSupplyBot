@@ -50,17 +50,16 @@ selectors:
     confirm_delete_button: "button:has-text('تأكيد'), button:has-text('حذف'), button:has-text('Delete'), button:has-text('Yes'), button:has-text('OK')"
 
 warehouse_strategy:
-  # Options: "first_available" | "max_available" | "max_discount"
-  mode: "first_available"
+  # The order always uses the lowest purchase price.
+  mode: "lowest_purchase_price"
   # Set to 0 to allow any discount, or e.g. 12 to require stores with >= 12% discount.
   min_discount_percent: 0
-  # Optional legacy comparison for non-Tawreed source rows. Tawreed winner
-  # selection always uses raw purchase_price and the 1 EGP tie tolerance.
+  # Optional legacy comparison for non-Tawreed source rows. Tawreed ordering
+  # uses raw purchase_price; the Excel Target gate uses a strict 0.25 EGP tolerance.
   sort_by_net: false
   
-  # Preferred warehouses (highest to lowest priority)
-  # When Tawreed purchase prices differ by less than 1 EGP, prefer these
-  # warehouses in the listed order.
+  # Preferred warehouses (highest to lowest priority).
+  # Lower purchase price wins first. This order breaks exact-price ties.
   preferred_warehouses:
     - "شركه البركه (الجيزه)"
     - "شركه الماسه (مالك سابقا ) (الجيزه)"

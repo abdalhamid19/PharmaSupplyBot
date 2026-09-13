@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from src.core.matching_types import SearchMatch
 from src.core.ordering.excel_target_cart_gate import ExcelTargetCartGate
+from src.core.ordering.warehouse_order_policy import LOWEST_PURCHASE_PRICE_MODE
 from src.core.utils.excel import Item
 from ..tawreed_constants import MAX_DOM_SEARCH_ROWS, STORE_DETAILS_ENDPOINT
 from ..tawreed_dialogs import close_visible_dialogs
@@ -21,7 +22,11 @@ from ..tawreed_dom import dom_search_results
 from ..store.tawreed_pricing import discount_value_as_percent, first_discount_value
 from .tawreed_product_search import PRODUCT_SEARCH_INPUT_SELECTOR
 from ..api.tawreed_api_payloads import stores_from_payload
-from ..store.tawreed_store_selection import choose_next_store_for_remaining_quantity
+from ..store.tawreed_order_planning import plan_order_allocations
+from ..store.tawreed_store_selection import (
+    available_store_choices,
+    choose_next_store_for_remaining_quantity,
+)
 from ..store.tawreed_store_summary import record_single_store, record_selected_stores
 from ..store.tawreed_store_run_payload import (
     excel_target_cart_gate_run_key,
@@ -44,7 +49,7 @@ from ..matching.tawreed_timing import wait_for_row_to_settle, wait_for_table_ove
 
 
 def _wh_mode(bot):
-    return bot.config.warehouse_strategy.get("mode", "first_available")
+    return LOWEST_PURCHASE_PRICE_MODE
 
 
 def _min_disc(bot):
@@ -55,26 +60,8 @@ def _preferred_warehouses(bot) -> list[str]:
     return bot.config.warehouse_strategy.get("preferred_warehouses", [])
 
 
-def _find_max_discount(stores: list[dict[str, Any]]) -> float:
-    """Find the maximum discount percent among available stores."""
-    max_discount = 0.0
-    for store in stores:
-        if int(store.get("availableQuantity", 0) or 0) > 0:
-            discount = discount_value_as_percent(first_discount_value(store))
-            max_discount = max(max_discount, discount)
-    return max_discount
-
-
 def _effective_min_discount(bot, sels) -> float:
-    if _wh_mode(bot) != "max_discount" or not sels:
-        return _min_disc(bot)
-    return max(_min_disc(bot), _selected_max_discount(sels))
-
-
-def _selected_max_discount(sels) -> float:
-    return max(
-        discount_value_as_percent(first_discount_value(store)) for store, _ in sels
-    )
+    return _min_disc(bot)
 
 
 def _cart_gate(bot) -> ExcelTargetCartGate:
@@ -83,8 +70,22 @@ def _cart_gate(bot) -> ExcelTargetCartGate:
     return ExcelTargetCartGate(options.get("path"))
 
 
+def _require_min_discount(bot, tawreed_store: dict[str, Any]) -> None:
+    """Reject an ineligible Tawreed offer before selection or cart mutation."""
+    minimum = _min_disc(bot)
+    discount = max(
+        0.0, discount_value_as_percent(first_discount_value(tawreed_store))
+    )
+    if discount < minimum - 0.001:
+        raise bot.skip_item_exception(
+            f"Tawreed offer discount {discount:g}% is below the configured "
+            f"minimum {minimum:g}%."
+        )
+
+
 def _check_cart_gate(bot, item: Item, tawreed_store: dict[str, Any]) -> None:
     """Raise the bot's skip exception before a blocked cart mutation."""
+    _require_min_discount(bot, tawreed_store)
     if getattr(bot, "match_only", False):
         return
     options = persistence_options(bot) or {}
@@ -94,7 +95,9 @@ def _check_cart_gate(bot, item: Item, tawreed_store: dict[str, Any]) -> None:
         excel_target_cart_gate_run_key(bot), item, tawreed_store
     )
     if decision.blocked:
-        raise bot.skip_item_exception(decision.reason)
+        raise bot.skip_item_exception(
+            f"Excel Target deferred_to_excel_target: {decision.reason}"
+        )
 
 
 # ============================================================================
@@ -187,58 +190,35 @@ def _open_add_to_cart_for_match(
 
 def add_item_from_store_dialogs(bot, page: Page, row, item: Item) -> None:
     """Add requested quantity across stores until fulfilled."""
-    rem, used_ids, sels = int(item.qty), set(), []
     store_rows = open_stores_dialog(bot, page, row)
-    mode = _wh_mode(bot)
-    
-    max_discount_value = None
-    if mode == "max_discount" and store_rows:
-        max_discount_value = _find_max_discount(store_rows)
-        min_discount = _min_disc(bot)
-        if max_discount_value < min_discount - 0.001:
-            raise bot.skip_item_exception(
-                f"Highest discount ({max_discount_value:g}%) is below minimum ({min_discount:g}%)."
-            )
-    
-    planned: list[tuple[Any, int]] = []
-    while rem > 0:
-        try:
-            choice = _next_store_choice(
-                bot, page, store_rows, used_ids, sels, click_cart=False
-            )
-        except bot.skip_item_exception:
-            if sels:
-                break
-            raise
-        if choice is None:
-            break
-        ordered = min(rem, choice.available_quantity)
-        # Resolve every selected store before opening the first quantity dialog.
-        # This prevents a later Excel Target win from leaving a partial cart.
-        _check_cart_gate(bot, item, choice.store)
-        planned.append((choice, ordered))
-        sels.append((choice.store, ordered))
-        used_ids.add(choice.identity)
-        rem -= ordered
-        
-        if mode == "max_discount" and max_discount_value is not None:
-            if choice.discount_percent < max_discount_value - 0.5:
-                break
-            
-    if not sels:
-        raise bot.skip_item_exception("All stores out of stock.")
-
-    # The preflight above only selects stores. Perform cart mutations after all
-    # selected choices have passed the gate.
+    plan = plan_order_allocations(
+        bot,
+        item,
+        store_rows,
+        mode=LOWEST_PURCHASE_PRICE_MODE,
+        preferred_warehouses=_preferred_warehouses(bot),
+        min_discount_percent=_min_disc(bot),
+    )
+    if plan.blocked_by_excel_target:
+        raise bot.skip_item_exception(
+            f"Excel Target deferred_to_excel_target: {plan.reason}; "
+            f"{plan.excel_purchase_price:.2f}"
+        )
+    if not plan.allocations:
+        raise bot.skip_item_exception("All stores out of stock or unpriced.")
+    choices = available_store_choices(
+        store_rows, None, _min_disc(bot), _preferred_warehouses(bot)
+    )
+    by_store = {id(choice.store): choice for choice in choices}
     actual_sels = []
-    for choice, ordered in planned:
+    for line in plan.allocations:
+        choice = by_store[id(line.store)]
         visible_dialog(page, bot.config.runtime.timeout_ms)
         store_dialog_cart_buttons(visible_dialog(page, 0)).nth(choice.index).click()
-        actual_ordered = fill_add_to_cart_dialog(bot, page, ordered)
+        actual_ordered = fill_add_to_cart_dialog(bot, page, line.quantity)
         actual_sels.append((choice.store, actual_ordered))
-
-    bot.last_ordered_total_qty = sum(q for _, q in actual_sels)
-    _record_stores(bot, actual_sels)
+        bot.last_ordered_total_qty = sum(q for _, q in actual_sels)
+        _record_stores(bot, actual_sels)
 
 
 def _next_store_choice(bot, page, store_rows, used_ids, sels, *, click_cart: bool = True):
@@ -298,14 +278,7 @@ def _cart_enabled(row) -> bool:
 
 
 def _click_cart(bot, row, item, match):
-    min_discount = _min_disc(bot)
-    if min_discount > 0:
-        store_discount = discount_value_as_percent(first_discount_value(match.data))
-        if store_discount < min_discount - 0.001:
-            raise bot.skip_item_exception(
-                f"Store discount ({store_discount:g}%) is below minimum ({min_discount:g}%)."
-            )
-    
+    _require_min_discount(bot, match.data)
     record_single_store(bot, match.data)
     _record_search_row_as_store(bot, match.data)
     wait_for_row_to_settle(row)
@@ -406,11 +379,10 @@ __all__ = [
     "_wh_mode",
     "_min_disc",
     "_preferred_warehouses",
-    "_find_max_discount",
     "_effective_min_discount",
-    "_selected_max_discount",
     "_cart_gate",
     "_check_cart_gate",
+    "_require_min_discount",
     # UI components (exported for external use)
     "cart_button",
     "visible_dialog",

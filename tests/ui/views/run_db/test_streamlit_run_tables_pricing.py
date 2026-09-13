@@ -58,10 +58,10 @@ class _FakeConn:
 
 
 import src.core.database.order_runs_read as _read
-_read.order_runs_connection = lambda _db: _FakeConn()
 
 
-with patch.object(tbl, 'fetch_item_stores', return_value=fetched):
+with patch.object(_read, 'order_runs_connection', lambda _db: _FakeConn()), \
+     patch.object(tbl, 'fetch_item_stores', return_value=fetched):
     _show()
 """
 

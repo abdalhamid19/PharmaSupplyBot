@@ -23,6 +23,14 @@ join items i on i.item_key = ri.item_key
 where ri.run_key = ?
   and ri.matched = 1
   and ri.status != 'not-orderable'
+  and (
+      ri.source_kind = 'tawreed'
+      or not exists (
+          select 1 from run_items scoped
+          where scoped.run_key = ri.run_key
+            and scoped.source_kind = 'tawreed'
+      )
+  )
 order by i.item_name, i.item_code, ri.source_kind, ri.source_label
 """
 
@@ -37,6 +45,14 @@ from run_items ri
 join items i on i.item_key = ri.item_key
 where ri.run_key = ?
   and ri.manual_review_required = 1
+  and (
+      ri.source_kind = 'tawreed'
+      or not exists (
+          select 1 from run_items scoped
+          where scoped.run_key = ri.run_key
+            and scoped.source_kind = 'tawreed'
+      )
+  )
 order by i.item_name, i.item_code, ri.source_kind, ri.source_label
 """
 
@@ -51,6 +67,14 @@ from run_items ri
 join items i on i.item_key = ri.item_key
 where ri.run_key = ?
   and ri.status = 'not-orderable'
+  and (
+      ri.source_kind = 'tawreed'
+      or not exists (
+          select 1 from run_items scoped
+          where scoped.run_key = ri.run_key
+            and scoped.source_kind = 'tawreed'
+      )
+  )
 order by i.item_name, i.item_code, ri.source_kind, ri.source_label
 """
 
@@ -65,6 +89,28 @@ from run_items ri
 join items i on i.item_key = ri.item_key
 where ri.run_key = ?
   and ri.ordered_qty > 0
+  and (
+      ri.source_kind = 'tawreed'
+      or not exists (
+          select 1 from run_items scoped
+          where scoped.run_key = ri.run_key
+            and scoped.source_kind = 'tawreed'
+      )
+  )
+order by i.item_name, i.item_code, ri.source_kind, ri.source_label
+"""
+
+RUN_ITEMS_DEFERRED_EXCEL = """
+select ri.item_key, i.item_code, i.item_name, ri.requested_qty,
+       ri.ordered_qty, ri.status, ri.reason, ri.matched,
+       ri.manual_review_required, ri.stores_offering,
+       ri.winner_store_key, ri.elapsed_seconds,
+       ri.matched_name_ar, ri.matched_name_en,
+       ri.source_kind, ri.source_label
+from run_items ri
+join items i on i.item_key = ri.item_key
+where ri.run_key = ?
+  and ri.status = 'deferred-to-excel-target'
 order by i.item_name, i.item_code, ri.source_kind, ri.source_label
 """
 
@@ -73,4 +119,5 @@ __all__ = [
     "RUN_ITEMS_FLAGGED",
     "RUN_ITEMS_NOT_ORDERABLE",
     "RUN_ITEMS_ORDERED",
+    "RUN_ITEMS_DEFERRED_EXCEL",
 ]

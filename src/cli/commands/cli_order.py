@@ -5,14 +5,15 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import logging
+import math
 from pathlib import Path
 
 from src.core.artifact_run import artifact_run
 from src.core.config.config_models import AppConfig, ProfileConfig
 from src.core.database.warehouse_winner_selection import (
     PREFERRED_WAREHOUSES,
-    purchase_prices_are_tied,
     warehouse_priority_rank,
+    warehouse_display_name,
 )
 from src.core.utils.excel import Item
 from src.tawreed.tawreed import TawreedBot
@@ -33,9 +34,6 @@ logger = logging.getLogger(__name__)
 
 def apply_order_overrides(app_config: AppConfig, args: argparse.Namespace) -> None:
     """Apply optional per-run order settings to the loaded application config."""
-    warehouse_mode = getattr(args, "warehouse_mode", None)
-    if warehouse_mode:
-        app_config.warehouse_strategy["mode"] = str(warehouse_mode)
     min_discount_percent = getattr(args, "min_discount_percent", None)
     if min_discount_percent is not None:
         app_config.warehouse_strategy["min_discount_percent"] = float(
@@ -232,8 +230,8 @@ def _reconcile_cross_source_winners(
     tab shows exactly one ✅ per item regardless of source.
 
     Across sources, Excel Target wins only when its purchase price is less
-    than or equal to Tawreed's. Within Tawreed, a difference below one pound
-    is treated as a tie and resolved by warehouse priority.
+    than or equal to Tawreed's. Within Tawreed, the lower exact purchase price
+    wins; warehouse priority resolves exact-price ties.
 
     The same pass also rewrites ``run_items.winner_store_key`` and
     ``run_items.winner_store_product_id`` for the row whose
@@ -260,10 +258,16 @@ def _reconcile_cross_source_winners(
         OrderRunsStore(db_path)
         conn = sqlite3.connect(str(db_path))
         try:
+            run_options = conn.execute(
+                "select min_discount_pct from runs where run_key = ?",
+                (run_key,),
+            ).fetchone()
+            min_discount_pct = float((run_options[0] if run_options else 0.0) or 0.0)
             winners = conn.execute(
                 """
                 select ris.item_key, ris.source, ris.source_label, ris.store_key,
                        ris.store_product_id, s.store_name, ris.purchase_price,
+                       ris.available_qty,
                        ris.public_price, ris.discount_percent
                   from run_item_stores ris
                   left join stores s on s.store_key = ris.store_key
@@ -274,7 +278,7 @@ def _reconcile_cross_source_winners(
             by_item: dict[str, dict] = {}
             for (
                 item_key, source, source_label, store_key, store_pid, store_name,
-                purchase_price, public_price, discount,
+                purchase_price, available_qty, public_price, discount,
             ) in winners:
                 candidate = {
                     "source": source,
@@ -283,9 +287,12 @@ def _reconcile_cross_source_winners(
                     "store_product_id": store_pid,
                     "store_name": store_name or "",
                     "purchase_price": purchase_price,
+                    "available_qty": available_qty,
                     "public_price": public_price,
                     "discount_percent": discount,
                 }
+                if not _is_eligible_winner_candidate(candidate, min_discount_pct):
+                    continue
                 current = by_item.get(item_key)
                 if current is None or _cross_source_should_replace(
                     candidate, current, sort_by_net, preferred_warehouses
@@ -367,6 +374,34 @@ def _net_for(row: dict) -> float | None:
     return round(float(purchase) * rate, 2)
 
 
+def _is_eligible_winner_candidate(
+    candidate: dict, min_discount_percent: float = 0.0
+) -> bool:
+    try:
+        purchase_price = float(candidate.get("purchase_price"))
+        available_qty = float(candidate.get("available_qty"))
+    except (TypeError, ValueError):
+        return False
+    eligible = (
+        math.isfinite(purchase_price)
+        and purchase_price > 0
+        and math.isfinite(available_qty)
+        and available_qty > 0
+    )
+    if not eligible:
+        return eligible
+    try:
+        discount = max(0.0, float(candidate.get("discount_percent") or 0.0))
+        minimum = float(min_discount_percent)
+    except (TypeError, ValueError):
+        return False
+    return (
+        math.isfinite(discount)
+        and math.isfinite(minimum)
+        and discount >= max(0.0, minimum) - 0.001
+    )
+
+
 def _cross_source_should_replace(
     candidate: dict,
     current: dict,
@@ -405,17 +440,33 @@ def _same_source_should_replace(
 def _tawreed_should_replace(
     candidate: dict, current: dict, preferred_warehouses: tuple[str, ...]
 ) -> bool:
-    """Compare Tawreed purchase prices and resolve near ties by priority."""
+    """Prefer the lower price; use warehouse priority only for equal prices."""
     candidate_price = candidate.get("purchase_price")
     current_price = current.get("purchase_price")
     if candidate_price is None or current_price is None:
         return _cheaper(candidate, current)
 
-    if purchase_prices_are_tied(candidate_price, current_price):
+    try:
+        candidate_price = float(candidate_price)
+        current_price = float(current_price)
+    except (TypeError, ValueError):
+        return _cheaper(candidate, current)
+
+    if candidate_price == current_price:
         candidate_rank = warehouse_priority_rank(candidate, preferred_warehouses)
         current_rank = warehouse_priority_rank(current, preferred_warehouses)
-        return candidate_rank < current_rank
+        if candidate_rank != current_rank:
+            return candidate_rank < current_rank
+        return _tawreed_stable_key(candidate) < _tawreed_stable_key(current)
     return candidate_price < current_price
+
+
+def _tawreed_stable_key(candidate: dict) -> tuple[str, str, str]:
+    return (
+        warehouse_display_name(candidate).casefold(),
+        str(candidate.get("store_key") or ""),
+        str(candidate.get("store_product_id") or ""),
+    )
 
 
 def _cheaper(candidate: dict, current: dict, sort_by_net: bool = False) -> bool:

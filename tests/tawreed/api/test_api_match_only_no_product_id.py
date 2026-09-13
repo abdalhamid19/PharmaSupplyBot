@@ -28,7 +28,12 @@ class _Api:
 
 
 def _bot() -> SimpleNamespace:
-    return SimpleNamespace()
+    return SimpleNamespace(
+        skip_item_exception=RuntimeError,
+        config=SimpleNamespace(
+            warehouse_strategy={"mode": "lowest_purchase_price", "min_discount_percent": 0}
+        ),
+    )
 
 
 def _row() -> dict:

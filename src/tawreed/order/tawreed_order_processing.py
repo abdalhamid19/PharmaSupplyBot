@@ -18,7 +18,6 @@ from ..products.tawreed_products_flow import add_item_from_products_page
 from ..products.tawreed_match_only_metadata import record_match_only_store_metadata
 from ..matching.tawreed_search_logic import require_product_match
 from ..auth.tawreed_session import close_browser, close_context, open_order_page
-from ..matching.tawreed_strategy import max_available_warehouse_row
 from ..store.tawreed_store_run_payload import (
     excel_target_cart_gate_run_key,
     persistence_options,
@@ -93,8 +92,9 @@ class OrderItemProcessor:
         )
         if decision.excel_purchase_price is not None:
             raise self.bot.skip_item_exception(
-                "Cannot compare legacy Tawreed price with Excel Target purchase "
-                f"price {decision.excel_purchase_price:.2f}; skipping item."
+                "Excel Target deferred_to_excel_target: cannot compare legacy "
+                "Tawreed price with Excel Target purchase price "
+                f"{decision.excel_purchase_price:.2f}."
             )
 
     def pick_configured_search_result(self, page: Page, search) -> None:
@@ -117,28 +117,18 @@ class OrderItemProcessor:
         quantity_input.fill(str(quantity))
 
     def pick_warehouse_if_needed(self, page: Page) -> None:
-        """Pick a warehouse row from a warehouse chooser when that flow is active."""
-        mode = self.warehouse_mode()
+        """Reject legacy warehouse dialogs without structured purchase prices."""
         rows = page.locator(self.bot.selectors.warehouse_rows)
         if rows.count() == 0:
             return
-
-        if mode == "first_available":
-            self.click_warehouse_row(page, rows.first)
-            return
-
-        if mode == "max_available":
-            row_index = max_available_warehouse_row(
-                rows, self.bot.selectors.warehouse_available_qty
-            )
-            self.click_warehouse_row(page, rows.nth(row_index))
-            return
-
-        raise ValueError(f"Unknown warehouse strategy mode: {mode}")
+        raise self.bot.skip_item_exception(
+            "Legacy warehouse rows do not expose a structured purchase price; "
+            "lowest_purchase_price cannot be applied safely."
+        )
 
     def warehouse_mode(self) -> str:
         """Return the configured warehouse-selection mode."""
-        return str(self.bot.config.warehouse_strategy.get("mode", "first_available"))
+        return "lowest_purchase_price"
 
     def click_warehouse_row(self, page: Page, row) -> None:
         """Click the warehouse pick button for the provided row."""

@@ -44,13 +44,13 @@ class ApplyOrderOverridesTests(unittest.TestCase):
 
     def test_sort_by_net_is_written_when_present(self) -> None:
         config = MagicMock()
-        config.warehouse_strategy = {"mode": "first_available"}
+        config.warehouse_strategy = {"mode": "lowest_purchase_price"}
         apply_order_overrides(config, Namespace(sort_by_net=True))
         self.assertEqual(config.warehouse_strategy["sort_by_net"], True)
 
     def test_sort_by_net_default_is_preserved(self) -> None:
         config = MagicMock()
-        config.warehouse_strategy = {"mode": "first_available"}
+        config.warehouse_strategy = {"mode": "lowest_purchase_price"}
         apply_order_overrides(config, Namespace())
         self.assertNotIn("sort_by_net", config.warehouse_strategy)
 

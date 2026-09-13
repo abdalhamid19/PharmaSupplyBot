@@ -180,10 +180,7 @@ def _build_bot_options(options: dict[str, Any], worker_id: int) -> dict[str, Any
 
 
 def _apply_warehouse_overrides(config, options: dict) -> None:
-    """Apply warehouse-mode overrides from CLI options to config."""
-    wh_mode = options.get("warehouse_mode")
-    if wh_mode:
-        config.warehouse_strategy["mode"] = str(wh_mode)
+    """Apply the remaining warehouse policy override to config."""
     min_discount = options.get("min_discount_percent")
     if min_discount is not None:
         config.warehouse_strategy["min_discount_percent"] = float(min_discount)

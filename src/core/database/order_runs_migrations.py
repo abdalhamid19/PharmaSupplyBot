@@ -174,11 +174,58 @@ def _migrate_v5_to_v6(conn) -> None:
         )
 
 
+def _migrate_v7_to_v8(conn) -> None:
+    """Align historical snapshot winners with final Excel deferrals."""
+    from .order_runs_final_winner import backfill_final_winners
+
+    backfill_final_winners(conn)
+
+
+def _migrate_v8_to_v9(conn) -> None:
+    """Rebuild saved price comparisons and Excel winners using each run's floor."""
+    from .order_runs_final_winner import backfill_final_winners
+    from .order_runs_warehouse_winners import backfill_warehouse_winners
+
+    backfill_final_winners(conn)
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "select name from sqlite_master where type='table'"
+        ).fetchall()
+    }
+    if {"run_item_stores", "run_warehouse_winners"}.issubset(tables):
+        backfill_warehouse_winners(conn)
+
+
+def _migrate_v9_to_v10(conn) -> None:
+    """Rebuild saved price comparisons using the discount floor for all sources."""
+    from .order_runs_final_winner import backfill_final_winners
+    from .order_runs_warehouse_winners import (
+        backfill_warehouse_winner_flags,
+        backfill_warehouse_winners,
+    )
+
+    backfill_final_winners(conn)
+    tables = {
+        row[0]
+        for row in conn.execute(
+            "select name from sqlite_master where type='table'"
+        ).fetchall()
+    }
+    if {"run_item_stores", "run_warehouse_winners"}.issubset(tables):
+        backfill_warehouse_winners(conn)
+    if "run_item_stores" in tables:
+        backfill_warehouse_winner_flags(conn)
+
+
 MIGRATIONS: dict[int, MigrationFn] = {
     3: _migrate_v2_to_v3,
     4: _migrate_v3_to_v4,
     5: _migrate_v4_to_v5,
     6: _migrate_v5_to_v6,
+    8: _migrate_v7_to_v8,
+    9: _migrate_v8_to_v9,
+    10: _migrate_v9_to_v10,
 }
 
 

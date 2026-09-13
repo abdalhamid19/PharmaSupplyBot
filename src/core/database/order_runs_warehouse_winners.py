@@ -47,7 +47,13 @@ def refresh_warehouse_winner(conn, run_key: str, item_key: str) -> None:
     ).fetchone()
     if facts is None:
         return
-    winner, reason = select_warehouse_winner(_offers(conn, run_key, item_key))
+    run_options = conn.execute(
+        "select min_discount_pct from runs where run_key = ?", (run_key,)
+    ).fetchone()
+    minimum = float((run_options[0] if run_options else 0.0) or 0.0)
+    winner, reason = select_warehouse_winner(
+        _offers(conn, run_key, item_key), min_discount_percent=minimum
+    )
     row = _comparison_row(run_key, item_key, facts, winner, reason)
     columns = ", ".join(WINNER_COLUMNS)
     values = ", ".join(f":{key}" for key in WINNER_COLUMNS)
@@ -81,3 +87,35 @@ def backfill_warehouse_winners(conn) -> None:
     keys = conn.execute("select distinct run_key, item_key from run_items").fetchall()
     for run_key, item_key in keys:
         refresh_warehouse_winner(conn, run_key, item_key)
+
+
+def backfill_warehouse_winner_flags(conn) -> None:
+    """Align historical checkmarks with the current eligible price winner."""
+    keys = conn.execute(
+        "select distinct run_key, item_key from run_item_stores"
+    ).fetchall()
+    for run_key, item_key in keys:
+        run_options = conn.execute(
+            "select min_discount_pct from runs where run_key = ?", (run_key,)
+        ).fetchone()
+        minimum = float((run_options[0] if run_options else 0.0) or 0.0)
+        winner, _reason = select_warehouse_winner(
+            _offers(conn, run_key, item_key), min_discount_percent=minimum
+        )
+        conn.execute(
+            "update run_item_stores set is_winner = 0 "
+            "where run_key = ? and item_key = ?",
+            (run_key, item_key),
+        )
+        if winner is not None:
+            conn.execute(
+                "update run_item_stores set is_winner = 1 "
+                "where run_key = ? and item_key = ? and source = ? "
+                "and store_product_id = ?",
+                (
+                    run_key,
+                    item_key,
+                    winner.get("source"),
+                    winner.get("store_product_id"),
+                ),
+            )

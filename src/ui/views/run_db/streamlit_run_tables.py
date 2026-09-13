@@ -16,6 +16,7 @@ STATUS_LABELS = {
     "no-results": "⛔ no results",
     "not-orderable": "🚫 not orderable",
     "manual-review": "⚠️ review",
+    "deferred-to-excel-target": "📊 deferred to Excel",
 }
 
 SOURCE_LABELS = {

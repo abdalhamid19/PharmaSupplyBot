@@ -35,17 +35,29 @@ where rank_by_discount = 1
 
 CREATE_V_RUN_SUMMARY = """
 create view if not exists v_run_summary as
+with tawreed_runs as (
+    select distinct run_key
+    from run_items
+    where source_kind = 'tawreed'
+), scoped_items as (
+    select ri.*
+    from run_items ri
+    left join tawreed_runs tr on tr.run_key = ri.run_key
+    where tr.run_key is null or ri.source_kind = 'tawreed'
+)
 select r.run_key, r.run_id, r.profile_key, r.started_at, r.finished_at, r.mode,
-       count(*)                                                     as items,
-       sum(case when ri.status != 'not-orderable'
-                then ri.matched else 0 end)                         as matched,
-       sum(ri.manual_review_required)                               as flagged,
-       sum(case when ri.status = 'no-results'    then 1 else 0 end)  as no_results,
-       sum(case when ri.status = 'not-orderable' then 1 else 0 end)  as not_orderable,
-       sum(case when ri.status = 'added-to-cart' then 1 else 0 end)  as added_to_cart,
-       sum(ri.ordered_qty)                                          as total_ordered
+       count(distinct si.item_key)                                      as items,
+       sum(case when si.status != 'not-orderable'
+                then si.matched else 0 end)                             as matched,
+       sum(si.manual_review_required)                                    as flagged,
+       sum(case when si.status = 'no-results' then 1 else 0 end)         as no_results,
+       sum(case when si.status = 'not-orderable' then 1 else 0 end)      as not_orderable,
+       sum(case when si.status = 'added-to-cart' then 1 else 0 end)      as added_to_cart,
+       sum(case when si.status = 'deferred-to-excel-target'
+                then 1 else 0 end)                                      as deferred_to_excel,
+       sum(si.ordered_qty)                                               as total_ordered
 from runs r
-join run_items ri on ri.run_key = r.run_key
+join scoped_items si on si.run_key = r.run_key
 group by r.run_key
 """
 

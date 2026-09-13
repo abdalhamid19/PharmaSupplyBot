@@ -1,4 +1,4 @@
-"""Helper functions for manual review runtime."""
+﻿"""Helper functions for manual review runtime."""
 
 import logging
 import time
@@ -115,6 +115,8 @@ def _manual_review_id_match(
     for query, candidates in results:
         for index, candidate in enumerate(candidates):
             if candidate_store_product_id(candidate) == target_id:
+                if _saved_match_identity_conflict(item, candidate):
+                    continue
                 if candidate.get("excelTarget"):
                     candidate["verified_brand_identity"] = True
                     candidate["identity_evidence"] = "saved manual review"
@@ -166,6 +168,8 @@ def _find_name_match_in_candidates(
         c_ar = candidate_ar(candidate).lower()
         if not ((target_en and c_en == target_en) or (target_ar and c_ar == target_ar)):
             continue
+        if _saved_match_identity_conflict(item, candidate):
+            continue
         if candidate.get("excelTarget"):
             candidate["verified_brand_identity"] = True
             candidate["identity_evidence"] = "saved manual review"
@@ -183,6 +187,15 @@ def _find_name_match_in_candidates(
             "Approved by saved manual review (Name match, not orderable).",
         )
     return None
+
+
+def _saved_match_identity_conflict(item: Item | None, candidate: dict) -> bool:
+    """Prevent a saved Tawreed approval from bypassing the shared identity guard."""
+    if item is None:
+        return False
+    from ..matching.product_matching_acceptance import identity_conflict_rejection_reason
+
+    return bool(identity_conflict_rejection_reason(item.name, candidate))
 
 
 def _validate_manual_review_match(
@@ -398,6 +411,7 @@ __all__ = [
     "_manual_review_id_match",
     "_manual_review_name_match",
     "_find_name_match_in_candidates",
+    "_saved_match_identity_conflict",
     "_validate_manual_review_match",
     "_validate_product_id_match",
     "_validate_manufacturer_match",

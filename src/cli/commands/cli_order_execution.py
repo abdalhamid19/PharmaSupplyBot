@@ -194,7 +194,6 @@ def worker_options(args, auth_lock=None, *, app_config=None) -> dict[str, Any]:
             getattr(args, "flagged_match_action", "manual-review-only")
         ),
         "stop_flag": getattr(args, "stop_flag", None),
-        "warehouse_mode": getattr(args, "warehouse_mode", None),
         "min_discount_percent": getattr(args, "min_discount_percent", None),
         # Item workers reload AppConfig from disk in a subprocess.  Carry the
         # runtime shared Excel scope explicitly so every worker uses the same

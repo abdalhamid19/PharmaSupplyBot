@@ -6,9 +6,8 @@ import math
 import re
 from typing import Any
 
-RULE_VERSION = 2
+RULE_VERSION = 6
 DEFAULT_CURRENCY = "EGP"
-PURCHASE_PRICE_TOLERANCE = 1.0
 PREFERRED_WAREHOUSES = (
     "شركه البركه (الجيزه)",
     "شركه الماسه (مالك سابقا ) (الجيزه)",
@@ -33,10 +32,8 @@ def source_kind(value: str) -> str:
 
 
 def currency_code(value: str) -> str:
-    """The Egyptian ordering flow has no configurable run currency."""
-    text = (value or "").strip().upper()
-    aliases = {"", "EGP", "LE", "L.E.", "ج.م", "جنيه", "جنيه مصري"}
-    return DEFAULT_CURRENCY if text in aliases else text
+    """Return the sole currency supported by the Egyptian ordering flow."""
+    return DEFAULT_CURRENCY
 
 
 def warehouse_priority_rank(
@@ -46,11 +43,6 @@ def warehouse_priority_rank(
     name = warehouse_display_name(row)
     preferred = preferred_warehouses or PREFERRED_WAREHOUSES
     return _warehouse_rank(name, preferred)
-
-
-def purchase_prices_are_tied(first: float, second: float) -> bool:
-    """Return whether two purchase prices differ by less than one EGP."""
-    return abs(float(first) - float(second)) < PURCHASE_PRICE_TOLERANCE
 
 
 def _priority(row: dict[str, Any]) -> tuple:
@@ -90,27 +82,29 @@ def warehouse_display_name(row: dict[str, Any]) -> str:
     return name
 
 
-def select_warehouse_winner(offers: list[dict[str, Any]]) -> tuple[dict | None, str]:
-    """Return one available lowest-price offer, or an exclusion reason."""
-    eligible = _eligible_offers(offers)
+def select_warehouse_winner(
+    offers: list[dict[str, Any]], min_discount_percent: float = 0.0
+) -> tuple[dict | None, str]:
+    """Return the lowest offer meeting availability, price, and discount rules."""
+    try:
+        minimum = float(min_discount_percent or 0.0)
+    except (TypeError, ValueError):
+        minimum = 0.0
+    if not math.isfinite(minimum):
+        minimum = 0.0
+    minimum = max(0.0, minimum)
+    eligible = _eligible_offers(offers, minimum)
     if not eligible:
         return None, "no_eligible_offer"
-    if len({currency_code(row.get("currency")) for row in eligible}) > 1:
-        return None, "mixed_currencies"
     price = min(float(row["purchase_price"]) for row in eligible)
-    same_source = {source_kind(row.get("source", "")) for row in eligible}
-    if same_source == {"tawreed"}:
-        tied = [
-            row for row in eligible
-            if purchase_prices_are_tied(float(row["purchase_price"]), price)
-        ]
-    else:
-        tied = [row for row in eligible if float(row["purchase_price"]) == price]
+    tied = [row for row in eligible if float(row["purchase_price"]) == price]
     winner = min(tied, key=_priority)
     return winner, _selection_reason(tied, winner)
 
 
-def _eligible_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _eligible_offers(
+    offers: list[dict[str, Any]], min_discount_percent: float = 0.0
+) -> list[dict[str, Any]]:
     eligible = []
     for row in offers:
         try:
@@ -118,8 +112,20 @@ def _eligible_offers(offers: list[dict[str, Any]]) -> list[dict[str, Any]]:
             available = float(row["available_qty"])
         except (KeyError, TypeError, ValueError):
             continue
-        if math.isfinite(price) and price > 0 and math.isfinite(available) and available > 0:
-            eligible.append(row)
+        if not (
+            math.isfinite(price)
+            and price > 0
+            and math.isfinite(available)
+            and available > 0
+        ):
+            continue
+        try:
+            discount = max(0.0, float(row.get("discount_percent") or 0.0))
+        except (TypeError, ValueError):
+            discount = 0.0
+        if not math.isfinite(discount) or discount < min_discount_percent - 0.001:
+            continue
+        eligible.append(row)
     return eligible
 
 

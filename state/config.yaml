@@ -33,7 +33,7 @@ selectors:
     delete_button: button:has(.pi-trash), button:has(.pi-times), button:has-text('حذف'), button:has-text('Delete')
     confirm_delete_button: button:has-text('تأكيد'), button:has-text('حذف'), button:has-text('Delete'), button:has-text('Yes'), button:has-text('OK')
 warehouse_strategy:
-  mode: first_available
+  mode: lowest_purchase_price
   min_discount_percent: 0
   preferred_warehouses:
   - شركه البركه (الجيزه)
@@ -138,6 +138,16 @@ excel_targets:
     - en: MENOPACE 30 TAB
       ar: مينوبيس اورجينال 30 قرص
       source: "review_only: البركة1309.xlsx row 4075"
+  القيصر شركات:
+    name_col: الصنف
+    price_col: سعر ج
+    discount_col: جملة
+    code_col: ''
+    sheet: ''
+    header_row: 0
+    enabled: true
+    display_name: القيصر شركات
 user_added_targets:
 - الجزيره
 - البركة شركات
+- القيصر شركات

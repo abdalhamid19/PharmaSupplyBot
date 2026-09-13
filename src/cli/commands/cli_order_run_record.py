@@ -14,6 +14,7 @@ from src.core.ordering.order_run_persistence import (
     finish_run_record,
     open_run_record,
 )
+from src.core.config.config_models import LOWEST_PURCHASE_PRICE_MODE
 
 
 def active_run_key() -> str:
@@ -35,7 +36,7 @@ def order_run_options(app_config, args, artifact_dir: str) -> dict[str, Any]:
     return {
         "mode": "match-only" if getattr(args, "match_only", False) else "order",
         "execution_mode": str(getattr(args, "execution_mode", "") or ""),
-        "warehouse_mode": _warehouse_mode(warehouse, args),
+        "warehouse_mode": _warehouse_mode(),
         "min_discount_pct": _min_discount(warehouse, args),
         "matching_risk": str(getattr(args, "matching_risk_policy", "") or ""),
         "excel_source": str(getattr(args, "excel", "") or ""),
@@ -65,10 +66,9 @@ def _persistence_options(app_config) -> dict[str, Any]:
     return database.persistence_options() if database else {}
 
 
-def _warehouse_mode(warehouse: dict[str, Any], args) -> str:
-    """Return the effective warehouse-selection mode for this run."""
-    override = getattr(args, "warehouse_mode", None)
-    return str(override or warehouse.get("mode", "") or "")
+def _warehouse_mode() -> str:
+    """Return the only supported warehouse-selection mode for this run."""
+    return LOWEST_PURCHASE_PRICE_MODE
 
 
 def _min_discount(warehouse: dict[str, Any], args) -> float | None:

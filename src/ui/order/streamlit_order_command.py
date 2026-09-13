@@ -191,8 +191,6 @@ def _order_discount_args(form_values: dict[str, object]) -> list[str]:
     """Return discount-related CLI arguments."""
     from .streamlit_order_form import _float_form_value
     args = []
-    if form_values.get("highest_discount"):
-        args.extend(["--warehouse-mode", "max_discount"])
     min_discount = _float_form_value(form_values, "min_discount_percent", 0.0)
     if min_discount > 0:
         args.extend(["--min-discount-percent", f"{min_discount:g}"])

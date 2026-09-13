@@ -1,9 +1,11 @@
-"""Persistence and migration tests for manual-review provenance metadata."""
+﻿"""Persistence and migration tests for manual-review provenance metadata."""
 
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+
+import pytest
 
 from src.core.manual_review.manual_review_selection import decision_from_selection
 from src.core.manual_review.manual_review_store import ManualReviewDecision, ManualReviewStore
@@ -146,6 +148,68 @@ def test_same_item_keeps_independent_rows_per_matching_supplier(tmp_path: Path) 
     remaining = store.list_decisions()
     assert len(remaining) == 1
     assert remaining[0].matching_source == "excel-target"
+
+
+def test_delete_exact_revokes_only_expected_legacy_scope_and_preserves_history(
+    tmp_path: Path,
+) -> None:
+    store = ManualReviewStore(tmp_path / "manual.sqlite3")
+    store.upsert(
+        ManualReviewDecision(
+            item_code="92558",
+            item_name="LIMITLESS MILGA MAX 30 TABS",
+            approved=True,
+            correct_store_product_id="2145610",
+            correct_product_name="LIMITLESS MAN MAX 30 TABS",
+            run_id="20260825_1005",
+            manual_decision="approved_match",
+            matching_source="legacy-unknown",
+            supplier_scope_key="legacy-unknown",
+        )
+    )
+    store.upsert(
+        ManualReviewDecision(
+            item_code="92558",
+            item_name="LIMITLESS MILGA MAX 30 TABS",
+            approved=True,
+            correct_store_product_id="verified-milga",
+            correct_product_name="LIMITLESS MILGA MAX 30 TABS",
+            run_id="20260913_1200",
+            manual_decision="approved_match",
+            matching_source="tawreed",
+            matching_source_label="wardany",
+        )
+    )
+
+    deleted = store.delete_exact(
+        item_code="92558",
+        item_name="LIMITLESS MILGA MAX 30 TABS",
+        matching_source="legacy-unknown",
+        supplier_scope_key="legacy-unknown",
+        expected_store_product_id="2145610",
+        expected_product_name="LIMITLESS MAN MAX 30 TABS",
+        expected_run_id="20260825_1005",
+        expected_manual_decision="approved_match",
+    )
+
+    assert deleted == 1
+    assert [d.correct_store_product_id for d in store.lookup_all("92558", "LIMITLESS MILGA MAX 30 TABS")] == [
+        "verified-milga"
+    ]
+    history = store.list_source_history("92558", "LIMITLESS MILGA MAX 30 TABS")
+    assert {row.store_product_id for row in history} == {"2145610", "verified-milga"}
+
+    with pytest.raises(RuntimeError, match="found 0"):
+        store.delete_exact(
+            item_code="92558",
+            item_name="LIMITLESS MILGA MAX 30 TABS",
+            matching_source="legacy-unknown",
+            supplier_scope_key="legacy-unknown",
+            expected_store_product_id="2145610",
+            expected_product_name="LIMITLESS MAN MAX 30 TABS",
+            expected_run_id="20260825_1005",
+            expected_manual_decision="approved_match",
+        )
 
 
 def test_batch_upsert_preserves_current_decisions_and_history(

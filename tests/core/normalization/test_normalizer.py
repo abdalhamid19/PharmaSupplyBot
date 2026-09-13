@@ -30,6 +30,7 @@ class NormalizerTests(unittest.TestCase):
             ("كبسولة", "كبسوله"),
             ("على", "علي"),
             ("أقراص", "اقراص"),
+            ("شـركة الفا فارما", "شركه الفا فارما"),
         ]
         for raw, expected in cases:
             with self.subTest(raw=raw):

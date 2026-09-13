@@ -28,7 +28,7 @@ def test_order_help_lists_all_flag_groups() -> None:
     assert "--matching-risk-policy" in result.stdout
     assert "--flagged-match-action" in result.stdout
     # Store filters
-    assert "--warehouse-mode" in result.stdout
+    assert "--warehouse-mode" not in result.stdout
     assert "--min-discount-percent" in result.stdout
     assert "--prevented-items-excel" in result.stdout
     # Excel target source
@@ -57,7 +57,6 @@ def test_order_invokes_handler_with_all_flag_groups() -> None:
                 "--excel-target", "alnasr",
                 "--match-only",
                 "--execution-mode", "api",
-                "--warehouse-mode", "max_discount",
                 "--min-discount-percent", "10",
                 "--format", "json",
             ],

@@ -12,6 +12,7 @@ KPI_LABELS: dict[str, str] = {
     "flagged": "Flagged",
     "not_orderable": "Not-orderable",
     "ordered": "Ordered qty",
+    "deferred_excel": "Deferred to Excel",
 }
 
 FETCHER_NAMES: dict[str, str] = {
@@ -19,6 +20,7 @@ FETCHER_NAMES: dict[str, str] = {
     "flagged": "fetch_run_items_flagged",
     "not_orderable": "fetch_run_items_not_orderable",
     "ordered": "fetch_run_items_ordered",
+    "deferred_excel": "fetch_run_items_deferred_excel",
 }
 
 
