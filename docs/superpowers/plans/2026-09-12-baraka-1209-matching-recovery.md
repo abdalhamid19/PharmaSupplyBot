@@ -2,11 +2,11 @@
 
 > **For agentic workers:** استخدم مهارة `executing-plans` ونفّذ المهام بالترتيب، مع مراجعة نتيجة كل بوابة قبل الانتقال.
 
-**Goal:** استعادة المطابقات الآمنة لكتالوج `البركه 1209.xlsx`، مع التمييز بين مفتاح الهدف في النتائج وملف المصدر الفعلي، وإبقاء المنتجات الملتبسة أو الناقصة للمراجعة.
+**Goal:** استعادة المطابقات الآمنة لكتالوج `البركه 1209.xlsx`، مع التمييز بين مفتاح الهدف وملف المصدر الفعلي، ومنع قبول `LIMITLESS MAN MAX` بديلاً عن `LIMITLESS MILGA MAX` وتحويل المرشح الملتبس للمراجعة اليدوية.
 
-**Architecture:** يختار `--excel-target-path KEY=PATH` ملف الكتالوج، بينما يظل `target_key` هو اسم الهدف الظاهر ونطاق القرارات المحفوظة. ثبت أن تجاوز المسار تحت المفتاح القديم يحمّل ملف 1209 فعلاً، لكنه يبقي النتائج والقرارات تحت `البركة شركات`; لذلك يضيف التنفيذ مفتاحاً مستقلاً لـ1209 للاستخدام الدائم وعزل aliases والمراجعات. بعد ذلك يثبت هوية الصف العربي ويتحقق من التركيز والشكل والعبوة دون تجاوز بوابات التوافق.
+**Architecture:** يختار `--excel-target-path KEY=PATH` ملف الكتالوج، بينما يظل `target_key` هو اسم الهدف الظاهر ونطاق القرارات المحفوظة. يضيف التنفيذ مفتاحاً مستقلاً لـ1209 لعزل aliases والمراجعات، ثم يثبت هوية الصف العربي ويتحقق من التركيز والشكل والعبوة. وفي مسار Tawreed، يرفض حاجز الهوية المشترك الخلط بين `MILGA` و`MAN` قبل اختيار الفائز، مع إبقاء المرشح المرفوض في قائمة المراجعة اليدوية.
 
-**Tech Stack:** Python، openpyxl، YAML، pytest، ومخرجات CSV/JSONL لوضع المطابقة فقط.
+**Tech Stack:** Python، openpyxl، YAML، pytest، ومخرجات CSV/JSONL للمطابقة وقائمة المراجعة اليدوية.
 
 **Spec:** طلب المستخدم الحالي وقائمة الأصناف الاثني عشر؛ خط الأساس في `artifacts/excel-target/البركة شركات/20260912_1730/match_only_summary_البركة شركات.csv`؛ والكتالوج المقصود `data/input/excel target/البركه 1209.xlsx`.
 
@@ -26,7 +26,7 @@
 - لا تقبل صفاً عربياً بلا دليل هوية معروف أو alias معتمد ومحدد للهدف.
 - يجب أن تبقى بوابات التركيز والشكل والعبوة قائمة؛ المعلومة غير الموجودة في الصف تعني مراجعة أو رفضاً، لا قبولاً تلقائياً.
 - يجب أن تكون مطابقة Excel المحلية حتمية ودون استدعاء ترجمة مباشرة؛ أي ترجمة جماعية تبقى في خطوة pre-translation الصريحة.
-- لا تطابق `LIMITLESS MILGA MAX` مع `LIMITLESS MAN MAX`، ولا تنشئ صفاً بديلاً من قاموس Tawreed.
+- لا تعتمد `LIMITLESS MAN MAX` كمطابقة لـ`LIMITLESS MILGA MAX`. إذا أعاده بحث Tawreed كمرشح قريب، ارفضه آلياً واحتفظ به للمراجع اليدوية مع توضيح تعارض `MAN` و`MILGA`؛ لا تنشئ صفاً بديلاً في كتالوج Excel من قاموس Tawreed.
 - افصل في التقارير بين `matched-only` واختيار المورد والسعر والكمية التي أضيفت فعلياً.
 - اختبر قرارات المراجعة على قاعدة بيانات مؤقتة؛ لا تعدّل قرارات المستخدم المحفوظة أو بقية تغييرات مساحة العمل.
 
@@ -38,6 +38,12 @@
 - `src/core/excel_target/excel_target_matching.py`: مسار تجاوز المطابقة الاعتيادية عند وجود قرار قديم غير قابل لإعادة الربط.
 - `src/cli/commands/cli_order_excel_target.py`: تشغيل Excel-target عبر CLI يجب أن يستخدم الفهارس المحلية/المخزنة فقط.
 - `src/core/excel_target/excel_target_identity.py` و`src/core/excel_target/excel_target_aliases.py`: مصادر الهوية والـaliases المحددة بهدف البركة.
+- `src/core/matching/product_matching_acceptance.py`: حاجز الهوية المشترك الذي يمنع قبول بديل Tawreed ذي اسم منتج متعارض.
+- `src/core/manual_review/manual_review_runtime.py`: تطبيق قرارات المراجعة المحفوظة قبل المطابقة، ومنها منع سجل `auto_matched` القديم من تجاوز تعارض الهوية.
+- `src/core/ordering/order_run_artifact_rows.py`: تحديد وجوب إحالة نتيجة مرفوضة للمراجعة حتى مع وجود قرار آلي قديم.
+- `src/tawreed/order/tawreed_order_match.py`: تحميل قرارات التشغيل وتفعيل `manual_review_cache_context` أثناء المطابقة الفعلية.
+- `src/tawreed/order/tawreed_order_summary_build.py`: تحويل نتيجة الرفض ومرشحيها إلى سجل المراجعة اليدوية.
+- `src/ui/manual_review/streamlit_manual_review_page.py`: عرض سبب رفض المرشح للمراجع قبل اتخاذ القرار.
 - `scripts/baraka_coverage_report.py`: إعادة تشغيل محلية للقياس دون قراءة/إعادة ربط قرارات المستخدم المحفوظة.
 - `src/core/normalization/normalizer_parsing_normalize.py` وملفات تحليل خصائص المنتج في `src/core/normalization/` و`src/core/excel_target/product_attributes.py`: اختصارات الاسم والعبوة/التركيز.
 - `tests/cli/commands/test_excel_target_e2e.py`: اختيار الهدف والملف في مسار CLI.
@@ -93,7 +99,7 @@
 | 88189 | `LEVOFLOXACIN-EVA 500 MG 10 F.C.TABS.` | 3808 `ليفوفلوكساسين ايفا 500مجم 10اقراص` | تحقّق أن التطبيع يستخرج عبوة 10 أقراص |
 | 90893 | `quadriderm cream 15g` | 3431 `كوادريدرم كريم س ج` | حجم 15 جم غير مذكور |
 | 90993 | `OMEGAL ULTRA 30CAP` | 791 `اوميجال الترا 30كبسولة` | تحقّق من تطابق الاسم والعبوة |
-| 92558 | `LIMITLESS MILGA MAX 30 TABS` | لا يوجد صف يثبت نسخة `MILGA MAX` | لا تستخدم منتج LIMITLESS آخر كبديل |
+| 92558 | `LIMITLESS MILGA MAX 30 TABS` | لا يوجد صف يثبت نسخة `MILGA MAX` في كتالوج 1209 الفعلي | تظل نتيجة كتالوج 1209 `no_match`؛ لا تفبرك صفاً. يعالج Task 5 مرشح Tawreed السابق `LIMITLESS MAN MAX`: لا يقبله آلياً ويُرسله للمراجعة اليدوية |
 - [ ] لا تصنّف المرشح كـ`auto_match` اعتماداً على التشابه وحده. أبقِ ELBAVIT للمراجعة لوجود الحديد والكالسيوم كصفين؛ وابقِ pack/strength/form غير المثبت في DURJOY وPENCITARD وPROTOFIX وZOLADEX وLOGUSGYN وSYNOBAR-S وCONVENTIN وQUADRIDERM للمراجعة أو الرفض.
 - [ ] سجّل LEVOFLOXACIN-EVA وOMEGAL ULTRA كحالتَي قبول فقط إذا بقي row name والعبوة متوافقين بعد إصلاح التحليل. سجّل LIMITLESS كـ`no_match` ما لم يظهر صف مستقل موثق لـ`MILGA MAX`؛ لا تستخدم `ليمتلس باور ماكس` أو`ميلجا ادفانس` كبديل.
 - [ ] اكتب اختباراً يقرأ الـfixture ويقارن كل قرار بالمطابقة الفعلية على بيانات عربية مصطنعة مكافئة، حتى لا يعتمد الاختبار الآلي على ملف المستخدم المحلي غير المتعقب.
@@ -115,12 +121,41 @@
 - [ ] أضف فقط aliases التي يثبتها سجل الصفوف أو قاموس موثوق: الاسم الإنجليزي، النص العربي المطابق للصف، والخصائص المتاحة. إذا لم تثبت خاصية لازمة، يجب أن ينتج المرشح مراجعة لا قبولاً.
 - [ ] أضف اختبارات تطبيع مستقلة على الإدخالات الحرفية `ELBAVIT SYP` و`PENCITARD 1200000 i.u vial` و`LEVOFLOXACIN-EVA 500 MG 10 F.C.TABS.`؛ يجب أن تتعرف على شراب، و`1200000 IU`، وعبوة 10 أقراص مغلفة. لا تعرّف `AM` كـampoule عاماً؛ لا تضف هذا التفسير لـZOLADEX إلا إذا وثّق مرجع المنتج أنه المقصود.
 - [ ] اجعل `run_excel_target_match_only_multi` يستخدم `allow_live_translation=False` افتراضياً؛ أضف اختباراً يثبت أن مسار المطابقة لا يستدعي مزوّد ترجمة. تبقى ترجمة الكتالوج خطوة منفصلة وصريحة عبر أداة pre-translation.
-- [ ] أضف حواجز سلبية: اختلاف نسخة ELBAVIT (حديد/كالسيوم)، غياب قوة PENCITARD، غياب عدد الأقراص/الوزن، ورفض `LIMITLESS MAN MAX` أمام `LIMITLESS MILGA MAX`.
+- [ ] أضف حواجز سلبية: اختلاف نسخة ELBAVIT (حديد/كالسيوم)، غياب قوة PENCITARD، وغياب عدد الأقراص/الوزن. لا تنشئ alias أو صف Excel-target يوحّد `LIMITLESS MAN MAX` و`LIMITLESS MILGA MAX`؛ يعالج Task 5 مرشح Tawreed السابق ومسار مراجعته.
 - [ ] شغّل: `.\.venv\Scripts\python.exe -m pytest -q tests\core\excel_target\test_excel_target_aliases.py tests\core\excel_target\test_product_attributes.py tests\core\excel_target\test_baraka_safe_matching.py`.
 
 **Expected:** يمكن توليد مرشحين للتهجئات الثنائية اللغة الموثقة، لكن المطابقة التلقائية تظل مشروطة بتوافق الجرعة والشكل والعبوة وعدم وجود التباس.
 
-## Task 5: أعد تشغيل المطابقة محلياً مع حفظ provenance بأمان
+## Task 5: ارفض بديل Tawreed الملتبس وأرسله للمراجعة اليدوية
+
+**Files:**
+- Modify: `src/core/matching/product_matching_acceptance.py`
+- Modify: `src/core/matching/matching_risk.py`
+- Modify: `src/core/manual_review/manual_review_runtime.py`
+- Modify: `src/core/ordering/order_run_artifact_rows.py`
+- Modify: `src/tawreed/order/tawreed_order_summary_build.py`
+- Modify: `src/ui/manual_review/streamlit_manual_review_page.py`
+- Test: `tests/test_product_matching.py`
+- Modify: `tests/test_latest_no_results_regressions.py`
+- Test: `tests/core/manual_review/test_manual_review_runtime.py`
+- Test: `tests/core/matching/test_matching_risk.py`
+- Test: `tests/tawreed/matching/test_tawreed_search_logic.py`
+- Test: `tests/tawreed/api/test_tawreed_api_execution_mode.py`
+- Create: `tests/tawreed/order/test_limitless_manual_review.py`
+- Test: `tests/ui/manual_review/test_streamlit_manual_review.py`
+
+- [ ] وسّع الحالة الموجودة في `tests/test_latest_no_results_regressions.py` للزوج نفسه بدلاً من تكرار اختبار الرفض فقط: الطلب `LIMITLESS MILGA MAX 30 TABS` ومرشح Tawreed `LIMITLESS MAN MAX 30 TABS`. أثبت أن `explain_best_product_match` لا يختاره فائزاً، ويحتفظ بسبب واضح يحدد تعارض `MILGA` و`MAN`، مع إبقاء التشخيص والمرشح متاحين للمراجعة اليدوية.
+- [ ] طبّق حاجز الهوية في مسار القبول المشترك قبل اختيار الفائز، بحيث يمنع قبول `MAN MAX` اعتماداً على الكلمات المشتركة `LIMITLESS` و`MAX`، ويعمل بالطريقة نفسها لمستهلكَي API والمتصفح. لا تغيّر سلوك بقية منتجات LIMITLESS.
+- [ ] افحص مسار القرار المحفوظ قبل المطابقة العادية: قد يجبر `manual_review_match` نتيجة `auto_matched` قديمة على المنتج الخاطئ قبل وصولها إلى حاجز الهوية. اجعل التعارض المثبت بين اسم الطلب والمنتج المحفوظ يمنع هذا الإجبار الآلي، مع إبقاء السجل التاريخي دون حذف أو تعديل، ثم دع المرشح المرفوض يمر لمسار المراجعة.
+- [ ] امنع سياسة aggressive من إعادة ترقية تشخيص الهوية المرفوض إلى مرشح قابل للإضافة للسلة حتى إذا كان `flagged_match_action=add-to-cart`؛ اختبر أن زوج `MILGA`/`MAN` يظل مرفوضاً وأن مرشحاً آخر لا يحمل هذا التعارض يستمر وفق السياسة الحالية.
+- [ ] مرّر قرار المطابقة إلى `manual_review_required` من موضعي الاستدعاء `order_item_summary_row` و`_handle_manual_review_or_auto_save`؛ عند وجود رفض صريح بسبب تعارض الهوية، لا تسمح لسجل `auto_matched` القديم بإخفاء المراجعة حتى عندما يكون `enable_auto_match_re_review_on_fail=false`.
+- [ ] أنشئ اختبار تكامل في `tests/tawreed/order/test_limitless_manual_review.py`: ازرع قاعدة قرارات مؤقتة بسجل Tawreed قديم من نوع `auto_matched` يشير إلى `LIMITLESS MAN MAX`، مع تعطيل `enable_auto_match_re_review_on_fail`. شغّل مسار تنفيذ الطلب الفعلي (API أو المتصفح) ببوابة Tawreed اختبارية، وتأكد أن التنفيذ يستخدم `preload_manual_review_decisions` و`manual_review_cache_context`، ثم مرّر طلب `LIMITLESS MILGA MAX 30 TABS` ونتيجة بحث `LIMITLESS MAN MAX 30 TABS` خلال `manual_review_match` والمطابقة العادية قبل أي محاولة إضافة للسلة؛ لا تستدعِ helper منفرداً ولا تستخدم قراراً مسبق التجهيز من نوع `no-results` لتجاوز هذا المسار. تحقق أن السجل القديم لا يجبر `MAN MAX` على أن يصبح فائزاً أو يضيفه للسلة، وأن قرار المطابقة النهائي مرفوض بسبب تعارض الهوية. مرّر هذا القرار المرفوض مع ملخص `no-results` إلى مسار artifact handling، واحفظ مرشح `MAN MAX` وسبب التعارض في ملف المراجعة ضمن مجلد تشغيل مؤقت؛ حمّله عبر `load_review_candidates` وتأكد من ظهور السبب للمراجع ومن أن الصف أُحيل فعلاً للمراجعة. أثبت أن سجل `auto_matched` المزروع لم يُحذف أو يُعدّل، وأن الصنف لم يُسجّل كـ`auto_matched` جديد. وجّه `src.core.manual_review.manual_review_store.DEFAULT_MANUAL_REVIEW_DB` و`src.tawreed.order.tawreed_order_summary_build.DEFAULT_MANUAL_REVIEW_DB` إلى قاعدة مؤقتة كي لا يقرأ الاختبار قرارات المستخدم ولا يكتب إليها.
+- [ ] اعرض `rejection_reason` في صفحة المراجعة اليدوية قرب اسم `LIMITLESS MAN MAX`، وأضف اختبار UI يثبت أن عبارة تعارض `MAN`/`MILGA` ظاهرة للمراجع وليست محفوظة في JSONL فقط.
+- [ ] أضف حالة مقابلة تثبت أن صفاً موثقاً باسم `LIMITLESS MILGA MAX` لا يتأثر بالحاجز، ثم شغّل: `.\.venv\Scripts\python.exe -m pytest -q tests\test_product_matching.py tests\test_latest_no_results_regressions.py tests\core\manual_review\test_manual_review_runtime.py tests\core\matching\test_matching_risk.py tests\tawreed\matching\test_tawreed_search_logic.py tests\tawreed\api\test_tawreed_api_execution_mode.py tests\tawreed\order\test_limitless_manual_review.py tests\ui\manual_review\test_streamlit_manual_review.py`.
+
+**Expected:** لا يتحول `LIMITLESS MAN MAX` إلى مطابقة آلية أو إضافة للسلة لطلب `MILGA MAX`، ولا يخفيه سجل `auto_matched` قديم عن المراجعة؛ يظهر للمراجع اليدوي كمرشح مع سبب اختلاف الهوية قبل أن يتخذ قراره، مع بقاء السجل التاريخي محفوظاً. وتظل مطابقة `MILGA MAX` الحقيقي ممكنة عند ثبوتها.
+
+## Task 6: أعد تشغيل المطابقة محلياً مع حفظ provenance بأمان
 
 **Files:**
 - Modify: `scripts/baraka_coverage_report.py`
