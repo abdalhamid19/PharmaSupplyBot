@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..manual_review.manual_review_reason import manual_review_reason_fields
 from ..manual_review.manual_review_runtime import saved_manual_review_decision
+from ..matching.matching_diagnostics import best_recognized_unorderable_diagnostic
 from ..matching.product_matching_acceptance import identity_conflict_rejection_reason
 from .order_winner_fields import candidate_summary_fields
 
@@ -55,8 +56,9 @@ def _candidate_for_summary(decision) -> tuple[object | None, dict]:
     match = getattr(decision, "best_match", None) if decision else None
     if match:
         return match, match.data
-    diagnostics = getattr(decision, "diagnostics", []) if decision else []
-    best = max(diagnostics, key=lambda item: item.score, default=None)
+    best = best_recognized_unorderable_diagnostic(
+        getattr(decision, "diagnostics", []) if decision else []
+    )
     return None, dict(getattr(best, "candidate", {}) or {})
 
 

@@ -433,6 +433,59 @@ class TawreedBotTests(unittest.TestCase):
 
         self.assertEqual(bot._skip_status("No decisive match found"), "not-orderable")
 
+    def test_not_orderable_summary_prefers_identity_candidate_without_store_id(self) -> None:
+        bot = self._bot()
+        bot.last_match_decision = MatchDecision(
+            best_match=None,
+            diagnostics=[
+                CandidateMatchDiagnostic(
+                    query="LIMITLESS MILGA MAX 30 TABS",
+                    row_index=0,
+                    score=20.5,
+                    sort_key=(20.5, 0, 0, 0, 0, 0),
+                    accepted=False,
+                    accepted_reason="",
+                    rejection_reason="Candidate missing orderable storeProductId",
+                    breakdown=MatchScoreBreakdown(1, 1, 1, 1, 1, 0, 0, 0, 20.5),
+                    candidate={
+                        "productNameEn": "LIMITLESS MILGA MAX 30 TABS",
+                        "productName": "ليمتلس ميلجا ماكس 30 اقراص",
+                    },
+                ),
+                CandidateMatchDiagnostic(
+                    query="LIMITLESS MILGA MAX 30 TABS",
+                    row_index=1,
+                    score=20.615384615384617,
+                    sort_key=(20.615384615384617, 0, 0, 0, 0, 1),
+                    accepted=False,
+                    accepted_reason="",
+                    rejection_reason=(
+                        "Product identity conflict: requested LIMITLESS MILGA MAX "
+                        "but candidate is LIMITLESS MAN MAX"
+                    ),
+                    breakdown=MatchScoreBreakdown(
+                        1, 1, 1, 1, 1, 0, 0, 0, 20.615384615384617
+                    ),
+                    candidate={
+                        "storeProductId": "2940276",
+                        "productNameEn": "LIMITLESS MAN MAX 30 TABS",
+                        "productName": "ليمتلس مان 30 اقراص س جديد",
+                    },
+                ),
+            ],
+            final_reason="No decisive match found",
+        )
+
+        summary = bot._build_item_summary(
+            status="not-orderable",
+            reason="No decisive match found",
+            elapsed=1.0,
+            match_elapsed=0.5,
+        )
+
+        self.assertEqual(summary.matched_product_english_name, "LIMITLESS MILGA MAX 30 TABS")
+        self.assertEqual(summary.matched_product_arabic_name, "ليمتلس ميلجا ماكس 30 اقراص")
+
     def test_manual_review_skip_has_explicit_status(self) -> None:
         bot = self._bot()
 

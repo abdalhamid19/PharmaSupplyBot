@@ -2,7 +2,10 @@
 
 import time
 
-from src.core.matching.candidate_identity import candidate_has_store_product_id
+from src.core.matching.matching_diagnostics import (
+    best_recognized_unorderable_diagnostic,
+    is_recognized_unorderable_diagnostic,
+)
 from src.core.matching_types import CandidateMatchDiagnostic
 from src.core.utils.excel import Item
 from .tawreed_dialogs import close_visible_dialogs, visible_overlay_diagnostics
@@ -72,11 +75,9 @@ class SummaryBuilder:
         if decision.best_match:
             return decision.best_match.data, decision.best_match.query
 
-        diagnostics = getattr(decision, "diagnostics", None)
-        if not diagnostics:
-            return None, ""
-
-        best = max(diagnostics, key=lambda d: d.score, default=None)
+        best = best_recognized_unorderable_diagnostic(
+            getattr(decision, "diagnostics", None)
+        )
         if best and getattr(best, "candidate", None):
             return best.candidate, best.query
         return None, ""
@@ -160,24 +161,7 @@ def _diagnostic_missing_orderable_identity(
     diagnostic,  # CandidateMatchDiagnostic
 ) -> bool:
     """Return whether a diagnostic found an otherwise acceptable non-orderable row."""
-    if candidate_has_store_product_id(diagnostic.candidate):
-        return False
-    reason = diagnostic.rejection_reason.lower()
-    if "candidate missing orderable storeproductid" in reason:
-        return True
-    hard_rejections = (
-        "component mismatch",
-        "identity token",
-        "different_brand",
-        "semantic token",
-    )
-    if any(text in reason for text in hard_rejections):
-        return False
-    # Soft numeric-only blocks with strong brand/form score still mean the catalog
-    # row was recognized; report not-orderable instead of no-results.
-    if "unrequested numeric" in reason and diagnostic.score >= 9.0:
-        return True
-    return diagnostic.score >= 12.0
+    return is_recognized_unorderable_diagnostic(diagnostic)
 
 
 # ============================================================================
