@@ -168,6 +168,7 @@ def run_excel_target_match_only(
         catalog,
         allow_live_translation=allow_live_translation,
         approved_aliases=target_cfg.aliases if target_cfg is not None else (),
+        review_identity_aliases=target_cfg.review_aliases if target_cfg is not None else (),
     )
     deadline = time.monotonic() + 300
     timed_out = False

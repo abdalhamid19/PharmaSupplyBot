@@ -99,6 +99,22 @@ excel_targets:
             [("البركه 1209", [Path("data/input/excel target/البركه 1209.xlsx")])],
         )
 
+    def test_selected_excel_target_configs_resolves_baraka_1309_default_path(
+        self,
+    ) -> None:
+        args = argparse.Namespace(
+            excel_target="البركة1309",
+            all_excel_targets=False,
+            excel_target_path=None,
+        )
+
+        selected = selected_excel_target_configs(self.app_config, args)
+
+        self.assertEqual(
+            selected,
+            [("البركة1309", [Path("data/input/excel target/البركة1309.xlsx")])],
+        )
+
     def test_baraka_1209_default_path_loads_fixture_with_provenance(self) -> None:
         """Default 1209 resolution reads the fixture and records its file name."""
         args = argparse.Namespace(
@@ -172,7 +188,7 @@ excel_targets:
         selected = selected_excel_target_configs(self.app_config, args)
         self.assertEqual(
             [key for key, _ in selected],
-            ["alnasr", "البركة شركات", "البركه 1209"],
+            ["alnasr", "البركة شركات", "البركه 1209", "البركة1309"],
         )
 
     def test_selected_excel_target_configs_none(self) -> None:

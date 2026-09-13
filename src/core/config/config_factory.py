@@ -54,22 +54,27 @@ def build_excel_target(raw_values: Any) -> ExcelTargetConfig:
     price_meaning = str(values.get("price_meaning", "public_with_discount"))
     if price_meaning not in {"public_with_discount", "purchase_only", "public_only"}:
         price_meaning = "public_with_discount"
-    aliases: list[dict[str, str]] = []
-    raw_aliases = values.get("aliases", ()) or ()
-    if isinstance(raw_aliases, dict):
-        raw_aliases = raw_aliases.get("rows", ()) or ()
-    if isinstance(raw_aliases, (list, tuple)):
-        for raw_alias in raw_aliases:
-            if not isinstance(raw_alias, dict):
-                continue
-            english = str(raw_alias.get("en", raw_alias.get("english", "")) or "").strip()
-            arabic = str(raw_alias.get("ar", raw_alias.get("arabic", "")) or "").strip()
-            source = str(
-                raw_alias.get("source", raw_alias.get("reference", "local_alias"))
-                or "local_alias"
-            ).strip()
-            if english and arabic:
-                aliases.append({"en": english, "ar": arabic, "source": source})
+    def _parse_aliases(key: str) -> list[dict[str, str]]:
+        parsed: list[dict[str, str]] = []
+        raw_aliases = values.get(key, ()) or ()
+        if isinstance(raw_aliases, dict):
+            raw_aliases = raw_aliases.get("rows", ()) or ()
+        if isinstance(raw_aliases, (list, tuple)):
+            for raw_alias in raw_aliases:
+                if not isinstance(raw_alias, dict):
+                    continue
+                english = str(raw_alias.get("en", raw_alias.get("english", "")) or "").strip()
+                arabic = str(raw_alias.get("ar", raw_alias.get("arabic", "")) or "").strip()
+                source = str(
+                    raw_alias.get("source", raw_alias.get("reference", "local_alias"))
+                    or "local_alias"
+                ).strip()
+                if english and arabic:
+                    parsed.append({"en": english, "ar": arabic, "source": source})
+        return parsed
+
+    aliases = _parse_aliases("aliases")
+    review_aliases = _parse_aliases("review_aliases")
     return ExcelTargetConfig(
         name_col=str(values.get("name_col", DEFAULT_TARGET_NAME_COLUMN)),
         price_col=str(values.get("price_col", DEFAULT_TARGET_PRICE_COLUMN)),
@@ -81,6 +86,7 @@ def build_excel_target(raw_values: Any) -> ExcelTargetConfig:
         enabled=_as_bool(values.get("enabled"), True),
         price_meaning=price_meaning,
         aliases=tuple(aliases),
+        review_aliases=tuple(review_aliases),
     )
 
 

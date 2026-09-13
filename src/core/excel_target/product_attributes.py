@@ -26,9 +26,13 @@ _FORMS = {
     "DROPS": ("DROP", "DROPS", "\u0642\u0637\u0631\u0629", "\u0642\u0637\u0631\u0627\u062a", "\u0642\u0637\u0631\u0647", "\u0646\u0642\u0637"),
     "SPRAY": ("SPRAY", "\u0628\u062e\u0627\u062e", "\u0633\u0628\u0631\u0627\u0649", "\u0633\u0628\u0631\u0627\u064a"),
     "SACHET": ("SACHET", "SACHETS", "\u0643\u064a\u0633", "\u0627\u0643\u064a\u0627\u0633", "\u0623\u0643\u064a\u0627\u0633"),
+    # ``AM`` is an ambiguous supplier abbreviation. Keep it distinct from
+    # ``AMPOULE`` so it cannot silently authorize a different presentation.
+    "AMBIGUOUS_AM": ("AM",),
+    "GUMMY": ("GUMMY", "GUMMIES", "\u062c\u0627\u0645\u064a\u0632", "\u062c\u0627\u0645\u064a"),
 }
 _STRENGTH_RE = re.compile(
-    r"(\d+(?:\.\d+)?)\s*(mcg|µg|ug|mg|gm|g|ml|iu|%)|"
+    r"(\d+(?:\.\d+)?)\s*(mcg|µg|ug|mg|gm|g|ml|iu|%)(?![a-z])|"
     r"(\d+(?:\.\d+)?)\s*(\u0645\u064a\u0643\u0631\u0648\u062c\u0631\u0627\u0645|\u0645\u062c\u0645|\u0645\u0644\u062c\u0645|\u062c\u0631\u0627\u0645|\u062c\u0645|\u0645\u0644|\u0648\u062d\u062f\u0629|%)",
     re.IGNORECASE,
 )
@@ -52,12 +56,12 @@ _BARE_DROPS_DOSE_RE = re.compile(
     re.IGNORECASE,
 )
 _PACK_RE = re.compile(
-    r"\b(\d+)\s*(?:tab|tabs|tablet|tablets|cap|caps|capsule|capsules|film|films|flim|flims|vial|vials|amp|amps|ampoule|ampoules|supp|suppository|suppositories|lozenge|lozenges)\b|"
+    r"\b(\d+)\s*(?:tab|tabs|tablet|tablets|cap|caps|capsule|capsules|film|films|flim|flims|vial|vials|amp|amps|ampoule|ampoules|supp|suppository|suppositories|lozenge|lozenges|gummy|gummies)\b|"
     r"(\d+)\s*(?:\u0642\u0631\u0635|\u0623\u0642\u0631\u0627\u0635|\u0627\u0642\u0631\u0627\u0635|\u0643\u0628\u0633\u0648\u0644|\u0643\u0628\u0633\u0648\u0644\u0629|\u0643\u0628\u0633\u0648\u0644\u0627\u062a|\u0643\u064a\u0633|\u0627\u0643\u064a\u0627\u0633|\u0623\u0643\u064a\u0627\u0633|\u0641\u064a\u0644\u0645|\u0641\u064a\u0644\u0645\u0633|\u0641\u064a\u0627\u0644|\u0627\u0645\u0628\u0648\u0644|\u0645\u0628\u0648\u0644|\u0623\u0645\u0628\u0648\u0644|\u0644\u0628\u0648\u0633|\u062a\u062d\u0627\u0645\u064a\u0644|\u062a\u062d\u0645\u064a\u0644\u0629)",
     re.IGNORECASE,
 )
 _PACK_AFTER_FORM_RE = re.compile(
-    r"\b(?:tab|tabs|tablet|tablets|cap|caps|capsule|capsules|film|films|flim|flims|vial|vials|amp|amps|ampoule|ampoules|supp|suppository|suppositories|lozenge|lozenges)\s*(\d+)\b",
+    r"\b(?:tab|tabs|tablet|tablets|cap|caps|capsule|capsules|film|films|flim|flims|vial|vials|amp|amps|ampoule|ampoules|supp|suppository|suppositories|lozenge|lozenges|gummy|gummies)\s*(\d+)\b",
     re.IGNORECASE,
 )
 
@@ -142,6 +146,10 @@ def _normalize_attribute_text(text: str) -> str:
     # ``i.u.``. Treat the dotted abbreviation as the same explicit IU unit so
     # a missing strength cannot be mistaken for a compatible vial.
     normalized = re.sub(r"\bi\s*[.]\s*u[.]?\b", "iu", normalized)
+    # Supplier exports use both ``30 F.C. TABS`` and ``30 F.C.TABS``.
+    # Remove only the dotted abbreviation so the existing pack parser sees
+    # the explicit count while ordinary product tokens remain unchanged.
+    normalized = re.sub(r"\bf\s*[.]\s*c[.]?\s*", "", normalized)
     normalized = re.sub(r"[\u064B-\u065F\u0670]", "", normalized)
     return re.sub(r"(?<![a-z])mgc(?![a-z])", "mcg", normalized)
 

@@ -110,6 +110,7 @@ class ExcelTargetBilingualIndex:
     alias_resolver: ExcelTargetAliasResolver
     alias_products_by_id: Mapping[str, tuple[TargetProduct, ...]]
     review_aliases: tuple[AliasEntry, ...] = ()
+    review_identity_product_ids: frozenset[str] = frozenset()
 
     @classmethod
     def build(
@@ -118,6 +119,7 @@ class ExcelTargetBilingualIndex:
         *,
         allow_live_translation: bool = False,
         alias_entries: Sequence[AliasEntry | Mapping[str, object]] = (),
+        custom_review_alias_entries: Sequence[AliasEntry | Mapping[str, object]] = (),
     ) -> "ExcelTargetBilingualIndex":
         native: dict[str, list[TargetProduct]] = {}
         arabic: dict[str, list[TargetProduct]] = {}
@@ -146,6 +148,28 @@ class ExcelTargetBilingualIndex:
         discovered_alias_entries: list[AliasEntry] = []
         review_aliases: list[tuple[str, str]] = []
         review_alias_entries: list[AliasEntry] = []
+        review_identity_product_ids: set[str] = set()
+        for raw_entry in custom_review_alias_entries:
+            if isinstance(raw_entry, AliasEntry):
+                entry = raw_entry
+            else:
+                entry = AliasEntry(
+                    str(raw_entry.get("en", raw_entry.get("english", "")) or ""),
+                    str(raw_entry.get("ar", raw_entry.get("arabic", "")) or ""),
+                    str(raw_entry.get("source", "local_alias") or "local_alias"),
+                )
+            if entry.english and entry.arabic:
+                review_aliases.append(
+                    (normalize_english_brand(entry.english), normalize_arabic_brand(entry.arabic))
+                )
+                review_alias_entries.append(entry)
+                review_identity_product_ids.update(
+                    product.store_product_id
+                    for product, _ in _review_targets_for_alias(
+                        review_target_by_root,
+                        normalize_arabic_brand(entry.arabic),
+                    )
+                )
         for row in tawreed_rows:
             english_brand = normalize_english_brand(row.get("en", ""))
             arabic_brand = normalize_arabic_brand(row.get("ar", ""))
@@ -253,6 +277,7 @@ class ExcelTargetBilingualIndex:
             ),
             _freeze(alias_products),
             tuple(review_alias_entries),
+            frozenset(review_identity_product_ids),
         )
 
     def identify(self, item_name: str) -> tuple[IdentifiedTarget, ...]:

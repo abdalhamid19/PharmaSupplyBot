@@ -80,6 +80,7 @@ class ExcelTargetMatcher:
         allow_live_translation: bool = False,
         use_saved_approvals: bool = True,
         review_aliases: Sequence[AliasEntry] = (),
+        review_identity_aliases: Sequence[AliasEntry | Mapping[str, object]] = (),
         approved_aliases: Sequence[AliasEntry | Mapping[str, object]] = (),
     ) -> None:
         self.target_key = target_key
@@ -93,6 +94,7 @@ class ExcelTargetMatcher:
             self.catalog,
             allow_live_translation=allow_live_translation,
             alias_entries=approved_aliases,
+            custom_review_alias_entries=review_identity_aliases,
         )
         self.review_discovery = ExcelTargetReviewDiscoveryIndex.build(
             self.catalog,
@@ -118,7 +120,11 @@ class ExcelTargetMatcher:
             if manual is not None:
                 return ExcelTargetMatch(self.target_key, manual, len(self.catalog))
         identified = self.identity_index.identify(item.name)
-        accepted, rejected = _compatible_identified(item, identified)
+        accepted, rejected = _compatible_identified(
+            item,
+            identified,
+            review_identity_product_ids=self.identity_index.review_identity_product_ids,
+        )
         if len(accepted) == 1:
             decision = _identity_decision(item, accepted[0][0], started)
         elif len(accepted) > 1:
@@ -200,6 +206,9 @@ def match_item_against_all_targets(
                 if hasattr(app_config, "excel_targets")
                 else (),
             ),
+            review_identity_aliases=getattr(
+                app_config.excel_targets.get(target_key), "review_aliases", ()
+            ) if hasattr(app_config, "excel_targets") else (),
         )
         for target_key, catalog in catalogs.items()
     }
@@ -219,11 +228,17 @@ def first_accepted_match(
 
 
 def _compatible_identified(
-    item: Item, identified: Sequence[IdentifiedTarget]
+    item: Item,
+    identified: Sequence[IdentifiedTarget],
+    *,
+    review_identity_product_ids: frozenset[str] = frozenset(),
 ) -> tuple[list[tuple[IdentifiedTarget, CompatibilityResult]], list[str]]:
     accepted: list[tuple[IdentifiedTarget, CompatibilityResult]] = []
     rejected: list[str] = []
     for candidate in identified:
+        if candidate.product.store_product_id in review_identity_product_ids:
+            rejected.append("review-only identity requires manual review")
+            continue
         if candidate.evidence.kind == "cohere_translation":
             rejected.append("Cohere identity requires manual review under safe policy")
             continue

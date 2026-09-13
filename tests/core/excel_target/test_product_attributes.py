@@ -36,6 +36,31 @@ def test_dotted_iu_abbreviation_is_an_explicit_strength() -> None:
     assert matching.accepted
 
 
+def test_film_coated_tablet_pack_count_is_extracted() -> None:
+    attrs = extract_product_attributes("PREGNASTEP 1 PRENATAL 30 F.C. TABS")
+    assert attrs.packs == frozenset({30})
+
+    result = validate_product_compatibility(
+        "PREGNASTEP 1 PRENATAL 30 F.C. TABS", "بريجناستيب1 اقراص"
+    )
+    assert not result.accepted
+    assert result.rejection_reason == "candidate pack conflicts with requested pack"
+
+
+def test_gummies_are_a_pack_form_not_a_gram_strength() -> None:
+    attrs = extract_product_attributes("BALENA OMEGA GUMMIES 30 GUMMIES")
+    assert attrs.packs == frozenset({30})
+    assert not any(strength.unit == "mg" for strength in attrs.strengths)
+
+
+def test_supplier_am_abbreviation_is_not_assumed_to_be_an_ampoule() -> None:
+    result = validate_product_compatibility(
+        "ZOLADEX DEPOT 3.6 MG AM", "زولاديكس 3.6مجم 1سرنجة"
+    )
+    assert not result.accepted
+    assert "form" in result.rejection_reason
+
+
 def test_conflicting_pack_is_rejected() -> None:
     result = validate_product_compatibility("PRODUCT CAPSULES 30", "منتج 20 كبسول")
     assert not result.accepted

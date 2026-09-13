@@ -25,3 +25,10 @@ excel_targets:
     discount_col: "شركات"
     sheet: "محروس ص"
     header_row: 0
+  البركة1309:
+    display_name: "البركة1309"
+    name_col: "الصنف"
+    price_col: "سعر ج"
+    discount_col: "شركات"
+    sheet: "محروس"
+    header_row: 0

@@ -149,7 +149,49 @@ excel_targets:
     - en: OMEGAL ULTRA
       ar: اوميجال الترا 30كبسولة
       source: "البركه 1209.xlsx row 791"
+  البركة1309:
+    name_col: الصنف
+    price_col: سعر ج
+    discount_col: شركات
+    code_col: ''
+    sheet: محروس
+    header_row: 0
+    enabled: true
+    display_name: البركة1309
+    aliases:
+    - en: ARIPIPRAZOLE
+      ar: اربيبرازول15 مجم اقراص
+      source: "البركة1309.xlsx row 164"
+    - en: BALENA OMEGA GUMMIES 1 FREE 30 GUMMIES
+      ar: بالينا اوميجا 3 جاميز برطمان علبه + علبه عرض
+      source: "البركة1309.xlsx row 983"
+    - en: MEBO OINT 30 GM
+      ar: ميبو سى كريم
+      source: "البركة1309.xlsx row 3986"
+    - en: MELACRYST 1.5 MG 20 FILMS
+      ar: ميلا كريست 1.5مجم لزقه20 فيلم
+      source: "البركة1309.xlsx row 4035"
+    - en: PENCITARD 1200000 I.U VIAL
+      ar: بنسيتارد فيال
+      source: "البركة1309.xlsx row 1211"
+    - en: PREGNASTEP 1 PRENATAL 30 F.C. TABS
+      ar: بريجناستيب1 اقراص
+      source: "البركة1309.xlsx row 1123"
+    - en: SYNOBAR-S SOAP 100GM
+      ar: سينوبار اس صابونة
+      source: "البركة1309.xlsx row 2769"
+    - en: ZOLADEX DEPOT 3.6 MG AM
+      ar: زولاديكس 3.6مجم 1سرنجة
+      source: "البركة1309.xlsx row 2281"
+    - en: QUADRIDERM CREAM 15G
+      ar: كوادريدرم كريم س ج
+      source: "البركة1309.xlsx row 3399"
+    review_aliases:
+    - en: MENOPACE 30 TAB
+      ar: مينوبيس اورجينال 30 قرص
+      source: "review_only: البركة1309.xlsx row 4075"
 user_added_targets:
 - الجزيره
 - البركة شركات
 - البركه 1209
+- البركة1309

@@ -49,6 +49,9 @@ class ExcelTargetConfig:
     # Target-scoped bilingual aliases. Each mapping carries ``en``, ``ar``
     # and a source/reference string; aliases are never shared across targets.
     aliases: tuple[dict[str, str], ...] = ()
+    # Identity hints that may surface a row for a human reviewer but must
+    # never be eligible for automatic matching.
+    review_aliases: tuple[dict[str, str], ...] = ()
 
     @property
     def requires_code(self) -> bool:
