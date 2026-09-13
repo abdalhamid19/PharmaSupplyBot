@@ -162,10 +162,12 @@ def run_excel_target_match_only(
     """
     matched = flagged = manual_review_count = 0
     items_list = list(items)
+    target_cfg = app_config.excel_targets.get(target_key)
     matcher = ExcelTargetMatcher(
         target_key,
         catalog,
         allow_live_translation=allow_live_translation,
+        approved_aliases=target_cfg.aliases if target_cfg is not None else (),
     )
     deadline = time.monotonic() + 300
     timed_out = False
@@ -548,7 +550,7 @@ def run_excel_target_match_only_multi(
             ),
             run_key=run_key,
             run_id=run_id,
-            allow_live_translation=True,
+            allow_live_translation=False,
         )
     return totals
 
